@@ -3,7 +3,7 @@
  * KẾT HỢP TUẦN TỰ (dưới 30 phút) VÀ SONG SONG (trên 30 phút).
  */
 
-import { openChromeProfile } from './makeChromeProfile.js';
+import { openChromeProfile } from './scripts/makeChromeProfile.js';
 import { checkContentSrt, createPromptUpdateShortTranscript } from './promts/updateContent.js';
 import { extractGeminiResponse, waitForGeminiResponse } from './utils/gemini.util.js';
 import { clickElement } from './utils/dom.util.js';

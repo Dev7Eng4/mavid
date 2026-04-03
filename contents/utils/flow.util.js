@@ -1,5 +1,5 @@
 import fs from 'fs';
-import { openChromeProfile } from '../makeChromeProfile.js';
+import { openChromeProfile } from '../scripts/makeChromeProfile.js';
 import { delay, clickElement } from './dom.util.js';
 import { flowSettings } from '../constants/index.js';
 

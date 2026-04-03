@@ -1,11 +1,11 @@
 /**
  * Tạo / load Chrome profile persistent.
  * Mỗi profile lưu trong chrome-profile/profile1, chrome-profile/profile2, ...
- * Lần đầu: chạy `node contents/makeChromeProfile.js [số]` để đăng nhập Google.
+ * Lần đầu: chạy `node contents/scripts/makeChromeProfile.js [số]` để đăng nhập Google.
  * Các lần sau: load lại profile đã lưu, không cần đăng nhập lại.
  *
  * Cách dùng:
- *   import { openChromeProfile } from './makeChromeProfile.js';
+ *   import { openChromeProfile } from './scripts/makeChromeProfile.js';
  *   const { context, page } = await openChromeProfile({ profile: 1 });
  *   // ... dùng page ...
  *   await context.close();
@@ -17,7 +17,7 @@ import { fileURLToPath } from 'url';
 import fs from 'fs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const ROOT = path.join(__dirname, '..');
+const ROOT = path.join(__dirname, '..', '..');
 const PROFILES_ROOT = path.join(ROOT, 'chrome-profile');
 
 function getProfileDir(profileNum) {
@@ -67,8 +67,8 @@ export async function openChromeProfile(options = {}) {
  * Chạy trực tiếp file này để tạo profile + đăng nhập Google lần đầu.
  * Sau khi đăng nhập xong → đóng browser → session đã được lưu.
  *
- *   node contents/makeChromeProfile.js        → setup profile1
- *   node contents/makeChromeProfile.js 2      → setup profile2
+ *   node contents/scripts/makeChromeProfile.js        → setup profile1
+ *   node contents/scripts/makeChromeProfile.js 2      → setup profile2
  */
 async function main() {
   const profileNum = parseInt(process.argv[2], 10) || 1;

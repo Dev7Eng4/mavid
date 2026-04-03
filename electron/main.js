@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain, Menu } from 'electron';
+import { app, BrowserWindow, ipcMain, Menu, globalShortcut } from 'electron';
 import path from 'path';
 import { spawn } from 'child_process';
 import fs from 'fs';
@@ -10,6 +10,15 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const ROOT = path.join(__dirname, '..');
 const CONSTANTS_DIR = path.join(ROOT, 'contents', 'constants');
+const CONSTANTS_INDEX_FILE = path.join(CONSTANTS_DIR, 'index.js');
+const CHANNELS_DIR = path.join(ROOT, 'channels');
+const OUTPUTS_DIR = path.join(ROOT, 'outputs');
+const DOWNLOADS_DIR = path.join(ROOT, 'downloads');
+const BACKGROUNDS_DIR = path.join(ROOT, 'backgrounds');
+
+let mainWindow = null;
+
+// --------------- Script runner ---------------
 
 const ALLOWED_NPM_SCRIPTS = new Set([
   'tao-chrome-profile',
@@ -23,106 +32,250 @@ const ALLOWED_NPM_SCRIPTS = new Set([
 
 let jobRunning = false;
 
-ipcMain.handle('run-npm-script', async (_event, { npmScript }) => {
-  if (!npmScript || typeof npmScript !== 'string') {
-    throw new Error('npmScript không hợp lệ.');
-  }
-  if (!ALLOWED_NPM_SCRIPTS.has(npmScript)) {
-    throw new Error(`Script không được phép: ${npmScript}`);
-  }
-  if (jobRunning) {
-    throw new Error('Đang có job chạy. Vui lòng chờ kết thúc.');
-  }
+ipcMain.handle('run-npm-script', async (_event, { npmScript, extraEnv }) => {
+  if (!npmScript || typeof npmScript !== 'string') throw new Error('npmScript không hợp lệ.');
+  if (!ALLOWED_NPM_SCRIPTS.has(npmScript)) throw new Error(`Script không được phép: ${npmScript}`);
+  if (jobRunning) throw new Error('Đang có job chạy. Vui lòng chờ kết thúc.');
 
   jobRunning = true;
+
+  function sendLog(line) {
+    process.stdout.write(`[log] ${line}\n`);
+    try {
+      const wins = BrowserWindow.getAllWindows();
+      for (const w of wins) {
+        if (!w.isDestroyed()) w.webContents.send('script-log', line);
+      }
+    } catch { /* window closed */ }
+  }
+
+  sendLog(`[MaVid] Bắt đầu: npm run ${npmScript}`);
+
   try {
     const npmCmd = process.platform === 'win32' ? 'npm.cmd' : 'npm';
-    await new Promise((resolve, reject) => {
-      const child = spawn(npmCmd, ['run', npmScript], {
+    const childEnv = extraEnv ? { ...process.env, ...extraEnv } : process.env;
+    const code = await new Promise((resolve, reject) => {
+      const child = spawn(`${npmCmd} run "${npmScript}"`, [], {
         cwd: ROOT,
-        env: process.env,
-        stdio: 'inherit',
+        env: childEnv,
+        stdio: ['ignore', 'pipe', 'pipe'],
+        shell: true,
       });
-      child.on('close', code => {
-        if (code === 0) resolve();
-        else reject(new Error(`npm script exited with code ${code}`));
+
+      child.stdout.on('data', chunk => {
+        const lines = chunk.toString().split('\n');
+        for (const l of lines) if (l.trim()) sendLog(l);
       });
+
+      child.stderr.on('data', chunk => {
+        const lines = chunk.toString().split('\n');
+        for (const l of lines) if (l.trim()) sendLog(`[stderr] ${l}`);
+      });
+
+      child.on('close', c => resolve(c ?? 1));
       child.on('error', reject);
     });
+
+    if (code !== 0) {
+      sendLog(`[MaVid] Script kết thúc với code ${code}`);
+      throw new Error(`npm script exited with code ${code}`);
+    }
+
+    sendLog('[MaVid] Hoàn thành.');
     return { code: 0 };
   } finally {
     jobRunning = false;
   }
 });
 
-function safeResolveConstantsFile(file) {
-  if (!file || typeof file !== 'string') throw new Error('File không hợp lệ.');
-  // Chỉ cho phép tên file (không path) để tránh traversal.
-  if (file.includes('/') || file.includes('\\')) throw new Error('File không hợp lệ.');
+// --------------- input.txt ---------------
 
-  const fullPath = path.join(CONSTANTS_DIR, file);
-  const normalized = path.normalize(fullPath);
-  if (!normalized.startsWith(path.normalize(CONSTANTS_DIR))) {
-    throw new Error('Truy cập file bị từ chối.');
-  }
-  return fullPath;
-}
+const INPUT_FILE = path.join(ROOT, 'input.txt');
 
-ipcMain.handle('list-constants-files', async () => {
-  if (!fs.existsSync(CONSTANTS_DIR)) return [];
-  return fs
-    .readdirSync(CONSTANTS_DIR, { withFileTypes: true })
-    .filter(d => d.isFile())
-    .map(d => d.name);
+ipcMain.handle('read-input-file', async () => {
+  if (!fs.existsSync(INPUT_FILE)) return '';
+  return fs.readFileSync(INPUT_FILE, 'utf-8');
 });
 
-ipcMain.handle('read-constants-file', async (_event, { file }) => {
-  const fullPath = safeResolveConstantsFile(file);
-  return fs.readFileSync(fullPath, 'utf-8');
-});
-
-ipcMain.handle('write-constants-file', async (_event, { file, content }) => {
-  const fullPath = safeResolveConstantsFile(file);
-  if (typeof content !== 'string') throw new Error('Nội dung không hợp lệ.');
-  fs.writeFileSync(fullPath, content, 'utf-8');
+ipcMain.handle('write-input-file', async (_event, { content }) => {
+  if (typeof content !== 'string') throw new Error('content không hợp lệ.');
+  fs.writeFileSync(INPUT_FILE, content, 'utf-8');
   return { ok: true };
 });
 
+// --------------- Constants read/write ---------------
+
+const CONSTANT_EXPORT_KEYS = [
+  'MAKE_VIDEO_MODE', 'VIDEO_TYPE', 'flowSettings', 'GEMINI_CONFIG',
+  'GEMINI_CHUNK_SIZE', 'LANGUAGES_NEED_UPDATE_TRANSCRIPT', 'META_DATA',
+  'DEFAULT_VIDEO', 'AUDIO_SPEED', 'STOCK_VIDEO', 'SUBTITLE', 'LOGO',
+];
+
+async function importConstantsFresh() {
+  if (!fs.existsSync(CONSTANTS_INDEX_FILE)) {
+    throw new Error(`Không tìm thấy: ${CONSTANTS_INDEX_FILE}`);
+  }
+  const moduleUrl = pathToFileURL(CONSTANTS_INDEX_FILE).toString();
+  return import(`${moduleUrl}?cacheBust=${Date.now()}`);
+}
+
+ipcMain.handle('get-constants-ui-model', async () => {
+  const mod = await importConstantsFresh();
+  const model = {};
+  for (const key of CONSTANT_EXPORT_KEYS) model[key] = mod[key];
+  return model;
+});
+
+ipcMain.handle('save-constants-ui-model', async (_event, { modelPatch }) => {
+  if (!modelPatch || typeof modelPatch !== 'object') throw new Error('modelPatch không hợp lệ.');
+
+  const mod = await importConstantsFresh();
+  const nextValues = { ...mod };
+  for (const key of Object.keys(modelPatch)) {
+    if (!CONSTANT_EXPORT_KEYS.includes(key)) continue;
+    nextValues[key] = modelPatch[key];
+  }
+
+  const header = `// Auto-generated by MaVid UI (edit settings)\n// File path: contents/constants/index.js\n\n`;
+  const body = CONSTANT_EXPORT_KEYS.map(name => {
+    return `export const ${name} = ${JSON.stringify(nextValues[name], null, 2)};`;
+  }).join('\n\n');
+
+  fs.writeFileSync(CONSTANTS_INDEX_FILE, header + body + '\n', 'utf-8');
+  return { ok: true };
+});
+
+// --------------- Backgrounds ---------------
+
+ipcMain.handle('list-backgrounds', async () => {
+  if (!fs.existsSync(BACKGROUNDS_DIR)) return [];
+  return fs.readdirSync(BACKGROUNDS_DIR, { withFileTypes: true })
+    .filter(d => d.isDirectory())
+    .map(d => d.name)
+    .sort((a, b) => a.localeCompare(b));
+});
+
+// --------------- Channel Folders ---------------
+
+ipcMain.handle('list-channel-folders', async () => {
+  if (!fs.existsSync(CHANNELS_DIR)) return [];
+  return fs.readdirSync(CHANNELS_DIR, { withFileTypes: true })
+    .filter(d => d.isDirectory())
+    .map(d => d.name)
+    .sort((a, b) => a.localeCompare(b));
+});
+
+// --------------- Stats ---------------
+
+function countFiles(dir) {
+  try {
+    if (!fs.existsSync(dir)) return 0;
+    return fs.readdirSync(dir, { withFileTypes: true }).filter(d => d.isFile()).length;
+  } catch { return 0; }
+}
+
+function countDirs(dir) {
+  try {
+    if (!fs.existsSync(dir)) return 0;
+    return fs.readdirSync(dir, { withFileTypes: true }).filter(d => d.isDirectory()).length;
+  } catch { return 0; }
+}
+
+ipcMain.handle('get-stats', async () => {
+  return {
+    channels: countFiles(CHANNELS_DIR),
+    outputs: countFiles(OUTPUTS_DIR) + countDirs(OUTPUTS_DIR),
+    downloads: countFiles(DOWNLOADS_DIR) + countDirs(DOWNLOADS_DIR),
+  };
+});
+
+// --------------- Channels ---------------
+
+ipcMain.handle('list-channels', async () => {
+  if (!fs.existsSync(CHANNELS_DIR)) return [];
+  const entries = fs.readdirSync(CHANNELS_DIR, { withFileTypes: true });
+  return entries
+    .filter(d => d.isFile() && (d.name.endsWith('.xlsx') || d.name.endsWith('.csv')))
+    .map(d => {
+      const fullPath = path.join(CHANNELS_DIR, d.name);
+      const stat = fs.statSync(fullPath);
+      return { name: d.name, path: fullPath, modifiedAt: stat.mtime.toISOString() };
+    })
+    .sort((a, b) => b.modifiedAt.localeCompare(a.modifiedAt));
+});
+
+ipcMain.handle('read-channel-data', async (_event, { filePath }) => {
+  if (!filePath || typeof filePath !== 'string') throw new Error('filePath không hợp lệ.');
+  const norm = path.normalize(filePath);
+  if (!norm.startsWith(path.normalize(CHANNELS_DIR))) throw new Error('Truy cập bị từ chối.');
+  if (!fs.existsSync(norm)) throw new Error('File không tồn tại.');
+
+  const { default: ExcelJS } = await import('exceljs');
+  const workbook = new ExcelJS.Workbook();
+  await workbook.xlsx.readFile(norm);
+
+  const sheet = workbook.worksheets[0];
+  if (!sheet) return { headers: [], rows: [] };
+
+  const headers = [];
+  const headerRow = sheet.getRow(1);
+  headerRow.eachCell((cell, colNum) => {
+    headers[colNum - 1] = cell.text || `Col${colNum}`;
+  });
+
+  const rows = [];
+  sheet.eachRow((row, rowNum) => {
+    if (rowNum === 1) return;
+    const obj = {};
+    row.eachCell((cell, colNum) => {
+      const key = headers[colNum - 1] || `Col${colNum}`;
+      obj[key] = cell.text ?? cell.value;
+    });
+    rows.push(obj);
+  });
+
+  return { headers: headers.filter(Boolean), rows };
+});
+
+// --------------- Window ---------------
+
 async function waitForDevServer(url, timeoutMs = 30000) {
   const start = Date.now();
-
   while (Date.now() - start < timeoutMs) {
     try {
       const res = await fetch(url);
-      // Chỉ cần server phản hồi là được.
       if (res && (res.ok || res.status)) return true;
-    } catch {
-      // Chờ retry.
-    }
+    } catch { /* retry */ }
     await new Promise(r => setTimeout(r, 500));
   }
-
   return false;
 }
 
 async function createMainWindow() {
   const win = new BrowserWindow({
-    width: 1200,
-    height: 800,
+    width: 1280,
+    height: 860,
+    minWidth: 900,
+    minHeight: 600,
     webPreferences: {
-      // Không bật nodeIntegration để an toàn hơn.
       nodeIntegration: false,
       contextIsolation: true,
       preload: path.join(__dirname, 'preload.js'),
     },
   });
 
-  // Tắt thanh menu chuẩn (File/Edit/Window/Help...) theo yêu cầu.
   win.setMenuBarVisibility(false);
+  mainWindow = win;
+
+  win.webContents.on('before-input-event', (_e, input) => {
+    if (input.key === 'F12' && input.type === 'keyDown') {
+      win.webContents.toggleDevTools();
+    }
+  });
+
+  win.on('closed', () => { mainWindow = null; });
 
   const isDev = !app.isPackaged;
-
-  // Dev: load từ Vite server, Prod: load từ dist.
   if (isDev) {
     await waitForDevServer(VITE_DEV_SERVER_URL);
     win.loadURL(VITE_DEV_SERVER_URL);
@@ -139,7 +292,6 @@ app.whenReady().then(async () => {
   await createMainWindow();
 
   app.on('activate', () => {
-    // macOS: nếu không còn window thì mở lại.
     if (BrowserWindow.getAllWindows().length === 0) void createMainWindow();
   });
 });
@@ -147,4 +299,3 @@ app.whenReady().then(async () => {
 app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') app.quit();
 });
-

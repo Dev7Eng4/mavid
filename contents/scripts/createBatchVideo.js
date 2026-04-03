@@ -89,17 +89,19 @@ export async function readVideoUrlsFromFile(inputFile = null) {
       }
       const rawVal = row.getCell(videoIdx).value;
       const val = rawVal && typeof rawVal === 'object' ? String(rawVal.text || rawVal.hyperlink || '').trim() : String(rawVal || '').trim();
-      const bgVal = bgIdx >= 0 ? String(row.getCell(bgIdx).value || '').trim() : 'cat';
+      const defaultBg = process.env.MAVID_BACKGROUND || 'cat';
+      const bgVal = bgIdx >= 0 ? String(row.getCell(bgIdx).value || '').trim() : defaultBg;
       if (val && (val.startsWith('http://') || val.startsWith('https://')) && !val.includes('(Không có video)')) {
         items.push({
           url: val,
-          background: bgVal || 'cat',
+          background: bgVal || defaultBg,
         });
       }
     }
     return items;
   }
 
+  const defaultBg = process.env.MAVID_BACKGROUND || 'cat';
   const content = fs.readFileSync(filePath, 'utf-8').replace(/^\uFEFF/, '');
   const lines = content.split('\n').filter(l => l.trim());
   if (lines.length < 2) throw new Error('File CSV không có dữ liệu.');
@@ -136,11 +138,11 @@ export async function readVideoUrlsFromFile(inputFile = null) {
       if (trangThai) continue;
     }
     const val = cells[videoIdx] || '';
-    const bgVal = bgIdx >= 0 ? (cells[bgIdx] || '').trim() : 'cat';
+    const bgVal = bgIdx >= 0 ? (cells[bgIdx] || '').trim() : defaultBg;
     if (val && (val.startsWith('http://') || val.startsWith('https://')) && !val.includes('(Không có video)')) {
       items.push({
         url: val,
-        background: bgVal || 'cat',
+        background: bgVal || defaultBg,
       });
     }
   }
@@ -150,6 +152,9 @@ export async function readVideoUrlsFromFile(inputFile = null) {
 async function main(props = {}) {
   const { MAKE_VIDEO_MODE } = await import('../constants/index.js');
   let type = props.videoType;
+
+  const envMode = process.env.MAVID_MODE; // 'single' | 'batch'
+  const envBackground = process.env.MAVID_BACKGROUND;
 
   if (!type) {
     const inquirer = (await import('inquirer')).default;
@@ -167,9 +172,32 @@ async function main(props = {}) {
     type = videoType;
   }
 
-  let inputFile = null;
+  if (envMode === 'single' && type === MAKE_VIDEO_MODE.FROM_AUDIO) {
+    console.log(`[MaVid] Mode: single | Background: ${envBackground || 'cat'}`);
+    const { default: makeVideoFromAudio } = await import('../makeVideoFromAudio.js');
+    await makeVideoFromAudio({ mode: 'single', background: envBackground || 'cat' });
+    return;
+  }
 
-  if (fs.existsSync(CHANNELS_DIR)) {
+  let inputFile = null;
+  const envChannel = process.env.MAVID_CHANNEL;
+
+  if (envChannel) {
+    const folderPath = path.join(CHANNELS_DIR, envChannel);
+    if (fs.existsSync(folderPath)) {
+      const files = fs.readdirSync(folderPath).filter(f => f.endsWith('.xlsx') || f.endsWith('.csv'));
+      if (files.length > 0) {
+        inputFile = path.join(folderPath, files[0]);
+        console.log(`[MaVid] Channel: ${envChannel} → ${files[0]}`);
+      } else {
+        console.error(`Không tìm thấy file excel (.xlsx, .csv) trong folder: ${envChannel}`);
+        process.exit(1);
+      }
+    } else {
+      console.error(`Không tìm thấy channel folder: ${envChannel}`);
+      process.exit(1);
+    }
+  } else if (fs.existsSync(CHANNELS_DIR)) {
     const entries = fs.readdirSync(CHANNELS_DIR, { withFileTypes: true });
     const folders = entries.filter(e => e.isDirectory()).map(e => e.name);
 

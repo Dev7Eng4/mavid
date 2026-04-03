@@ -23,7 +23,8 @@ const ROOT = path.join(__dirname, '..');
 const DOWNLOADS_DIR = path.join(ROOT, 'downloads');
 const OUTPUT_DIR = path.join(ROOT, 'outputs');
 
-export const SPEED = AUDIO_SPEED;
+const envSpeed = parseFloat(process.env.MAVID_AUDIO_SPEED);
+export const SPEED = Number.isFinite(envSpeed) && envSpeed > 0 ? envSpeed : AUDIO_SPEED;
 
 function getDynamicStockVideoCount(audioDurationSec) {
   const minutes = audioDurationSec / 60;
@@ -467,7 +468,8 @@ async function processOne(bgNameArg, options = {}) {
   );
 
   // 2. Lấy video stock dựa trên thời lượng MỚI
-  const stockVideoCount = getDynamicStockVideoCount(audioDurationAfterTempo);
+  const envStockCount = parseInt(process.env.MAVID_STOCK_COUNT, 10);
+  const stockVideoCount = envStockCount > 0 ? envStockCount : getDynamicStockVideoCount(audioDurationAfterTempo);
   const videoPaths = getStockVideos(backgroundsDir, stockVideoCount);
   console.log(`Stock videos (${stockVideoCount} clip): ${videoPaths.map(p => path.basename(p)).join(', ')}`);
 
@@ -509,8 +511,8 @@ async function processOne(bgNameArg, options = {}) {
   const videoToScale = `[0:v]null[vpadded]`;
   const videoEncodeArgs = [...GPU_INFO.videoEncodeArgs, '-c:a', 'aac', '-b:a', '128k'];
   const logoPathForMerge = options.logoPath != null ? options.logoPath : LOGO_PATH;
-  // const hasLogo = fs.existsSync(logoPathForMerge);
-  const hasLogo = false;
+  const envShowLogo = process.env.MAVID_SHOW_LOGO;
+  const hasLogo = envShowLogo === '1' ? fs.existsSync(logoPathForMerge) : false;
 
   const buildLogoOverlay = inputLabel => {
     if (!hasLogo) return inputLabel;
