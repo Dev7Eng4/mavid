@@ -1,0 +1,174 @@
+import { useState } from 'react';
+import type { Page, ScriptId, VideoFromAudioConfig } from '../../types';
+import { scriptDefs } from '../../types';
+import { buildMavidEnvForVideoFromAudio } from '../../utils/videoFromAudioEnv';
+import { ScriptCard } from '../pipeline/ScriptCard';
+import { YouTubeLinkPopup } from '../pipeline/YouTubeLinkPopup';
+import { VideoFromAudioPopup } from '../pipeline/VideoFromAudioPopup';
+import type { ScriptStatus } from '../pipeline/ScriptCard';
+
+const YOUTUBE_SCRIPT_ID: ScriptId = 'lay-thong-tin-youtube (video, channel)';
+const VIDEO_FROM_AUDIO_SCRIPT_ID: ScriptId = 'tao-batch-video-tu-audio';
+
+interface Props {
+  runningScript: ScriptId | null;
+  setRunningScript: (id: ScriptId | null) => void;
+  appendLog: (line: string) => void;
+  onNavigate: (page: Page) => void;
+}
+
+export function PipelinePage({ runningScript, setRunningScript, appendLog, onNavigate }: Props) {
+  const [statuses, setStatuses] = useState<Record<string, ScriptStatus>>({});
+  const [showLinkPopup, setShowLinkPopup] = useState(false);
+  const [showVideoAudioPopup, setShowVideoAudioPopup] = useState(false);
+
+  async function runScript(id: ScriptId, npmScript: string, extraEnv?: Record<string, string>) {
+    if (runningScript) return;
+    if (!window.runner?.runNpmScript) {
+      appendLog('[MaVid] Runner chưa sẵn sàng. Hãy khởi động lại app.');
+      return;
+    }
+
+    setRunningScript(id);
+    setStatuses(prev => ({ ...prev, [id]: 'running' }));
+
+    try {
+      const res = await window.runner.runNpmScript(npmScript, extraEnv);
+      if (res.cancelled) {
+        appendLog('[MaVid] Đã dừng batch/script.');
+        setStatuses(prev => ({ ...prev, [id]: 'idle' }));
+        return;
+      }
+      if (res.code !== 0) throw new Error(`Exit code: ${res.code}`);
+      setStatuses(prev => ({ ...prev, [id]: 'done' }));
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : 'Lỗi không xác định';
+      appendLog(`[MaVid] Lỗi: ${msg}`);
+      setStatuses(prev => ({ ...prev, [id]: 'error' }));
+    } finally {
+      setRunningScript(null);
+    }
+  }
+
+  function handleClickRun(id: ScriptId, npmScript: string) {
+    if (id === YOUTUBE_SCRIPT_ID) {
+      setShowLinkPopup(true);
+    } else if (id === VIDEO_FROM_AUDIO_SCRIPT_ID) {
+      setShowVideoAudioPopup(true);
+    } else {
+      void runScript(id, npmScript);
+    }
+  }
+
+  async function handleVideoAudioConfirm(config: VideoFromAudioConfig) {
+    setShowVideoAudioPopup(false);
+    const def = scriptDefs.find(s => s.id === VIDEO_FROM_AUDIO_SCRIPT_ID);
+    if (def) {
+      const bgList = await window.runner.listBackgrounds().catch(() => [] as string[]);
+      const extraEnv = buildMavidEnvForVideoFromAudio(config, bgList);
+      await runScript(def.id, def.npmScript, extraEnv);
+    }
+  }
+
+  async function handleStopNpmJob() {
+    try {
+      const r = await window.runner?.cancelRunningJob?.();
+      if (r?.ok) appendLog('[MaVid] Đã gửi lệnh dừng.');
+      else appendLog('[MaVid] Không có tiến trình npm để dừng.');
+    } catch (e) {
+      appendLog(`[MaVid] Lỗi khi dừng: ${e instanceof Error ? e.message : 'Không xác định'}`);
+    }
+  }
+
+  async function handleYouTubeConfirm(links: string) {
+    setShowLinkPopup(false);
+    try {
+      await window.runner.writeInputFile(links);
+    } catch (e) {
+      appendLog(`[MaVid] Lỗi ghi input.txt: ${e instanceof Error ? e.message : 'unknown'}`);
+      return;
+    }
+    const def = scriptDefs.find(s => s.id === YOUTUBE_SCRIPT_ID);
+    if (def) {
+      await runScript(def.id, def.npmScript);
+      window.runner.writeInputFile('').catch(() => {});
+    }
+  }
+
+  return (
+    <div className="space-y-6 w-full min-w-0">
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-bold mb-2" style={{ color: 'var(--text-h)' }}>Pipeline</h1>
+          <p className="text-sm" style={{ color: 'var(--text)' }}>
+            Chọn và chạy các script xử lý video
+          </p>
+        </div>
+        {runningScript && (
+          <button
+            onClick={() => onNavigate('logs')}
+            className="flex items-center gap-2 rounded-xl px-4 py-2 text-sm font-medium cursor-pointer transition-all duration-200"
+            style={{
+              background: 'var(--accent-bg)',
+              color: 'var(--accent)',
+              border: '1px solid var(--accent-border)',
+            }}
+            onMouseEnter={e => {
+              e.currentTarget.style.boxShadow = 'var(--shadow-accent)';
+            }}
+            onMouseLeave={e => {
+              e.currentTarget.style.boxShadow = 'none';
+            }}
+          >
+            Xem Logs
+          </button>
+        )}
+      </div>
+
+      {runningScript && (
+        <div
+          className="rounded-xl px-4 py-3 flex flex-wrap items-center gap-3 text-sm"
+          style={{ background: 'var(--accent-bg)', border: '1px solid var(--accent-border)' }}
+        >
+          <span
+            className="w-2 h-2 rounded-full animate-pulse shrink-0"
+            style={{ background: 'var(--accent)', boxShadow: '0 0 8px var(--accent)' }}
+          />
+          <span className="flex-1 min-w-[12rem]" style={{ color: 'var(--accent)' }}>
+            Đang chạy: {scriptDefs.find(s => s.id === runningScript)?.title}
+          </span>
+          <button
+            type="button"
+            onClick={() => void handleStopNpmJob()}
+            className="rounded-lg px-3 py-1.5 text-xs font-medium cursor-pointer shrink-0"
+            style={{
+              color: '#fecaca',
+              background: 'rgba(239, 68, 68, 0.2)',
+              border: '1px solid rgba(239, 68, 68, 0.45)',
+            }}
+          >
+            Dừng
+          </button>
+        </div>
+      )}
+
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+        {scriptDefs.map(s => (
+          <ScriptCard
+            key={s.id}
+            script={s}
+            status={s.id === runningScript ? 'running' : (statuses[s.id] ?? 'idle')}
+            disabled={runningScript !== null}
+            onRun={() => handleClickRun(s.id, s.npmScript)}
+          />
+        ))}
+      </div>
+
+      {showLinkPopup && <YouTubeLinkPopup onConfirm={links => void handleYouTubeConfirm(links)} onCancel={() => setShowLinkPopup(false)} />}
+
+      {showVideoAudioPopup && (
+        <VideoFromAudioPopup onConfirm={config => void handleVideoAudioConfirm(config)} onCancel={() => setShowVideoAudioPopup(false)} />
+      )}
+    </div>
+  );
+}
