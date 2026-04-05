@@ -88,10 +88,7 @@ export function ChannelUploadVideoDialog({ channelFolders, onClose, onConfirm }:
     }
   }, [channelFolders, folderPick]);
 
-  const channelOptions = useMemo<SelectOption[]>(
-    () => channelFolders.map(f => ({ value: f, label: f })),
-    [channelFolders],
-  );
+  const channelOptions = useMemo<SelectOption[]>(() => channelFolders.map(f => ({ value: f, label: f })), [channelFolders]);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -115,7 +112,7 @@ export function ChannelUploadVideoDialog({ channelFolders, onClose, onConfirm }:
       return;
     }
 
-    const total = totalVideos == null ? null : clampInt(totalVideos, 1, 99_999);
+    const total = totalVideos == null ? null : clampInt(totalVideos, 1, 5);
     setFormError(null);
     setBusy(true);
     try {
@@ -130,9 +127,7 @@ export function ChannelUploadVideoDialog({ channelFolders, onClose, onConfirm }:
 
       const gpmProfileId = resolveGpmProfileIdByEmail(profiles, email);
       if (!gpmProfileId) {
-        setFormError(
-          `Không tìm thấy profile GPM có trường name trùng email «${email}». Trong GPM hãy đặt tên profile = email.`,
-        );
+        setFormError(`Không tìm thấy profile GPM có trường name trùng email «${email}». Trong GPM hãy đặt tên profile = email.`);
         return;
       }
 
@@ -149,8 +144,7 @@ export function ChannelUploadVideoDialog({ channelFolders, onClose, onConfirm }:
     }
   }, [channelFolders, folderPick, onClose, onConfirm, totalVideos]);
 
-  const inputClass =
-    'w-full rounded-xl px-3 py-2.5 text-base outline-none border transition-colors duration-150';
+  const inputClass = 'w-full rounded-xl px-3 py-2.5 text-base outline-none border transition-colors duration-150';
 
   const noChannels = channelFolders.length === 0;
   const canSubmit = !noChannels;
@@ -176,9 +170,9 @@ export function ChannelUploadVideoDialog({ channelFolders, onClose, onConfirm }:
         <p className='text-sm leading-snug mt-2 shrink-0' style={{ color: 'var(--text-muted)' }}>
           Profile GPM được chọn tự động: đọc <code className='text-xs'>email</code> trong{' '}
           <code className='text-xs'>mavid-channel-config.json</code> của kênh, rồi tìm trong API{' '}
-          <code className='text-xs'>listProfiles</code> dòng có <code className='text-xs'>name</code> trùng email (bạn đã
-          cấu hình tên profile = email trong GPM). Sau đó mở YouTube và upload từng .mp4 trong các thư mục con của kênh
-          (sắp xếp theo tên). Để trống «Số lượng» = tất cả thư mục có .mp4.
+          <code className='text-xs'>listProfiles</code> dòng có <code className='text-xs'>name</code> trùng email (bạn đã cấu hình tên
+          profile = email trong GPM). Sau đó mở YouTube và upload từng .mp4 trong các thư mục con của kênh (sắp xếp theo tên). Để trống «Số
+          lượng» = tất cả thư mục có .mp4.
         </p>
 
         <div className='grid grid-cols-1 gap-y-4 mt-4 overflow-y-auto min-h-0 flex-1 pr-1 content-start'>
@@ -191,13 +185,7 @@ export function ChannelUploadVideoDialog({ channelFolders, onClose, onConfirm }:
                 Không có kênh nào có email trong index (cần cột ID/CHANNEL và EMAIL).
               </p>
             ) : (
-              <CustomSelect
-                value={folderPick}
-                options={channelOptions}
-                onChange={setFolderPick}
-                placeholder='Chọn kênh'
-                menuZIndex={100}
-              />
+              <CustomSelect value={folderPick} options={channelOptions} onChange={setFolderPick} placeholder='Chọn kênh' menuZIndex={100} />
             )}
           </div>
 
