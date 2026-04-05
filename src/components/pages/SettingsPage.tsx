@@ -1,6 +1,8 @@
 import type { ReactNode } from 'react';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import type { ConstantsUiModel } from '../../types';
+import { AppButton } from '../ui/AppButton';
+import { PageHeader } from '../ui/PageHeader';
 import { SectionCard } from '../ui/SectionCard';
 
 interface Props {
@@ -10,7 +12,7 @@ interface Props {
 function Field({ label, children }: { label: string; children: ReactNode }) {
   return (
     <label className='block'>
-      <div className='text-xs mb-1' style={{ opacity: 0.9 }}>
+      <div className='text-sm mb-1' style={{ opacity: 0.9 }}>
         {label}
       </div>
       {children}
@@ -60,6 +62,7 @@ const DEFAULT_MODEL: ConstantsUiModel = {
     CHAR_SPACING: 2,
   },
   LOGO: { SIZE: 80, MARGIN_TOP: 20, MARGIN_RIGHT: 20 },
+  VIDEO_STORAGE_ROOT: '',
 };
 
 type SettingsTab = 'common' | 'video';
@@ -70,8 +73,34 @@ export function SettingsPage({ disabled }: Props) {
   const [saving, setSaving] = useState(false);
   const [msg, setMsg] = useState('');
   const [tab, setTab] = useState<SettingsTab>('common');
+  const [constantsLoading, setConstantsLoading] = useState(true);
 
   const canEdit = !disabled && !saving;
+  const canPickStorageFolder = typeof window.runner?.selectVideoStorageFolder === 'function';
+
+  useEffect(() => {
+    if (!window.runner?.getConstantsUiModel) {
+      setConstantsLoading(false);
+      return;
+    }
+    let cancelled = false;
+    void (async () => {
+      try {
+        const m = await window.runner.getConstantsUiModel();
+        if (!cancelled) {
+          setModel(prev => ({ ...prev, ...m }));
+          setDirty(false);
+        }
+      } catch {
+        if (!cancelled) setMsg('Không đọc được contents/constants/index.js.');
+      } finally {
+        if (!cancelled) setConstantsLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   async function handleSave() {
     if (!window.runner?.saveConstantsUiModel) return;
@@ -99,45 +128,46 @@ export function SettingsPage({ disabled }: Props) {
     setMsg('');
   }
 
-  return (
-    <div className='space-y-4'>
-      <div className='flex items-center justify-between'>
-        <div className='flex gap-2 items-center'>
-          {msg && (
-            <span className='text-xs' style={{ color: msg.startsWith('Lỗi') ? '#ef4444' : 'var(--accent)' }}>
-              {msg}
-            </span>
-          )}
-          <button
-            onClick={handleReset}
-            disabled={!dirty || disabled}
-            className='rounded-lg px-3 py-2 text-xs font-medium'
-            style={{
-              color: 'var(--text-h)',
-              background: 'transparent',
-              border: '1px solid var(--border)',
-              opacity: !dirty || disabled ? 0.5 : 1,
-            }}
-          >
-            Reset
-          </button>
-          <button
-            onClick={() => void handleSave()}
-            disabled={!dirty || saving || disabled}
-            className='rounded-lg px-4 py-2 text-xs font-medium'
-            style={{
-              color: 'var(--accent)',
-              background: 'var(--accent-bg)',
-              border: '1px solid var(--accent-border)',
-              opacity: !dirty || saving || disabled ? 0.5 : 1,
-            }}
-          >
-            {saving ? 'Đang lưu...' : 'Lưu settings'}
-          </button>
-        </div>
-      </div>
+  async function handleSelectVideoStorageRoot() {
+    if (!window.runner?.selectVideoStorageFolder) {
+      setMsg('Chỉ chọn thư mục được trong app Electron.');
+      return;
+    }
+    setMsg('');
+    try {
+      const r = await window.runner.selectVideoStorageFolder(model.VIDEO_STORAGE_ROOT?.trim() || null);
+      if (!r?.ok || !r.path) return;
+      const chosen = r.path;
+      setModel(m => ({ ...m, VIDEO_STORAGE_ROOT: chosen }));
+      setMsg('Đã lưu: trong thư mục đã chọn tạo MaVidMedia với backgrounds, videos, channels.');
+    } catch (e) {
+      setMsg(`Lỗi: ${e instanceof Error ? e.message : 'Không chọn được thư mục.'}`);
+    }
+  }
 
-      {/* ───── TAB SWITCHER ───── */}
+  return (
+    <div className='space-y-6 w-full min-w-0'>
+      <PageHeader
+        align='start'
+        title='Settings'
+        description='Flow, Gemini, lưu trữ video, video, phụ đề và logo — ghi vào contents/constants/index.js.'
+        actions={
+          <>
+            {msg ? (
+              <span className='text-sm max-w-56 sm:max-w-xs leading-snug text-right' style={{ color: msg.startsWith('Lỗi') ? 'var(--error)' : 'var(--accent)' }}>
+                {msg}
+              </span>
+            ) : null}
+            <AppButton variant='ghost' size='sm' onClick={handleReset} disabled={!dirty || disabled}>
+              Reset
+            </AppButton>
+            <AppButton variant='secondary' onClick={() => void handleSave()} disabled={!dirty || saving || disabled || constantsLoading}>
+              {saving ? 'Đang lưu...' : 'Lưu settings'}
+            </AppButton>
+          </>
+        }
+      />
+
       <div className='flex gap-2'>
         {(
           [
@@ -147,13 +177,9 @@ export function SettingsPage({ disabled }: Props) {
         ).map(([id, label]) => (
           <button
             key={id}
+            type='button'
             onClick={() => setTab(id)}
-            className='flex-1 rounded-lg px-4 py-2.5 text-sm font-medium transition-colors'
-            style={{
-              color: tab === id ? 'var(--accent)' : 'var(--text)',
-              background: tab === id ? 'var(--accent-bg)' : 'transparent',
-              border: `1px solid ${tab === id ? 'var(--accent-border)' : 'var(--border)'}`,
-            }}
+            className={`mavid-tab ${tab === id ? 'mavid-tab--active' : 'mavid-tab--inactive'}`}
           >
             {label}
           </button>
@@ -163,6 +189,40 @@ export function SettingsPage({ disabled }: Props) {
       {/* ───── CHUNG ───── */}
       {tab === 'common' && (
         <div className='space-y-4'>
+          <SectionCard title='Lưu trữ video'>
+            <p className='text-sm leading-relaxed mb-3' style={{ color: 'var(--text-muted)' }}>
+              Chọn thư mục cha (ví dụ ổ D:\\ hoặc thư mục trên ổ ngoài). App tạo bên trong thư mục đó{' '}
+              <code className='text-xs'>MaVidMedia</code> với ba thư mục con: <code className='text-xs'>backgrounds</code>,{' '}
+              <code className='text-xs'>videos</code>, <code className='text-xs'>channels</code>. Giá trị lưu trong{' '}
+              <code className='text-xs'>VIDEO_STORAGE_ROOT</code> là đường dẫn tới <code className='text-xs'>MaVidMedia</code>{' '}
+              (file <code className='text-xs'>contents/constants/index.js</code>). Mặc định gợi ý khi chưa cấu hình: ổ đầu tiên khác C: (Windows) hoặc volume trong{' '}
+              <code className='text-xs'>/Volumes</code> (Mac).
+            </p>
+            <div className='flex flex-wrap gap-3 items-end'>
+              <div className='flex-1 min-w-[min(100%,18rem)]'>
+                <Field label='Đường dẫn MaVidMedia (VIDEO_STORAGE_ROOT)'>
+                  <input
+                    value={constantsLoading ? 'Đang tải…' : model.VIDEO_STORAGE_ROOT}
+                    readOnly
+                    disabled={constantsLoading}
+                    className='w-full rounded-xl px-3 py-2 text-sm outline-none'
+                    style={inputStyle}
+                    title={model.VIDEO_STORAGE_ROOT}
+                  />
+                </Field>
+              </div>
+              <AppButton
+                type='button'
+                variant='secondary'
+                onClick={() => void handleSelectVideoStorageRoot()}
+                disabled={!canEdit || constantsLoading || !canPickStorageFolder}
+                title={!canPickStorageFolder ? 'Chỉ dùng trong app Electron' : undefined}
+              >
+                Chọn thư mục…
+              </AppButton>
+            </div>
+          </SectionCard>
+
           <SectionCard title='Flow'>
             <div className='grid gap-3'>
               <Field label='FLOW_URL'>
@@ -170,7 +230,7 @@ export function SettingsPage({ disabled }: Props) {
                   value={model.flowSettings.FLOW_URL}
                   disabled={!canEdit}
                   onChange={e => patch('flowSettings', { ...model.flowSettings, FLOW_URL: e.target.value })}
-                  className='w-full rounded-lg px-3 py-2 text-sm outline-none'
+                  className='w-full rounded-xl px-3 py-2 text-sm outline-none'
                   style={inputStyle}
                 />
               </Field>
@@ -179,7 +239,7 @@ export function SettingsPage({ disabled }: Props) {
                   value={model.flowSettings.FLOW_PROJECT_ID}
                   disabled={!canEdit}
                   onChange={e => patch('flowSettings', { ...model.flowSettings, FLOW_PROJECT_ID: e.target.value })}
-                  className='w-full rounded-lg px-3 py-2 text-sm outline-none'
+                  className='w-full rounded-xl px-3 py-2 text-sm outline-none'
                   style={inputStyle}
                 />
               </Field>
@@ -193,7 +253,7 @@ export function SettingsPage({ disabled }: Props) {
                   value={model.GEMINI_CONFIG.URL}
                   disabled={!canEdit}
                   onChange={e => patch('GEMINI_CONFIG', { ...model.GEMINI_CONFIG, URL: e.target.value })}
-                  className='w-full rounded-lg px-3 py-2 text-sm outline-none'
+                  className='w-full rounded-xl px-3 py-2 text-sm outline-none'
                   style={inputStyle}
                 />
               </Field>
@@ -208,7 +268,7 @@ export function SettingsPage({ disabled }: Props) {
                       MAX_CONCURRENT: toNum(e.target.value, model.GEMINI_CONFIG.MAX_CONCURRENT),
                     })
                   }
-                  className='w-full rounded-lg px-3 py-2 text-sm outline-none'
+                  className='w-full rounded-xl px-3 py-2 text-sm outline-none'
                   style={inputStyle}
                 />
               </Field>
@@ -223,7 +283,7 @@ export function SettingsPage({ disabled }: Props) {
                       UPDATE_TRANSCRIPT: toNum(e.target.value, model.GEMINI_CHUNK_SIZE.UPDATE_TRANSCRIPT),
                     })
                   }
-                  className='w-full rounded-lg px-3 py-2 text-sm outline-none'
+                  className='w-full rounded-xl px-3 py-2 text-sm outline-none'
                   style={inputStyle}
                 />
               </Field>
@@ -238,7 +298,7 @@ export function SettingsPage({ disabled }: Props) {
                       SUMMARY_CONTENT: toNum(e.target.value, model.GEMINI_CHUNK_SIZE.SUMMARY_CONTENT),
                     })
                   }
-                  className='w-full rounded-lg px-3 py-2 text-sm outline-none'
+                  className='w-full rounded-xl px-3 py-2 text-sm outline-none'
                   style={inputStyle}
                 />
               </Field>
@@ -257,7 +317,7 @@ export function SettingsPage({ disabled }: Props) {
                   value={model.DEFAULT_VIDEO.BACKGROUND_VIDEO}
                   disabled={!canEdit}
                   onChange={e => patch('DEFAULT_VIDEO', { ...model.DEFAULT_VIDEO, BACKGROUND_VIDEO: e.target.value })}
-                  className='w-full rounded-lg px-3 py-2 text-sm outline-none'
+                  className='w-full rounded-xl px-3 py-2 text-sm outline-none'
                   style={inputStyle}
                 />
               </Field>
@@ -268,7 +328,7 @@ export function SettingsPage({ disabled }: Props) {
                   value={model.AUDIO_SPEED}
                   disabled={!canEdit}
                   onChange={e => patch('AUDIO_SPEED', toNum(e.target.value, model.AUDIO_SPEED))}
-                  className='w-full rounded-lg px-3 py-2 text-sm outline-none'
+                  className='w-full rounded-xl px-3 py-2 text-sm outline-none'
                   style={inputStyle}
                 />
               </Field>
@@ -290,7 +350,7 @@ export function SettingsPage({ disabled }: Props) {
                         const next = isNum ? toNum(e.target.value, val as number) : e.target.value;
                         patch('STOCK_VIDEO', { ...model.STOCK_VIDEO, [k]: next });
                       }}
-                      className='w-full rounded-lg px-3 py-2 text-sm outline-none'
+                      className='w-full rounded-xl px-3 py-2 text-sm outline-none'
                       style={inputStyle}
                     />
                   </Field>
@@ -309,7 +369,7 @@ export function SettingsPage({ disabled }: Props) {
                     disabled={!canEdit}
                     step={k === 'BOX_OPACITY' ? 0.1 : 1}
                     onChange={e => patch('SUBTITLE', { ...model.SUBTITLE, [k]: toNum(e.target.value, model.SUBTITLE[k]) })}
-                    className='w-full rounded-lg px-3 py-2 text-sm outline-none'
+                    className='w-full rounded-xl px-3 py-2 text-sm outline-none'
                     style={inputStyle}
                   />
                 </Field>
@@ -326,7 +386,7 @@ export function SettingsPage({ disabled }: Props) {
                     value={model.LOGO[k]}
                     disabled={!canEdit}
                     onChange={e => patch('LOGO', { ...model.LOGO, [k]: toNum(e.target.value, model.LOGO[k]) })}
-                    className='w-full rounded-lg px-3 py-2 text-sm outline-none'
+                    className='w-full rounded-xl px-3 py-2 text-sm outline-none'
                     style={inputStyle}
                   />
                 </Field>

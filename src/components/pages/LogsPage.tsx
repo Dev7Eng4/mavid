@@ -1,4 +1,6 @@
 import { useEffect, useRef } from 'react';
+import { AppButton } from '../ui/AppButton';
+import { PageHeader } from '../ui/PageHeader';
 
 interface Props {
   logs: string[];
@@ -14,30 +16,21 @@ export function LogsPage({ logs, clearLogs }: Props) {
   }, [logs]);
 
   return (
-    <div className="space-y-4 flex flex-col" style={{ height: 'calc(100vh - 4rem)' }}>
-      <div className="flex items-center justify-between shrink-0">
-        <div>
-          <h1 className="text-2xl font-bold mb-1" style={{ color: 'var(--text-h)' }}>Logs</h1>
-          <p className="text-sm" style={{ color: 'var(--text)' }}>
-            Output của script đang/đã chạy ({logs.length} dòng)
-          </p>
-        </div>
-        <button
-          onClick={clearLogs}
-          className="rounded-lg px-3 py-2 text-xs font-medium"
-          style={{
-            color: 'var(--text-h)',
-            background: 'transparent',
-            border: '1px solid var(--border)',
-          }}
-        >
-          Clear
-        </button>
-      </div>
+    <div className="space-y-6 flex flex-col w-full min-w-0" style={{ height: 'calc(100vh - 4rem)' }}>
+      <PageHeader
+        className="shrink-0"
+        title="Logs"
+        description={`Output của script đang/đã chạy (${logs.length} dòng)`}
+        actions={
+          <AppButton variant="danger" size="sm" onClick={clearLogs}>
+            Xóa log
+          </AppButton>
+        }
+      />
 
       <div
         ref={containerRef}
-        className="flex-1 overflow-auto rounded-xl p-4 font-mono text-xs leading-relaxed"
+        className="flex-1 overflow-auto rounded-2xl p-4 font-mono text-sm leading-relaxed min-h-0"
         style={{ background: 'var(--code-bg)', border: '1px solid var(--border)' }}
       >
         {logs.length === 0 ? (

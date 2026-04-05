@@ -1,13 +1,19 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { ChannelData, ChannelFolderDataResult, ChannelRow } from '../../types';
 import { scriptDefs } from '../../types';
+import { useClientPagination } from '../../hooks/useClientPagination';
+import { AppButton } from '../ui/AppButton';
 import { RefreshIcon, SpinnerIcon } from '../ui/Icons';
-import { ChannelIndexEditDialog } from './channels/ChannelIndexEditDialog';
+import { PageHeader } from '../ui/PageHeader';
+import { TablePaginationBar } from '../ui/TablePaginationBar';
+import { ChannelAddDialog } from './channels/ChannelAddDialog';
+import { ChannelUploadVideoDialog, type ChannelUploadVideoPayload } from './channels/ChannelUploadVideoDialog';
+import { gpmApi } from '../../services';
 import {
   buildExtraEnvForIndexChannelRow,
   channelFolderFromRow,
+  findIndexHeaderKey,
   headerNorm,
-  indexRowsEqual,
   resolveIndexRowVideoType,
   SCRIPT_FROM_AUDIO,
   SCRIPT_REUP_FULL,
@@ -76,6 +82,10 @@ export function ChannelsPage() {
   } | null>(null);
 
   const [indexEditRowIndex, setIndexEditRowIndex] = useState<number | null>(null);
+  const [uploadVideoOpen, setUploadVideoOpen] = useState(false);
+  const [uploadScheduleInfo, setUploadScheduleInfo] = useState<string | null>(null);
+  const [addChannelOpen, setAddChannelOpen] = useState(false);
+  const [addChannelInfo, setAddChannelInfo] = useState<string | null>(null);
 
   const loadIndex = useCallback(async () => {
     setIndexLoading(true);
@@ -134,6 +144,7 @@ export function ChannelsPage() {
   useEffect(() => {
     setFilterStatus('__all__');
     setDetailActionError(null);
+    setUploadVideoOpen(false);
   }, [selectedChannel]);
 
   const indexHeaders = useMemo(() => {
@@ -145,53 +156,45 @@ export function ChannelsPage() {
 
   const indexColCount = Math.max(indexHeaders.length, 1) + 1;
 
-  const indexDirty = useMemo(() => {
-    const base = indexData?.rows ?? [];
-    if (base.length !== indexDraftRows.length) return true;
-    return !indexRowsEqual(indexDraftRows, base, indexHeaders);
-  }, [indexData?.rows, indexDraftRows, indexHeaders]);
-
   const canWriteIndex = typeof window.runner?.writeChannelIndex === 'function';
 
   const closeIndexRowEdit = useCallback(() => {
     setIndexEditRowIndex(null);
   }, []);
 
-  const handleIndexCancel = useCallback(() => {
-    const base = indexData?.rows ?? [];
-    setIndexDraftRows(base.map(r => ({ ...r })));
-    setIndexListError(null);
-    closeIndexRowEdit();
-  }, [indexData?.rows, closeIndexRowEdit]);
-
-  const handleIndexSave = useCallback(async () => {
-    if (!canWriteIndex) {
-      setIndexListError('Chỉ lưu index được trong app Electron.');
-      return;
-    }
-    setIndexSaving(true);
-    setIndexListError(null);
-    try {
-      const normalized = indexDraftRows.map(row => {
-        const o: ChannelRow = {};
-        for (const h of indexHeaders) {
-          const v = row[h];
-          o[h] = v == null || v === '' ? '' : v;
-        }
-        return o;
-      });
-      await window.runner.writeChannelIndex({
-        filePath: INDEX_FILE,
-        headers: indexHeaders,
-        rows: normalized,
-      });
-      await loadIndex();
-    } catch (e) {
-      setIndexListError(e instanceof Error ? e.message : 'Không lưu được index.xlsx.');
-    } finally {
-      setIndexSaving(false);
-    }
-  }, [canWriteIndex, indexDraftRows, indexHeaders, loadIndex]);
+  /** Ghi `MaVidMedia/channels/index.xlsx` (token UI: channels/index.xlsx). */
+  const persistIndexRows = useCallback(
+    async (rows: ChannelRow[]) => {
+      if (!canWriteIndex) {
+        throw new Error('Chỉ lưu index được trong app Electron.');
+      }
+      setIndexSaving(true);
+      setIndexListError(null);
+      try {
+        const normalized = rows.map(row => {
+          const o: ChannelRow = {};
+          for (const h of indexHeaders) {
+            const v = row[h];
+            o[h] = v == null || v === '' ? '' : v;
+          }
+          return o;
+        });
+        await window.runner.writeChannelIndex({
+          filePath: INDEX_FILE,
+          headers: indexHeaders,
+          rows: normalized,
+        });
+        await loadIndex();
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : 'Không lưu được index.xlsx.';
+        setIndexListError(msg);
+        throw e;
+      } finally {
+        setIndexSaving(false);
+      }
+    },
+    [canWriteIndex, indexHeaders, loadIndex],
+  );
 
   const indexBatchEligibleCount = useMemo(() => {
     let n = 0;
@@ -259,7 +262,7 @@ export function ChannelsPage() {
   }, [indexDraftRows, indexHeaders, indexBackgrounds]);
 
   /** Cột video trong file kênh — dùng làm skeleton khi đang tải. */
-  const DETAIL_TABLE_LOADING_HEADERS = ['LINK VIDEO', 'VIEWS', 'DURATION', 'STATUS', 'BACKGROUND VIDEO', 'START FROM'];
+  const DETAIL_TABLE_LOADING_HEADERS = ['LINK VIDEO', 'VIEWS', 'DURATION', 'STATUS', 'START FROM'];
 
   const detailLayout = useMemo(() => {
     if (!detail) {
@@ -384,6 +387,18 @@ export function ChannelsPage() {
     filterStatus,
   ]);
 
+  const indexPag = useClientPagination(indexDraftRows.length);
+  const pageIndexRows = useMemo(
+    () => indexDraftRows.slice(indexPag.startIndex, indexPag.startIndex + indexPag.pageSize),
+    [indexDraftRows, indexPag.startIndex, indexPag.pageSize],
+  );
+
+  const detailPag = useClientPagination(filteredRowsWithIndex.length);
+  const pageDetailRows = useMemo(
+    () => filteredRowsWithIndex.slice(detailPag.startIndex, detailPag.startIndex + detailPag.pageSize),
+    [filteredRowsWithIndex, detailPag.startIndex, detailPag.pageSize],
+  );
+
   const canSetStartFrom = Boolean(detail?.fileName?.toLowerCase().endsWith('.xlsx') && detailLayout.startFromKey);
 
   async function handleSetStartFromRow(dataRowIndex: number) {
@@ -426,133 +441,140 @@ export function ChannelsPage() {
   const refreshBusy = selectedChannel ? detailLoading : indexLoading;
   const hasIndexRows = (indexData?.rows?.length ?? 0) > 0;
 
+  /** Chỉ kênh có EMAIL không rỗng trong index (popup Upload video). */
+  const uploadChannelFolders = useMemo(() => {
+    const emailKey = findIndexHeaderKey(indexHeaders, 'EMAIL');
+    const set = new Set<string>();
+    for (const row of indexDraftRows) {
+      const f = channelFolderFromRow(row, indexHeaders);
+      if (!f?.trim()) continue;
+      if (!emailKey) continue;
+      const email = String(row[emailKey] ?? '').trim();
+      if (!email) continue;
+      set.add(f.trim());
+    }
+    return [...set].sort((a, b) => a.localeCompare(b, undefined, { sensitivity: 'base' }));
+  }, [indexDraftRows, indexHeaders]);
+
   return (
     <div className='space-y-6 w-full min-w-0'>
-      <div className='flex flex-wrap items-start justify-between gap-4'>
-        <div className='min-w-0 flex-1'>
-          <h1 className='text-2xl font-bold mb-2' style={{ color: 'var(--text-h)' }}>
-            Channels
-          </h1>
-          <p className='text-sm' style={{ color: 'var(--text)' }}>
-            {selectedChannel
-              ? `Chi tiết: channels/${selectedChannel}/`
-              : `Danh sách từ ${INDEX_FILE} — chi tiết mở thư mục channels/{ID} (cột ID; nếu trống dùng CHANNEL)`}
-          </p>
+      <PageHeader
+        align='start'
+        title='Channels'
+        description={
+          selectedChannel
+            ? `Chi tiết: MaVidMedia/channels/${selectedChannel}/`
+            : 'Danh sách từ MaVidMedia/channels/index.xlsx'
+        }
+        actions={
+          <>
+            {!selectedChannel && (
+              <>
+                {hasIndexRows ? (
+                  <>
+                    {indexSaving ? (
+                      <span className='text-sm inline-flex items-center gap-2' style={{ color: 'var(--text-muted)' }}>
+                        <SpinnerIcon className='w-4 h-4' />
+                        Đang lưu index…
+                      </span>
+                    ) : null}
+                    <AppButton
+                      type='button'
+                      variant='primary'
+                      onClick={() => void handleCreateVideoAllChannels()}
+                      disabled={
+                        indexLoading || indexSaving || indexBatchVideo !== null || indexBatchEligibleCount === 0 || !canRunIndexBatchVideo
+                      }
+                      title={
+                        indexBatchEligibleCount === 0
+                          ? 'Cần ít nhất một dòng có ID/CHANNEL và LOẠI VIDEO (from_audio hoặc reup_full).'
+                          : `Chạy batch lần lượt cho ${indexBatchEligibleCount} kênh (theo bảng hiện tại).`
+                      }
+                    >
+                      {indexBatchVideo ? (
+                        <span className='inline-flex items-center gap-2 max-w-[min(100vw-2rem,28rem)] min-w-0'>
+                          <SpinnerIcon className='w-4 h-4 shrink-0' />
+                          <span className='truncate'>
+                            Tạo video {indexBatchVideo.current}/{indexBatchVideo.total}: {indexBatchVideo.channelLabel}
+                          </span>
+                        </span>
+                      ) : (
+                        `Tạo video (${indexBatchEligibleCount} kênh)`
+                      )}
+                    </AppButton>
+                  </>
+                ) : null}
+                <AppButton
+                  type='button'
+                  variant='secondary'
+                  onClick={() => {
+                    setAddChannelInfo(null);
+                    setAddChannelOpen(true);
+                  }}
+                  disabled={indexLoading}
+                  title='Tạo thư mục kênh và tạo/cập nhật MaVidMedia/channels/index.xlsx (không cần có sẵn index)'
+                >
+                  Thêm channel
+                </AppButton>
+                <AppButton
+                  type='button'
+                  variant='primary'
+                  onClick={() => setUploadVideoOpen(true)}
+                  disabled={indexLoading || uploadChannelFolders.length === 0}
+                  title={
+                    uploadChannelFolders.length === 0
+                      ? 'Cần ít nhất một dòng index có thư mục kênh (ID/CHANNEL) và cột EMAIL có giá trị.'
+                      : 'Lịch upload video theo kênh (chỉ kênh có email trong index).'
+                  }
+                >
+                  Upload video
+                </AppButton>
+              </>
+            )}
+            {selectedChannel && (
+              <AppButton type='button' variant='neutral' onClick={() => setSelectedChannel(null)}>
+                ← Danh sách (index)
+              </AppButton>
+            )}
+            <AppButton type='button' variant='secondary' onClick={() => void handleRefresh()} disabled={refreshBusy}>
+              {refreshBusy ? <SpinnerIcon className='w-4 h-4' /> : <RefreshIcon className='w-4 h-4' />}
+              <span>{refreshBusy ? 'Đang tải...' : 'Tải lại'}</span>
+            </AppButton>
+          </>
+        }
+      />
+
+      {uploadScheduleInfo ? (
+        <div
+          className='rounded-2xl px-4 py-3 text-base wrap-break-word'
+          style={{
+            color: 'var(--text-h)',
+            background: 'var(--accent-bg)',
+            border: '1px solid var(--accent-border)',
+          }}
+        >
+          {uploadScheduleInfo}
         </div>
-        <div className='flex flex-wrap items-center gap-2 shrink-0 justify-end'>
-          {!selectedChannel && hasIndexRows && (
-            <>
-              <button
-                type='button'
-                onClick={() => void handleIndexSave()}
-                disabled={!indexDirty || indexSaving || !canWriteIndex}
-                className='text-sm font-medium rounded-xl px-4 py-2 cursor-pointer transition-all duration-200 disabled:opacity-45 disabled:cursor-not-allowed'
-                style={{
-                  color: '#fff',
-                  background: 'var(--accent)',
-                  border: '1px solid var(--accent)',
-                }}
-              >
-                {indexSaving ? (
-                  <span className='inline-flex items-center gap-2'>
-                    <SpinnerIcon className='w-4 h-4' />
-                    Đang lưu…
-                  </span>
-                ) : (
-                  'Lưu index'
-                )}
-              </button>
-              <button
-                type='button'
-                onClick={handleIndexCancel}
-                disabled={!indexDirty || indexSaving}
-                className='text-sm font-medium rounded-xl px-4 py-2 cursor-pointer transition-all duration-200 disabled:opacity-45 disabled:cursor-not-allowed'
-                style={{
-                  color: 'var(--text)',
-                  background: 'var(--code-bg)',
-                  border: '1px solid var(--border)',
-                }}
-              >
-                Hủy
-              </button>
-              <button
-                type='button'
-                onClick={() => void handleCreateVideoAllChannels()}
-                disabled={
-                  indexLoading || indexSaving || indexBatchVideo !== null || indexBatchEligibleCount === 0 || !canRunIndexBatchVideo
-                }
-                className='flex items-center gap-2 text-sm font-medium rounded-xl px-4 py-2 cursor-pointer transition-all duration-200 disabled:opacity-45 disabled:cursor-not-allowed'
-                style={{
-                  color: '#fff',
-                  background: 'var(--accent)',
-                  border: '1px solid var(--accent)',
-                }}
-                title={
-                  indexBatchEligibleCount === 0
-                    ? 'Cần ít nhất một dòng có ID/CHANNEL và LOẠI VIDEO (from_audio hoặc reup_full).'
-                    : `Chạy batch lần lượt cho ${indexBatchEligibleCount} kênh (theo bảng hiện tại).`
-                }
-              >
-                {indexBatchVideo ? (
-                  <span className='inline-flex items-center gap-2 max-w-[min(100vw-2rem,28rem)] min-w-0'>
-                    <SpinnerIcon className='w-4 h-4 shrink-0' />
-                    <span className='truncate'>
-                      Tạo video {indexBatchVideo.current}/{indexBatchVideo.total}: {indexBatchVideo.channelLabel}
-                    </span>
-                  </span>
-                ) : (
-                  `Tạo video (${indexBatchEligibleCount} kênh)`
-                )}
-              </button>
-              {!canWriteIndex && (
-                <span className='text-xs max-w-48 leading-snug' style={{ color: 'var(--text-muted)' }}>
-                  Lưu index chỉ trong Electron.
-                </span>
-              )}
-            </>
-          )}
-          {selectedChannel && (
-            <button
-              type='button'
-              onClick={() => setSelectedChannel(null)}
-              className='text-sm font-medium rounded-xl px-4 py-2 cursor-pointer transition-all duration-200'
-              style={{
-                color: 'var(--text)',
-                background: 'var(--code-bg)',
-                border: '1px solid var(--border)',
-              }}
-            >
-              ← Danh sách (index)
-            </button>
-          )}
-          <button
-            type='button'
-            onClick={() => void handleRefresh()}
-            disabled={refreshBusy}
-            className='flex items-center gap-2 text-sm font-medium rounded-xl px-4 py-2 cursor-pointer transition-all duration-200 disabled:opacity-50'
-            style={{
-              color: 'var(--accent)',
-              background: 'var(--accent-bg)',
-              border: '1px solid var(--accent-border)',
-            }}
-            onMouseEnter={e => {
-              if (!refreshBusy) e.currentTarget.style.boxShadow = 'var(--shadow-accent)';
-            }}
-            onMouseLeave={e => {
-              e.currentTarget.style.boxShadow = 'none';
-            }}
-          >
-            {refreshBusy ? <SpinnerIcon className='w-4 h-4' /> : <RefreshIcon className='w-4 h-4' />}
-            <span>{refreshBusy ? 'Đang tải...' : 'Tải lại'}</span>
-          </button>
+      ) : null}
+
+      {addChannelInfo ? (
+        <div
+          className='rounded-2xl px-4 py-3 text-base wrap-break-word'
+          style={{
+            color: 'var(--text-h)',
+            background: 'var(--accent-bg)',
+            border: '1px solid var(--accent-border)',
+          }}
+        >
+          {addChannelInfo}
         </div>
-      </div>
+      ) : null}
 
       {!selectedChannel ? (
         <div className='space-y-4 w-full min-w-0'>
           {indexListError && (
             <div
-              className='rounded-xl px-4 py-3 text-sm wrap-break-word'
+              className='rounded-2xl px-4 py-3 text-base wrap-break-word'
               style={{
                 color: '#fecaca',
                 background: 'rgba(239, 68, 68, 0.12)',
@@ -563,124 +585,135 @@ export function ChannelsPage() {
             </div>
           )}
 
-          <div
-            className='overflow-auto rounded-2xl w-full min-w-0'
-            style={{ background: 'var(--card-bg)', border: '1px solid var(--border)' }}
-          >
-            <table className='w-full min-w-0 text-sm' style={{ borderCollapse: 'collapse', tableLayout: 'auto' }}>
-              <thead>
-                <tr style={{ background: 'var(--code-bg)' }}>
-                  {indexHeaders.map(h => (
+          <div className='rounded-2xl w-full min-w-0' style={{ background: 'var(--card-bg)', border: '1px solid var(--border)' }}>
+            <div className='overflow-auto w-full min-w-0'>
+              <table className='w-full min-w-0 text-base' style={{ borderCollapse: 'collapse', tableLayout: 'auto' }}>
+                <thead>
+                  <tr style={{ background: 'var(--code-bg)' }}>
+                    {indexHeaders.map(h => (
+                      <th
+                        key={h}
+                        className='text-left px-4 py-3 font-medium whitespace-nowrap uppercase text-base tracking-wider'
+                        style={{ color: 'var(--text-muted)', borderBottom: '1px solid var(--border)' }}
+                      >
+                        {h}
+                      </th>
+                    ))}
                     <th
-                      key={h}
-                      className='text-left px-4 py-3 font-medium whitespace-nowrap uppercase text-xs tracking-wider'
+                      className='text-left px-4 py-3 font-medium whitespace-nowrap uppercase text-base tracking-wider w-44 shrink-0'
                       style={{ color: 'var(--text-muted)', borderBottom: '1px solid var(--border)' }}
                     >
-                      {h}
+                      Thao tác
                     </th>
-                  ))}
-                  <th
-                    className='text-left px-4 py-3 font-medium whitespace-nowrap uppercase text-xs tracking-wider w-44 shrink-0'
-                    style={{ color: 'var(--text-muted)', borderBottom: '1px solid var(--border)' }}
-                  >
-                    Thao tác
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
-                {indexLoading ? (
-                  <tr>
-                    <td colSpan={indexColCount} className='px-4 py-8 text-center'>
-                      <div className='flex items-center justify-center gap-3' style={{ color: 'var(--text)' }}>
-                        <SpinnerIcon className='w-5 h-5' />
-                        <span>Đang tải index...</span>
-                      </div>
-                    </td>
                   </tr>
-                ) : indexDraftRows.length > 0 ? (
-                  indexDraftRows.map((row, i) => {
-                    const folder = channelFolderFromRow(row, indexHeaders);
-                    return (
-                      <tr
-                        key={i}
-                        className='transition-colors duration-150'
-                        style={{ borderBottom: '1px solid var(--border)' }}
-                        onMouseEnter={e => {
-                          e.currentTarget.style.background = 'var(--hover-bg)';
-                        }}
-                        onMouseLeave={e => {
-                          e.currentTarget.style.background = 'transparent';
-                        }}
-                      >
-                        {indexHeaders.map(h => (
-                          <td
-                            key={h}
-                            className='px-4 py-3 align-top wrap-break-word min-w-0'
-                            style={{ color: 'var(--text-h)' }}
-                            title={String(row[h] ?? '')}
-                          >
-                            {String(row[h] ?? '')}
-                          </td>
-                        ))}
-                        <td className='px-4 py-3 align-top'>
-                          <div className='flex gap-1.5 items-stretch'>
-                            <button
-                              type='button'
-                              onClick={() => setIndexEditRowIndex(i)}
-                              className='text-xs font-medium rounded-lg px-3 py-1.5 cursor-pointer transition-colors duration-150 whitespace-nowrap'
-                              style={{
-                                color: 'var(--text)',
-                                background: 'var(--code-bg)',
-                                border: '1px solid var(--border)',
-                              }}
+                </thead>
+                <tbody>
+                  {indexLoading ? (
+                    <tr>
+                      <td colSpan={indexColCount} className='px-4 py-8 text-center'>
+                        <div className='flex items-center justify-center gap-3' style={{ color: 'var(--text)' }}>
+                          <SpinnerIcon className='w-5 h-5' />
+                          <span>Đang tải index...</span>
+                        </div>
+                      </td>
+                    </tr>
+                  ) : indexDraftRows.length > 0 ? (
+                    pageIndexRows.map((row, i) => {
+                      const globalIndex = indexPag.startIndex + i;
+                      const folder = channelFolderFromRow(row, indexHeaders);
+                      return (
+                        <tr
+                          key={globalIndex}
+                          className='transition-colors duration-150'
+                          style={{ borderBottom: '1px solid var(--border)' }}
+                          onMouseEnter={e => {
+                            e.currentTarget.style.background = 'var(--hover-bg)';
+                          }}
+                          onMouseLeave={e => {
+                            e.currentTarget.style.background = 'transparent';
+                          }}
+                        >
+                          {indexHeaders.map(h => (
+                            <td
+                              key={h}
+                              className='px-4 py-3 align-top wrap-break-word min-w-0'
+                              style={{ color: 'var(--text-h)' }}
+                              title={String(row[h] ?? '')}
                             >
-                              Sửa
-                            </button>
-                            {folder ? (
+                              {String(row[h] ?? '')}
+                            </td>
+                          ))}
+                          <td className='px-4 py-3 align-top'>
+                            <div className='flex gap-1.5 items-stretch'>
                               <button
                                 type='button'
-                                onClick={() => setSelectedChannel(folder)}
-                                className='text-xs font-medium rounded-lg px-3 py-1.5 cursor-pointer transition-colors duration-150 whitespace-nowrap'
+                                onClick={() => setIndexEditRowIndex(globalIndex)}
+                                disabled={indexSaving}
+                                className='text-base font-medium rounded-lg px-3 py-1.5 cursor-pointer transition-colors duration-150 whitespace-nowrap disabled:opacity-45 disabled:cursor-not-allowed'
                                 style={{
-                                  color: 'var(--accent)',
-                                  background: 'var(--accent-bg)',
-                                  border: '1px solid var(--accent-border)',
+                                  color: 'var(--text)',
+                                  background: 'var(--code-bg)',
+                                  border: '1px solid var(--border)',
                                 }}
                               >
-                                Chi tiết folder
+                                Sửa
                               </button>
-                            ) : (
-                              <span className='text-xs' style={{ color: 'var(--text-muted)' }}>
-                                —
-                              </span>
-                            )}
-                          </div>
-                        </td>
-                      </tr>
-                    );
-                  })
-                ) : (
-                  <tr>
-                    <td colSpan={indexColCount} className='px-4 py-8 text-center' style={{ color: 'var(--text-muted)' }}>
-                      Chưa có dữ liệu trong index. Hãy thêm channel từ Pipeline.
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
+                              {folder ? (
+                                <button
+                                  type='button'
+                                  onClick={() => setSelectedChannel(folder)}
+                                  className='text-base font-medium rounded-lg px-3 py-1.5 cursor-pointer transition-colors duration-150 whitespace-nowrap'
+                                  style={{
+                                    color: 'var(--accent)',
+                                    background: 'var(--accent-bg)',
+                                    border: '1px solid var(--accent-border)',
+                                  }}
+                                >
+                                  Chi tiết
+                                </button>
+                              ) : (
+                                <span className='text-base' style={{ color: 'var(--text-muted)' }}>
+                                  —
+                                </span>
+                              )}
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })
+                  ) : (
+                    <tr>
+                      <td colSpan={indexColCount} className='px-4 py-8 text-center' style={{ color: 'var(--text-muted)' }}>
+                        Chưa có dữ liệu trong index. Hãy thêm channel từ Pipeline.
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+            {!indexLoading && indexDraftRows.length > 0 ? (
+              <TablePaginationBar
+                page={indexPag.page}
+                totalPages={indexPag.totalPages}
+                onPageChange={indexPag.setPage}
+                totalItems={indexDraftRows.length}
+                pageSize={indexPag.pageSize}
+              />
+            ) : null}
           </div>
 
           {indexEditRowIndex !== null && indexDraftRows[indexEditRowIndex] != null && (
-            <ChannelIndexEditDialog
-              key={indexEditRowIndex}
+            <ChannelAddDialog
+              key={`edit-${indexEditRowIndex}`}
               initialRow={indexDraftRows[indexEditRowIndex]}
               indexHeaders={indexHeaders}
               backgroundFolders={indexBackgrounds}
               onClose={closeIndexRowEdit}
-              onApply={merged => {
+              onAdd={async row => {
                 if (indexEditRowIndex === null) return;
                 const idx = indexEditRowIndex;
-                setIndexDraftRows(prev => prev.map((r, i) => (i === idx ? { ...r, ...merged } : r)));
+                const nextRows = indexDraftRows.map((r, i) => (i === idx ? { ...r, ...row } : r));
+                await persistIndexRows(nextRows);
               }}
             />
           )}
@@ -688,7 +721,7 @@ export function ChannelsPage() {
       ) : (
         <div className='space-y-4 w-full min-w-0'>
           {detail?.fileName && (
-            <p className='text-xs' style={{ color: 'var(--text-muted)' }}>
+            <p className='text-sm' style={{ color: 'var(--text-muted)' }}>
               File: <span style={{ color: 'var(--text-h)' }}>{detail.fileName}</span>
             </p>
           )}
@@ -698,30 +731,30 @@ export function ChannelsPage() {
               <div className='grid grid-cols-1 md:grid-cols-3 gap-5'>
                 {detailLayout.showEmail && (
                   <div className='min-w-0'>
-                    <div className='text-[11px] font-medium uppercase tracking-wider mb-2' style={{ color: 'var(--text-muted)' }}>
+                    <div className='text-sm font-medium uppercase tracking-wider mb-2' style={{ color: 'var(--text-muted)' }}>
                       Email
                     </div>
-                    <div className='text-sm wrap-break-word' style={{ color: 'var(--text-h)' }}>
+                    <div className='text-base wrap-break-word' style={{ color: 'var(--text-h)' }}>
                       {detailLayout.meta.email || '—'}
                     </div>
                   </div>
                 )}
                 {detailLayout.showChannelName && (
                   <div className='min-w-0'>
-                    <div className='text-[11px] font-medium uppercase tracking-wider mb-2' style={{ color: 'var(--text-muted)' }}>
+                    <div className='text-sm font-medium uppercase tracking-wider mb-2' style={{ color: 'var(--text-muted)' }}>
                       Channel name
                     </div>
-                    <div className='text-sm wrap-break-word' style={{ color: 'var(--text-h)' }}>
+                    <div className='text-base wrap-break-word' style={{ color: 'var(--text-h)' }}>
                       {detailLayout.meta.channelName || '—'}
                     </div>
                   </div>
                 )}
                 {detailLayout.showTags && (
                   <div className='min-w-0 md:col-span-1'>
-                    <div className='text-[11px] font-medium uppercase tracking-wider mb-2' style={{ color: 'var(--text-muted)' }}>
+                    <div className='text-sm font-medium uppercase tracking-wider mb-2' style={{ color: 'var(--text-muted)' }}>
                       Channel tags
                     </div>
-                    <div className='text-sm wrap-break-word' style={{ color: 'var(--text-h)' }}>
+                    <div className='text-base wrap-break-word' style={{ color: 'var(--text-h)' }}>
                       {detailLayout.meta.channelTags || '—'}
                     </div>
                   </div>
@@ -732,7 +765,7 @@ export function ChannelsPage() {
 
           {detailActionError && (
             <div
-              className='rounded-xl px-4 py-3 text-sm wrap-break-word'
+              className='rounded-2xl px-4 py-3 text-base wrap-break-word'
               style={{
                 color: '#fecaca',
                 background: 'rgba(239, 68, 68, 0.12)',
@@ -752,10 +785,10 @@ export function ChannelsPage() {
             >
               {detailLayout.durationKey && durationBounds.hasData ? (
                 <div className='min-w-56 flex-1 space-y-3'>
-                  <div className='text-[11px] font-medium uppercase tracking-wider' style={{ color: 'var(--text-muted)' }}>
+                  <div className='text-sm font-medium uppercase tracking-wider' style={{ color: 'var(--text-muted)' }}>
                     Lọc duration (kéo min / max)
                   </div>
-                  <div className='flex flex-wrap items-center justify-between gap-2 text-xs' style={{ color: 'var(--text-h)' }}>
+                  <div className='flex flex-wrap items-center justify-between gap-2 text-base' style={{ color: 'var(--text-h)' }}>
                     <span>
                       Từ <strong style={{ color: 'var(--accent)' }}>{formatSecondsAsDuration(durationSliderMin)}</strong>
                     </span>
@@ -764,7 +797,7 @@ export function ChannelsPage() {
                     </span>
                   </div>
                   <div className='space-y-1'>
-                    <label className='text-[10px]' style={{ color: 'var(--text-muted)' }} htmlFor='ch-dur-min'>
+                    <label className='text-sm' style={{ color: 'var(--text-muted)' }} htmlFor='ch-dur-min'>
                       Tối thiểu
                     </label>
                     <input
@@ -783,7 +816,7 @@ export function ChannelsPage() {
                     />
                   </div>
                   <div className='space-y-1'>
-                    <label className='text-[10px]' style={{ color: 'var(--text-muted)' }} htmlFor='ch-dur-max'>
+                    <label className='text-sm' style={{ color: 'var(--text-muted)' }} htmlFor='ch-dur-max'>
                       Tối đa
                     </label>
                     <input
@@ -801,7 +834,7 @@ export function ChannelsPage() {
                       style={{ accentColor: 'var(--accent)' }}
                     />
                   </div>
-                  <p className='text-[10px] leading-snug' style={{ color: 'var(--text-muted)' }}>
+                  <p className='text-sm leading-snug' style={{ color: 'var(--text-muted)' }}>
                     Phạm vi trong file: {formatSecondsAsDuration(durationBounds.min)} — {formatSecondsAsDuration(durationBounds.max)}. Dòng
                     không đọc được duration chỉ hiện khi khoảng trùng toàn bộ phạm vi.
                   </p>
@@ -810,7 +843,7 @@ export function ChannelsPage() {
               {detailLayout.statusKey && statusOptions.length > 0 && (
                 <div className='min-w-44 flex-1'>
                   <label
-                    className='block text-[11px] font-medium uppercase tracking-wider mb-2'
+                    className='block text-sm font-medium uppercase tracking-wider mb-2'
                     style={{ color: 'var(--text-muted)' }}
                     htmlFor='ch-filter-status'
                   >
@@ -840,123 +873,182 @@ export function ChannelsPage() {
           ) : null}
 
           <div
-            className='overflow-auto rounded-2xl max-h-[min(70vh,720px)] w-full min-w-0'
+            className='rounded-2xl w-full min-w-0 flex flex-col max-h-[min(70vh,720px)]'
             style={{ background: 'var(--card-bg)', border: '1px solid var(--border)' }}
           >
-            <table className='w-full min-w-0 text-sm' style={{ borderCollapse: 'collapse', tableLayout: 'auto' }}>
-              <thead className='sticky top-0 z-1'>
-                <tr style={{ background: 'var(--code-bg)' }}>
-                  {detailTheadHeaders.map(h => (
-                    <th
-                      key={h}
-                      className='text-left px-4 py-3 font-medium whitespace-nowrap uppercase text-xs tracking-wider'
-                      style={{ color: 'var(--text-muted)', borderBottom: '1px solid var(--border)' }}
-                    >
-                      {h}
-                    </th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {detailLoading ? (
-                  <tr>
-                    <td colSpan={detailColCount} className='px-4 py-8 text-center'>
-                      <div className='flex items-center justify-center gap-3' style={{ color: 'var(--text)' }}>
-                        <SpinnerIcon className='w-5 h-5' />
-                        <span>Đang đọc dữ liệu...</span>
-                      </div>
-                    </td>
-                  </tr>
-                ) : detail?.rows?.length ? (
-                  detailLayout.tableHeaders.length === 0 ? (
-                    <tr>
-                      <td className='px-4 py-8 text-center' style={{ color: 'var(--text-muted)' }}>
-                        File chỉ có cột meta (email / tên / tags), không có cột bảng video.
-                      </td>
-                    </tr>
-                  ) : filteredRowsWithIndex.length === 0 ? (
-                    <tr>
-                      <td colSpan={detailColCount} className='px-4 py-8 text-center' style={{ color: 'var(--text-muted)' }}>
-                        Không có dòng nào khớp bộ lọc duration / status.
-                      </td>
-                    </tr>
-                  ) : (
-                    filteredRowsWithIndex.map(({ row, originalIndex }) => (
-                      <tr
-                        key={originalIndex}
-                        className='transition-colors duration-150'
-                        style={{ borderBottom: '1px solid var(--border)' }}
-                        onMouseEnter={e => {
-                          e.currentTarget.style.background = 'var(--hover-bg)';
-                        }}
-                        onMouseLeave={e => {
-                          e.currentTarget.style.background = 'transparent';
-                        }}
+            <div className='overflow-auto w-full min-w-0 min-h-0 flex-1'>
+              <table className='w-full min-w-0 text-base' style={{ borderCollapse: 'collapse', tableLayout: 'auto' }}>
+                <thead className='sticky top-0 z-1'>
+                  <tr style={{ background: 'var(--code-bg)' }}>
+                    {detailTheadHeaders.map(h => (
+                      <th
+                        key={h}
+                        className='text-left px-4 py-3 font-medium whitespace-nowrap uppercase text-base tracking-wider'
+                        style={{ color: 'var(--text-muted)', borderBottom: '1px solid var(--border)' }}
                       >
-                        {detailLayout.tableHeaders.map(h => {
-                          const isStartCol = canSetStartFrom && detailLayout.startFromKey === h;
-                          if (isStartCol) {
-                            const marked = String(row[h] ?? '').trim();
-                            return (
-                              <td key={h} className='px-4 py-3 align-top min-w-28'>
-                                <div className='flex flex-col gap-2 items-start'>
-                                  {marked ? (
-                                    <span className='text-[10px] font-medium uppercase tracking-wider' style={{ color: 'var(--accent)' }}>
-                                      Điểm bắt đầu
-                                    </span>
-                                  ) : null}
-                                  <button
-                                    type='button'
-                                    disabled={startMarkingIndex !== null}
-                                    onClick={() => void handleSetStartFromRow(originalIndex)}
-                                    className='rounded-lg px-3 py-1.5 text-xs font-medium cursor-pointer transition-opacity duration-150 disabled:opacity-40 disabled:cursor-not-allowed'
-                                    style={{
-                                      color: '#fff',
-                                      background: 'var(--accent)',
-                                      border: '1px solid var(--accent)',
-                                    }}
-                                  >
-                                    {startMarkingIndex === originalIndex ? (
-                                      <span className='inline-flex items-center gap-2'>
-                                        <SpinnerIcon className='w-3.5 h-3.5' />
-                                        Đang lưu…
+                        {h}
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {detailLoading ? (
+                    <tr>
+                      <td colSpan={detailColCount} className='px-4 py-8 text-center'>
+                        <div className='flex items-center justify-center gap-3' style={{ color: 'var(--text)' }}>
+                          <SpinnerIcon className='w-5 h-5' />
+                          <span>Đang đọc dữ liệu...</span>
+                        </div>
+                      </td>
+                    </tr>
+                  ) : detail?.rows?.length ? (
+                    detailLayout.tableHeaders.length === 0 ? (
+                      <tr>
+                        <td className='px-4 py-8 text-center' style={{ color: 'var(--text-muted)' }}>
+                          File chỉ có cột meta (email / tên / tags), không có cột bảng video.
+                        </td>
+                      </tr>
+                    ) : filteredRowsWithIndex.length === 0 ? (
+                      <tr>
+                        <td colSpan={detailColCount} className='px-4 py-8 text-center' style={{ color: 'var(--text-muted)' }}>
+                          Không có dòng nào khớp bộ lọc duration / status.
+                        </td>
+                      </tr>
+                    ) : (
+                      pageDetailRows.map(({ row, originalIndex }) => (
+                        <tr
+                          key={originalIndex}
+                          className='transition-colors duration-150'
+                          style={{ borderBottom: '1px solid var(--border)' }}
+                          onMouseEnter={e => {
+                            e.currentTarget.style.background = 'var(--hover-bg)';
+                          }}
+                          onMouseLeave={e => {
+                            e.currentTarget.style.background = 'transparent';
+                          }}
+                        >
+                          {detailLayout.tableHeaders.map(h => {
+                            const isStartCol = canSetStartFrom && detailLayout.startFromKey === h;
+                            if (isStartCol) {
+                              const marked = String(row[h] ?? '').trim();
+                              return (
+                                <td key={h} className='px-4 py-3 align-top min-w-28'>
+                                  <div className='flex flex-col gap-2 items-start'>
+                                    {marked ? (
+                                      <span className='text-sm font-medium uppercase tracking-wider' style={{ color: 'var(--accent)' }}>
+                                        Điểm bắt đầu
                                       </span>
-                                    ) : (
-                                      'Start'
-                                    )}
-                                  </button>
-                                </div>
+                                    ) : null}
+                                    <button
+                                      type='button'
+                                      disabled={startMarkingIndex !== null}
+                                      onClick={() => void handleSetStartFromRow(originalIndex)}
+                                      className='rounded-lg px-3 py-1.5 text-base font-medium cursor-pointer transition-opacity duration-150 disabled:opacity-40 disabled:cursor-not-allowed'
+                                      style={{
+                                        color: '#fff',
+                                        background: 'var(--accent)',
+                                        border: '1px solid var(--accent)',
+                                      }}
+                                    >
+                                      {startMarkingIndex === originalIndex ? (
+                                        <span className='inline-flex items-center gap-2'>
+                                          <SpinnerIcon className='w-3.5 h-3.5' />
+                                          Đang lưu…
+                                        </span>
+                                      ) : (
+                                        'Start'
+                                      )}
+                                    </button>
+                                  </div>
+                                </td>
+                              );
+                            }
+                            return (
+                              <td
+                                key={h}
+                                className='px-4 py-3 align-top wrap-break-word min-w-0'
+                                style={{ color: 'var(--text-h)' }}
+                                title={String(row[h] ?? '')}
+                              >
+                                {String(row[h] ?? '')}
                               </td>
                             );
-                          }
-                          return (
-                            <td
-                              key={h}
-                              className='px-4 py-3 align-top wrap-break-word min-w-0'
-                              style={{ color: 'var(--text-h)' }}
-                              title={String(row[h] ?? '')}
-                            >
-                              {String(row[h] ?? '')}
-                            </td>
-                          );
-                        })}
-                      </tr>
-                    ))
-                  )
-                ) : (
-                  <tr>
-                    <td colSpan={detailColCount} className='px-4 py-8 text-center' style={{ color: 'var(--text-muted)' }}>
-                      {detail?.fileName
-                        ? 'File không có dòng dữ liệu hoặc không đọc được.'
-                        : 'Không có file .xlsx / .csv trong thư mục channel này.'}
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
+                          })}
+                        </tr>
+                      ))
+                    )
+                  ) : (
+                    <tr>
+                      <td colSpan={detailColCount} className='px-4 py-8 text-center' style={{ color: 'var(--text-muted)' }}>
+                        {detail?.fileName
+                          ? 'File không có dòng dữ liệu hoặc không đọc được.'
+                          : 'Không có file .xlsx / .csv trong thư mục channel này.'}
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+            {!detailLoading && filteredRowsWithIndex.length > 0 ? (
+              <TablePaginationBar
+                page={detailPag.page}
+                totalPages={detailPag.totalPages}
+                onPageChange={detailPag.setPage}
+                totalItems={filteredRowsWithIndex.length}
+                pageSize={detailPag.pageSize}
+              />
+            ) : null}
           </div>
         </div>
       )}
+
+      {uploadVideoOpen ? (
+        <ChannelUploadVideoDialog
+          channelFolders={uploadChannelFolders}
+          onClose={() => setUploadVideoOpen(false)}
+          onConfirm={async (p: ChannelUploadVideoPayload) => {
+            if (!window.runner?.runScript) throw new Error('Chỉ chạy upload trong app Electron.');
+            await window.runner.runScript('uploadYoutubeViaGpm', {
+              gpmProfileId: p.gpmProfileId,
+              channelFolder: p.channelFolder,
+              maxUploads: p.totalVideos,
+              gpmApiBase: gpmApi.getBaseUrl(),
+            });
+            const n = p.totalVideos == null ? 'tất cả thư mục con có .mp4' : String(p.totalVideos);
+            setUploadScheduleInfo(
+              `Upload YouTube đã chạy xong — kênh «${p.channelFolder}», profile GPM ${p.gpmProfileId} (theo email ↔ name), tối đa ${n}. Kiểm tra GPM / YouTube Studio và tab Logs.`,
+            );
+          }}
+        />
+      ) : null}
+
+      {addChannelOpen ? (
+        <ChannelAddDialog
+          indexHeaders={indexHeaders}
+          backgroundFolders={indexBackgrounds}
+          onClose={() => setAddChannelOpen(false)}
+          onSaveNewChannel={async payload => {
+            if (!window.runner?.runScript) throw new Error('Chỉ chạy trong Electron.');
+            await window.runner.runScript('addChannelFromForm', {
+              url: payload.channelUrl.trim(),
+              formMeta: {
+                email: payload.email,
+                videoType: payload.videoType,
+                durationMinutes: payload.durationMinutes,
+                background: payload.background,
+                videosPerDayPreset: payload.videosPerDayPreset,
+                publishTimes: payload.publishTimes,
+                folderIdOverride: payload.folderIdOverride.trim() || undefined,
+              },
+            });
+            await loadIndex();
+            const folderHint = payload.folderIdOverride.trim() || '(theo URL)';
+            setAddChannelInfo(
+              `Đã tạo thư mục kênh, mavid-channel-config.json và cập nhật ${INDEX_FILE} (email ${payload.email}, folder ${folderHint}).`,
+            );
+          }}
+        />
+      ) : null}
     </div>
   );
 }

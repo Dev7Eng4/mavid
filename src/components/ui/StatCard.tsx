@@ -17,10 +17,10 @@ export function StatCard({ label, value, icon }: Props) {
         {icon}
       </div>
       <div>
-        <div className="text-2xl font-bold" style={{ color: 'var(--text-h)' }}>
+        <div className="text-xl font-bold" style={{ color: 'var(--text-h)' }}>
           {value}
         </div>
-        <div className="text-xs mt-0.5" style={{ color: 'var(--text)' }}>
+        <div className="text-sm mt-0.5" style={{ color: 'var(--text)' }}>
           {label}
         </div>
       </div>

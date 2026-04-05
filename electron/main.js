@@ -1,21 +1,22 @@
-import { app, BrowserWindow, ipcMain, Menu, globalShortcut } from 'electron';
+import { app, BrowserWindow, ipcMain, Menu, globalShortcut, dialog } from 'electron';
 import path from 'path';
 import { spawn } from 'child_process';
 import fs from 'fs';
 import { fileURLToPath, pathToFileURL } from 'url';
+import { resolveGpmChromiumExecutable } from '../contents/scripts/openGpmPlaywright.js';
+import { getDefaultVideoStorageRoot, MAVID_MEDIA_FOLDER } from '../contents/constants/defaultVideoStorageRoot.js';
 
 const VITE_DEV_SERVER_URL = process.env.VITE_DEV_SERVER_URL || 'http://localhost:5173';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const ROOT = path.join(__dirname, '..');
+const GPM_API_V3_ROOT = (process.env.GPM_API_BASE || 'http://127.0.0.1:19995/api/v3').replace(/\/$/, '');
 const CONSTANTS_DIR = path.join(ROOT, 'contents', 'constants');
 const CONSTANTS_INDEX_FILE = path.join(CONSTANTS_DIR, 'index.js');
-const CHANNELS_DIR = path.join(ROOT, 'channels');
+const MAVID_CHANNEL_CONFIG_FILENAME = 'mavid-channel-config.json';
 const OUTPUTS_DIR = path.join(ROOT, 'outputs');
 const DOWNLOADS_DIR = path.join(ROOT, 'downloads');
-const BACKGROUNDS_DIR = path.join(ROOT, 'assets', 'backgrounds');
-
 let mainWindow = null;
 
 // --------------- Script runner ---------------
@@ -47,7 +48,9 @@ function killNpmSpawnTree(child) {
   } else {
     try {
       child.kill('SIGTERM');
-    } catch { /* ignore */ }
+    } catch {
+      /* ignore */
+    }
   }
 }
 
@@ -75,7 +78,9 @@ ipcMain.handle('run-npm-script', async (_event, { npmScript, extraEnv }) => {
       for (const w of wins) {
         if (!w.isDestroyed()) w.webContents.send('script-log', line);
       }
-    } catch { /* window closed */ }
+    } catch {
+      /* window closed */
+    }
   }
 
   sendLog(`[MaVid] Bắt đầu: npm run ${npmScript}`);
@@ -140,11 +145,13 @@ ipcMain.handle('run-npm-script', async (_event, { npmScript, extraEnv }) => {
 
 const SCRIPT_MAP = {
   getInfoChannel: '../contents/getInfoChannel.js',
+  addChannelFromForm: '../contents/addChannelFromForm.js',
   downloadVideo: '../contents/downloadVideo.js',
   createBatchVideo: '../contents/scripts/createBatchVideo.js',
   makeChromeProfile: '../contents/scripts/makeChromeProfile.js',
   createThumbnailFlow: '../contents/scripts/createThumbnailFlow.js',
   summaryMetaFromTranscript: '../contents/scripts/summaryMetaFromTranscript.js',
+  uploadYoutubeViaGpm: '../contents/scripts/youtubeUploadViaGpm.js',
 };
 
 ipcMain.handle('run-script', async (_event, { script, params = {} }) => {
@@ -161,7 +168,9 @@ ipcMain.handle('run-script', async (_event, { script, params = {} }) => {
       for (const w of wins) {
         if (!w.isDestroyed()) w.webContents.send('script-log', line);
       }
-    } catch { /* window closed */ }
+    } catch {
+      /* window closed */
+    }
   }
 
   // Intercept console.log/warn/error
@@ -191,9 +200,9 @@ ipcMain.handle('run-script', async (_event, { script, params = {} }) => {
     const modulePath = SCRIPT_MAP[script];
     const moduleUrl = pathToFileURL(path.join(__dirname, modulePath)).toString();
     const module = await import(`${moduleUrl}?cacheBust=${Date.now()}`);
-    
+
     const result = await module.default(params);
-    
+
     sendLog('[MaVid] Hoàn thành.');
     return { success: true, data: result };
   } catch (err) {
@@ -223,13 +232,424 @@ ipcMain.handle('write-input-file', async (_event, { content }) => {
   return { ok: true };
 });
 
+// --------------- GPM: thư mục dữ liệu + đọc SQLite Profiles ---------------
+
+let sqlJsPromise = null;
+
+function getSqlJs() {
+  if (!sqlJsPromise) {
+    sqlJsPromise = (async () => {
+      const initSqlJs = (await import('sql.js')).default;
+      const wasmRoot = path.join(ROOT, 'node_modules', 'sql.js', 'dist');
+      return initSqlJs({
+        locateFile: file => path.join(wasmRoot, file),
+      });
+    })();
+  }
+  return sqlJsPromise;
+}
+
+function gpmSettingsPath() {
+  return path.join(app.getPath('userData'), 'gpm-settings.json');
+}
+
+function readGpmSettings() {
+  try {
+    const raw = fs.readFileSync(gpmSettingsPath(), 'utf8');
+    const j = JSON.parse(raw);
+    return {
+      dataFolder: typeof j.dataFolder === 'string' && j.dataFolder.trim() ? j.dataFolder.trim() : null,
+      browserExe: typeof j.browserExe === 'string' && j.browserExe.trim() ? j.browserExe.trim() : null,
+    };
+  } catch {
+    return { dataFolder: null, browserExe: null };
+  }
+}
+
+/** @param {{ dataFolder?: string | null; browserExe?: string | null }} updates */
+function writeGpmSettings(updates) {
+  const cur = readGpmSettings();
+  const next = {
+    dataFolder: 'dataFolder' in updates ? updates.dataFolder : cur.dataFolder,
+    browserExe: 'browserExe' in updates ? updates.browserExe : cur.browserExe,
+  };
+  const userData = app.getPath('userData');
+  fs.mkdirSync(userData, { recursive: true });
+  const obj = {};
+  if (next.dataFolder) obj.dataFolder = next.dataFolder;
+  if (next.browserExe) obj.browserExe = next.browserExe;
+  fs.writeFileSync(gpmSettingsPath(), JSON.stringify(obj, null, 2), 'utf8');
+}
+
+function readGpmDataFolder() {
+  return readGpmSettings().dataFolder;
+}
+
+function writeGpmDataFolder(dataFolder) {
+  writeGpmSettings({ dataFolder });
+}
+
+function findDbFilesInFolder(folder) {
+  if (!fs.existsSync(folder) || !fs.statSync(folder).isDirectory()) return [];
+  return fs
+    .readdirSync(folder, { withFileTypes: true })
+    .filter(d => d.isFile() && d.name.toLowerCase().endsWith('.db'))
+    .map(d => path.join(folder, d.name))
+    .sort();
+}
+
+function resolveProfilesTableName(db) {
+  const r = db.exec(`SELECT name FROM sqlite_master WHERE type='table'`);
+  if (!r.length || !r[0].values?.length) return null;
+  const nameCol = r[0].columns.findIndex(c => String(c).toLowerCase() === 'name');
+  const col = nameCol >= 0 ? nameCol : 0;
+  for (const row of r[0].values) {
+    const t = String(row[col] ?? '');
+    if (t.toLowerCase() === 'profiles') return t;
+  }
+  return null;
+}
+
+function cellToString(v) {
+  if (v == null) return '';
+  if (typeof v === 'number') return String(v);
+  if (v instanceof Uint8Array) return new TextDecoder().decode(v);
+  return String(v);
+}
+
+function rowToGpmProfile(cols, row) {
+  const lower = cols.map(c => String(c).toLowerCase());
+  const get = (...names) => {
+    for (const n of names) {
+      const i = lower.indexOf(n.toLowerCase());
+      if (i >= 0) return cellToString(row[i]);
+    }
+    return '';
+  };
+  return {
+    id: get('id'),
+    name: get('name'),
+    profilePath: get('profilepath'),
+  };
+}
+
+async function readProfilesFromDbFile(dbPath) {
+  const SQL = await getSqlJs();
+  const buf = fs.readFileSync(dbPath);
+  const db = new SQL.Database(buf);
+  try {
+    const table = resolveProfilesTableName(db);
+    if (!table) return [];
+    const quoted = `"${String(table).replace(/"/g, '""')}"`;
+    const res = db.exec(`SELECT * FROM ${quoted}`);
+    if (!res.length) return [];
+    const { columns, values } = res[0];
+    return values.map(row => rowToGpmProfile(columns, row));
+  } finally {
+    db.close();
+  }
+}
+
+async function loadGpmProfilesFromDbFiles(dbFiles) {
+  const byId = new Map();
+  for (const file of dbFiles) {
+    try {
+      const rows = await readProfilesFromDbFile(file);
+      for (const row of rows) {
+        const key = row.id || `${file}:${row.name}:${row.profilePath}`;
+        if (!byId.has(key)) byId.set(key, row);
+      }
+    } catch (e) {
+      console.error('[MaVid] loadGpmProfilesFromDbFiles:', file, e);
+    }
+  }
+  return [...byId.values()];
+}
+
+ipcMain.handle('get-gpm-data-folder', async () => ({ path: readGpmDataFolder() }));
+
+ipcMain.handle('select-gpm-browser-exe', async () => {
+  const win = BrowserWindow.getFocusedWindow() || mainWindow;
+  const r = await dialog.showOpenDialog(win ?? undefined, {
+    properties: ['openFile'],
+    title: 'Chọn trình duyệt GPM (browser.exe hoặc chrome.exe)',
+    filters:
+      process.platform === 'win32'
+        ? [{ name: 'Executable', extensions: ['exe'] }, { name: 'Tất cả', extensions: ['*'] }]
+        : [{ name: 'Tất cả', extensions: ['*'] }],
+  });
+  if (r.canceled || !r.filePaths?.length) return { ok: false, cancelled: true };
+  const p = r.filePaths[0];
+  try {
+    if (!fs.existsSync(p) || !fs.statSync(p).isFile()) return { ok: false, reason: 'not-found' };
+  } catch {
+    return { ok: false, reason: 'not-found' };
+  }
+  writeGpmSettings({ browserExe: p });
+  return { ok: true, path: p };
+});
+
+ipcMain.handle('clear-gpm-browser-exe', async () => {
+  writeGpmSettings({ browserExe: null });
+  return { ok: true, path: null };
+});
+
+ipcMain.handle('select-gpm-data-folder', async () => {
+  const win = BrowserWindow.getFocusedWindow() || mainWindow;
+  const r = await dialog.showOpenDialog(win ?? undefined, {
+    properties: ['openDirectory'],
+    title: 'Chọn thư mục dữ liệu GPM',
+  });
+  if (r.canceled || !r.filePaths?.length) return { ok: false, cancelled: true };
+  const p = r.filePaths[0];
+  writeGpmDataFolder(p);
+  return { ok: true, path: p };
+});
+
+ipcMain.handle('load-gpm-profiles', async () => {
+  const { dataFolder: folder, browserExe } = readGpmSettings();
+  if (!folder) {
+    return {
+      ok: true,
+      path: null,
+      browserExe,
+      profiles: [],
+      dbFiles: [],
+      message: 'Chưa chọn thư mục dữ liệu GPM.',
+    };
+  }
+  if (!fs.existsSync(folder)) {
+    return {
+      ok: true,
+      path: folder,
+      browserExe,
+      profiles: [],
+      dbFiles: [],
+      message: 'Thư mục đã lưu không còn tồn tại.',
+    };
+  }
+  const dbFiles = findDbFilesInFolder(folder);
+  if (!dbFiles.length) {
+    return {
+      ok: true,
+      path: folder,
+      browserExe,
+      profiles: [],
+      dbFiles: [],
+      message: 'Không tìm thấy file .db trong thư mục đã chọn.',
+    };
+  }
+  const profiles = await loadGpmProfilesFromDbFiles(dbFiles);
+  return {
+    ok: true,
+    path: folder,
+    browserExe,
+    profiles,
+    dbFiles: dbFiles.map(f => path.basename(f)),
+    message: null,
+  };
+});
+
+/** `profileKey` (id UI) → tiến trình `node openGpmPlaywright.js --folder …` */
+const gpmPlaywrightFolderChildren = new Map();
+
+function resolveGpmProfileDirectory(gpmRoot, profilePath) {
+  if (!profilePath || typeof profilePath !== 'string' || !profilePath.trim()) return null;
+  const raw = profilePath.trim();
+  let resolved;
+  if (path.isAbsolute(raw)) {
+    resolved = path.normalize(raw);
+  } else {
+    if (!gpmRoot || typeof gpmRoot !== 'string' || !gpmRoot.trim()) return null;
+    resolved = path.normalize(path.join(gpmRoot.trim(), raw));
+  }
+  try {
+    if (!fs.existsSync(resolved) || !fs.statSync(resolved).isDirectory()) return null;
+  } catch {
+    return null;
+  }
+  return resolved;
+}
+
+/** Renderer gọi API Local GPM qua main (không CORS, kể cả khi load file://). */
+function registerGpmApiRequestIpc() {
+  const ch = 'gpm-api-request';
+  try {
+    ipcMain.removeHandler(ch);
+  } catch {
+    /* ignore */
+  }
+  ipcMain.handle(ch, async (_event, payload) => {
+    const rawPath = payload?.path;
+    if (typeof rawPath !== 'string' || !rawPath.trim()) {
+      return { ok: false, status: 0, bodyText: '', error: 'missing-path' };
+    }
+    const rel = rawPath.replace(/^\/+/, '');
+    const url = `${GPM_API_V3_ROOT}/${rel}`;
+    const method = typeof payload?.method === 'string' && payload.method.trim() ? payload.method.trim() : 'GET';
+    const h = new Headers();
+    h.set('Accept', 'application/json');
+    const extra = payload?.headers && typeof payload.headers === 'object' && !Array.isArray(payload.headers) ? payload.headers : {};
+    for (const [k, v] of Object.entries(extra)) {
+      if (v != null && v !== '') h.set(k, String(v));
+    }
+    const t = process.env.GPM_API_TOKEN?.trim();
+    if (t && !h.has('Authorization')) h.set('Authorization', `Bearer ${t}`);
+    try {
+      const res = await fetch(url, { method, headers: h });
+      const bodyText = await res.text();
+      return { ok: res.ok, status: res.status, bodyText };
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      return { ok: false, status: 0, bodyText: '', error: msg };
+    }
+  });
+}
+
+function registerGpmPlaywrightFolderIpc() {
+  const gpmPwChannels = ['gpm-playwright-list-open', 'gpm-playwright-start-folder', 'gpm-playwright-stop-folder'];
+  for (const ch of gpmPwChannels) {
+    try {
+      ipcMain.removeHandler(ch);
+    } catch {
+      /* ignore */
+    }
+  }
+
+  ipcMain.handle('gpm-playwright-list-open', async () => ({
+    keys: [...gpmPlaywrightFolderChildren.keys()],
+  }));
+
+  ipcMain.handle('gpm-playwright-start-folder', async (_event, { gpmRoot, profilePath, profileKey, startUrl }) => {
+    const key = typeof profileKey === 'string' && profileKey.trim() ? profileKey.trim() : '';
+    if (!key) return { ok: false, reason: 'missing-profile-key' };
+    if (gpmPlaywrightFolderChildren.has(key)) return { ok: false, reason: 'already-running' };
+
+    const resolved = resolveGpmProfileDirectory(gpmRoot, profilePath);
+    if (!resolved) return { ok: false, reason: 'invalid-profile-path' };
+
+    const scriptPath = path.join(ROOT, 'contents', 'scripts', 'openGpmPlaywright.js');
+    if (!fs.existsSync(scriptPath)) return { ok: false, reason: 'script-missing' };
+
+    const url = typeof startUrl === 'string' && startUrl.trim() ? startUrl.trim() : 'https://www.google.com';
+
+    const gpmSt = readGpmSettings();
+    const gpmRootTrim = gpmRoot.trim();
+    const env = { ...process.env, GPM_DATA_ROOT: gpmRootTrim };
+    if (gpmSt.browserExe) env.GPM_CHROMIUM_PATH = gpmSt.browserExe;
+
+    const preferredExe = gpmSt.browserExe?.trim() || process.env.GPM_CHROMIUM_PATH?.trim() || '';
+    try {
+      resolveGpmChromiumExecutable(resolved, gpmRootTrim, preferredExe || undefined);
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      return { ok: false, reason: 'gpm-browser-not-found', detail: msg };
+    }
+
+    const child = spawn('node', [scriptPath, '--folder', resolved, url], {
+      cwd: ROOT,
+      env,
+      stdio: ['ignore', 'ignore', 'pipe'],
+      windowsHide: true,
+    });
+    child.stderr?.on('data', buf => {
+      const t = buf.toString().trimEnd();
+      if (t) console.error('[openGpmPlaywright]', t);
+    });
+
+    child.on('error', err => {
+      console.error('[MaVid] gpm-playwright-start-folder:', err);
+      gpmPlaywrightFolderChildren.delete(key);
+    });
+    child.once('exit', (code, signal) => {
+      gpmPlaywrightFolderChildren.delete(key);
+      if (code !== 0 && code != null) {
+        console.warn(`[MaVid] openGpmPlaywright folder exit code=${code} signal=${signal ?? ''}`);
+      }
+    });
+
+    gpmPlaywrightFolderChildren.set(key, child);
+    return { ok: true, resolvedDir: resolved };
+  });
+
+  ipcMain.handle('gpm-playwright-stop-folder', async (_event, { profileKey }) => {
+    const key = typeof profileKey === 'string' ? profileKey.trim() : '';
+    if (!key) return { ok: false, reason: 'missing-profile-key' };
+    const child = gpmPlaywrightFolderChildren.get(key);
+    if (!child) return { ok: false, reason: 'not-running' };
+
+    try {
+      child.kill('SIGTERM');
+    } catch (e) {
+      console.error('[MaVid] gpm-playwright-stop-folder:', e);
+    }
+
+    setTimeout(() => {
+      try {
+        const c = gpmPlaywrightFolderChildren.get(key);
+        if (c === child && !child.killed) {
+          killNpmSpawnTree(child);
+        }
+      } catch {
+        /* ignore */
+      }
+    }, 5000);
+
+    return { ok: true };
+  });
+}
+
 // --------------- Constants read/write ---------------
 
 const CONSTANT_EXPORT_KEYS = [
-  'MAKE_VIDEO_MODE', 'VIDEO_TYPE', 'flowSettings', 'GEMINI_CONFIG',
-  'GEMINI_CHUNK_SIZE', 'LANGUAGES_NEED_UPDATE_TRANSCRIPT', 'META_DATA',
-  'DEFAULT_VIDEO', 'AUDIO_SPEED', 'STOCK_VIDEO', 'SUBTITLE', 'LOGO',
+  'MAKE_VIDEO_MODE',
+  'VIDEO_TYPE',
+  'flowSettings',
+  'GEMINI_CONFIG',
+  'GEMINI_CHUNK_SIZE',
+  'LANGUAGES_NEED_UPDATE_TRANSCRIPT',
+  'META_DATA',
+  'DEFAULT_VIDEO',
+  'AUDIO_SPEED',
+  'STOCK_VIDEO',
+  'SUBTITLE',
+  'LOGO',
+  'VIDEO_STORAGE_ROOT',
 ];
+
+/** Thư mục con trong `MaVidMedia`. */
+const VIDEO_STORAGE_CHILD_DIRS = ['backgrounds', 'videos', 'channels'];
+
+async function resolveStockBackgroundsDirFromDisk() {
+  const mod = await importConstantsFresh();
+  let root = typeof mod.VIDEO_STORAGE_ROOT === 'string' ? mod.VIDEO_STORAGE_ROOT.trim() : '';
+  if (!root) root = getDefaultVideoStorageRoot();
+  return path.join(root, 'backgrounds');
+}
+
+async function resolveChannelsDirFromDisk() {
+  const mod = await importConstantsFresh();
+  let root = typeof mod.VIDEO_STORAGE_ROOT === 'string' ? mod.VIDEO_STORAGE_ROOT.trim() : '';
+  if (!root) root = getDefaultVideoStorageRoot();
+  return path.join(root, 'channels');
+}
+
+/**
+ * Đường dẫn tuyệt đối trong thư mục kênh (MaVidMedia/channels).
+ * UI có thể gửi `channels/index.xlsx` hoặc `index.xlsx` — bỏ tiền tố `channels/`.
+ */
+async function resolvePathUnderChannelsDir(filePath) {
+  const channelsDir = await resolveChannelsDirFromDisk();
+  if (path.isAbsolute(filePath)) {
+    return { channelsDir, abs: path.normalize(filePath) };
+  }
+  let rel = String(filePath).replace(/^[/\\]+/, '').replace(/\\/g, '/');
+  const prefix = 'channels/';
+  if (rel.toLowerCase().startsWith(prefix)) {
+    rel = rel.slice(prefix.length);
+  }
+  return { channelsDir, abs: path.normalize(path.join(channelsDir, rel)) };
+}
 
 async function importConstantsFresh() {
   if (!fs.existsSync(CONSTANTS_INDEX_FILE)) {
@@ -239,10 +659,24 @@ async function importConstantsFresh() {
   return import(`${moduleUrl}?cacheBust=${Date.now()}`);
 }
 
+async function writeConstantsIndexJs(nextValues) {
+  const header = `// Auto-generated by MaVid UI (edit settings)\n// File path: contents/constants/index.js\n\n`;
+  const body = CONSTANT_EXPORT_KEYS.map(name => {
+    const v = nextValues[name];
+    if (v === undefined) throw new Error(`Thiếu giá trị export: ${name}`);
+    return `export const ${name} = ${JSON.stringify(v, null, 2)};`;
+  }).join('\n\n');
+  fs.writeFileSync(CONSTANTS_INDEX_FILE, header + body + '\n', 'utf-8');
+}
+
 ipcMain.handle('get-constants-ui-model', async () => {
   const mod = await importConstantsFresh();
   const model = {};
   for (const key of CONSTANT_EXPORT_KEYS) model[key] = mod[key];
+  const root = model.VIDEO_STORAGE_ROOT;
+  if (typeof root !== 'string' || !root.trim()) {
+    model.VIDEO_STORAGE_ROOT = getDefaultVideoStorageRoot();
+  }
   return model;
 });
 
@@ -256,20 +690,59 @@ ipcMain.handle('save-constants-ui-model', async (_event, { modelPatch }) => {
     nextValues[key] = modelPatch[key];
   }
 
-  const header = `// Auto-generated by MaVid UI (edit settings)\n// File path: contents/constants/index.js\n\n`;
-  const body = CONSTANT_EXPORT_KEYS.map(name => {
-    return `export const ${name} = ${JSON.stringify(nextValues[name], null, 2)};`;
-  }).join('\n\n');
-
-  fs.writeFileSync(CONSTANTS_INDEX_FILE, header + body + '\n', 'utf-8');
+  await writeConstantsIndexJs(nextValues);
   return { ok: true };
+});
+
+/**
+ * Chọn thư mục cha (vd. ổ D:\\); tạo `MaVidMedia/backgrounds`, `MaVidMedia/videos`, `MaVidMedia/channels`;
+ * ghi `VIDEO_STORAGE_ROOT` = đường dẫn tới `MaVidMedia`.
+ */
+ipcMain.handle('select-video-storage-folder', async (_event, { currentPath } = {}) => {
+  const win = BrowserWindow.getFocusedWindow() || mainWindow;
+  const defaultMaVidRoot = getDefaultVideoStorageRoot();
+  let defaultPath = path.dirname(defaultMaVidRoot);
+  if (typeof currentPath === 'string' && currentPath.trim()) {
+    const cp = path.normalize(currentPath.trim());
+    try {
+      if (path.basename(cp).toLowerCase() === MAVID_MEDIA_FOLDER.toLowerCase()) {
+        defaultPath = path.dirname(cp);
+      } else if (fs.existsSync(cp)) {
+        defaultPath = cp;
+      }
+    } catch {
+      /* giữ defaultPath */
+    }
+  }
+  try {
+    if (!fs.existsSync(defaultPath)) defaultPath = path.dirname(defaultMaVidRoot);
+  } catch {
+    defaultPath = path.dirname(defaultMaVidRoot);
+  }
+  const r = await dialog.showOpenDialog(win, {
+    title: 'Chọn thư mục chứa MaVidMedia',
+    defaultPath,
+    properties: ['openDirectory', 'createDirectory'],
+  });
+  if (r.canceled || !r.filePaths?.length) return { ok: false, path: null };
+  const parentDir = path.normalize(r.filePaths[0]);
+  const root = path.join(parentDir, MAVID_MEDIA_FOLDER);
+  for (const sub of VIDEO_STORAGE_CHILD_DIRS) {
+    fs.mkdirSync(path.join(root, sub), { recursive: true });
+  }
+  const mod = await importConstantsFresh();
+  const nextValues = { ...mod, VIDEO_STORAGE_ROOT: root };
+  await writeConstantsIndexJs(nextValues);
+  return { ok: true, path: root };
 });
 
 // --------------- Backgrounds ---------------
 
 ipcMain.handle('list-backgrounds', async () => {
-  if (!fs.existsSync(BACKGROUNDS_DIR)) return [];
-  return fs.readdirSync(BACKGROUNDS_DIR, { withFileTypes: true })
+  const dir = await resolveStockBackgroundsDirFromDisk();
+  if (!fs.existsSync(dir)) return [];
+  return fs
+    .readdirSync(dir, { withFileTypes: true })
     .filter(d => d.isDirectory())
     .map(d => d.name)
     .sort((a, b) => a.localeCompare(b));
@@ -278,11 +751,63 @@ ipcMain.handle('list-backgrounds', async () => {
 // --------------- Channel Folders ---------------
 
 ipcMain.handle('list-channel-folders', async () => {
-  if (!fs.existsSync(CHANNELS_DIR)) return [];
-  return fs.readdirSync(CHANNELS_DIR, { withFileTypes: true })
+  const channelsDir = await resolveChannelsDirFromDisk();
+  if (!fs.existsSync(channelsDir)) return [];
+  return fs
+    .readdirSync(channelsDir, { withFileTypes: true })
     .filter(d => d.isDirectory())
     .map(d => d.name)
     .sort((a, b) => a.localeCompare(b));
+});
+
+/** Email đã dùng: index.xlsx + cột EMAIL trong mỗi file kênh con (MaVidMedia/channels/<tên>/*.xlsx|.csv). */
+ipcMain.handle('list-registered-channel-emails', async () => {
+  const channelsDir = await resolveChannelsDirFromDisk();
+  const set = new Set();
+  const normEmail = e =>
+    String(e ?? '')
+      .trim()
+      .toLowerCase();
+
+  const indexPath = path.join(channelsDir, 'index.xlsx');
+  if (fs.existsSync(indexPath)) {
+    const data = await readSpreadsheetAsChannelData(indexPath);
+    const emailKey = data.headers.find(h => normHeaderCell(h) === 'EMAIL');
+    if (emailKey) {
+      for (const row of data.rows) {
+        const v = normEmail(row[emailKey]);
+        if (v) set.add(v);
+      }
+    }
+  }
+
+  if (fs.existsSync(channelsDir)) {
+    const subs = fs.readdirSync(channelsDir, { withFileTypes: true }).filter(d => d.isDirectory());
+    for (const ent of subs) {
+      const dir = path.join(channelsDir, ent.name);
+      const names = fs.readdirSync(dir);
+      const dataFiles = names
+        .filter(f => /\.xlsx$/i.test(f) || /\.csv$/i.test(f))
+        .sort((a, b) => {
+          const ax = /\.xlsx$/i.test(a);
+          const bx = /\.xlsx$/i.test(b);
+          if (ax && !bx) return -1;
+          if (!ax && bx) return 1;
+          return a.localeCompare(b);
+        });
+      if (dataFiles.length === 0) continue;
+      const fullPath = path.join(dir, dataFiles[0]);
+      const data = await readSpreadsheetAsChannelData(fullPath);
+      const emailKey = data.headers.find(h => normHeaderCell(h) === 'EMAIL');
+      if (!emailKey) continue;
+      for (const row of data.rows) {
+        const v = normEmail(row[emailKey]);
+        if (v) set.add(v);
+      }
+    }
+  }
+
+  return [...set].sort((a, b) => a.localeCompare(b));
 });
 
 /** Tên preset (`NAME`) từ contents/constants/overlayOptions.js — không import makeVideoFromFull (tránh load GPU/ffmpeg khi mở UI). */
@@ -306,19 +831,24 @@ function countFiles(dir) {
   try {
     if (!fs.existsSync(dir)) return 0;
     return fs.readdirSync(dir, { withFileTypes: true }).filter(d => d.isFile()).length;
-  } catch { return 0; }
+  } catch {
+    return 0;
+  }
 }
 
 function countDirs(dir) {
   try {
     if (!fs.existsSync(dir)) return 0;
     return fs.readdirSync(dir, { withFileTypes: true }).filter(d => d.isDirectory()).length;
-  } catch { return 0; }
+  } catch {
+    return 0;
+  }
 }
 
 ipcMain.handle('get-stats', async () => {
+  const channelsDir = await resolveChannelsDirFromDisk();
   return {
-    channels: countFiles(CHANNELS_DIR),
+    channels: countFiles(channelsDir),
     outputs: countFiles(OUTPUTS_DIR) + countDirs(OUTPUTS_DIR),
     downloads: countFiles(DOWNLOADS_DIR) + countDirs(DOWNLOADS_DIR),
   };
@@ -327,12 +857,13 @@ ipcMain.handle('get-stats', async () => {
 // --------------- Channels ---------------
 
 ipcMain.handle('list-channels', async () => {
-  if (!fs.existsSync(CHANNELS_DIR)) return [];
-  const entries = fs.readdirSync(CHANNELS_DIR, { withFileTypes: true });
+  const channelsDir = await resolveChannelsDirFromDisk();
+  if (!fs.existsSync(channelsDir)) return [];
+  const entries = fs.readdirSync(channelsDir, { withFileTypes: true });
   return entries
     .filter(d => d.isFile() && (d.name.endsWith('.xlsx') || d.name.endsWith('.csv')))
     .map(d => {
-      const fullPath = path.join(CHANNELS_DIR, d.name);
+      const fullPath = path.join(channelsDir, d.name);
       const stat = fs.statSync(fullPath);
       return { name: d.name, path: fullPath, modifiedAt: stat.mtime.toISOString() };
     })
@@ -387,7 +918,10 @@ async function readXlsxAsChannelData(absPath) {
 function readCsvAsChannelData(absPath) {
   try {
     const content = fs.readFileSync(absPath, 'utf-8').replace(/^\uFEFF/, '');
-    const lines = content.split(/\n/).map(l => l.trimEnd()).filter(l => l.trim());
+    const lines = content
+      .split(/\n/)
+      .map(l => l.trimEnd())
+      .filter(l => l.trim());
     if (lines.length === 0) return { headers: [], rows: [] };
     const parseLine = line => line.split(',').map(c => c.trim().replace(/^"|"$/g, ''));
     const headers = parseLine(lines[0]);
@@ -429,9 +963,9 @@ const INDEX_THOI_GIAN_OPTIONS = [15, 20, 30, 60];
 ipcMain.handle('read-channel-data', async (_event, { filePath }) => {
   if (!filePath || typeof filePath !== 'string') throw new Error('filePath không hợp lệ.');
 
-  const norm = path.isAbsolute(filePath) ? path.normalize(filePath) : path.normalize(path.join(ROOT, filePath));
+  const { channelsDir, abs: norm } = await resolvePathUnderChannelsDir(filePath);
 
-  if (!isPathInsideDir(CHANNELS_DIR, norm)) throw new Error('Truy cập bị từ chối.');
+  if (!isPathInsideDir(channelsDir, norm)) throw new Error('Truy cập bị từ chối.');
 
   if (!fs.existsSync(norm)) return { headers: [], rows: [] };
   const st = fs.statSync(norm);
@@ -445,10 +979,10 @@ ipcMain.handle('read-channel-data', async (_event, { filePath }) => {
  */
 ipcMain.handle('write-channel-index', async (_event, { filePath, headers, rows }) => {
   if (!filePath || typeof filePath !== 'string') throw new Error('filePath không hợp lệ.');
-  const norm = path.isAbsolute(filePath) ? path.normalize(filePath) : path.normalize(path.join(ROOT, filePath));
-  const indexOnly = path.join(CHANNELS_DIR, 'index.xlsx');
+  const { channelsDir, abs: norm } = await resolvePathUnderChannelsDir(filePath);
+  const indexOnly = path.join(channelsDir, 'index.xlsx');
   if (path.resolve(norm) !== path.resolve(indexOnly)) {
-    throw new Error('Chỉ được ghi channels/index.xlsx.');
+    throw new Error('Chỉ được ghi channels/index.xlsx (MaVidMedia/channels).');
   }
   if (!Array.isArray(headers) || headers.length === 0 || !headers.every(h => typeof h === 'string' && h.trim())) {
     throw new Error('headers không hợp lệ.');
@@ -485,9 +1019,10 @@ ipcMain.handle('write-channel-index', async (_event, { filePath, headers, rows }
   const thoiGianCol = headers.findIndex(h => normHeaderCell(h) === normHeaderCell('THỜI GIAN VIDEO')) + 1;
   const bgCol = headers.findIndex(h => normHeaderCell(h) === normHeaderCell('BACKGROUND')) + 1;
 
+  const backgroundsDir = await resolveStockBackgroundsDirFromDisk();
   let bgOptions = [];
-  if (fs.existsSync(BACKGROUNDS_DIR)) {
-    bgOptions = fs.readdirSync(BACKGROUNDS_DIR).filter(f => fs.statSync(path.join(BACKGROUNDS_DIR, f)).isDirectory());
+  if (fs.existsSync(backgroundsDir)) {
+    bgOptions = fs.readdirSync(backgroundsDir).filter(f => fs.statSync(path.join(backgroundsDir, f)).isDirectory());
   }
 
   const typeFormula = `"${INDEX_VIDEO_TYPE_OPTIONS.join(',')}"`;
@@ -518,16 +1053,17 @@ ipcMain.handle('write-channel-index', async (_event, { filePath, headers, rows }
     }
   }
 
-  fs.mkdirSync(CHANNELS_DIR, { recursive: true });
+  fs.mkdirSync(channelsDir, { recursive: true });
   await workbook.xlsx.writeFile(norm);
   return { ok: true };
 });
 
-/** Đọc file .xlsx hoặc .csv đầu tiên (ưu tiên .xlsx) trong `channels/{channelFolder}/`. */
+/** Đọc file .xlsx hoặc .csv đầu tiên (ưu tiên .xlsx) trong `MaVidMedia/channels/{channelFolder}/`. */
 ipcMain.handle('read-channel-folder-data', async (_event, { channelFolder }) => {
+  const channelsDir = await resolveChannelsDirFromDisk();
   const safe = assertSafeChannelFolderName(channelFolder);
-  const dir = path.join(CHANNELS_DIR, safe);
-  if (!isPathInsideDir(CHANNELS_DIR, dir)) throw new Error('Truy cập bị từ chối.');
+  const dir = path.join(channelsDir, safe);
+  if (!isPathInsideDir(channelsDir, dir)) throw new Error('Truy cập bị từ chối.');
   if (!fs.existsSync(dir) || !fs.statSync(dir).isDirectory()) {
     return { headers: [], rows: [], fileName: null, channelFolder: safe };
   }
@@ -550,17 +1086,80 @@ ipcMain.handle('read-channel-folder-data', async (_event, { channelFolder }) => 
   return { ...data, fileName, channelFolder: safe };
 });
 
+/** Đọc `MaVidMedia/channels/{channelFolder}/mavid-channel-config.json` (null nếu không có / lỗi parse). */
+ipcMain.handle('read-mavid-channel-config', async (_event, { channelFolder }) => {
+  const channelsDir = await resolveChannelsDirFromDisk();
+  const safe = assertSafeChannelFolderName(channelFolder);
+  const dir = path.join(channelsDir, safe);
+  if (!isPathInsideDir(channelsDir, dir) || !fs.existsSync(dir) || !fs.statSync(dir).isDirectory()) {
+    return null;
+  }
+  const p = path.join(dir, MAVID_CHANNEL_CONFIG_FILENAME);
+  if (!fs.existsSync(p)) return null;
+  try {
+    const raw = fs.readFileSync(p, 'utf-8');
+    return JSON.parse(raw);
+  } catch {
+    return null;
+  }
+});
+
 /**
- * Đánh dấu START FROM trên một dòng dữ liệu (xóa các dòng khác) — file .xlsx trong `channels/{channelFolder}/`.
+ * Ghi merge `patch` vào `MaVidMedia/channels/{channelFolder}/mavid-channel-config.json`.
+ * Chỉ cập nhật các khóa được phép (setup từ form); giữ nguyên channelUrl, youtube, createdAt, …
+ */
+ipcMain.handle('write-mavid-channel-config', async (_event, { channelFolder, patch }) => {
+  const channelsDir = await resolveChannelsDirFromDisk();
+  const safe = assertSafeChannelFolderName(channelFolder);
+  const dir = path.join(channelsDir, safe);
+  if (!isPathInsideDir(channelsDir, dir) || !fs.existsSync(dir) || !fs.statSync(dir).isDirectory()) {
+    throw new Error('Thư mục channel không tồn tại.');
+  }
+  if (!patch || typeof patch !== 'object') throw new Error('patch không hợp lệ.');
+  const p = path.join(dir, MAVID_CHANNEL_CONFIG_FILENAME);
+  let base = { version: 1, folderId: safe };
+  if (fs.existsSync(p)) {
+    try {
+      base = { ...base, ...JSON.parse(fs.readFileSync(p, 'utf-8')) };
+    } catch {
+      throw new Error('File mavid-channel-config.json không đọc được (JSON hỏng).');
+    }
+  }
+  const allowed = ['email', 'videoType', 'durationMinutes', 'background', 'videosPerDayPreset', 'publishTimes'];
+  const clean = {};
+  for (const k of allowed) {
+    if (Object.prototype.hasOwnProperty.call(patch, k)) clean[k] = patch[k];
+  }
+  if (clean.email != null && typeof clean.email !== 'string') throw new Error('email không hợp lệ.');
+  if (clean.videoType != null && clean.videoType !== 'from_audio' && clean.videoType !== 'reup_full') {
+    throw new Error('videoType không hợp lệ.');
+  }
+  if (clean.durationMinutes != null && (typeof clean.durationMinutes !== 'number' || !Number.isFinite(clean.durationMinutes))) {
+    throw new Error('durationMinutes không hợp lệ.');
+  }
+  if (clean.background != null && typeof clean.background !== 'string') throw new Error('background không hợp lệ.');
+  if (clean.videosPerDayPreset != null && typeof clean.videosPerDayPreset !== 'string') {
+    throw new Error('videosPerDayPreset không hợp lệ.');
+  }
+  if (clean.publishTimes != null && !Array.isArray(clean.publishTimes)) throw new Error('publishTimes phải là mảng.');
+  const next = { ...base, ...clean };
+  if (typeof next.version !== 'number') next.version = 1;
+  fs.writeFileSync(p, `${JSON.stringify(next, null, 2)}\n`, 'utf-8');
+  return { ok: true };
+});
+
+/**
+ * Đánh dấu START FROM trên một dòng dữ liệu (xóa các dòng khác) — file .xlsx trong `MaVidMedia/channels/{channelFolder}/`.
  * `dataRowIndex`: 0 = dòng đầu sau header (khớp thứ tự `rows` từ read-channel-folder-data).
  */
 ipcMain.handle('set-channel-folder-start-from-row', async (_event, { channelFolder, dataRowIndex }) => {
+  const channelsDir = await resolveChannelsDirFromDisk();
   const safe = assertSafeChannelFolderName(channelFolder);
   if (typeof dataRowIndex !== 'number' || !Number.isInteger(dataRowIndex) || dataRowIndex < 0) {
     throw new Error('dataRowIndex không hợp lệ.');
   }
-  const dir = path.join(CHANNELS_DIR, safe);
-  if (!isPathInsideDir(CHANNELS_DIR, dir) || !fs.existsSync(dir) || !fs.statSync(dir).isDirectory()) {
+  const dir = path.join(channelsDir, safe);
+  if (!isPathInsideDir(channelsDir, dir) || !fs.existsSync(dir) || !fs.statSync(dir).isDirectory()) {
     throw new Error('Thư mục channel không tồn tại.');
   }
   const names = fs.readdirSync(dir);
@@ -615,7 +1214,9 @@ async function waitForDevServer(url, timeoutMs = 30000) {
     try {
       const res = await fetch(url);
       if (res && (res.ok || res.status)) return true;
-    } catch { /* retry */ }
+    } catch {
+      /* retry */
+    }
     await new Promise(r => setTimeout(r, 500));
   }
   return false;
@@ -643,7 +1244,9 @@ async function createMainWindow() {
     }
   });
 
-  win.on('closed', () => { mainWindow = null; });
+  win.on('closed', () => {
+    mainWindow = null;
+  });
 
   const isDev = !app.isPackaged;
   if (isDev) {
@@ -658,6 +1261,8 @@ async function createMainWindow() {
 }
 
 app.whenReady().then(async () => {
+  registerGpmApiRequestIpc();
+  registerGpmPlaywrightFolderIpc();
   Menu.setApplicationMenu(null);
   await createMainWindow();
 

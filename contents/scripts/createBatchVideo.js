@@ -1,10 +1,11 @@
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import { resolveChannelsDir } from '../utils/channelsStoragePath.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.join(__dirname, '..', '..');
-const CHANNELS_DIR = path.join(ROOT, 'channels');
+const CHANNELS_DIR = resolveChannelsDir();
 
 /**
  * @param {Record<string, unknown>} props
@@ -54,10 +55,10 @@ function parseDurationCellToSeconds(raw) {
 }
 
 const DATA_FILE_PATHS = [
-  path.join(ROOT, 'channels', '*', 'output.xlsx'),
-  path.join(ROOT, 'channels', '*', 'output.csv'),
-  path.join(ROOT, 'channels', 'output.xlsx'),
-  path.join(ROOT, 'channels', 'output.csv'),
+  path.join(CHANNELS_DIR, '*', 'output.xlsx'),
+  path.join(CHANNELS_DIR, '*', 'output.csv'),
+  path.join(CHANNELS_DIR, 'output.xlsx'),
+  path.join(CHANNELS_DIR, 'output.csv'),
   path.join(ROOT, 'output.xlsx'),
   path.join(ROOT, 'output.csv'),
 ];
@@ -231,7 +232,7 @@ export async function readVideoUrlsFromFile(inputFile = null, options = {}) {
 }
 
 /**
- * Suy ra tên folder channel từ đường dẫn file dữ liệu (output.xlsx nằm trong channels/TênChannel/).
+ * Suy ra tên folder channel từ đường dẫn file dữ liệu (output.xlsx nằm trong MaVidMedia/channels/TênChannel/).
  */
 function inferChannelFolderName(inputFile, channelsDir) {
   if (!inputFile) return null;
@@ -277,8 +278,8 @@ function buildMakeVideoFromAudioOptions(props, channelFolderName) {
  * @param {string} [props.channel] - Tên folder channel (skip prompt nếu có)
  * @param {number} [props.stockVideoCount] — (from_audio) giống makeVideoFromAudio: 0 / bỏ qua → dynamic
  * @param {number} [props.audioSpeed] — (from_audio) atempo, vd 0.91
- * @param {string} [props.stockFolder] — (from_audio) folder trong assets/backgrounds
- * @param {boolean} [props.showLogo] — (from_audio) true: ảnh đầu tiên trong channels/{channel}
+ * @param {string} [props.stockFolder] — (from_audio) tên folder con trong MaVidMedia/backgrounds
+ * @param {boolean} [props.showLogo] — (from_audio) true: ảnh đầu tiên trong MaVidMedia/channels/{channel}
  * @param {number} [props.maxVideosPerBatch] — tối đa số video mỗi lần chạy; env MAVID_MAX_VIDEOS_PER_BATCH; mặc định 5
  * @param {string} [props.overlay] — (reup_full) tên preset OVERLAY_OPTIONS
  * @param {string|number} [props.videoCropPercent] — (reup_full) VIDEO_CROP_PERCENT
@@ -330,7 +331,7 @@ async function main(props = {}) {
     } else if (folders.length === 1) {
       selectedFolder = folders[0];
     } else {
-      throw new Error('Không tìm thấy folder nào trong directories channels');
+      throw new Error('Không tìm thấy folder kênh nào trong MaVidMedia/channels');
     }
 
     if (selectedFolder) {
@@ -379,7 +380,6 @@ async function main(props = {}) {
         inputFile,
         items,
         batchLimit,
-        syncProgressToSpreadsheet: false,
         ...buildMakeVideoFromAudioOptions(props, effectiveChannelName),
       });
     } else if (videoType === MAKE_VIDEO_MODE.REUP_FULL) {
@@ -388,7 +388,6 @@ async function main(props = {}) {
         inputFile,
         items,
         batchLimit,
-        syncProgressToSpreadsheet: false,
         ...(overlayReup != null && String(overlayReup).trim() !== '' ? { overlay: String(overlayReup).trim() } : {}),
         ...(videoCropReup !== undefined && videoCropReup !== null && String(videoCropReup).trim() !== ''
           ? { VIDEO_CROP_PERCENT: videoCropReup }

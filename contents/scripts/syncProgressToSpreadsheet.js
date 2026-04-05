@@ -1,15 +1,15 @@
 /**
- * Duyệt mọi thư mục con trong channels/; nếu có file dữ liệu (.xlsx/.csv) và *_progress.json tương ứng
+ * Duyệt mọi thư mục con trong MaVidMedia/channels; nếu có file dữ liệu (.xlsx/.csv) và *_progress.json tương ứng
  * thì đồng bộ cột STATUS vào Excel/CSV.
  */
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { syncProgressFromFileToSpreadsheet } from '../syncProgressToSpreadsheet.js';
+import { resolveChannelsDir } from '../utils/channelsStoragePath.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const ROOT = path.join(__dirname, '..', '..');
-const CHANNELS_DIR = path.join(ROOT, 'channels');
+const CHANNELS_DIR = resolveChannelsDir();
 
 /** File .xlsx / .csv đầu tiên trong folder (ưu tiên .xlsx) — cùng quy tắc với batch/UI. */
 function getChannelDataFile(channelDir) {
@@ -30,7 +30,7 @@ function getChannelDataFile(channelDir) {
 
 async function main() {
   if (!fs.existsSync(CHANNELS_DIR)) {
-    console.error('Không tìm thấy thư mục channels/');
+    console.error('Không tìm thấy thư mục kênh (MaVidMedia/channels — kiểm tra VIDEO_STORAGE_ROOT trong constants).');
     process.exit(1);
   }
 

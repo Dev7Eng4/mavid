@@ -1,11 +1,12 @@
 import type { Page } from '../../types';
-import { PlayIcon, VideoIcon, SettingsIcon, ListIcon, TerminalIcon, FilmIcon } from '../ui/Icons';
+import { PlayIcon, VideoIcon, SettingsIcon, ListIcon, TerminalIcon, FilmIcon, GpmIcon } from '../ui/Icons';
 import type { ReactNode } from 'react';
 
 const NAV_ITEMS: { id: Page; label: string; icon: ReactNode }[] = [
   { id: 'pipeline', label: 'Pipeline', icon: <PlayIcon className='w-[18px] h-[18px]' /> },
   { id: 'create-video', label: 'Tạo video', icon: <FilmIcon className='w-[18px] h-[18px]' /> },
   { id: 'channels', label: 'Channels', icon: <ListIcon className='w-[18px] h-[18px]' /> },
+  { id: 'gpm', label: 'GPM', icon: <GpmIcon className='w-[18px] h-[18px]' /> },
   { id: 'settings', label: 'Settings', icon: <SettingsIcon className='w-[18px] h-[18px]' /> },
   { id: 'logs', label: 'Logs', icon: <TerminalIcon className='w-[18px] h-[18px]' /> },
 ];
@@ -28,7 +29,7 @@ export function Sidebar({ activePage, onNavigate, isRunning, onStopRunningJob }:
         <div
           className='w-9 h-9 rounded-xl flex items-center justify-center text-sm font-bold shadow-lg'
           style={{
-            background: 'linear-gradient(135deg, var(--accent) 0%, var(--accent-secondary) 100%)',
+            background: 'var(--accent)',
             color: '#fff',
           }}
         >
@@ -51,7 +52,7 @@ export function Sidebar({ activePage, onNavigate, isRunning, onStopRunningJob }:
                 background: active ? 'var(--accent-bg)' : 'transparent',
                 color: active ? 'var(--accent)' : 'var(--text)',
                 fontWeight: active ? 500 : 400,
-                boxShadow: active ? '0 0 20px rgba(192, 132, 252, 0.15)' : 'none',
+                boxShadow: active ? '0 0 20px rgba(0, 0, 0, 0.55)' : 'none',
               }}
               onMouseEnter={e => {
                 if (!active) {
@@ -102,7 +103,7 @@ export function Sidebar({ activePage, onNavigate, isRunning, onStopRunningJob }:
         </div>
       )}
 
-      <div className='px-5 py-4 text-xs font-medium' style={{ color: 'var(--text)', opacity: 0.4 }}>
+      <div className='px-5 py-4 text-sm font-medium' style={{ color: 'var(--text)', opacity: 0.4 }}>
         v0.1.0
       </div>
     </aside>

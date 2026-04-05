@@ -121,3 +121,24 @@ export function FilmIcon({ className = 'w-5 h-5' }: IconProps) {
     </svg>
   );
 }
+
+/** Chọn thư mục dữ liệu (GPM .db) */
+export function FolderOpenIcon({ className = 'w-5 h-5' }: IconProps) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M5 19a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2h4l2 2h10a2 2 0 0 1 2 2v1" />
+      <path d="M5 19h14a2 2 0 0 0 2-2v-3.28a2 2 0 0 0-.89-1.664l-5.08-3.81a2 2 0 0 0-1.23-.38H5" />
+    </svg>
+  );
+}
+
+/** GPM-Login / profile trình duyệt */
+export function GpmIcon({ className = 'w-5 h-5' }: IconProps) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <circle cx="12" cy="12" r="10" />
+      <path d="M2 12h20" />
+      <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z" />
+    </svg>
+  );
+}

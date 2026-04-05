@@ -13,12 +13,17 @@
   --card-bg: #14141e;
   --hover-bg: rgba(148, 163, 184, 0.08);
 
-  /* Accent Colors - Purple/Violet */
-  --accent: #a78bfa;
-  --accent-secondary: #7c3aed;
-  --accent-bg: rgba(167, 139, 250, 0.12);
-  --accent-border: rgba(167, 139, 250, 0.3);
-  --accent-glow: rgba(167, 139, 250, 0.25);
+  /* Accent — xanh dương (nút chính, link, sidebar active) */
+  --accent: #3b82f6;
+  --accent-secondary: #2563eb;
+  --accent-bg: rgba(59, 130, 246, 0.14);
+  --accent-border: rgba(59, 130, 246, 0.4);
+  --accent-glow: rgba(59, 130, 246, 0.2);
+
+  /* Bóng nút / thẻ: tối, dễ thấy trên nền OLED (không dùng màu accent loãng) */
+  --shadow-btn: 0 2px 10px rgba(0, 0, 0, 0.55);
+  --shadow-btn-hover: 0 4px 16px rgba(0, 0, 0, 0.65);
+  --shadow-elevated: 0 4px 24px rgba(0, 0, 0, 0.5);
 
   /* Status Colors */
   --success: #22c55e;
@@ -30,13 +35,14 @@
 
   --social-bg: rgba(30, 30, 46, 0.6);
   --shadow: 0 4px 24px rgba(0, 0, 0, 0.4);
-  --shadow-accent: 0 0 30px var(--accent-glow);
+  /* Hover card / secondary nút — bóng đen + viền sáng nhẹ */
+  --shadow-accent: var(--shadow-btn-hover);
 
   --sans: 'Inter', system-ui, -apple-system, sans-serif;
   --heading: 'Inter', system-ui, -apple-system, sans-serif;
   --mono: ui-monospace, 'Fira Code', Consolas, monospace;
 
-  font: 14px/1.6 var(--sans);
+  font: 15px/1.6 var(--sans);
   letter-spacing: -0.01em;
   color-scheme: dark;
   color: var(--text);
@@ -47,7 +53,7 @@
   -moz-osx-font-smoothing: grayscale;
 
   @media (max-width: 1024px) {
-    font-size: 14px;
+    font-size: 15px;
   }
 }
 
@@ -116,8 +122,186 @@ code,
 }
 
 code {
-  font-size: 15px;
+  font-size: 0.9375rem;
   line-height: 135%;
   padding: 4px 8px;
   background: var(--code-bg);
+}
+
+/* ─── Nút & liên kết quay lại — đồng bộ UI giữa các trang ─── */
+
+.mavid-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  border-radius: 0.75rem;
+  font-weight: 600;
+  line-height: 1.25;
+  transition:
+    background 0.2s,
+    border-color 0.2s,
+    color 0.2s,
+    box-shadow 0.2s,
+    filter 0.2s,
+    transform 0.15s;
+  cursor: pointer;
+  border-style: solid;
+  border-width: 1px;
+  outline: none;
+}
+
+.mavid-btn:focus-visible {
+  box-shadow: 0 0 0 2px var(--bg), 0 0 0 4px var(--accent);
+}
+
+.mavid-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
+.mavid-btn--md {
+  padding: 0.5625rem 0.9375rem;
+  font-size: 0.9375rem;
+}
+
+.mavid-btn--sm {
+  padding: 0.375rem 0.75rem;
+  font-size: 0.875rem;
+  font-weight: 600;
+}
+
+.mavid-btn--primary {
+  background: var(--accent);
+  color: #fff;
+  border-color: #1d4ed8;
+  box-shadow: var(--shadow-btn);
+}
+
+.mavid-btn--primary:hover:not(:disabled) {
+  background: var(--accent-secondary);
+  border-color: #1e40af;
+  box-shadow: var(--shadow-btn-hover);
+}
+
+.mavid-btn--primary:active:not(:disabled) {
+  transform: scale(0.98);
+}
+
+.mavid-btn--secondary {
+  background: var(--accent-bg);
+  color: var(--accent);
+  border-color: var(--accent-border);
+}
+
+.mavid-btn--secondary:hover:not(:disabled) {
+  box-shadow: var(--shadow-btn);
+  border-color: var(--accent-border);
+}
+
+.mavid-btn--ghost {
+  background: transparent;
+  color: var(--text-h);
+  border-color: var(--border);
+}
+
+.mavid-btn--ghost:hover:not(:disabled) {
+  background: var(--hover-bg);
+  border-color: var(--accent-border);
+}
+
+.mavid-btn--neutral {
+  background: var(--code-bg);
+  color: var(--text);
+  border-color: var(--border);
+}
+
+.mavid-btn--neutral:hover:not(:disabled) {
+  border-color: var(--accent-border);
+  background: var(--hover-bg);
+}
+
+.mavid-btn--danger {
+  color: #fff;
+  background: #dc2626;
+  border-color: #b91c1c;
+  box-shadow: var(--shadow-btn);
+}
+
+.mavid-btn--danger:hover:not(:disabled) {
+  background: #b91c1c;
+  border-color: #991b1b;
+  box-shadow: var(--shadow-btn-hover);
+}
+
+.mavid-back-link {
+  font-size: 0.9375rem;
+  font-weight: 600;
+  cursor: pointer;
+  border: none;
+  background: none;
+  padding: 0;
+  color: var(--accent);
+  transition: opacity 0.2s;
+}
+
+.mavid-back-link:hover:not(:disabled) {
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.mavid-back-link:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+/* Tab phân đoạn (Settings) */
+.mavid-tab {
+  flex: 1;
+  border-radius: 0.75rem;
+  padding: 0.5625rem 0.9375rem;
+  font-size: 0.9375rem;
+  font-weight: 600;
+  transition:
+    background 0.2s,
+    border-color 0.2s,
+    color 0.2s;
+  cursor: pointer;
+  border: 1px solid var(--border);
+  outline: none;
+}
+
+.mavid-tab:focus-visible {
+  box-shadow: 0 0 0 2px var(--bg), 0 0 0 4px var(--accent);
+}
+
+.mavid-tab--active {
+  color: var(--accent);
+  background: var(--accent-bg);
+  border-color: var(--accent-border);
+}
+
+.mavid-tab--inactive {
+  color: var(--text);
+  background: transparent;
+}
+
+.mavid-tab--inactive:hover {
+  border-color: var(--accent-border);
+  background: var(--hover-bg);
+}
+
+/* Cảnh báo dạng banner (đang chạy script…) */
+.mavid-callout-warning {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  font-size: 0.875rem;
+  line-height: 1.45;
+  border-radius: 0.75rem;
+  padding: 0.75rem 1rem;
+  color: var(--warning);
+  background: var(--warning-bg);
+  border: 1px solid rgba(245, 158, 11, 0.22);
 }

@@ -9,7 +9,7 @@ interface Props {
 export function SectionCard({ title, children, className = '' }: Props) {
   return (
     <div
-      className={`rounded-xl p-5 ${className}`}
+      className={`rounded-2xl p-5 ${className}`}
       style={{ background: 'var(--code-bg)', border: '1px solid var(--border)' }}
     >
       <h3 className="text-sm font-semibold mb-3" style={{ color: 'var(--text-h)' }}>

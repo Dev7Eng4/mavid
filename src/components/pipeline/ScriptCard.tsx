@@ -1,4 +1,5 @@
 import type { ScriptDef } from '../../types';
+import { AppButton } from '../ui/AppButton';
 import { StatusBadge } from '../ui/StatusBadge';
 import { PlayIcon, SpinnerIcon } from '../ui/Icons';
 
@@ -35,40 +36,21 @@ export function ScriptCard({ script, status, disabled, onRun }: Props) {
           <div className="text-sm font-semibold" style={{ color: 'var(--text-h)' }}>
             {script.title}
           </div>
-          <div className="text-xs mt-1.5 leading-relaxed" style={{ color: 'var(--text)' }}>
+          <div className="text-sm mt-1.5 leading-relaxed" style={{ color: 'var(--text)' }}>
             {script.summary}
           </div>
         </div>
         <StatusBadge status={status} />
       </div>
 
-      <button
-        onClick={onRun}
-        disabled={disabled}
-        className="self-start flex items-center gap-2 rounded-xl px-4 py-2 text-sm font-medium cursor-pointer transition-all duration-200"
-        style={{
-          background: 'var(--accent-bg)',
-          color: 'var(--accent)',
-          border: '1px solid var(--accent-border)',
-          opacity: disabled ? 0.4 : 1,
-          cursor: disabled ? 'not-allowed' : 'pointer',
-        }}
-        onMouseEnter={e => {
-          if (!disabled) {
-            e.currentTarget.style.boxShadow = 'var(--shadow-accent)';
-          }
-        }}
-        onMouseLeave={e => {
-          e.currentTarget.style.boxShadow = 'none';
-        }}
-      >
+      <AppButton type="button" variant="secondary" onClick={onRun} disabled={disabled} className="self-start">
         {isRunning ? (
           <SpinnerIcon className="w-4 h-4" />
         ) : (
           <PlayIcon className="w-4 h-4" />
         )}
         <span>{isRunning ? 'Đang chạy...' : 'Chạy'}</span>
-      </button>
+      </AppButton>
     </div>
   );
 }

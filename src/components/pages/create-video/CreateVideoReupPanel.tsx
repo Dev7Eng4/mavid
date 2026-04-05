@@ -3,6 +3,8 @@ import type { Page, ScriptId } from '../../../types';
 import { scriptDefs } from '../../../types';
 import { AlertIcon } from '../../ui/Icons';
 import { CustomSelect } from '../../ui/CustomSelect';
+import { PageBackLink } from '../../ui/PageBackLink';
+import { PageHeader } from '../../ui/PageHeader';
 import { buildMavidEnvForReupFull } from '../../../utils/reupFullEnv';
 
 const REUP_FULL_SCRIPT_ID: ScriptId = 'tao-batch-video-reup-full';
@@ -15,7 +17,7 @@ const CHANNEL_ICON = (
 
 function FieldLabel({ children }: { children: React.ReactNode }) {
   return (
-    <label className='block text-[11px] font-medium uppercase tracking-wider mb-2' style={{ color: 'var(--text-muted)' }}>
+    <label className='block text-sm font-medium uppercase tracking-wider mb-2' style={{ color: 'var(--text-muted)' }}>
       {children}
     </label>
   );
@@ -133,30 +135,15 @@ export function CreateVideoReupPanel({
 
   return (
     <div className='space-y-6 w-full min-w-0'>
-      <button
-        type='button'
-        onClick={() => !isBusy && onBack()}
-        disabled={isBusy}
-        className='text-sm font-medium cursor-pointer transition-colors duration-200 disabled:opacity-40'
-        style={{ color: 'var(--accent)' }}
-      >
-        ← Quay lại
-      </button>
+      <PageBackLink onClick={() => !isBusy && onBack()} disabled={isBusy} />
 
-      <div>
-        <h1 className='text-2xl font-bold' style={{ color: 'var(--text-h)' }}>
-          Reup Full
-        </h1>
-        <p className='text-sm mt-1' style={{ color: 'var(--text)' }}>
-          Overlay lên video gốc theo file Excel trong folder channel (giống batch Pipeline).
-        </p>
-      </div>
+      <PageHeader
+        title='Reup Full'
+        description='Overlay lên video gốc theo file Excel trong folder channel (giống batch Pipeline).'
+      />
 
       {disabled && (
-        <div
-          className='flex items-center gap-3 text-sm rounded-xl px-4 py-3'
-          style={{ color: 'var(--warning)', background: 'var(--warning-bg)', border: '1px solid rgba(245, 158, 11, 0.2)' }}
-        >
+        <div className='mavid-callout-warning'>
           <AlertIcon className='w-5 h-5 shrink-0' />
           <span>Đang có script khác chạy.</span>
         </div>
@@ -171,7 +158,7 @@ export function CreateVideoReupPanel({
               options={chOptions}
               onChange={setChannel}
               placeholder='Chọn channel...'
-              emptyText='Không có folder trong channels/'
+              emptyText='Không có folder trong MaVidMedia/channels/'
               icon={CHANNEL_ICON}
             />
           </div>
@@ -185,7 +172,7 @@ export function CreateVideoReupPanel({
               placeholder='Chọn preset...'
               emptyText='Không đọc được constants/overlayOptions.js / IPC Electron.'
             />
-            <p className='text-[11px] mt-2' style={{ color: 'var(--text-muted)' }}>
+            <p className='text-sm mt-2' style={{ color: 'var(--text-muted)' }}>
               Khớp tên thư mục trong assets/overlay/&lt;NAME&gt;/ — danh sách từ contents/constants/overlayOptions.js.
             </p>
           </div>
@@ -225,7 +212,7 @@ export function CreateVideoReupPanel({
                 +
               </button>
             </div>
-            <p className='text-[11px] mt-1.5' style={{ color: 'var(--text-muted)' }}>
+            <p className='text-sm mt-1.5' style={{ color: 'var(--text-muted)' }}>
               0 = tắt. 1–49: zoom tâm rồi cắt ~% mỗi phía (giống makeVideoFromFull).
             </p>
           </div>
@@ -265,7 +252,7 @@ export function CreateVideoReupPanel({
                 +
               </button>
             </div>
-            <p className='text-[11px] mt-1.5' style={{ color: 'var(--text-muted)' }}>
+            <p className='text-sm mt-1.5' style={{ color: 'var(--text-muted)' }}>
               Giới hạn số link xử lý mỗi lần chạy (1–100), mặc định 5.
             </p>
           </div>
@@ -305,7 +292,7 @@ export function CreateVideoReupPanel({
                 +
               </button>
             </div>
-            <p className='text-[11px] mt-1.5' style={{ color: 'var(--text-muted)' }}>
+            <p className='text-sm mt-1.5' style={{ color: 'var(--text-muted)' }}>
               0 = không lọc. &gt;0 = chỉ dòng có cột DURATION ≥ số phút.
             </p>
           </div>

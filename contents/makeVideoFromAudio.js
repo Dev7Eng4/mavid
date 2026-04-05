@@ -1,7 +1,7 @@
 /**
  * Tạo video từ audio + video stock
  * - Audio từ folder downloads
- * - N video stock từ assets/backgrounds/<tên> (N = STOCK_VIDEO_COUNT, cat, dog, ...)
+ * - N video stock từ MaVidMedia/backgrounds/<tên> (VIDEO_STORAGE_ROOT trong settings; N = STOCK_VIDEO_COUNT, cat, dog, ...)
  * - Bước 1: chỉnh tempo audio (ffmpeg atempo; nhỏ hơn 1 = chậm hơn → thời lượng dài hơn)
  * - Độ dài video = độ dài audio (sau khi chỉnh tốc độ), loop video nếu không đủ
  * - Phụ đề: copy file .srt/.vtt từ downloads/ — nếu SPEED ≠ 1 sẽ tự động scale timestamps cho khớp tốc độ audio
@@ -15,6 +15,8 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import { execSync, spawnSync } from 'child_process';
 import { MAKE_VIDEO_MODE, STOCK_VIDEO, SUBTITLE, LOGO } from './constants/index.js';
+import { resolveStockBackgroundsDir } from './utils/stockBackgroundsPath.js';
+import { resolveChannelsDir } from './utils/channelsStoragePath.js';
 import { convertAudioFile } from './convertAudio.js';
 import { GPU_INFO } from './utils/hardware.util.js';
 
@@ -451,20 +453,23 @@ async function processOne(bgNameArg, options = {}) {
   const { perVideoDir, originalTitle, description, tags, url, geminiByUrl, audioSpeed: speedIn, stockVideoCount: stockCountOpt, logoPath: logoPathOpt } =
     options;
   const speed = speedIn != null && Number.isFinite(Number(speedIn)) && Number(speedIn) > 0 ? Number(speedIn) : resolveAudioSpeed({});
+  const stockBgRoot = resolveStockBackgroundsDir();
   let backgroundName = bgNameArg || 'cat';
-  let backgroundsDir = path.join(ROOT, 'assets', 'backgrounds', backgroundName);
+  let backgroundsDir = path.join(stockBgRoot, backgroundName);
 
   if (!fs.existsSync(backgroundsDir)) {
-    console.warn(`Không tìm thấy folder assets/backgrounds/${backgroundName}/, sử dụng default là "cat"`);
+    console.warn(`Không tìm thấy folder backgrounds/${backgroundName}/ (MaVidMedia/backgrounds), thử "cat"`);
     backgroundName = 'cat';
-    backgroundsDir = path.join(ROOT, 'assets', 'backgrounds', backgroundName);
+    backgroundsDir = path.join(stockBgRoot, backgroundName);
   }
 
   if (!fs.existsSync(DOWNLOADS_DIR)) {
     throw new Error('Không tìm thấy folder downloads/');
   }
   if (!fs.existsSync(backgroundsDir)) {
-    throw new Error(`Không tìm thấy folder assets/backgrounds/${backgroundName}/`);
+    throw new Error(
+      `Không tìm thấy folder stock "${backgroundName}" trong ${stockBgRoot}/ — kiểm tra Settings (VIDEO_STORAGE_ROOT) và tạo thư mục con tương ứng.`
+    );
   }
 
   const audioPath = getAudioFile();
@@ -647,7 +652,7 @@ async function processOne(bgNameArg, options = {}) {
   }
 }
 
-const CHANNELS_ROOT = path.join(ROOT, 'channels');
+const CHANNELS_ROOT = resolveChannelsDir();
 
 /** Ưu tiên `options.showLogo`; sau đó MAVID_SHOW_LOGO. */
 function shouldShowLogo(mainOptions) {
@@ -659,7 +664,7 @@ function shouldShowLogo(mainOptions) {
 }
 
 /**
- * Ảnh đầu tiên (png/jpg/…) trong `channels/{channel}`.
+ * Ảnh đầu tiên (png/jpg/…) trong `MaVidMedia/channels/{channel}`.
  * `channel` lấy từ options.channel hoặc MAVID_CHANNEL; không có thì dùng destFolder (thư mục chứa file Excel).
  */
 function resolveLogoFromChannelFolder(mainOptions, destFolder) {
@@ -672,7 +677,7 @@ function resolveLogoFromChannelFolder(mainOptions, destFolder) {
   return imgs.length > 0 ? imgs[0] : null;
 }
 
-/** Tên folder con trong assets/backgrounds khi dòng Excel không có background. */
+/** Tên folder con trong MaVidMedia/backgrounds khi dòng Excel không có background. */
 function resolveDefaultStockFolder(mainOptions) {
   const o = mainOptions.stockFolder;
   if (o != null && String(o).trim()) return String(o).trim();
@@ -697,10 +702,10 @@ function pickStockVideoCountOverride(mainOptions) {
  * @param {object} [options]
  * @param {number} [options.stockVideoCount] — Số clip stock; bỏ qua hoặc 0 → `getDynamicStockVideoCount` theo độ dài audio
  * @param {number} [options.audioSpeed] — atempo; mặc định 0.91 hoặc `MAVID_AUDIO_SPEED`
- * @param {string} [options.stockFolder] — Tên folder trong assets/backgrounds (mặc định cat hoặc MAVID_BACKGROUND)
- * @param {boolean} [options.showLogo] — true: lấy ảnh logo trong `channels/{channel}`; false: không logo
+ * @param {string} [options.stockFolder] — Tên folder trong MaVidMedia/backgrounds (mặc định cat hoặc MAVID_BACKGROUND)
+ * @param {boolean} [options.showLogo] — true: lấy ảnh logo trong `MaVidMedia/channels/{channel}`; false: không logo
  * @param {string} [options.channel] — Tên folder channel (kèm showLogo / MAVID_SHOW_LOGO=1)
- * @param {boolean} [options.syncProgressToSpreadsheet=true] — false khi createBatchVideo tự đồng bộ một lần sau batch
+ * @param {boolean} [options.syncProgressToSpreadsheet=true] — ghi cột STATUS vào Excel/CSV sau mỗi video (và khi có progress)
  */
 async function main(options = {}) {
   const syncProgressToSpreadsheet = options.syncProgressToSpreadsheet !== false;
@@ -719,19 +724,33 @@ async function main(options = {}) {
 
   // Tìm file thực tế được dùng để lấy thư mục đích (folder channel)
   const actualInputFile = inputFile;
-  let destFolder = path.join(ROOT, 'channels');
+  let destFolder = resolveChannelsDir();
   if (actualInputFile) {
     destFolder = path.dirname(actualInputFile);
   }
 
   const progressFile = actualInputFile
     ? actualInputFile.replace(/\.(xlsx|csv)$/, '_progress.json')
-    : path.join(ROOT, 'channels', 'progress.json');
+    : path.join(CHANNELS_ROOT, 'progress.json');
   let progressData = {};
   if (fs.existsSync(progressFile)) {
     try {
       progressData = JSON.parse(fs.readFileSync(progressFile, 'utf8'));
     } catch (e) {}
+  }
+
+  /** @type {{ syncProgressStatusToSpreadsheet?: (f: string, d: object) => Promise<void> } | null} */
+  let syncProgressModule = null;
+  async function flushProgressToSpreadsheet() {
+    if (!syncProgressToSpreadsheet || !actualInputFile) return;
+    try {
+      if (!syncProgressModule) {
+        syncProgressModule = await import('./syncProgressToSpreadsheet.js');
+      }
+      await syncProgressModule.syncProgressStatusToSpreadsheet(actualInputFile, progressData);
+    } catch (e) {
+      console.warn('[sync] Đồng bộ STATUS → Excel/CSV:', e.message);
+    }
   }
 
   const wantLogo = shouldShowLogo(options);
@@ -814,21 +833,13 @@ async function main(options = {}) {
           status: 'Đã tạo video',
         };
         fs.writeFileSync(progressFile, JSON.stringify(progressData, null, 2), 'utf8');
+        await flushProgressToSpreadsheet();
       } catch (err) {
         console.error('Lỗi tạo video:', err.message);
       }
     }
   }
   console.log(`\nHoàn thành xử lý ${items.length} video.`);
-
-  if (syncProgressToSpreadsheet && actualInputFile) {
-    try {
-      const { syncProgressStatusToSpreadsheet } = await import('./syncProgressToSpreadsheet.js');
-      await syncProgressStatusToSpreadsheet(actualInputFile, progressData);
-    } catch (e) {
-      console.warn('[sync] Đồng bộ STATUS → Excel/CSV:', e.message);
-    }
-  }
 }
 
 export default main;

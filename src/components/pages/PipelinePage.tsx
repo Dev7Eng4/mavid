@@ -3,6 +3,8 @@ import type { Page, ScriptId, VideoFromAudioConfig } from '../../types';
 import { scriptDefs } from '../../types';
 import { buildMavidEnvForVideoFromAudio } from '../../utils/videoFromAudioEnv';
 import { ScriptCard } from '../pipeline/ScriptCard';
+import { AppButton } from '../ui/AppButton';
+import { PageHeader } from '../ui/PageHeader';
 import { YouTubeLinkPopup } from '../pipeline/YouTubeLinkPopup';
 import { VideoFromAudioPopup } from '../pipeline/VideoFromAudioPopup';
 import type { ScriptStatus } from '../pipeline/ScriptCard';
@@ -97,37 +99,21 @@ export function PipelinePage({ runningScript, setRunningScript, appendLog, onNav
 
   return (
     <div className="space-y-6 w-full min-w-0">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold mb-2" style={{ color: 'var(--text-h)' }}>Pipeline</h1>
-          <p className="text-sm" style={{ color: 'var(--text)' }}>
-            Chọn và chạy các script xử lý video
-          </p>
-        </div>
-        {runningScript && (
-          <button
-            onClick={() => onNavigate('logs')}
-            className="flex items-center gap-2 rounded-xl px-4 py-2 text-sm font-medium cursor-pointer transition-all duration-200"
-            style={{
-              background: 'var(--accent-bg)',
-              color: 'var(--accent)',
-              border: '1px solid var(--accent-border)',
-            }}
-            onMouseEnter={e => {
-              e.currentTarget.style.boxShadow = 'var(--shadow-accent)';
-            }}
-            onMouseLeave={e => {
-              e.currentTarget.style.boxShadow = 'none';
-            }}
-          >
-            Xem Logs
-          </button>
-        )}
-      </div>
+      <PageHeader
+        title="Pipeline"
+        description="Chọn và chạy các script xử lý video"
+        actions={
+          runningScript ? (
+            <AppButton variant="secondary" onClick={() => onNavigate('logs')}>
+              Xem Logs
+            </AppButton>
+          ) : null
+        }
+      />
 
       {runningScript && (
         <div
-          className="rounded-xl px-4 py-3 flex flex-wrap items-center gap-3 text-sm"
+          className="rounded-2xl px-4 py-3 flex flex-wrap items-center gap-3 text-sm"
           style={{ background: 'var(--accent-bg)', border: '1px solid var(--accent-border)' }}
         >
           <span
@@ -137,18 +123,9 @@ export function PipelinePage({ runningScript, setRunningScript, appendLog, onNav
           <span className="flex-1 min-w-[12rem]" style={{ color: 'var(--accent)' }}>
             Đang chạy: {scriptDefs.find(s => s.id === runningScript)?.title}
           </span>
-          <button
-            type="button"
-            onClick={() => void handleStopNpmJob()}
-            className="rounded-lg px-3 py-1.5 text-xs font-medium cursor-pointer shrink-0"
-            style={{
-              color: '#fecaca',
-              background: 'rgba(239, 68, 68, 0.2)',
-              border: '1px solid rgba(239, 68, 68, 0.45)',
-            }}
-          >
+          <AppButton type="button" variant="danger" size="sm" onClick={() => void handleStopNpmJob()} className="shrink-0">
             Dừng
-          </button>
+          </AppButton>
         </div>
       )}
 

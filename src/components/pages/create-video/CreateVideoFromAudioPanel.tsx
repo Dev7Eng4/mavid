@@ -3,6 +3,8 @@ import type { Page, ScriptId, VideoFromAudioBackgroundSource } from '../../../ty
 import { scriptDefs } from '../../../types';
 import { AlertIcon } from '../../ui/Icons';
 import { CustomSelect } from '../../ui/CustomSelect';
+import { PageBackLink } from '../../ui/PageBackLink';
+import { PageHeader } from '../../ui/PageHeader';
 import { defaultBackgroundFolder, buildMavidEnvForVideoFromAudio } from '../../../utils/videoFromAudioEnv';
 
 const VIDEO_FROM_AUDIO_SCRIPT_ID: ScriptId = 'tao-batch-video-tu-audio';
@@ -15,7 +17,7 @@ const CHANNEL_ICON = (
 
 function FieldLabel({ children }: { children: React.ReactNode }) {
   return (
-    <label className='block text-[11px] font-medium uppercase tracking-wider mb-2' style={{ color: 'var(--text-muted)' }}>
+    <label className='block text-sm font-medium uppercase tracking-wider mb-2' style={{ color: 'var(--text-muted)' }}>
       {children}
     </label>
   );
@@ -144,30 +146,15 @@ export function CreateVideoFromAudioPanel({
 
   return (
     <div className='space-y-6 w-full min-w-0'>
-      <button
-        type='button'
-        onClick={() => !isBusy && onBack()}
-        disabled={isBusy}
-        className='text-sm font-medium cursor-pointer transition-colors duration-200 disabled:opacity-40'
-        style={{ color: 'var(--accent)' }}
-      >
-        ← Quay lại
-      </button>
+      <PageBackLink onClick={() => !isBusy && onBack()} disabled={isBusy} />
 
-      <div>
-        <h1 className='text-2xl font-bold' style={{ color: 'var(--text-h)' }}>
-          Tạo từ Audio
-        </h1>
-        <p className='text-sm' style={{ color: 'var(--text)' }}>
-          Batch theo file Excel trong folder channel đã chọn.
-        </p>
-      </div>
+      <PageHeader
+        title='Tạo từ Audio'
+        description='Batch theo file Excel trong folder channel đã chọn.'
+      />
 
       {disabled && (
-        <div
-          className='flex items-center gap-3 text-sm rounded-xl px-4 py-3'
-          style={{ color: 'var(--warning)', background: 'var(--warning-bg)', border: '1px solid rgba(245, 158, 11, 0.2)' }}
-        >
+        <div className='mavid-callout-warning'>
           <AlertIcon className='w-5 h-5 shrink-0' />
           <span>Đang có script khác chạy.</span>
         </div>
@@ -182,7 +169,7 @@ export function CreateVideoFromAudioPanel({
               options={chOptions}
               onChange={setChannel}
               placeholder='Chọn channel...'
-              emptyText='Không có folder trong channels/'
+              emptyText='Không có folder trong MaVidMedia/channels/'
               icon={CHANNEL_ICON}
             />
           </div>
@@ -201,7 +188,7 @@ export function CreateVideoFromAudioPanel({
                   type='button'
                   disabled={isBusy}
                   onClick={() => setBackgroundSource(opt.id)}
-                  className='flex-1 rounded-lg px-3 py-2.5 text-xs font-medium cursor-pointer transition-all duration-200 disabled:cursor-not-allowed'
+                  className='flex-1 rounded-lg px-3 py-2.5 text-sm font-medium cursor-pointer transition-all duration-200 disabled:cursor-not-allowed'
                   style={{
                     background: backgroundSource === opt.id ? 'var(--accent-bg)' : 'transparent',
                     color: backgroundSource === opt.id ? 'var(--accent)' : 'var(--text)',
@@ -212,7 +199,7 @@ export function CreateVideoFromAudioPanel({
                 </button>
               ))}
             </div>
-            <p className='text-[11px] mt-2' style={{ color: 'var(--text-muted)' }}>
+            <p className='text-sm mt-2' style={{ color: 'var(--text-muted)' }}>
               Auto generate: tự tính số clip; folder nền mặc định (ưu tiên &quot;stock video&quot;).
             </p>
           </div>
@@ -220,12 +207,12 @@ export function CreateVideoFromAudioPanel({
           {backgroundSource === 'stock' && (
             <>
               <div className='min-w-0'>
-                <FieldLabel>Folder assets/backgrounds</FieldLabel>
+                <FieldLabel>Folder stock (MaVidMedia/backgrounds)</FieldLabel>
                 <CustomSelect
                   value={background}
                   options={bgOptions}
                   onChange={setBackground}
-                  emptyText='Không có folder trong assets/backgrounds/'
+                  emptyText='Không có folder trong MaVidMedia/backgrounds/'
                 />
               </div>
               <div className='min-w-0'>
@@ -263,7 +250,7 @@ export function CreateVideoFromAudioPanel({
                     +
                   </button>
                 </div>
-                <p className='text-[11px] mt-1.5' style={{ color: 'var(--text-muted)' }}>
+                <p className='text-sm mt-1.5' style={{ color: 'var(--text-muted)' }}>
                   0 = tự tính theo thời lượng audio sau khi speed.
                 </p>
               </div>
@@ -305,7 +292,7 @@ export function CreateVideoFromAudioPanel({
                 +
               </button>
             </div>
-            <p className='text-[11px] mt-1.5' style={{ color: 'var(--text-muted)' }}>
+            <p className='text-sm mt-1.5' style={{ color: 'var(--text-muted)' }}>
               Giới hạn số link xử lý trong một lần chạy batch (1–100).
             </p>
           </div>
@@ -345,7 +332,7 @@ export function CreateVideoFromAudioPanel({
                 +
               </button>
             </div>
-            <p className='text-[11px] mt-1.5' style={{ color: 'var(--text-muted)' }}>
+            <p className='text-sm mt-1.5' style={{ color: 'var(--text-muted)' }}>
               0 = không lọc. &gt;0 = chỉ dòng có cột DURATION ≥ số phút (HH:mm:ss / mm:ss trong Excel).
             </p>
           </div>

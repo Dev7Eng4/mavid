@@ -1,17 +1,21 @@
 /**
- * Tạo clip kết: video từ assets/backgrounds/outro + audio + phụ đề trùng N giây cuối (từ SRT/VTT trong downloads).
+ * Tạo clip kết: video từ MaVidMedia/backgrounds/outro + audio + phụ đề trùng N giây cuối (từ SRT/VTT trong downloads).
  */
 
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { execSync, spawnSync } from 'child_process';
+import { resolveStockBackgroundsDir } from './utils/stockBackgroundsPath.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.join(__dirname, '..');
 const DOWNLOADS_DIR = path.join(ROOT, 'downloads');
 const OUTPUT_DIR = path.join(ROOT, 'outputs');
-const OUTRO_BG_DIR = path.join(ROOT, 'assets', 'backgrounds', 'outro');
+
+function getOutroBgDir() {
+  return path.join(resolveStockBackgroundsDir(), 'outro');
+}
 
 const LOGO_PATH = path.join(ROOT, 'logo', 'catLogo.png');
 const LOGO_SIZE = 80;
@@ -340,20 +344,21 @@ export default async function main({ outroSeconds, outroFile, mode = 'single' } 
     console.error('Không có thư mục downloads/.');
     return;
   }
-  if (!fs.existsSync(OUTRO_BG_DIR)) {
-    fs.mkdirSync(OUTRO_BG_DIR, { recursive: true });
-    console.log('Đã tạo thư mục assets/backgrounds/outro — hãy thêm file video (.mp4, ...) vào đó.');
+  const outroBgDir = getOutroBgDir();
+  if (!fs.existsSync(outroBgDir)) {
+    fs.mkdirSync(outroBgDir, { recursive: true });
+    console.log(`Đã tạo thư mục ${outroBgDir} — hãy thêm file video (.mp4, ...) vào đó.`);
   }
 
-  const bgFiles = fs.readdirSync(OUTRO_BG_DIR).filter(f => /\.(mp4|mov|mkv|webm)$/i.test(f));
+  const bgFiles = fs.readdirSync(outroBgDir).filter(f => /\.(mp4|mov|mkv|webm)$/i.test(f));
   if (bgFiles.length === 0) {
-    console.error('Không có file video trong assets/backgrounds/outro/, bỏ qua tạo outro.');
+    console.error(`Không có file video trong ${outroBgDir}/, bỏ qua tạo outro.`);
     return;
   }
 
   if (outroFile) {
     if (!bgFiles.includes(outroFile)) {
-      console.warn(`Không tìm thấy file "${outroFile}" trong assets/backgrounds/outro/. Dùng video đầu tiên: ${bgFiles[0]}`);
+      console.warn(`Không tìm thấy file "${outroFile}" trong ${outroBgDir}/. Dùng video đầu tiên: ${bgFiles[0]}`);
       outroFile = bgFiles[0];
     }
   } else {
@@ -440,7 +445,7 @@ export default async function main({ outroSeconds, outroFile, mode = 'single' } 
   );
 
   // === BƯỚC 4: Tạo video outro bằng ffmpeg (giữ nguyên logic cũ) ===
-  const videoIn = path.join(OUTRO_BG_DIR, outroFile);
+  const videoIn = path.join(outroBgDir, outroFile);
   const vidDur = getDuration(videoIn);
   const tempVideo = path.join(OUTPUT_DIR, 'temp_outro_video.mp4');
 

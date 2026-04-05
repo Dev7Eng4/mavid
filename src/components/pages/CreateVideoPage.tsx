@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import type { Page, ScriptId } from '../../types';
 import { MusicIcon, RefreshIcon, SpinnerIcon, ArrowRightIcon, AlertIcon } from '../ui/Icons';
+import { PageHeader } from '../ui/PageHeader';
 import { CreateVideoFromAudioPanel } from './create-video/CreateVideoFromAudioPanel';
 import { CreateVideoReupPanel } from './create-video/CreateVideoReupPanel';
 
@@ -109,21 +110,11 @@ export function CreateVideoPage({ disabled = false, runningScript, setRunningScr
   }
 
   return (
-    <div className='space-y-8 w-full min-w-0'>
-      <div>
-        <h1 className='text-2xl font-bold mb-2' style={{ color: 'var(--text-h)' }}>
-          Tạo video
-        </h1>
-        <p className='text-sm' style={{ color: 'var(--text)' }}>
-          Chọn loại video và điền form tương ứng.
-        </p>
-      </div>
+    <div className='space-y-6 w-full min-w-0'>
+      <PageHeader title='Tạo video' description='Chọn loại video và điền form tương ứng.' />
 
       {disabled && (
-        <div
-          className='flex items-center gap-3 text-sm rounded-xl px-4 py-3'
-          style={{ color: 'var(--warning)', background: 'var(--warning-bg)', border: '1px solid rgba(245, 158, 11, 0.2)' }}
-        >
+        <div className='mavid-callout-warning'>
           <AlertIcon className='w-5 h-5 shrink-0' />
           <span>Đang có script chạy. Vui lòng chờ hoàn tất.</span>
         </div>

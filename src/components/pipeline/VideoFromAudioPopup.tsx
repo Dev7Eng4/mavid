@@ -108,7 +108,7 @@ export function VideoFromAudioPopup({ onConfirm, onCancel }: Props) {
               options={chOptions}
               onChange={setChannel}
               placeholder='Chọn channel...'
-              emptyText='Không tìm thấy folder trong channels/'
+              emptyText='Không tìm thấy folder trong MaVidMedia/channels/'
               icon={CHANNEL_ICON}
             />
           </div>
@@ -122,7 +122,7 @@ export function VideoFromAudioPopup({ onConfirm, onCancel }: Props) {
               value={background}
               options={bgOptions}
               onChange={setBackground}
-              emptyText='Không tìm thấy folder assets/backgrounds'
+              emptyText='Không tìm thấy folder trong MaVidMedia/backgrounds'
             />
           </div>
 

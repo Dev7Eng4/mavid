@@ -195,7 +195,7 @@ export function CustomSelect({ value, options, onChange, placeholder, emptyText,
             );
           })}
           {options.length === 0 && (
-            <div className='px-3 py-2 text-xs' style={{ color: 'var(--text)', opacity: 0.5 }}>
+            <div className='px-3 py-2 text-sm' style={{ color: 'var(--text)', opacity: 0.5 }}>
               {emptyText ?? 'Không có lựa chọn'}
             </div>
           )}

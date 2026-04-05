@@ -9,8 +9,9 @@
     "build": "tsc -b && vite build",
     "lint": "eslint .",
     "preview": "vite preview",
-    "start": "concurrently -k \"vite --port 5173 --strictPort\" \"electron .\"",
+    "start": "concurrently -k \"vite --port 5173 --strictPort\" \"nodemon --watch electron --ext js,cjs --exec electron .\"",
     "tao-chrome-profile": "node contents/scripts/makeChromeProfile.js",
+    "mo-gpm-playwright": "node contents/scripts/openGpmPlaywright.js",
     "lay-thong-tin-youtube (video, channel)": "node -e \"import('./contents/getInfoChannel.js').then(m=>m.default())\"",
     "tao-batch-video-tu-audio": "node -e \"import('./contents/scripts/createBatchVideo.js').then(m => m.default({ videoType: 'from_audio' }))\"",
     "tao-batch-video-reup-full": "node -e \"import('./contents/scripts/createBatchVideo.js').then(m => m.default({ videoType: 'reup_full' }))\"",
@@ -29,6 +30,7 @@
     "react": "19.2.4",
     "react-dom": "19.2.4",
     "sharp": "0.34.5",
+    "sql.js": "^1.14.1",
     "tailwindcss": "4.2.2",
     "xlsx": "0.18.5",
     "youtube-dl-exec": "3.1.4"
@@ -48,6 +50,7 @@
     "eslint-plugin-react-hooks": "7.0.1",
     "eslint-plugin-react-refresh": "0.5.2",
     "globals": "17.4.0",
+    "nodemon": "3.1.11",
     "typescript": "5.9.3",
     "typescript-eslint": "8.57.0",
     "vite": "8.0.1"

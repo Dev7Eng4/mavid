@@ -5,9 +5,11 @@ import { spawn, execSync } from 'child_process';
 import { MAKE_VIDEO_MODE } from './constants/index.js';
 import { GPU_INFO } from './utils/hardware.util.js';
 import { OVERLAY_OPTIONS } from './constants/overlayOptions.js';
+import { resolveChannelsDir } from './utils/channelsStoragePath.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.join(__dirname, '..');
+const CHANNELS_DIR = resolveChannelsDir();
 
 const DOWNLOADS_DIR = path.join(ROOT, 'downloads');
 
@@ -201,7 +203,7 @@ async function remakeVideo(videoPath, imagePath, overlayVideoPath, outputPath, o
 }
 
 /**
- * @param {boolean} [options.syncProgressToSpreadsheet=true] — false khi createBatchVideo tự đồng bộ sau batch
+ * @param {boolean} [options.syncProgressToSpreadsheet=true] — ghi cột STATUS vào Excel/CSV sau mỗi video
  */
 async function main(options = {}) {
   const syncProgressToSpreadsheet = options.syncProgressToSpreadsheet !== false;
@@ -228,20 +230,34 @@ async function main(options = {}) {
 
   // Tìm file thực tế được dùng để lấy thư mục đích (folder channel)
   const actualInputFile = inputFile;
-  let destFolder = path.join(ROOT, 'channels');
+  let destFolder = CHANNELS_DIR;
   if (actualInputFile) {
     destFolder = path.dirname(actualInputFile);
   }
 
   const progressFile = actualInputFile
     ? actualInputFile.replace(/\.(xlsx|csv)$/, '_progress.json')
-    : path.join(ROOT, 'channels', 'progress.json');
+    : path.join(CHANNELS_DIR, 'progress.json');
 
   let progressData = {};
   if (fs.existsSync(progressFile)) {
     try {
       progressData = JSON.parse(fs.readFileSync(progressFile, 'utf8'));
     } catch (e) {}
+  }
+
+  /** @type {{ syncProgressStatusToSpreadsheet?: (f: string, d: object) => Promise<void> } | null} */
+  let syncProgressModule = null;
+  async function flushProgressToSpreadsheet() {
+    if (!syncProgressToSpreadsheet || !actualInputFile) return;
+    try {
+      if (!syncProgressModule) {
+        syncProgressModule = await import('./syncProgressToSpreadsheet.js');
+      }
+      await syncProgressModule.syncProgressStatusToSpreadsheet(actualInputFile, progressData);
+    } catch (e) {
+      console.warn('[sync] Đồng bộ STATUS → Excel/CSV:', e.message);
+    }
   }
 
   const images = getFiles(OVERLAY_DIR, ['.png', '.jpg', '.jpeg', '.webp']);
@@ -325,6 +341,7 @@ async function main(options = {}) {
 
         progressData[url] = { status: 'Đã tạo video' };
         fs.writeFileSync(progressFile, JSON.stringify(progressData, null, 2), 'utf8');
+        await flushProgressToSpreadsheet();
 
         console.log(`ĐÃ HOÀN THÀNH VIDEO: ${url}`);
       } catch (err) {
@@ -344,15 +361,6 @@ async function main(options = {}) {
   }
 
   console.log(`\nHoàn thành xử lý ${items.length} video.`);
-
-  if (syncProgressToSpreadsheet && actualInputFile) {
-    try {
-      const { syncProgressStatusToSpreadsheet } = await import('./syncProgressToSpreadsheet.js');
-      await syncProgressStatusToSpreadsheet(actualInputFile, progressData);
-    } catch (e) {
-      console.warn('[sync] Đồng bộ STATUS → Excel/CSV:', e.message);
-    }
-  }
 }
 
 if (process.argv[1] && fileURLToPath(import.meta.url) === path.resolve(process.argv[1])) {

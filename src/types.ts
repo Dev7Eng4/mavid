@@ -1,4 +1,4 @@
-export type Page = 'pipeline' | 'create-video' | 'settings' | 'channels' | 'logs';
+export type Page = 'pipeline' | 'create-video' | 'settings' | 'channels' | 'gpm' | 'logs';
 
 export type ScriptId =
   | 'tao-chrome-profile'
@@ -25,7 +25,7 @@ export const scriptDefs: ScriptDef[] = [
   {
     id: 'lay-thong-tin-youtube (video, channel)',
     title: 'Lấy thông tin YouTube',
-    summary: 'Đọc URL từ input.txt, lấy info kênh/playlist, xuất Excel vào channels/.',
+    summary: 'Đọc URL từ input.txt, lấy info kênh/playlist, xuất Excel vào MaVidMedia/channels/.',
     npmScript: 'lay-thong-tin-youtube (video, channel)',
   },
   {
@@ -88,6 +88,11 @@ export interface ConstantsUiModel {
     CHAR_SPACING: number;
   };
   LOGO: { SIZE: number; MARGIN_TOP: number; MARGIN_RIGHT: number };
+  /**
+   * Thư mục `MaVidMedia`: bên trong có `backgrounds/`, `videos/`, `channels/`.
+   * Rỗng trong file → app gợi ý mặc định (Windows: ổ không C:; macOS: volume ngoài hoặc HOME).
+   */
+  VIDEO_STORAGE_ROOT: string;
 }
 
 export interface ChannelFile {
@@ -105,7 +110,52 @@ export interface ChannelData {
   rows: ChannelRow[];
 }
 
-/** Dữ liệu đọc từ `channels/{channelFolder}/*.xlsx|*.csv` (file đầu tiên). */
+/** Một profile GPM từ API Local (GET …/profiles) hoặc nguồn tương đương. */
+export interface GpmProfileRow {
+  id: string;
+  name: string;
+  profilePath: string;
+}
+
+export interface LoadGpmProfilesResult {
+  ok: boolean;
+  path: string | null;
+  /** Trình duyệt GPM tùy chọn (browser.exe / chrome.exe), lưu trong gpm-settings.json */
+  browserExe: string | null;
+  profiles: GpmProfileRow[];
+  dbFiles: string[];
+  message: string | null;
+}
+
+export interface GpmPlaywrightStartFolderPayload {
+  gpmRoot: string;
+  profilePath: string;
+  /** Khóa ổn định theo dòng (vd. Id hoặc `gpm-row-${i}`). */
+  profileKey: string;
+  startUrl?: string;
+}
+
+export type GpmPlaywrightStartFolderResult =
+  | { ok: true; resolvedDir: string }
+  | { ok: false; reason: string; detail?: string };
+
+export type GpmPlaywrightStopFolderResult = { ok: true } | { ok: false; reason: string };
+
+export interface GpmPlaywrightListOpenResult {
+  keys: string[];
+}
+
+export interface SelectGpmDataFolderResult {
+  ok: boolean;
+  cancelled?: boolean;
+  path?: string;
+}
+
+export type SelectGpmBrowserExeResult =
+  | { ok: true; path: string }
+  | { ok: false; cancelled?: boolean; reason?: string };
+
+/** Dữ liệu đọc từ `MaVidMedia/channels/{channelFolder}/*.xlsx|*.csv` (file đầu tiên). */
 export interface ChannelFolderDataResult extends ChannelData {
   fileName: string | null;
   channelFolder: string;
@@ -137,13 +187,15 @@ export interface VideoFromAudioConfig {
   minDurationMinutes?: number;
 }
 
-export type DirectScriptId = 
+export type DirectScriptId =
   | 'getInfoChannel'
+  | 'addChannelFromForm'
   | 'downloadVideo'
   | 'createBatchVideo'
   | 'makeChromeProfile'
   | 'createThumbnailFlow'
-  | 'summaryMetaFromTranscript';
+  | 'summaryMetaFromTranscript'
+  | 'uploadYoutubeViaGpm';
 
 export interface ScriptResult<T = unknown> {
   success: boolean;
@@ -153,6 +205,30 @@ export interface ScriptResult<T = unknown> {
 export interface GetInfoChannelParams {
   url?: string;
   urls?: string[];
+}
+
+/** Payload gửi tới `contents/addChannelFromForm.js` (Electron run-script). */
+/** Tham số `uploadYoutubeViaGpm` — GPM API + thư mục kênh MaVidMedia/channels. */
+export interface UploadYoutubeViaGpmParams {
+  gpmProfileId: string;
+  channelFolder: string;
+  /** null/undefined = upload tất cả thư mục con có .mp4 */
+  maxUploads?: number | null;
+  /** Base API GPM, ví dụ `http://127.0.0.1:19995/api/v3` */
+  gpmApiBase?: string;
+}
+
+export interface AddChannelFromFormParams {
+  url: string;
+  formMeta: {
+    email: string;
+    videoType: 'from_audio' | 'reup_full';
+    durationMinutes: number;
+    background: string;
+    videosPerDayPreset: string;
+    publishTimes: string[];
+    folderIdOverride?: string;
+  };
 }
 
 export interface GetInfoChannelResult {
@@ -170,6 +246,24 @@ export interface GetInfoChannelResult {
   }>;
 }
 
+/** `MaVidMedia/channels/{folder}/mavid-channel-config.json` — đồng bộ với form Thêm/Sửa channel. */
+export interface MavidChannelConfig {
+  version?: number;
+  email?: string;
+  videoType?: string;
+  durationMinutes?: number;
+  background?: string;
+  videosPerDayPreset?: string;
+  publishTimes?: string[];
+  channelUrl?: string;
+  channelLink?: string;
+  channelName?: string;
+  folderId?: string;
+  lastUpload?: string;
+  youtube?: { usernameId?: string; channelId?: string | null };
+  createdAt?: string;
+}
+
 declare global {
   interface Window {
     runner: {
@@ -177,22 +271,48 @@ declare global {
       cancelRunningJob: () => Promise<{ ok: boolean; reason?: string }>;
       runScript: <T = unknown>(script: DirectScriptId, params?: Record<string, unknown>) => Promise<ScriptResult<T>>;
       getConstantsUiModel: () => Promise<ConstantsUiModel>;
-      saveConstantsUiModel: (model: ConstantsUiModel) => Promise<{ ok: boolean }>;
+      saveConstantsUiModel: (modelPatch: Partial<ConstantsUiModel>) => Promise<{ ok: boolean }>;
+      /** Chọn thư mục cha → tạo `MaVidMedia/{backgrounds,videos,channels}`, ghi `VIDEO_STORAGE_ROOT` = …/MaVidMedia. */
+      selectVideoStorageFolder: (currentPath?: string | null) => Promise<{ ok: boolean; path: string | null }>;
       listChannels: () => Promise<ChannelFile[]>;
       readChannelData: (filePath: string) => Promise<ChannelData>;
-      /** Chỉ ghi được `channels/index.xlsx` (kiểm tra path ở main process). */
+      /** Chỉ ghi được `channels/index.xlsx` → thực tế `MaVidMedia/channels/index.xlsx`. */
       writeChannelIndex: (payload: { filePath: string } & ChannelData) => Promise<{ ok: boolean }>;
       readChannelFolderData: (channelFolder: string) => Promise<ChannelFolderDataResult>;
+      readMavidChannelConfig: (channelFolder: string) => Promise<MavidChannelConfig | null>;
+      writeMavidChannelConfig: (payload: {
+        channelFolder: string;
+        patch: Pick<
+          MavidChannelConfig,
+          'email' | 'videoType' | 'durationMinutes' | 'background' | 'videosPerDayPreset' | 'publishTimes'
+        >;
+      }) => Promise<{ ok: boolean }>;
       setChannelFolderStartFromRow: (
         channelFolder: string,
         dataRowIndex: number,
       ) => Promise<{ ok: boolean; fileName?: string }>;
       listBackgrounds: () => Promise<string[]>;
       listChannelFolders: () => Promise<string[]>;
+      /** Email đã có trong index.xlsx hoặc file kênh con (tránh trùng khi thêm kênh). */
+      listRegisteredChannelEmails: () => Promise<string[]>;
       getOverlayOptionNames: () => Promise<string[]>;
       getStats: () => Promise<AppStats>;
       readInputFile: () => Promise<string>;
       writeInputFile: (content: string) => Promise<{ ok: boolean }>;
+      getGpmDataFolder: () => Promise<{ path: string | null }>;
+      selectGpmDataFolder: () => Promise<SelectGpmDataFolderResult>;
+      loadGpmProfiles: () => Promise<LoadGpmProfilesResult>;
+      selectGpmBrowserExe: () => Promise<SelectGpmBrowserExeResult>;
+      clearGpmBrowserExe: () => Promise<{ ok: boolean; path: null }>;
+      /** GET tới API GPM v3 qua main process (tránh CORS). `path`: phần sau `/api/v3/` (vd. `profiles?group=Ebay`). */
+      gpmApiRequest: (payload: {
+        path: string;
+        method?: string;
+        headers?: Record<string, string>;
+      }) => Promise<{ ok: boolean; status: number; bodyText: string; error?: string }>;
+      gpmPlaywrightListOpen: () => Promise<GpmPlaywrightListOpenResult>;
+      gpmPlaywrightStartFolder: (payload: GpmPlaywrightStartFolderPayload) => Promise<GpmPlaywrightStartFolderResult>;
+      gpmPlaywrightStopFolder: (profileKey: string) => Promise<GpmPlaywrightStopFolderResult>;
       onScriptLog: (cb: (line: string) => void) => void;
       removeScriptLogListener: () => void;
     };

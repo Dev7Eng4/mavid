@@ -10,9 +10,11 @@ import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import ExcelJS from 'exceljs';
+import { resolveStockBackgroundsDir } from './utils/stockBackgroundsPath.js';
+import { resolveChannelsDir } from './utils/channelsStoragePath.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const DEFAULT_OUTPUT_DIR = path.join(__dirname, '..', 'channels');
+const DEFAULT_OUTPUT_DIR = resolveChannelsDir();
 const INPUT_FILE = path.join(__dirname, '..', 'input.txt');
 const INDEX_FILE = path.join(DEFAULT_OUTPUT_DIR, 'index.xlsx');
 
@@ -49,7 +51,7 @@ function migrateIndexSheetIfNeeded(sheet) {
 
 /** Gắn dropdown cho index sheet (cột E–G: loại video, thời gian, background) */
 function applyIndexDataValidation(sheet) {
-  const backgroundsDir = path.join(__dirname, '..', 'assets', 'backgrounds');
+  const backgroundsDir = resolveStockBackgroundsDir();
   let bgOptions = [];
   if (fs.existsSync(backgroundsDir)) {
     bgOptions = fs.readdirSync(backgroundsDir).filter(f => fs.statSync(path.join(backgroundsDir, f)).isDirectory());
@@ -81,10 +83,29 @@ function applyIndexDataValidation(sheet) {
 }
 
 /**
+ * Cột D–G index (EMAIL, LOẠI VIDEO, THỜI GIAN, BACKGROUND) — chỉ dùng khi `channelData` có khóa `email`
+ * (luồng addChannelFromForm). Luồng CLI getInfoChannel không truyền → giữ ô trống / không ghi đè cột 4–7 khi cập nhật dòng cũ.
+ */
+function resolveIndexMetaColumns(channelData) {
+  if (!('email' in channelData)) {
+    return { c4: '', c5: '', c6: '', c7: '' };
+  }
+  const c4 = String(channelData.email ?? '').trim();
+  const c5 = String(channelData.videoType ?? '').trim();
+  const dm = channelData.durationMinutes;
+  const c6 = dm === '' || dm == null || (typeof dm === 'number' && !Number.isFinite(dm)) ? '' : Number(dm);
+  const c7 = String(channelData.background ?? '').trim();
+  return { c4, c5, c6, c7 };
+}
+
+/**
  * Cập nhật hoặc thêm channel vào file index.xlsx
+ * @param {Object} channelData
+ * @param {string} [channelData.email] — nếu có (kể cả `''`), coi là luồng form: ghi đầy đủ cột D–G
  */
 async function updateIndexFile(channelData) {
   const { name, link, id, lastUpload } = channelData;
+  const meta = resolveIndexMetaColumns(channelData);
 
   if (!fs.existsSync(DEFAULT_OUTPUT_DIR)) {
     fs.mkdirSync(DEFAULT_OUTPUT_DIR, { recursive: true });
@@ -121,10 +142,16 @@ async function updateIndexFile(channelData) {
       row.getCell(1).value = name;
       row.getCell(2).value = link;
       row.getCell(8).value = lastUpload;
+      if ('email' in channelData) {
+        row.getCell(4).value = meta.c4;
+        row.getCell(5).value = meta.c5;
+        row.getCell(6).value = meta.c6;
+        row.getCell(7).value = meta.c7;
+      }
       console.log(`Đã cập nhật channel "${name}" trong index.xlsx`);
     } else {
       // Thêm row mới
-      sheet.addRow([name, link, id, '', '', '', '', lastUpload]);
+      sheet.addRow([name, link, id, meta.c4, meta.c5, meta.c6, meta.c7, lastUpload]);
       console.log(`Đã thêm channel "${name}" vào index.xlsx`);
     }
 
@@ -134,7 +161,7 @@ async function updateIndexFile(channelData) {
     workbook = new ExcelJS.Workbook();
     sheet = workbook.addWorksheet('Channels', { views: [{ state: 'frozen', ySplit: 1 }] });
     sheet.addRow(INDEX_HEADERS);
-    sheet.addRow([name, link, id, '', '', '', '', lastUpload]);
+    sheet.addRow([name, link, id, meta.c4, meta.c5, meta.c6, meta.c7, lastUpload]);
 
     sheet.columns = [
       { width: 45 }, // CHANNEL
@@ -158,7 +185,7 @@ async function updateIndexFile(channelData) {
 /**
  * Phát hiện loại URL: 'video' | 'channel' | 'playlist'
  */
-function detectUrlType(url) {
+export function detectUrlType(url) {
   const u = url.toLowerCase().trim();
   if (u.includes('/watch?v=') || u.includes('/shorts/') || u.includes('/live/')) {
     return 'video';
@@ -194,7 +221,7 @@ function formatDuration(seconds) {
 /**
  * Lấy thông tin kênh (và video từ kênh)
  */
-async function getChannelInfo(url) {
+export async function getChannelInfo(url) {
   // Bước 1: Lấy metadata kênh
   const rawMeta = await youtubedl(url, {
     dumpSingleJson: true,
@@ -274,6 +301,194 @@ async function getChannelInfo(url) {
         }))
         .filter(e => e.url),
     },
+  };
+}
+
+/**
+ * Thêm kênh từ form app: gọi getChannelInfo, ghi `MaVidMedia/channels/index.xlsx` (giống luồng getInfoChannel),
+ * tạo thư mục `MaVidMedia/channels/<folder>/`, file Excel kênh và `mavid-channel-config.json`.
+ *
+ * @param {Object} options
+ * @param {string} options.url - URL kênh / playlist
+ * @param {Object} options.formMeta
+ * @param {string} options.formMeta.email
+ * @param {string} options.formMeta.videoType - from_audio | reup_full
+ * @param {number} options.formMeta.durationMinutes
+ * @param {string} options.formMeta.background
+ * @param {string} options.formMeta.videosPerDayPreset - "1" | "2" | "3" | "1-2"
+ * @param {string[]} options.formMeta.publishTimes
+ * @param {string} [options.formMeta.folderIdOverride] - tên thư mục (ID kênh), tùy chọn
+ */
+export async function addChannelFromForm(options = {}) {
+  const url = (options.url || '').trim();
+  const formMeta = options.formMeta;
+  if (!url) throw new Error('Thiếu URL kênh.');
+  if (!formMeta || typeof formMeta.email !== 'string' || !formMeta.email.trim()) {
+    throw new Error('Thiếu email.');
+  }
+
+  const urlType = detectUrlType(url);
+  if (urlType === 'video') {
+    throw new Error('Chỉ hỗ trợ link kênh hoặc playlist, không phải link video đơn.');
+  }
+
+  console.log(`[addChannelFromForm] Đang lấy thông tin: ${url}`);
+  const result = await getChannelInfo(url);
+
+  let usernameId = result.metadata?.uploader_id || '';
+  if (usernameId.startsWith('@')) usernameId = usernameId.slice(1);
+  if (!usernameId && result.metadata?.uploader_url) {
+    const match = result.metadata.uploader_url.match(/@([a-zA-Z0-9_.-]+)/);
+    if (match) usernameId = match[1];
+  }
+  if (!usernameId) usernameId = result.metadata?.channel_id || '';
+
+  const channelLink =
+    usernameId && !usernameId.startsWith('UC')
+      ? `https://www.youtube.com/@${usernameId}`
+      : result.metadata?.uploader_url || result.metadata?.channel_url || url;
+
+  let lastUpload = '';
+  if (result.video_links && result.video_links.length > 0) {
+    const latestVideo = result.video_links[0];
+    if (latestVideo?.upload_date) {
+      const d = latestVideo.upload_date;
+      lastUpload = `${d.slice(0, 4)}-${d.slice(4, 6)}-${d.slice(6, 8)}`;
+    }
+  }
+
+  let excelFilename = 'unknown_id';
+  const matchUrl = url.match(/@([a-zA-Z0-9_.-]+)/);
+  if (matchUrl) {
+    excelFilename = matchUrl[1];
+  } else if (result.metadata?.uploader_url && result.metadata.uploader_url.includes('@')) {
+    const m2 = result.metadata.uploader_url.match(/@([a-zA-Z0-9_.-]+)/);
+    if (m2) excelFilename = m2[1];
+  } else if (result.metadata?.uploader_id) {
+    excelFilename = result.metadata.uploader_id;
+    if (excelFilename.startsWith('@')) excelFilename = excelFilename.substring(1);
+  } else if (result.metadata?.channel_id || result.metadata?.id) {
+    excelFilename = result.metadata.channel_id || result.metadata.id;
+  }
+
+  const override = typeof formMeta.folderIdOverride === 'string' ? formMeta.folderIdOverride.trim() : '';
+  const folderName = override || excelFilename;
+  if (!folderName || folderName.includes('..') || folderName.includes('/') || folderName.includes('\\')) {
+    throw new Error('Tên thư mục kênh không hợp lệ.');
+  }
+
+  const channelDir = path.join(DEFAULT_OUTPUT_DIR, folderName);
+  const outputExcelPath = path.join(channelDir, `${folderName}.xlsx`);
+
+  if (fs.existsSync(channelDir)) {
+    throw new Error(`Thư mục kênh "${folderName}" đã tồn tại (MaVidMedia/channels). Chọn URL/ID khác hoặc xóa thư mục cũ.`);
+  }
+
+  const headers = [
+    'EMAIL',
+    'CHANNEL NAME',
+    'CHANNEL TAGS',
+    'LINK VIDEO',
+    'VIEWS',
+    'DURATION',
+    'STATUS',
+    'START FROM',
+  ];
+  const videoLinks = [...(result.video_links || [])].reverse();
+  const channelName = result.name || '';
+  const channelTagsStr = (result.tags || []).join(', ');
+  const seedEmail = formMeta.email.trim();
+
+  const rows =
+    videoLinks.length > 0
+      ? videoLinks.map((video, i) => {
+          const vu = video?.url || '';
+          const views = video?.viewCount || 0;
+          const duration = video?.duration || '';
+          return [i === 0 ? seedEmail : '', i === 0 ? channelName : '', i === 0 ? channelTagsStr : '', vu, views, duration, '', ''];
+        })
+      : [[seedEmail, channelName, channelTagsStr, '(Không có video)', 0, '00:00:00', '', '']];
+
+  fs.mkdirSync(channelDir, { recursive: true });
+
+  const workbook = new ExcelJS.Workbook();
+  const sheet = workbook.addWorksheet('Kênh YouTube', { views: [{ state: 'frozen', ySplit: 1 }] });
+  sheet.addRow(headers);
+  rows.forEach(row => sheet.addRow(row));
+  sheet.columns = [
+    { width: 20 },
+    { width: 25 },
+    { width: 20 },
+    { width: 45 },
+    { width: 12 },
+    { width: 12 },
+    { width: 20 },
+    { width: 12 },
+  ];
+
+  const listFormula = `"${TRANG_THAI_OPTIONS.filter(Boolean).join(',')}"`;
+  for (let i = 2; i <= sheet.rowCount; i++) {
+    sheet.getCell(`G${i}`).dataValidation = {
+      type: 'list',
+      allowBlank: true,
+      formulae: [listFormula],
+    };
+  }
+
+  await workbook.xlsx.writeFile(outputExcelPath);
+  console.log(`[addChannelFromForm] Đã tạo ${outputExcelPath}`);
+
+  const config = {
+    version: 1,
+    email: seedEmail,
+    videoType: formMeta.videoType,
+    durationMinutes: Number(formMeta.durationMinutes),
+    background: String(formMeta.background ?? ''),
+    videosPerDayPreset: String(formMeta.videosPerDayPreset ?? '1'),
+    publishTimes: Array.isArray(formMeta.publishTimes) ? formMeta.publishTimes : [],
+    channelUrl: url,
+    channelLink,
+    channelName,
+    folderId: folderName,
+    lastUpload,
+    youtube: {
+      usernameId,
+      channelId: result.metadata?.channel_id || null,
+    },
+    createdAt: new Date().toISOString(),
+  };
+  const configPath = path.join(channelDir, 'mavid-channel-config.json');
+  fs.writeFileSync(configPath, JSON.stringify(config, null, 2), 'utf-8');
+  console.log(`[addChannelFromForm] Đã ghi ${configPath}`);
+
+  await updateIndexFile({
+    name: channelName,
+    link: channelLink,
+    id: usernameId,
+    lastUpload,
+    email: seedEmail,
+    videoType: formMeta.videoType,
+    durationMinutes: formMeta.durationMinutes,
+    background: formMeta.background,
+  });
+  console.log(`[addChannelFromForm] Đã cập nhật ${path.relative(path.join(__dirname, '..'), INDEX_FILE)}`);
+
+  return {
+    success: true,
+    processedCount: 1,
+    results: [
+      {
+        url,
+        type: urlType,
+        channelName: result.name,
+        channelId: usernameId,
+        channelLink,
+        videoCount: videoLinks.length,
+        outputFile: outputExcelPath,
+        configFile: configPath,
+        channelFolder: folderName,
+      },
+    ],
   };
 }
 
@@ -370,7 +585,6 @@ async function main(options = {}) {
       'VIEWS',
       'DURATION',
       'STATUS',
-      'BACKGROUND VIDEO',
       'START FROM',
     ];
     const videoLinks = [...(result.video_links || [])].reverse();
@@ -392,7 +606,7 @@ async function main(options = {}) {
       excelFilename = result.metadata.channel_id || result.metadata.id;
     }
 
-    // Thư mục lưu kết quả: channels/<Tên người dùng>/
+    // Thư mục lưu kết quả: MaVidMedia/channels/<Tên người dùng>/
     const channelDir = path.join(DEFAULT_OUTPUT_DIR, excelFilename);
     const outputExcelPath = path.join(channelDir, `${excelFilename}.xlsx`);
 
@@ -409,6 +623,8 @@ async function main(options = {}) {
       const headerRow = sheet.getRow(1);
       const videoIdx = headerRow.values.findIndex(v => String(v || '').toLowerCase() === 'link video');
       if (videoIdx < 0) throw new Error('Không tìm thấy cột LINK VIDEO trong file hiện tại.');
+      const col8Header = String(headerRow.getCell(8).value || '').trim().toUpperCase();
+      const legacyBackgroundColumn = col8Header === 'BACKGROUND VIDEO';
 
       const existingUrls = new Set();
       for (let i = 2; i <= sheet.rowCount; i++) {
@@ -445,7 +661,11 @@ async function main(options = {}) {
         const url = video?.url || '';
         const views = video?.viewCount || 0;
         const duration = video?.duration || '';
-        sheet.addRow(['', '', '', url, views, duration, '', '', '']);
+        if (legacyBackgroundColumn) {
+          sheet.addRow(['', '', '', url, views, duration, '', '', '']);
+        } else {
+          sheet.addRow(['', '', '', url, views, duration, '', '']);
+        }
       });
     } else {
       const rows =
@@ -454,9 +674,9 @@ async function main(options = {}) {
               const url = video?.url || '';
               const views = video?.viewCount || 0;
               const duration = video?.duration || '';
-              return ['', i === 0 ? channelName : '', i === 0 ? channelTagsStr : '', url, views, duration, '', '', ''];
+              return ['', i === 0 ? channelName : '', i === 0 ? channelTagsStr : '', url, views, duration, '', ''];
             })
-          : [['', channelName, channelTagsStr, '(Không có video)', 0, '00:00:00', '', '', '']];
+          : [['', channelName, channelTagsStr, '(Không có video)', 0, '00:00:00', '', '']];
 
       if (!fs.existsSync(channelDir)) {
         fs.mkdirSync(channelDir, { recursive: true });
@@ -467,7 +687,7 @@ async function main(options = {}) {
       sheet.addRow(headers);
       rows.forEach(row => sheet.addRow(row));
 
-      // Độ rộng cột: email | CHANNEL NAME | CHANNEL TAGS | LINK VIDEO | STATUS | BACKGROUND VIDEO | START FROM
+      // Độ rộng cột: EMAIL | CHANNEL NAME | CHANNEL TAGS | LINK VIDEO | VIEWS | DURATION | STATUS | START FROM
       sheet.columns = [
         { width: 20 }, // EMAIL
         { width: 25 }, // CHANNEL NAME
@@ -476,30 +696,31 @@ async function main(options = {}) {
         { width: 12 }, // VIEWS
         { width: 12 }, // DURATION
         { width: 20 }, // STATUS
-        { width: 22 }, // BACKGROUND VIDEO
         { width: 12 }, // START FROM
       ];
     }
 
     // Thêm hoặc cập nhật data validation cho tất cả các dòng dữ liệu (cả cũ và mới)
-    const backgroundsDir = path.join(__dirname, '..', 'assets', 'backgrounds');
+    const backgroundsDirForSheet = resolveStockBackgroundsDir();
     let bgOptions = [];
-    if (fs.existsSync(backgroundsDir)) {
-      bgOptions = fs.readdirSync(backgroundsDir).filter(f => fs.statSync(path.join(backgroundsDir, f)).isDirectory());
+    if (fs.existsSync(backgroundsDirForSheet)) {
+      bgOptions = fs.readdirSync(backgroundsDirForSheet).filter(f =>
+        fs.statSync(path.join(backgroundsDirForSheet, f)).isDirectory()
+      );
     }
 
     const listFormula = `"${TRANG_THAI_OPTIONS.filter(Boolean).join(',')}"`;
+    const row1ForValidation = sheet.getRow(1);
+    const legacyBgForValidation = String(row1ForValidation.getCell(8).value || '').trim().toUpperCase() === 'BACKGROUND VIDEO';
 
     for (let i = 2; i <= sheet.rowCount; i++) {
-      // Dropdown STATUS (cột G - index 7)
       sheet.getCell(`G${i}`).dataValidation = {
         type: 'list',
         allowBlank: true,
         formulae: [listFormula],
       };
 
-      // Dropdown Background Video (cột H - index 8)
-      if (bgOptions.length > 0) {
+      if (legacyBgForValidation && bgOptions.length > 0) {
         const bgFormula = `"${bgOptions.join(',')}"`;
         sheet.getCell(`H${i}`).dataValidation = {
           type: 'list',
