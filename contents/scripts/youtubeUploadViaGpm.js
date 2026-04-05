@@ -121,7 +121,7 @@ async function openUploadAndSelectFile(page, mp4Path) {
   await delay(2000 + Math.random() * 1200);
 
   // Chờ upload dialog xuất hiện (element ẩn, dùng 'attached' thay vì 'visible')
-  await page.waitForSelector('ytcp-uploads-dialog', { state: 'attached', timeout: 30000 });
+  await page.waitForSelector('ytcp-uploads-dialog', { state: 'attached', timeout: 3000 });
   console.log('[upload] ✓ Upload dialog đã xuất hiện');
 
   // ── Step 4: Set file trực tiếp qua input[type=file] ẩn ────────────────
@@ -129,35 +129,46 @@ async function openUploadAndSelectFile(page, mp4Path) {
   //    setInputFiles() dispatch event 'change' mà YouTube cần.
 
   console.log(`[upload] Step 4: Set file ${path.basename(mp4Path)}...`);
-  const fileInput = page.locator('input[type="file"]').first();
-  await fileInput.waitFor({ state: 'attached', timeout: 30000 });
-  await fileInput.setInputFiles(mp4Path);
+  // const fileInput = page.locator('input[type="file"]').first();
+  // await fileInput.waitFor({ state: 'attached', timeout: 3000 });
+  await delay(3000);
+  // await fileInput.setInputFiles(mp4Path);
+  const [fileChooser] = await Promise.all([
+    page.waitForEvent('filechooser'),
+    page.click('button:has-text("Select files")'),
+    // page.click('input[type="file"]'),
+  ]);
+  console.log('🚀 ~ openUploadAndSelectFile ~ fileChooser:', fileChooser);
+  await page.waitForTimeout(1000);
+
+  await fileChooser.setFiles(mp4Path);
   console.log(`[upload] ✓ Đã set file: ${mp4Path}`);
 
-  await delay(1000);
+  await delay(10000);
 
-  await clickElement(
-    page,
-    '/html/body/ytcp-uploads-dialog/tp-yt-paper-dialog/div/ytcp-uploads-file-picker/div/ytcp-button/ytcp-button-shape/button',
-  );
+  // await clickElement(
+  //   page,
+  //   '/html/body/ytcp-uploads-dialog/tp-yt-paper-dialog/div/ytcp-uploads-file-picker/div/ytcp-button/ytcp-button-shape/button',
+  // );
 
   // ── Step 5: Chờ YouTube xử lý upload và chuyển sang form "Chi tiết" ───
   //    workflow-step chuyển từ "SELECT_FILES" → bước khác khi upload bắt đầu.
   console.log('[upload] Step 5: Chờ YouTube xử lý file...');
+
   try {
     // Cách 1: Chờ workflow-step thay đổi (không còn SELECT_FILES)
     await page.waitForSelector('ytcp-uploads-dialog:not([workflow-step="SELECT_FILES"])', {
       state: 'attached',
-      timeout: 60000,
+      timeout: 6000,
     });
     console.log('[upload] ✓ YouTube đã nhận file — đang chuyển sang form chi tiết');
   } catch {
     // Cách 2: Nếu cách 1 không được, thử chờ metadata editor
     console.log('[upload] ⚠ workflow-step không đổi, thử chờ metadata editor...');
-    await page.waitForSelector('ytcp-video-metadata-editor, #details', {
-      state: 'attached',
-      timeout: 120000,
-    });
+    // await page.waitForSelector('ytcp-video-metadata-editor, #details', {
+    //   state: 'attached',
+    //   timeout: 120000,
+    // });
   }
   console.log('[upload] ✓ Form chi tiết đã xuất hiện — sẵn sàng edit title/description');
 }
@@ -196,7 +207,8 @@ async function fillVideoDetails(page, videoFolderPath) {
   // ── Step 1: Xóa title cũ và nhập title mới ────────────────────────────
   if (title) {
     console.log('[edit] Step 1: Nhập Title...');
-    const titleXpath = '/html/body/ytcp-uploads-dialog/tp-yt-paper-dialog/div/ytcp-animatable[1]/ytcp-ve/ytcp-video-metadata-editor/div/ytcp-video-metadata-editor-basics/div[1]/ytcp-video-title/div/ytcp-social-suggestions-textbox/ytcp-form-input-container/div[1]/div[2]/div/ytcp-social-suggestion-input/div';
+    const titleXpath =
+      '/html/body/ytcp-uploads-dialog/tp-yt-paper-dialog/div/ytcp-animatable[1]/ytcp-ve/ytcp-video-metadata-editor/div/ytcp-video-metadata-editor-basics/div[1]/ytcp-video-title/div/ytcp-social-suggestions-textbox/ytcp-form-input-container/div[1]/div[2]/div/ytcp-social-suggestion-input/div';
     await clickElement(page, titleXpath);
     await delay(500);
     // Chọn tất cả text cũ và xóa
@@ -205,7 +217,7 @@ async function fillVideoDetails(page, videoFolderPath) {
     await page.keyboard.press('Backspace');
     await delay(300);
     // Nhập title mới
-    await page.keyboard.type(title, { delay: 30 });
+    await page.keyboard.insertText(title);
     console.log('[edit] ✓ Đã nhập Title');
     await delay(500);
   }
@@ -213,21 +225,30 @@ async function fillVideoDetails(page, videoFolderPath) {
   // ── Step 2: Nhập Description ──────────────────────────────────────────
   if (description) {
     console.log('[edit] Step 2: Nhập Description...');
-    const descXpath = '/html/body/ytcp-uploads-dialog/tp-yt-paper-dialog/div/ytcp-animatable[1]/ytcp-ve/ytcp-video-metadata-editor/div/ytcp-video-metadata-editor-basics/div[2]/ytcp-video-description/div/ytcp-social-suggestions-textbox/ytcp-form-input-container/div[1]/div[2]/div/ytcp-social-suggestion-input/div';
+    const descXpath =
+      '/html/body/ytcp-uploads-dialog/tp-yt-paper-dialog/div/ytcp-animatable[1]/ytcp-ve/ytcp-video-metadata-editor/div/ytcp-video-metadata-editor-basics/div[2]/ytcp-video-description/div/ytcp-social-suggestions-textbox/ytcp-form-input-container/div[1]/div[2]/div/ytcp-social-suggestion-input/div';
     await clickElement(page, descXpath);
     await delay(500);
     await page.keyboard.press('Control+A');
     await delay(200);
     await page.keyboard.press('Backspace');
     await delay(300);
-    await page.keyboard.type(description, { delay: 10 });
+    await page.keyboard.insertText(description);
     console.log('[edit] ✓ Đã nhập Description');
     await delay(500);
   }
 
+  try {
+    await page.keyboard.press('Escape');
+    await delay(400);
+  } catch {
+    /* ignore */
+  }
+
   // ── Step 3: Scroll xuống cuối và click "Hiển thị thêm" (Show more) ────
   console.log('[edit] Step 3: Click "Hiển thị thêm" (Show more)...');
-  const showMoreXpath = '/html/body/ytcp-uploads-dialog/tp-yt-paper-dialog/div/ytcp-animatable[1]/ytcp-ve/ytcp-video-metadata-editor/div/div/ytcp-button/ytcp-button-shape/button';
+  const showMoreXpath =
+    '/html/body/ytcp-uploads-dialog/tp-yt-paper-dialog/div/ytcp-animatable[1]/ytcp-ve/ytcp-video-metadata-editor/div/div/ytcp-button/ytcp-button-shape/button';
   // Scroll xuống để nút "Show more" hiện ra
   await page.evaluate(() => {
     const dialog = document.querySelector('ytcp-uploads-dialog tp-yt-paper-dialog');
@@ -248,18 +269,23 @@ async function fillVideoDetails(page, videoFolderPath) {
     });
     await delay(1000);
 
-    const tagsXpath = '/html/body/ytcp-uploads-dialog/tp-yt-paper-dialog/div/ytcp-animatable[1]/ytcp-ve/ytcp-video-metadata-editor/div/ytcp-video-metadata-editor-advanced/div[7]/ytcp-form-input-container/div[1]/div/ytcp-free-text-chip-bar/ytcp-chip-bar/div/input';
+    const tagsXpath =
+      '/html/body/ytcp-uploads-dialog/tp-yt-paper-dialog/div/ytcp-animatable[1]/ytcp-ve/ytcp-video-metadata-editor/div/ytcp-video-metadata-editor-advanced/div[7]/ytcp-form-input-container/div[1]/div/ytcp-free-text-chip-bar/ytcp-chip-bar/div/input';
     await clickElement(page, tagsXpath);
     await delay(500);
 
     // Nhập từng tag, phân tách bằng dấu phẩy → mỗi tag nhấn Enter để tạo chip
-    const tagList = tags.split(',').map(t => t.trim()).filter(Boolean);
-    for (const tag of tagList) {
-      await page.keyboard.type(tag, { delay: 20 });
-      await delay(200);
-      await page.keyboard.press('Enter');
-      await delay(300);
-    }
+    await page.keyboard.insertText(tags);
+    // const tagList = tags
+    //   .split(',')
+    //   .map(t => t.trim())
+    //   .filter(Boolean);
+    // for (const tag of tagList) {
+    //   await page.keyboard.type(tag, { delay: 20 });
+    //   await delay(200);
+    //   await page.keyboard.press('Enter');
+    //   await delay(300);
+    // }
     console.log(`[edit] ✓ Đã nhập ${tagList.length} tags`);
     await delay(500);
   }
