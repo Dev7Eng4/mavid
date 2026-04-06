@@ -150,15 +150,17 @@ export function SettingsPage({ disabled }: Props) {
       <PageHeader
         align='start'
         title='Settings'
-        description='Flow, Gemini, lưu trữ video, video, phụ đề và logo — ghi vào contents/constants/index.js.'
         actions={
           <>
             {msg ? (
-              <span className='text-sm max-w-56 sm:max-w-xs leading-snug text-right' style={{ color: msg.startsWith('Lỗi') ? 'var(--error)' : 'var(--accent)' }}>
+              <span
+                className='text-sm max-w-56 sm:max-w-xs leading-snug text-right'
+                style={{ color: msg.startsWith('Lỗi') ? 'var(--error)' : 'var(--accent)' }}
+              >
                 {msg}
               </span>
             ) : null}
-            <AppButton variant='ghost' size='sm' onClick={handleReset} disabled={!dirty || disabled}>
+            <AppButton variant='ghost' onClick={handleReset} disabled={!dirty || disabled}>
               Reset
             </AppButton>
             <AppButton variant='secondary' onClick={() => void handleSave()} disabled={!dirty || saving || disabled || constantsLoading}>
@@ -189,18 +191,24 @@ export function SettingsPage({ disabled }: Props) {
       {/* ───── CHUNG ───── */}
       {tab === 'common' && (
         <div className='space-y-4'>
-          <SectionCard title='Lưu trữ video'>
+          <SectionCard title='LƯU TRỮ VIDEO'>
             <p className='text-sm leading-relaxed mb-3' style={{ color: 'var(--text-muted)' }}>
               Chọn thư mục cha (ví dụ ổ D:\\ hoặc thư mục trên ổ ngoài). App tạo bên trong thư mục đó{' '}
-              <code className='text-xs'>MaVidMedia</code> với ba thư mục con: <code className='text-xs'>backgrounds</code>,{' '}
-              <code className='text-xs'>videos</code>, <code className='text-xs'>channels</code>. Giá trị lưu trong{' '}
-              <code className='text-xs'>VIDEO_STORAGE_ROOT</code> là đường dẫn tới <code className='text-xs'>MaVidMedia</code>{' '}
-              (file <code className='text-xs'>contents/constants/index.js</code>). Mặc định gợi ý khi chưa cấu hình: ổ đầu tiên khác C: (Windows) hoặc volume trong{' '}
-              <code className='text-xs'>/Volumes</code> (Mac).
+              <code className='text-xs'>MaVidMedia</code> với ba thư mục con:
+            </p>
+            <p>
+              <code className='text-xs'>backgrounds</code>: chứa những video stock hoặc ảnh bạn muốn dùng để tạo thành video
+            </p>
+            <p>
+              <code className='text-xs'>videos</code>: lưu trữ những video đã đăng lên youtube
+            </p>
+            <p>
+              <code className='text-xs'>channels</code>: lưu trữ thông tin các kênh youtube{' '}
+              <span className='text-red-500 text-xs'>*không được thay đổi*</span>
             </p>
             <div className='flex flex-wrap gap-3 items-end'>
               <div className='flex-1 min-w-[min(100%,18rem)]'>
-                <Field label='Đường dẫn MaVidMedia (VIDEO_STORAGE_ROOT)'>
+                <Field label=''>
                   <input
                     value={constantsLoading ? 'Đang tải…' : model.VIDEO_STORAGE_ROOT}
                     readOnly
@@ -223,18 +231,18 @@ export function SettingsPage({ disabled }: Props) {
             </div>
           </SectionCard>
 
-          <SectionCard title='Flow'>
+          <SectionCard title='FLOW'>
             <div className='grid gap-3'>
-              <Field label='FLOW_URL'>
+              <Field label='URL'>
                 <input
                   value={model.flowSettings.FLOW_URL}
-                  disabled={!canEdit}
+                  disabled
                   onChange={e => patch('flowSettings', { ...model.flowSettings, FLOW_URL: e.target.value })}
                   className='w-full rounded-xl px-3 py-2 text-sm outline-none'
                   style={inputStyle}
                 />
               </Field>
-              <Field label='FLOW_PROJECT_ID'>
+              <Field label='PROJECT ID'>
                 <input
                   value={model.flowSettings.FLOW_PROJECT_ID}
                   disabled={!canEdit}
@@ -246,18 +254,18 @@ export function SettingsPage({ disabled }: Props) {
             </div>
           </SectionCard>
 
-          <SectionCard title='Gemini'>
+          <SectionCard title='GEMINI'>
             <div className='grid gap-3'>
               <Field label='URL'>
                 <input
                   value={model.GEMINI_CONFIG.URL}
-                  disabled={!canEdit}
+                  disabled
                   onChange={e => patch('GEMINI_CONFIG', { ...model.GEMINI_CONFIG, URL: e.target.value })}
                   className='w-full rounded-xl px-3 py-2 text-sm outline-none'
                   style={inputStyle}
                 />
               </Field>
-              <Field label='MAX_CONCURRENT'>
+              <Field label='MAX CONCURRENT'>
                 <input
                   type='number'
                   value={model.GEMINI_CONFIG.MAX_CONCURRENT}
@@ -310,32 +318,7 @@ export function SettingsPage({ disabled }: Props) {
       {/* ───── VIDEO ───── */}
       {tab === 'video' && (
         <div className='space-y-4'>
-          <SectionCard title='Video defaults'>
-            <div className='grid gap-3'>
-              <Field label='BACKGROUND_VIDEO'>
-                <input
-                  value={model.DEFAULT_VIDEO.BACKGROUND_VIDEO}
-                  disabled={!canEdit}
-                  onChange={e => patch('DEFAULT_VIDEO', { ...model.DEFAULT_VIDEO, BACKGROUND_VIDEO: e.target.value })}
-                  className='w-full rounded-xl px-3 py-2 text-sm outline-none'
-                  style={inputStyle}
-                />
-              </Field>
-              <Field label='AUDIO_SPEED'>
-                <input
-                  type='number'
-                  step={0.01}
-                  value={model.AUDIO_SPEED}
-                  disabled={!canEdit}
-                  onChange={e => patch('AUDIO_SPEED', toNum(e.target.value, model.AUDIO_SPEED))}
-                  className='w-full rounded-xl px-3 py-2 text-sm outline-none'
-                  style={inputStyle}
-                />
-              </Field>
-            </div>
-          </SectionCard>
-
-          <SectionCard title='Stock video'>
+          <SectionCard title='STOCK VIDEO'>
             <div className='grid gap-3 sm:grid-cols-2'>
               {(Object.keys(model.STOCK_VIDEO) as (keyof typeof model.STOCK_VIDEO)[]).map(k => {
                 const val = model.STOCK_VIDEO[k];
@@ -359,7 +342,7 @@ export function SettingsPage({ disabled }: Props) {
             </div>
           </SectionCard>
 
-          <SectionCard title='Subtitle'>
+          <SectionCard title='SUBTITLE'>
             <div className='grid gap-3 sm:grid-cols-2'>
               {(Object.keys(model.SUBTITLE) as (keyof typeof model.SUBTITLE)[]).map(k => (
                 <Field key={k} label={k}>
@@ -377,7 +360,7 @@ export function SettingsPage({ disabled }: Props) {
             </div>
           </SectionCard>
 
-          <SectionCard title='Logo'>
+          <SectionCard title='LOGO'>
             <div className='grid gap-3 sm:grid-cols-3'>
               {(Object.keys(model.LOGO) as (keyof typeof model.LOGO)[]).map(k => (
                 <Field key={k} label={k}>

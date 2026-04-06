@@ -144,95 +144,101 @@ export function GpmPage() {
           }
         />
 
-        <div className='space-y-2'>
+        {/* <div className='space-y-2'>
           {message ? (
             <p className='text-sm pl-0.5' style={{ color: 'var(--text-muted)' }}>
               {message}
             </p>
           ) : null}
-        </div>
+        </div> */}
       </div>
 
-      <div className='rounded-2xl w-full min-w-0' style={{ background: 'var(--card-bg)', border: '1px solid var(--border)' }}>
+      <div
+        className='rounded-2xl w-full min-w-0 overflow-hidden'
+        style={{ background: 'var(--card-bg)', border: '1px solid var(--border)' }}
+      >
         <div className='overflow-auto w-full min-w-0'>
-        <table className='w-full min-w-0 text-base' style={{ borderCollapse: 'collapse' }}>
-          <thead>
-            <tr style={{ background: 'var(--code-bg)' }}>
-              <th
-                className='text-left px-4 py-3 font-medium uppercase text-base tracking-wider'
-                style={{ color: 'var(--text-muted)', borderBottom: '1px solid var(--border)' }}
-              >
-                Id
-              </th>
-              <th
-                className='text-left px-4 py-3 font-medium uppercase text-base tracking-wider'
-                style={{ color: 'var(--text-muted)', borderBottom: '1px solid var(--border)' }}
-              >
-                Name
-              </th>
-              <th
-                className='text-left px-4 py-3 font-medium uppercase text-base tracking-wider'
-                style={{ color: 'var(--text-muted)', borderBottom: '1px solid var(--border)' }}
-              >
-                Profile path
-              </th>
-              <th
-                className='text-right px-4 py-3 font-medium uppercase text-base tracking-wider whitespace-nowrap w-1'
-                style={{ color: 'var(--text-muted)', borderBottom: '1px solid var(--border)' }}
-              >
-                API
-              </th>
-            </tr>
-          </thead>
-          <tbody>
-            {loading ? (
-              <tr>
-                <td colSpan={4} className='px-4 py-8 text-center' style={{ color: 'var(--text-muted)' }}>
-                  Đang tải…
-                </td>
+          <table className='w-full min-w-0 text-base' style={{ borderCollapse: 'collapse' }}>
+            <thead>
+              <tr style={{ background: 'var(--code-bg)' }}>
+                <th
+                  className='text-left px-4 py-3 font-medium uppercase text-base tracking-wider'
+                  style={{ color: 'var(--text-muted)', borderBottom: '1px solid var(--border)' }}
+                >
+                  Id
+                </th>
+                <th
+                  className='text-left px-4 py-3 font-medium uppercase text-base tracking-wider'
+                  style={{ color: 'var(--text-muted)', borderBottom: '1px solid var(--border)' }}
+                >
+                  Name
+                </th>
+                <th
+                  className='text-left px-4 py-3 font-medium uppercase text-base tracking-wider'
+                  style={{ color: 'var(--text-muted)', borderBottom: '1px solid var(--border)' }}
+                >
+                  Profile path
+                </th>
+                <th
+                  className='text-right px-4 py-3 font-medium uppercase text-base tracking-wider whitespace-nowrap w-1'
+                  style={{ color: 'var(--text-muted)', borderBottom: '1px solid var(--border)' }}
+                >
+                  API
+                </th>
               </tr>
-            ) : profiles.length === 0 ? (
-              <tr>
-                <td colSpan={4} className='px-4 py-8 text-center' style={{ color: 'var(--text-muted)' }}>
-                  Không có profile. Kiểm tra GPM đang chạy và API Local hoạt động.
-                </td>
-              </tr>
-            ) : (
-              pageProfiles.map((row, i) => {
-                const globalIndex = gpmPag.startIndex + i;
-                const rowKey = profileRowKey(row, globalIndex);
-                const pid = row.id?.trim();
-                const isOpen = pid ? openProfileIds.has(pid) : false;
-                const busy = busyKeys.has(rowKey);
-                return (
-                  <tr key={row.id ? `${row.id}-${globalIndex}` : `gpm-row-${globalIndex}`} style={{ borderBottom: '1px solid var(--border)' }}>
-                    <td className='px-4 py-3 wrap-break-word font-mono text-base' style={{ color: 'var(--text-h)' }}>
-                      {row.id || '—'}
-                    </td>
-                    <td className='px-4 py-3 wrap-break-word text-base' style={{ color: 'var(--text-h)' }}>
-                      {row.name || '—'}
-                    </td>
-                    <td className='px-4 py-3 wrap-break-word font-mono text-base' style={{ color: 'var(--text-h)' }}>
-                      {row.profilePath || '—'}
-                    </td>
-                    <td className='px-4 py-3 text-right whitespace-nowrap'>
-                      <AppButton
-                        type='button'
-                        variant={isOpen ? 'danger' : 'primary'}
-                        size='md'
-                        disabled={busy || loading || !pid}
-                        onClick={() => void toggleOpenClose(row, globalIndex)}
-                        className='py-1.5'
-                      >
-                        {busy ? '…' : isOpen ? 'Đóng' : 'Mở'}
-                      </AppButton>
-                    </td>
-                  </tr>
-                );
-              })
-            )}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {loading ? (
+                <tr>
+                  <td colSpan={4} className='px-4 py-8 text-center' style={{ color: 'var(--text-muted)' }}>
+                    Đang tải…
+                  </td>
+                </tr>
+              ) : profiles.length === 0 ? (
+                <tr>
+                  <td colSpan={4} className='px-4 py-8 text-center' style={{ color: 'var(--text-muted)' }}>
+                    Không có profile. Kiểm tra GPM đang chạy và API Local hoạt động.
+                  </td>
+                </tr>
+              ) : (
+                pageProfiles.map((row, i) => {
+                  const globalIndex = gpmPag.startIndex + i;
+                  const rowKey = profileRowKey(row, globalIndex);
+                  const pid = row.id?.trim();
+                  const isOpen = pid ? openProfileIds.has(pid) : false;
+                  const busy = busyKeys.has(rowKey);
+                  return (
+                    <tr
+                      key={row.id ? `${row.id}-${globalIndex}` : `gpm-row-${globalIndex}`}
+                      style={{ borderBottom: '1px solid var(--border)' }}
+                    >
+                      <td className='px-4 py-3 wrap-break-word font-mono text-base' style={{ color: 'var(--text-h)' }}>
+                        {row.id || '—'}
+                      </td>
+                      <td className='px-4 py-3 wrap-break-word text-base' style={{ color: 'var(--text-h)' }}>
+                        {row.name || '—'}
+                      </td>
+                      <td className='px-4 py-3 wrap-break-word font-mono text-base' style={{ color: 'var(--text-h)' }}>
+                        {row.profilePath || '—'}
+                      </td>
+                      <td className='px-4 py-3 text-right whitespace-nowrap'>
+                        <AppButton
+                          type='button'
+                          variant={isOpen ? 'danger' : 'primary'}
+                          size='md'
+                          disabled={busy || loading || !pid}
+                          onClick={() => void toggleOpenClose(row, globalIndex)}
+                          className='py-1.5'
+                        >
+                          {busy ? '…' : isOpen ? 'Đóng' : 'Mở'}
+                        </AppButton>
+                      </td>
+                    </tr>
+                  );
+                })
+              )}
+            </tbody>
+          </table>
         </div>
         {!loading && profiles.length > 0 ? (
           <TablePaginationBar

@@ -221,12 +221,15 @@ export interface UploadYoutubeViaGpmParams {
 export interface AddChannelFromFormParams {
   url: string;
   formMeta: {
-    email: string;
-    videoType: 'from_audio' | 'reup_full';
-    durationMinutes: number;
-    background: string;
-    videosPerDayPreset: string;
-    publishTimes: string[];
+    channels: {
+      email: string;
+      videoType: 'from_audio' | 'reup_full';
+      durationMinuteFrom: number;
+      durationMinuteTo: number | null;
+      background: string;
+      videosPerDayPreset: string;
+      publishTimes: string[];
+    }[];
     folderIdOverride?: string;
   };
 }
@@ -247,14 +250,19 @@ export interface GetInfoChannelResult {
 }
 
 /** `MaVidMedia/channels/{folder}/mavid-channel-config.json` — đồng bộ với form Thêm/Sửa channel. */
-export interface MavidChannelConfig {
-  version?: number;
+export interface MavidChannelConfigItem {
   email?: string;
   videoType?: string;
-  durationMinutes?: number;
+  durationMinuteFrom?: number;
+  durationMinuteTo?: number | null;
   background?: string;
   videosPerDayPreset?: string;
   publishTimes?: string[];
+}
+
+export interface MavidChannelConfig {
+  version?: number;
+  channels?: MavidChannelConfigItem[];
   channelUrl?: string;
   channelLink?: string;
   channelName?: string;
@@ -262,6 +270,14 @@ export interface MavidChannelConfig {
   lastUpload?: string;
   youtube?: { usernameId?: string; channelId?: string | null };
   createdAt?: string;
+  
+  // Backward compatibility properties
+  email?: string;
+  videoType?: string;
+  durationMinutes?: number;
+  background?: string;
+  videosPerDayPreset?: string;
+  publishTimes?: string[];
 }
 
 declare global {
@@ -282,10 +298,7 @@ declare global {
       readMavidChannelConfig: (channelFolder: string) => Promise<MavidChannelConfig | null>;
       writeMavidChannelConfig: (payload: {
         channelFolder: string;
-        patch: Pick<
-          MavidChannelConfig,
-          'email' | 'videoType' | 'durationMinutes' | 'background' | 'videosPerDayPreset' | 'publishTimes'
-        >;
+        patch: Pick<MavidChannelConfig, 'channels'>;
       }) => Promise<{ ok: boolean }>;
       setChannelFolderStartFromRow: (
         channelFolder: string,
@@ -315,6 +328,7 @@ declare global {
       gpmPlaywrightStopFolder: (profileKey: string) => Promise<GpmPlaywrightStopFolderResult>;
       onScriptLog: (cb: (line: string) => void) => void;
       removeScriptLogListener: () => void;
+      minimizeApp: () => Promise<{ ok: boolean }>;
     };
   }
 }

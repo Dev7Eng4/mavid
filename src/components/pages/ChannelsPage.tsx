@@ -7,7 +7,7 @@ import { RefreshIcon, SpinnerIcon } from '../ui/Icons';
 import { PageHeader } from '../ui/PageHeader';
 import { TablePaginationBar } from '../ui/TablePaginationBar';
 import { ChannelAddDialog } from './channels/ChannelAddDialog';
-import { ChannelUploadVideoDialog, type ChannelUploadVideoPayload } from './channels/ChannelUploadVideoDialog';
+import { ChannelUploadVideoDialog, type ChannelUploadVideoPayload, type ChannelItem } from './channels/ChannelUploadVideoDialog';
 import { gpmApi } from '../../services';
 import {
   buildExtraEnvForIndexChannelRow,
@@ -20,6 +20,7 @@ import {
 } from './channels/channelIndexHelpers';
 
 const INDEX_FILE = 'channels/index.xlsx';
+const tableHeaders = ['ID', 'LINK', 'EMAIL', 'LOẠI VIDEO', 'THỜI GIAN VIDEO', 'LAST UPLOAD'];
 
 /**
  * Parse duration từ ô Excel/text: `HH:mm:ss`, `mm:ss`, hoặc số (giây) → tổng giây.
@@ -151,7 +152,7 @@ export function ChannelsPage() {
     if (indexData?.headers?.length) return indexData.headers;
     const first = indexData?.rows?.[0];
     if (first && typeof first === 'object') return Object.keys(first);
-    return ['CHANNEL', 'LINK', 'ID', 'EMAIL', 'LAST UPLOAD'];
+    return ['ID', 'LINK', 'EMAIL', 'LAST UPLOAD'];
   }, [indexData]);
 
   const indexColCount = Math.max(indexHeaders.length, 1) + 1;
@@ -198,10 +199,12 @@ export function ChannelsPage() {
 
   const indexBatchEligibleCount = useMemo(() => {
     let n = 0;
+    const emailKey = findIndexHeaderKey(indexHeaders, 'EMAIL');
     for (const row of indexDraftRows) {
       const folder = channelFolderFromRow(row, indexHeaders);
+      const email = emailKey ? String(row[emailKey] ?? '').trim() : '';
       const vt = resolveIndexRowVideoType(row, indexHeaders);
-      if (folder && vt) n += 1;
+      if (folder && email && vt) n += 1;
     }
     return n;
   }, [indexDraftRows, indexHeaders]);
@@ -213,14 +216,19 @@ export function ChannelsPage() {
       setIndexListError('Runner chưa sẵn sàng.');
       return;
     }
+
     const queue: { row: ChannelRow; folder: string; videoType: 'from_audio' | 'reup_full' }[] = [];
+    const emailKey = findIndexHeaderKey(indexHeaders, 'EMAIL');
     for (const row of indexDraftRows) {
       const folder = channelFolderFromRow(row, indexHeaders);
+      const email = emailKey ? String(row[emailKey] ?? '').trim() : '';
       const videoType = resolveIndexRowVideoType(row, indexHeaders);
-      if (folder && videoType) queue.push({ row, folder, videoType });
+      if (folder && email && videoType) {
+        queue.push({ row, folder, videoType: videoType as 'from_audio' | 'reup_full' });
+      }
     }
     if (queue.length === 0) {
-      setIndexListError('Không có kênh nào đủ điều kiện: cần thư mục (cột ID hoặc CHANNEL) và LOẠI VIDEO là from_audio hoặc reup_full.');
+      setIndexListError('Không có kênh nào đủ điều kiện: cần thư mục (cột ID hoặc CHANNEL), EMAIL.');
       return;
     }
 
@@ -237,6 +245,7 @@ export function ChannelsPage() {
           failures.push(`${folder}: không tìm thấy script.`);
           continue;
         }
+
         const extraEnv = buildExtraEnvForIndexChannelRow(row, indexHeaders, folder, videoType, bgList);
         try {
           const res = await window.runner.runNpmScript(def.npmScript, extraEnv);
@@ -249,6 +258,7 @@ export function ChannelsPage() {
           failures.push(`${folder}: ${e instanceof Error ? e.message : 'lỗi'}.`);
         }
       }
+
       if (failures.length > 0) {
         setIndexListError(
           failures.length === queue.length
@@ -442,18 +452,31 @@ export function ChannelsPage() {
   const hasIndexRows = (indexData?.rows?.length ?? 0) > 0;
 
   /** Chỉ kênh có EMAIL không rỗng trong index (popup Upload video). */
-  const uploadChannelFolders = useMemo(() => {
+  const uploadChannels = useMemo(() => {
     const emailKey = findIndexHeaderKey(indexHeaders, 'EMAIL');
-    const set = new Set<string>();
+    const map = new Map<string, Set<string>>();
     for (const row of indexDraftRows) {
       const f = channelFolderFromRow(row, indexHeaders);
       if (!f?.trim()) continue;
       if (!emailKey) continue;
-      const email = String(row[emailKey] ?? '').trim();
-      if (!email) continue;
-      set.add(f.trim());
+      const emailRaw = String(row[emailKey] ?? '').trim();
+      if (!emailRaw) continue;
+
+      const emails = emailRaw
+        .split(',')
+        .map(e => e.trim())
+        .filter(Boolean);
+      if (emails.length > 0) {
+        const folder = f.trim();
+        if (!map.has(folder)) map.set(folder, new Set());
+        emails.forEach(e => map.get(folder)!.add(e));
+      }
     }
-    return [...set].sort((a, b) => a.localeCompare(b, undefined, { sensitivity: 'base' }));
+    const result: ChannelItem[] = Array.from(map.entries()).map(([folder, emails]) => ({
+      folder,
+      emails: Array.from(emails).sort((a, b) => a.localeCompare(b, undefined, { sensitivity: 'base' })),
+    }));
+    return result.sort((a, b) => a.folder.localeCompare(b.folder, undefined, { sensitivity: 'base' }));
   }, [indexDraftRows, indexHeaders]);
 
   return (
@@ -461,11 +484,7 @@ export function ChannelsPage() {
       <PageHeader
         align='start'
         title='Channels'
-        description={
-          selectedChannel
-            ? `Chi tiết: MaVidMedia/channels/${selectedChannel}/`
-            : 'Danh sách từ MaVidMedia/channels/index.xlsx'
-        }
+        description={selectedChannel ? `Chi tiết: MaVidMedia/channels/${selectedChannel}/` : 'Danh sách từ MaVidMedia/channels/index.xlsx'}
         actions={
           <>
             {!selectedChannel && (
@@ -520,9 +539,9 @@ export function ChannelsPage() {
                   type='button'
                   variant='primary'
                   onClick={() => setUploadVideoOpen(true)}
-                  disabled={indexLoading || uploadChannelFolders.length === 0}
+                  disabled={indexLoading || uploadChannels.length === 0}
                   title={
-                    uploadChannelFolders.length === 0
+                    uploadChannels.length === 0
                       ? 'Cần ít nhất một dòng index có thư mục kênh (ID/CHANNEL) và cột EMAIL có giá trị.'
                       : 'Lịch upload video theo kênh (chỉ kênh có email trong index).'
                   }
@@ -585,12 +604,15 @@ export function ChannelsPage() {
             </div>
           )}
 
-          <div className='rounded-2xl w-full min-w-0' style={{ background: 'var(--card-bg)', border: '1px solid var(--border)' }}>
+          <div
+            className='rounded-2xl w-full min-w-0 overflow-hidden'
+            style={{ background: 'var(--card-bg)', border: '1px solid var(--border)' }}
+          >
             <div className='overflow-auto w-full min-w-0'>
               <table className='w-full min-w-0 text-base' style={{ borderCollapse: 'collapse', tableLayout: 'auto' }}>
                 <thead>
                   <tr style={{ background: 'var(--code-bg)' }}>
-                    {indexHeaders.map(h => (
+                    {tableHeaders.map(h => (
                       <th
                         key={h}
                         className='text-left px-4 py-3 font-medium whitespace-nowrap uppercase text-base tracking-wider'
@@ -607,20 +629,21 @@ export function ChannelsPage() {
                     </th>
                   </tr>
                 </thead>
+
                 <tbody>
                   {indexLoading ? (
                     <tr>
                       <td colSpan={indexColCount} className='px-4 py-8 text-center'>
                         <div className='flex items-center justify-center gap-3' style={{ color: 'var(--text)' }}>
                           <SpinnerIcon className='w-5 h-5' />
-                          <span>Đang tải index...</span>
+                          <span>Đang tải dữ liệu...</span>
                         </div>
                       </td>
                     </tr>
                   ) : indexDraftRows.length > 0 ? (
                     pageIndexRows.map((row, i) => {
                       const globalIndex = indexPag.startIndex + i;
-                      const folder = channelFolderFromRow(row, indexHeaders);
+                      const folder = channelFolderFromRow(row, tableHeaders);
                       return (
                         <tr
                           key={globalIndex}
@@ -633,7 +656,7 @@ export function ChannelsPage() {
                             e.currentTarget.style.background = 'transparent';
                           }}
                         >
-                          {indexHeaders.map(h => (
+                          {tableHeaders.map(h => (
                             <td
                               key={h}
                               className='px-4 py-3 align-top wrap-break-word min-w-0'
@@ -643,6 +666,7 @@ export function ChannelsPage() {
                               {String(row[h] ?? '')}
                             </td>
                           ))}
+
                           <td className='px-4 py-3 align-top'>
                             <div className='flex gap-1.5 items-stretch'>
                               <button
@@ -708,6 +732,7 @@ export function ChannelsPage() {
               initialRow={indexDraftRows[indexEditRowIndex]}
               indexHeaders={indexHeaders}
               backgroundFolders={indexBackgrounds}
+              indexRows={indexDraftRows}
               onClose={closeIndexRowEdit}
               onAdd={async row => {
                 if (indexEditRowIndex === null) return;
@@ -1004,20 +1029,29 @@ export function ChannelsPage() {
 
       {uploadVideoOpen ? (
         <ChannelUploadVideoDialog
-          channelFolders={uploadChannelFolders}
+          channels={uploadChannels}
           onClose={() => setUploadVideoOpen(false)}
-          onConfirm={async (p: ChannelUploadVideoPayload) => {
+          onConfirm={async (payloads: ChannelUploadVideoPayload[]) => {
             if (!window.runner?.runScript) throw new Error('Chỉ chạy upload trong app Electron.');
-            await window.runner.runScript('uploadYoutubeViaGpm', {
-              gpmProfileId: p.gpmProfileId,
-              channelFolder: p.channelFolder,
-              maxUploads: p.totalVideos,
-              gpmApiBase: gpmApi.getBaseUrl(),
-            });
-            const n = p.totalVideos == null ? 'tất cả thư mục con có .mp4' : String(p.totalVideos);
-            setUploadScheduleInfo(
-              `Upload YouTube đã chạy xong — kênh «${p.channelFolder}», profile GPM ${p.gpmProfileId} (theo email ↔ name), tối đa ${n}. Kiểm tra GPM / YouTube Studio và tab Logs.`,
-            );
+            for (const p of payloads) {
+              await window.runner.runScript('uploadYoutubeViaGpm', {
+                gpmProfileId: p.gpmProfileId,
+                channelFolder: p.channelFolder,
+                maxUploads: p.totalVideos,
+                gpmApiBase: gpmApi.getBaseUrl(),
+              });
+            }
+            if (payloads.length === 1) {
+              const p = payloads[0];
+              const n = p.totalVideos == null ? 'tất cả thư mục con có .mp4' : String(p.totalVideos);
+              setUploadScheduleInfo(
+                `Upload YouTube đã chạy xong — kênh «${p.channelFolder}», profile GPM ${p.gpmProfileId} (theo email ↔ name), tối đa ${n}. Kiểm tra GPM / YouTube Studio và tab Logs.`,
+              );
+            } else if (payloads.length > 1) {
+              setUploadScheduleInfo(
+                `Upload YouTube đồng loạt đã chạy xong cho ${payloads.length} kênh. Kiểm tra GPM / YouTube Studio và tab Logs.`,
+              );
+            }
           }}
         />
       ) : null}
@@ -1025,6 +1059,7 @@ export function ChannelsPage() {
       {addChannelOpen ? (
         <ChannelAddDialog
           indexHeaders={indexHeaders}
+          indexRows={indexDraftRows}
           backgroundFolders={indexBackgrounds}
           onClose={() => setAddChannelOpen(false)}
           onSaveNewChannel={async payload => {
@@ -1032,20 +1067,12 @@ export function ChannelsPage() {
             await window.runner.runScript('addChannelFromForm', {
               url: payload.channelUrl.trim(),
               formMeta: {
-                email: payload.email,
-                videoType: payload.videoType,
-                durationMinutes: payload.durationMinutes,
-                background: payload.background,
-                videosPerDayPreset: payload.videosPerDayPreset,
-                publishTimes: payload.publishTimes,
+                channels: payload.channels,
                 folderIdOverride: payload.folderIdOverride.trim() || undefined,
               },
             });
             await loadIndex();
-            const folderHint = payload.folderIdOverride.trim() || '(theo URL)';
-            setAddChannelInfo(
-              `Đã tạo thư mục kênh, mavid-channel-config.json và cập nhật ${INDEX_FILE} (email ${payload.email}, folder ${folderHint}).`,
-            );
+            setAddChannelInfo(`Đã tạo thư mục kênh, mavid-channel-config.json và cập nhật ${INDEX_FILE}.`);
           }}
         />
       ) : null}

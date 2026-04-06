@@ -46,4 +46,5 @@ contextBridge.exposeInMainWorld('runner', {
       _scriptLogHandler = null;
     }
   },
+  minimizeApp: () => ipcRenderer.invoke('minimize-app'),
 });

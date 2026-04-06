@@ -88,12 +88,12 @@ h2 {
 }
 
 h1 {
-  font-size: 56px;
+  font-size: 36px;
   letter-spacing: -1.68px;
   /* margin: 32px 0; */
 
   @media (max-width: 1024px) {
-    font-size: 36px;
+    font-size: 24px;
     margin: 20px 0;
   }
 }
@@ -152,7 +152,9 @@ code {
 }
 
 .mavid-btn:focus-visible {
-  box-shadow: 0 0 0 2px var(--bg), 0 0 0 4px var(--accent);
+  box-shadow:
+    0 0 0 2px var(--bg),
+    0 0 0 4px var(--accent);
 }
 
 .mavid-btn:disabled {
@@ -273,7 +275,9 @@ code {
 }
 
 .mavid-tab:focus-visible {
-  box-shadow: 0 0 0 2px var(--bg), 0 0 0 4px var(--accent);
+  box-shadow:
+    0 0 0 2px var(--bg),
+    0 0 0 4px var(--accent);
 }
 
 .mavid-tab--active {

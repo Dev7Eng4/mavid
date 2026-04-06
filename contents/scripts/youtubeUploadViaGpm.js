@@ -10,9 +10,10 @@
  */
 import fs from 'fs';
 import path from 'path';
-import { clickElement, delay } from '../utils/dom.util.js';
+import { clickElement, delay, getRandomNumber, scrollUntilVisible } from '../utils/dom.util.js';
 import { resolveChannelsDir } from '../utils/channelsStoragePath.js';
 import { connectPlaywrightToGpmProfile, stopGpmProfile } from './openGpmPlaywright.js';
+import { execFile } from 'child_process';
 
 /** @param {string} base */
 function apiRootForPlaywright(base) {
@@ -97,7 +98,7 @@ async function humanWarmup(page) {
 async function openUploadAndSelectFile(page, mp4Path) {
   // ── Step 1: Mở trang YouTube ──────────────────────────────────────────
   console.log('[upload] Step 1: Mở trang YouTube...');
-  await page.goto('https://www.youtube.com/', { waitUntil: 'domcontentloaded', timeout: 120000 });
+  await page.goto('https://www.youtube.com/', { waitUntil: 'domcontentloaded', timeout: 60000 });
   // await humanWarmup(page);
 
   try {
@@ -110,7 +111,7 @@ async function openUploadAndSelectFile(page, mp4Path) {
   // ── Step 2: Bấm nút "Tạo" (Create) trên thanh masthead ──────────────
   console.log('[upload] Step 2: Bấm nút Tạo (Create)...');
   await clickElement(page, '/html/body/ytd-app/div[1]/div[2]/ytd-masthead/div[4]/div[3]/div[2]/ytd-button-renderer/yt-button-shape/button');
-  await delay(700 + Math.random() * 800);
+  await delay(getRandomNumber(500));
 
   // ── Step 3: Chọn mục "Tải video lên" (Upload videos) trong menu ─────
   console.log('[upload] Step 3: Chọn mục Tải video lên...');
@@ -118,38 +119,27 @@ async function openUploadAndSelectFile(page, mp4Path) {
     page,
     '/html/body/ytd-app/ytd-popup-container/tp-yt-iron-dropdown/div/ytd-multi-page-menu-renderer/div[3]/div[1]/yt-multi-page-menu-section-renderer/div[2]/ytd-compact-link-renderer[1]/a',
   );
-  await delay(2000 + Math.random() * 1200);
+  await delay(getRandomNumber(3000));
 
-  // Chờ upload dialog xuất hiện (element ẩn, dùng 'attached' thay vì 'visible')
-  await page.waitForSelector('ytcp-uploads-dialog', { state: 'attached', timeout: 3000 });
-  console.log('[upload] ✓ Upload dialog đã xuất hiện');
+  await clickElement(
+    page,
+    '/html/body/ytcp-uploads-dialog/tp-yt-paper-dialog/div/ytcp-uploads-file-picker/div/ytcp-button/ytcp-button-shape/button',
+  );
 
-  // ── Step 4: Set file trực tiếp qua input[type=file] ẩn ────────────────
-  //    Không click nút "Chọn tệp" → tránh popup native của OS.
-  //    setInputFiles() dispatch event 'change' mà YouTube cần.
+  // await moveToTopLeft(page, 100, 100);
+  await page.mouse.move(200, 200, { steps: 20 });
 
-  console.log(`[upload] Step 4: Set file ${path.basename(mp4Path)}...`);
-  // const fileInput = page.locator('input[type="file"]').first();
-  // await fileInput.waitFor({ state: 'attached', timeout: 3000 });
-  await delay(3000);
-  // await fileInput.setInputFiles(mp4Path);
-  const [fileChooser] = await Promise.all([
-    page.waitForEvent('filechooser'),
-    page.click('button:has-text("Select files")'),
-    // page.click('input[type="file"]'),
-  ]);
-  console.log('🚀 ~ openUploadAndSelectFile ~ fileChooser:', fileChooser);
-  await page.waitForTimeout(1000);
+  await delay(4000);
 
-  await fileChooser.setFiles(mp4Path);
+  execFile('uploadVideoTest.exe', [path.dirname(mp4Path), path.basename(mp4Path)]);
+  // execFile('uploadVideo.exe', [
+  //   'D:\\yup\\channels\\2ch-qp3vc\\jnwgkjqgxHM',
+  //   '【2ch馴れ初め】お隣さんの美人女子大生を 住み込みで雇った結果、年下の彼女が出来た.mp4',
+  // ]);
+
   console.log(`[upload] ✓ Đã set file: ${mp4Path}`);
 
-  await delay(10000);
-
-  // await clickElement(
-  //   page,
-  //   '/html/body/ytcp-uploads-dialog/tp-yt-paper-dialog/div/ytcp-uploads-file-picker/div/ytcp-button/ytcp-button-shape/button',
-  // );
+  await page.waitForTimeout(getRandomNumber(1000));
 
   // ── Step 5: Chờ YouTube xử lý upload và chuyển sang form "Chi tiết" ───
   //    workflow-step chuyển từ "SELECT_FILES" → bước khác khi upload bắt đầu.
@@ -159,18 +149,27 @@ async function openUploadAndSelectFile(page, mp4Path) {
     // Cách 1: Chờ workflow-step thay đổi (không còn SELECT_FILES)
     await page.waitForSelector('ytcp-uploads-dialog:not([workflow-step="SELECT_FILES"])', {
       state: 'attached',
-      timeout: 6000,
+      timeout: 60000,
     });
-    console.log('[upload] ✓ YouTube đã nhận file — đang chuyển sang form chi tiết');
-  } catch {
-    // Cách 2: Nếu cách 1 không được, thử chờ metadata editor
-    console.log('[upload] ⚠ workflow-step không đổi, thử chờ metadata editor...');
-    // await page.waitForSelector('ytcp-video-metadata-editor, #details', {
-    //   state: 'attached',
-    //   timeout: 120000,
-    // });
-  }
+  } catch {}
   console.log('[upload] ✓ Form chi tiết đã xuất hiện — sẵn sàng edit title/description');
+}
+
+async function getMetaInfo(videoFolderPath) {
+  const metaPath = path.join(videoFolderPath, 'video-meta.json');
+  if (!fs.existsSync(metaPath)) {
+    console.warn(`[edit] ⚠ Không tìm thấy ${metaPath} — bỏ qua edit details.`);
+    return;
+  }
+
+  try {
+    const meta = JSON.parse(fs.readFileSync(metaPath, 'utf8'));
+
+    return meta;
+  } catch (e) {
+    console.warn(`[edit] ⚠ Lỗi đọc video-meta.json: ${e.message}`);
+    return;
+  }
 }
 
 /**
@@ -181,28 +180,12 @@ async function openUploadAndSelectFile(page, mp4Path) {
  */
 async function fillVideoDetails(page, videoFolderPath) {
   // ── Đọc video-meta.json ─────────────────────────────────────────────────
-  const metaPath = path.join(videoFolderPath, 'video-meta.json');
-  if (!fs.existsSync(metaPath)) {
-    console.warn(`[edit] ⚠ Không tìm thấy ${metaPath} — bỏ qua edit details.`);
-    return;
-  }
-
-  let meta;
-  try {
-    meta = JSON.parse(fs.readFileSync(metaPath, 'utf8'));
-  } catch (e) {
-    console.warn(`[edit] ⚠ Lỗi đọc video-meta.json: ${e.message}`);
-    return;
-  }
+  const meta = getMetaInfo(videoFolderPath);
 
   const title = meta.titleGemini || meta.title || '';
   const description = meta.descriptionGemini || meta.description || '';
-  const tags = meta.tagsGemini || meta.tags || '';
-
-  console.log(`[edit] Bắt đầu điền thông tin video...`);
-  console.log(`[edit]   Title: ${title.substring(0, 60)}${title.length > 60 ? '...' : ''}`);
-  console.log(`[edit]   Description: ${description.substring(0, 60)}${description.length > 60 ? '...' : ''}`);
-  console.log(`[edit]   Tags: ${tags.substring(0, 60)}${tags.length > 60 ? '...' : ''}`);
+  const tagsGemini = meta.tagsGemini || '';
+  const tags = meta.tags || '';
 
   // ── Step 1: Xóa title cũ và nhập title mới ────────────────────────────
   if (title) {
@@ -245,52 +228,169 @@ async function fillVideoDetails(page, videoFolderPath) {
     /* ignore */
   }
 
+  // upload thumbnail
+  const thumbXpath =
+    '/html/body/ytcp-uploads-dialog/tp-yt-paper-dialog/div/ytcp-animatable[1]/ytcp-ve/ytcp-video-metadata-editor/div/ytcp-video-metadata-editor-basics/div[3]/ytcp-video-thumbnail-editor/div[4]/ytcp-video-custom-still-editor/div/ytcp-thumbnail-uploader/ytcp-thumbnail-editor/div[1]/ytcp-ve/button';
+
+  await scrollUntilVisible(page, thumbXpath, true, 100);
+
+  // Lưu ý: Tôi đã thêm thao tác click gọi hộp thoại chọn file, vì thường phải click thì file dialog mới hiện ra.
+  await clickElement(page, thumbXpath);
+
+  await page.mouse.move(200, 150, { steps: 20 });
+
+  await delay(4000);
+
+  // Tìm file ảnh trong folder (jpg, png,  jpeg)
+  const imageExts = ['.jpg', '.jpeg', '.png'];
+  const folderFiles = fs.readdirSync(videoFolderPath);
+  const imageFile = folderFiles.find(f => imageExts.includes(path.extname(f).toLowerCase()));
+
+  if (imageFile) {
+    execFile('uploadVideoTest.exe', [videoFolderPath, imageFile]);
+    console.log(`[edit] ✓ Gọi uploadVideo.exe cho thumbnail: ${imageFile}`);
+
+    const btnUploadThumb = page.locator(`xpath=${thumbXpath}`);
+    let found = false;
+
+    for (let i = 0; i < 15; i++) {
+      const count = await btnUploadThumb.count();
+
+      if (count <= 0) {
+        found = true;
+        break;
+      }
+
+      await page.waitForTimeout(1000);
+    }
+
+    if (!found) {
+      console.log('Đã upload thumbnail thành công');
+    }
+  } else {
+    console.log(`[edit] ⚠ Không tìm thấy file thumbnail (.jpg, .png...) trong ${videoFolderPath}`);
+  }
+
   // ── Step 3: Scroll xuống cuối và click "Hiển thị thêm" (Show more) ────
   console.log('[edit] Step 3: Click "Hiển thị thêm" (Show more)...');
   const showMoreXpath =
     '/html/body/ytcp-uploads-dialog/tp-yt-paper-dialog/div/ytcp-animatable[1]/ytcp-ve/ytcp-video-metadata-editor/div/div/ytcp-button/ytcp-button-shape/button';
   // Scroll xuống để nút "Show more" hiện ra
-  await page.evaluate(() => {
-    const dialog = document.querySelector('ytcp-uploads-dialog tp-yt-paper-dialog');
-    if (dialog) dialog.scrollTop = dialog.scrollHeight;
-  });
+  const box = await page.locator('xpath=/html/body/ytcp-uploads-dialog/tp-yt-paper-dialog/div/ytcp-animatable[1]').boundingBox();
+
+  if (box) {
+    await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+
+    for (let i = 0; i < 10; i++) {
+      await page.mouse.wheel(0, 300);
+      await page.waitForTimeout(100 + Math.random() * 200);
+    }
+  }
+  // await page.evaluate(() => {
+  //   const dialog = document.querySelector('ytcp-uploads-dialog tp-yt-paper-dialog');
+  //   if (dialog) dialog.scrollTop = dialog.scrollHeight;
+  // });
   await delay(1000);
   await clickElement(page, showMoreXpath);
   console.log('[edit] ✓ Đã click "Hiển thị thêm"');
   await delay(1500);
 
   // ── Step 4: Scroll xuống và nhập Tags ─────────────────────────────────
-  if (tags) {
+  if (tags || tagsGemini) {
     console.log('[edit] Step 4: Nhập Tags...');
     // Scroll xuống phần Tags
-    await page.evaluate(() => {
-      const dialog = document.querySelector('ytcp-uploads-dialog tp-yt-paper-dialog');
-      if (dialog) dialog.scrollTop = dialog.scrollHeight;
-    });
-    await delay(1000);
+
+    // 👉 lấy vị trí của vùng scroll
+    // const box = await scrollEl.boundingBox();
+
+    if (box) {
+      // await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+      await page.mouse.move(box.x + box.width / 2 + (Math.random() * 20 - 10), box.y + box.height / 2 + (Math.random() * 20 - 10));
+
+      await scrollUntilVisible(
+        page,
+        '/html/body/ytcp-uploads-dialog/tp-yt-paper-dialog/div/ytcp-animatable[1]/ytcp-ve/ytcp-video-metadata-editor/div/ytcp-video-metadata-editor-advanced/div[7]/ytcp-form-input-container',
+        true,
+      );
+    }
 
     const tagsXpath =
       '/html/body/ytcp-uploads-dialog/tp-yt-paper-dialog/div/ytcp-animatable[1]/ytcp-ve/ytcp-video-metadata-editor/div/ytcp-video-metadata-editor-advanced/div[7]/ytcp-form-input-container/div[1]/div/ytcp-free-text-chip-bar/ytcp-chip-bar/div/input';
     await clickElement(page, tagsXpath);
     await delay(500);
 
-    // Nhập từng tag, phân tách bằng dấu phẩy → mỗi tag nhấn Enter để tạo chip
-    await page.keyboard.insertText(tags);
-    // const tagList = tags
-    //   .split(',')
-    //   .map(t => t.trim())
-    //   .filter(Boolean);
-    // for (const tag of tagList) {
-    //   await page.keyboard.type(tag, { delay: 20 });
-    //   await delay(200);
-    //   await page.keyboard.press('Enter');
-    //   await delay(300);
-    // }
-    console.log(`[edit] ✓ Đã nhập ${tagList.length} tags`);
+    await page.keyboard.insertText(tagsGemini);
     await delay(500);
   }
 
-  console.log('[edit] ✓ Hoàn thành điền thông tin video!');
+  console.log('[edit] ✓ Hoàn thành điền thông tin video! Sang bước tiếp theo');
+  await clickElement(
+    page,
+    '/html/body/ytcp-uploads-dialog/tp-yt-paper-dialog/div/ytcp-animatable[2]/div/div[2]/ytcp-button[2]/ytcp-button-shape/button',
+  );
+}
+
+async function addRelatedVideo(page, videoFolderPath) {
+  const meta = getMetaInfo(videoFolderPath);
+
+  // thêm video liên quan
+  await clickElement(
+    page,
+    '/html/body/ytcp-uploads-dialog/tp-yt-paper-dialog/div/ytcp-animatable[1]/ytcp-uploads-video-elements/div[3]/ytcp-button[2]/ytcp-button-shape/button',
+  );
+
+  await delay(3000);
+
+  // chọn template đầu tiên
+  await clickElement(
+    page,
+    '/html/body/ytve-endscreen-modal/ytve-modal-host/ytcp-dialog/tp-yt-paper-dialog/div[2]/div/ytve-editor/div[1]/div/ytve-endscreen-editor-options-panel/div[2]/div/ytve-endscreen-template-picker/div/div/div/div[1]/div[1]',
+  );
+
+  if (meta?.uploadedVideos && meta?.uploadedVideos === 2) {
+    // click element
+    await clickElement(
+      page,
+      '/html/body/ytve-endscreen-modal/ytve-modal-host/ytcp-dialog/tp-yt-paper-dialog/div[2]/div/ytve-editor/div[1]/div/ytve-endscreen-editor-options-panel/div[1]/ytcp-button/ytcp-button-shape/button',
+    );
+
+    await delay(500);
+    // chọn video
+    await clickElement(page, '/html/body/ytcp-text-menu/tp-yt-paper-dialog/div/tp-yt-paper-listbox/tp-yt-paper-item[1]');
+  }
+
+  // save
+  await clickElement(
+    page,
+    '/html/body/ytve-endscreen-modal/ytve-modal-host/ytcp-dialog/tp-yt-paper-dialog/div[1]/div/div[2]/div/div[2]/ytcp-button/ytcp-button-shape/button',
+  );
+
+  await delay(5000);
+
+  // goto check video
+  await clickElement(
+    page,
+    '/html/body/ytcp-uploads-dialog/tp-yt-paper-dialog/div/ytcp-animatable[2]/div/div[2]/ytcp-button[2]/ytcp-button-shape/button',
+  );
+
+  await delay(2000);
+
+  // goto visibility
+  await clickElement(
+    page,
+
+    '/html/body/ytcp-uploads-dialog/tp-yt-paper-dialog/div/ytcp-animatable[2]/div/div[2]/ytcp-button[2]/ytcp-button-shape/button',
+  );
+}
+
+async function chooseVisibility(page) {
+  // chọn Schedule
+  await clickElement(
+    page,
+    '/html/body/ytcp-uploads-dialog/tp-yt-paper-dialog/div/ytcp-animatable[1]/ytcp-uploads-review/div[2]/div[1]/ytcp-video-visibility-select/div[3]',
+  );
+
+  await delay(1500);
 }
 
 /**
@@ -335,6 +435,8 @@ export default async function main(raw = {}) {
 
         // Sau khi upload xong → điền title, description, tags
         await fillVideoDetails(page, folderPath);
+        await addRelatedVideo(page, folderPath);
+        await chooseVisibility(page);
       } catch (e) {
         console.warn('[upload]', e instanceof Error ? e.message : e);
       }

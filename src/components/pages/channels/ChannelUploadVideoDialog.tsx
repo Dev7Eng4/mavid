@@ -64,11 +64,16 @@ export interface ChannelUploadVideoPayload {
   gpmProfileId: string;
 }
 
+export interface ChannelItem {
+  folder: string;
+  emails: string[];
+}
+
 export interface ChannelUploadVideoDialogProps {
-  /** Thư mục kênh (ID/CHANNEL); parent chỉ truyền kênh có EMAIL trong index. */
-  channelFolders: string[];
+  /** Danh sách kênh đủ điều kiện (có email trong index). */
+  channels: ChannelItem[];
   onClose: () => void;
-  onConfirm: (payload: ChannelUploadVideoPayload) => void | Promise<void>;
+  onConfirm: (payloads: ChannelUploadVideoPayload[]) => void | Promise<void>;
 }
 
 function clampInt(n: number, min: number, max: number): number {
@@ -76,19 +81,45 @@ function clampInt(n: number, min: number, max: number): number {
   return Math.min(max, Math.max(min, Math.trunc(n)));
 }
 
-export function ChannelUploadVideoDialog({ channelFolders, onClose, onConfirm }: ChannelUploadVideoDialogProps) {
+export function ChannelUploadVideoDialog({ channels, onClose, onConfirm }: ChannelUploadVideoDialogProps) {
   const [folderPick, setFolderPick] = useState<string>('');
+  const [emailPick, setEmailPick] = useState<string>('');
   const [totalVideos, setTotalVideos] = useState<number | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
-    if (channelFolders.length > 0 && (!folderPick || !channelFolders.includes(folderPick))) {
-      setFolderPick(channelFolders[0]);
+    if (channels.length > 0 && !folderPick) {
+      setFolderPick(channels.length > 1 ? '__all__' : channels[0].folder);
+    } else if (folderPick && folderPick !== '__all__' && !channels.some(c => c.folder === folderPick)) {
+      setFolderPick(channels.length > 1 ? '__all__' : channels[0]?.folder || '');
     }
-  }, [channelFolders, folderPick]);
+  }, [channels, folderPick]);
 
-  const channelOptions = useMemo<SelectOption[]>(() => channelFolders.map(f => ({ value: f, label: f })), [channelFolders]);
+  const channelOptions = useMemo<SelectOption[]>(() => {
+    const opts = channels.map(c => ({ value: c.folder, label: c.folder }));
+    if (channels.length > 1) {
+      opts.unshift({ value: '__all__', label: 'Tất cả kênh' });
+    }
+    return opts;
+  }, [channels]);
+
+  const activeChannel = useMemo(() => channels.find(c => c.folder === folderPick), [channels, folderPick]);
+
+  const emailOptions = useMemo<SelectOption[]>(() => {
+    if (!activeChannel) return [];
+    return activeChannel.emails.map(e => ({ value: e, label: e }));
+  }, [activeChannel]);
+
+  useEffect(() => {
+    if (emailOptions.length > 0) {
+      if (!emailPick || !emailOptions.some(o => o.value === emailPick)) {
+        setEmailPick(emailOptions[0].value);
+      }
+    } else {
+      setEmailPick('');
+    }
+  }, [emailOptions, emailPick]);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -99,16 +130,12 @@ export function ChannelUploadVideoDialog({ channelFolders, onClose, onConfirm }:
   }, [onClose, busy]);
 
   const handleConfirm = useCallback(async () => {
-    if (channelFolders.length === 0) {
+    if (channels.length === 0) {
       setFormError('Không có kênh đủ điều kiện: cần cột ID/CHANNEL và EMAIL có giá trị trong index.');
       return;
     }
-    if (!folderPick.trim() || !channelFolders.includes(folderPick)) {
+    if (!folderPick || (folderPick !== '__all__' && !channels.some(c => c.folder === folderPick))) {
       setFormError('Chọn một kênh.');
-      return;
-    }
-    if (typeof window.runner?.readMavidChannelConfig !== 'function') {
-      setFormError('Đọc mavid-channel-config.json chỉ dùng trong app Electron.');
       return;
     }
 
@@ -116,37 +143,53 @@ export function ChannelUploadVideoDialog({ channelFolders, onClose, onConfirm }:
     setFormError(null);
     setBusy(true);
     try {
-      const cfg = await window.runner.readMavidChannelConfig(folderPick.trim());
-      const email = typeof cfg?.email === 'string' ? cfg.email.trim() : '';
-      if (!email) {
-        setFormError('Không có email trong mavid-channel-config.json của kênh này.');
-        return;
-      }
-
       const profiles = await fetchAllGpmProfileRows();
+      const payloads: ChannelUploadVideoPayload[] = [];
 
-      const gpmProfileId = resolveGpmProfileIdByEmail(profiles, email);
-      if (!gpmProfileId) {
-        setFormError(`Không tìm thấy profile GPM có trường name trùng email «${email}». Trong GPM hãy đặt tên profile = email.`);
-        return;
+      if (folderPick === '__all__') {
+        for (const ch of channels) {
+          const email = ch.emails[0];
+          if (!email) continue;
+          const gpmProfileId = resolveGpmProfileIdByEmail(profiles, email);
+          if (!gpmProfileId) {
+            setFormError(`Kênh ${ch.folder}: Không tìm thấy profile GPM có trường name trùng email «${email}».`);
+            return;
+          }
+          payloads.push({ channelFolder: ch.folder, totalVideos: total, gpmProfileId });
+        }
+        if (payloads.length === 0) {
+          setFormError('Không có kênh nào có email hợp lệ.');
+          return;
+        }
+      } else {
+        const email = emailPick.trim();
+        if (!email) {
+          setFormError('Vui lòng chọn email (thêm email vào index nếu chưa có).');
+          return;
+        }
+        const gpmProfileId = resolveGpmProfileIdByEmail(profiles, email);
+        if (!gpmProfileId) {
+          setFormError(`Không tìm thấy profile GPM có trường name trùng email «${email}». Trong GPM hãy đặt tên profile = email.`);
+          return;
+        }
+        payloads.push({ channelFolder: folderPick, totalVideos: total, gpmProfileId });
       }
 
-      await onConfirm({
-        channelFolder: folderPick.trim(),
-        totalVideos: total,
-        gpmProfileId,
-      });
+      await onConfirm(payloads);
+      if (typeof window.runner?.minimizeApp === 'function') {
+        window.runner.minimizeApp();
+      }
       onClose();
     } catch (e) {
       setFormError(e instanceof Error ? e.message : 'Không chạy được upload.');
     } finally {
       setBusy(false);
     }
-  }, [channelFolders, folderPick, onClose, onConfirm, totalVideos]);
+  }, [channels, folderPick, emailPick, onClose, onConfirm, totalVideos]);
 
   const inputClass = 'w-full rounded-xl px-3 py-2.5 text-base outline-none border transition-colors duration-150';
 
-  const noChannels = channelFolders.length === 0;
+  const noChannels = channels.length === 0;
   const canSubmit = !noChannels;
 
   return (
@@ -168,10 +211,9 @@ export function ChannelUploadVideoDialog({ channelFolders, onClose, onConfirm }:
           Upload video
         </h2>
         <p className='text-sm leading-snug mt-2 shrink-0' style={{ color: 'var(--text-muted)' }}>
-          Profile GPM được chọn tự động: đọc <code className='text-xs'>email</code> trong{' '}
-          <code className='text-xs'>mavid-channel-config.json</code> của kênh, rồi tìm trong API{' '}
-          <code className='text-xs'>listProfiles</code> dòng có <code className='text-xs'>name</code> trùng email (bạn đã cấu hình tên
-          profile = email trong GPM). Sau đó mở YouTube và upload từng .mp4 trong các thư mục con của kênh (sắp xếp theo tên). Để trống «Số
+          Profile GPM được chọn tự động theo <code className='text-xs'>email</code> của kênh trong{' '}
+          <code className='text-xs'>index.xlsx</code>. Hệ thống sẽ tìm trong API <code className='text-xs'>listProfiles</code>{' '}
+          dòng có <code className='text-xs'>name</code> trùng email (bạn cần cấu hình tên profile = email trong GPM). Sau đó mở YouTube và upload từng .mp4 trong các thư mục con của kênh (sắp xếp theo tên). Để trống «Số
           lượng» = tất cả thư mục có .mp4.
         </p>
 
@@ -185,7 +227,27 @@ export function ChannelUploadVideoDialog({ channelFolders, onClose, onConfirm }:
                 Không có kênh nào có email trong index (cần cột ID/CHANNEL và EMAIL).
               </p>
             ) : (
-              <CustomSelect value={folderPick} options={channelOptions} onChange={setFolderPick} placeholder='Chọn kênh' menuZIndex={100} />
+              <CustomSelect value={folderPick} options={channelOptions} onChange={setFolderPick} placeholder='Chọn kênh' menuZIndex={110} />
+            )}
+          </div>
+
+          <div className='min-w-0'>
+            <div className='block text-sm font-medium mb-1.5' style={{ color: 'var(--text-h)' }}>
+              Email tải lên
+            </div>
+            {folderPick === '__all__' ? (
+              <div
+                className='w-full rounded-xl px-3 py-2.5 text-base outline-none border transition-colors duration-150 cursor-not-allowed opacity-80'
+                style={{ background: 'var(--code-bg)', color: 'var(--text-muted)', borderColor: 'var(--border)' }}
+              >
+                Tự động dùng email đầu tiên của từng kênh
+              </div>
+            ) : emailOptions.length === 0 ? (
+              <p className='text-sm' style={{ color: '#fecaca' }}>
+                Kênh này chưa có email trong index.
+              </p>
+            ) : (
+              <CustomSelect value={emailPick} options={emailOptions} onChange={setEmailPick} placeholder='Chọn email' menuZIndex={100} />
             )}
           </div>
 

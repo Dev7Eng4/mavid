@@ -137,10 +137,7 @@ export function CreateVideoReupPanel({
     <div className='space-y-6 w-full min-w-0'>
       <PageBackLink onClick={() => !isBusy && onBack()} disabled={isBusy} />
 
-      <PageHeader
-        title='Reup Full'
-        description='Overlay lên video gốc theo file Excel trong folder channel (giống batch Pipeline).'
-      />
+      <PageHeader title='Reup Full' description='Overlay lên video gốc theo file Excel trong folder channel (giống batch Pipeline).' />
 
       {disabled && (
         <div className='mavid-callout-warning'>

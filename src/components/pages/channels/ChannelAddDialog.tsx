@@ -6,8 +6,8 @@ import {
   buildChannelRowFromAddForm,
   channelAddDialogInitialFromIndexRow,
   channelFolderFromRow,
+  durationLabelToOption,
   findIndexHeaderKey,
-  INDEX_VIDEO_DURATION_MINUTES,
   INDEX_VIDEO_TYPE_VALUES,
   indexHeadersMissingForAddChannel,
   isValidPublishScheduleTime,
@@ -18,6 +18,19 @@ import {
   type ChannelAddDialogInitialFields,
   type VideoPerDayPreset,
 } from './channelIndexHelpers';
+
+function isDurationOverlap(opt1: string, opt2: string): boolean {
+  if (!opt1 || !opt2) return false;
+  const parseScale = (opt: string) => {
+    const [fromStr, toStr] = opt.split('_');
+    const from = fromStr === 'null' ? 0 : Number(fromStr);
+    const to = toStr === 'null' ? Infinity : Number(toStr);
+    return [from, to];
+  };
+  const [f1, t1] = parseScale(opt1);
+  const [f2, t2] = parseScale(opt2);
+  return f1 < t2 && f2 < t1;
+}
 
 /** Đọc giờ trực tiếp từ `<input type="time">` lúc submit — tránh state React lệch với DOM (Electron/Chromium). */
 function readPublishTimesFromTimeInputs(slotCount: number, fallback: string[]): string[] {
@@ -34,7 +47,7 @@ const ADD_FORM_DEFAULT: ChannelAddDialogInitialFields = {
   channelUrl: '',
   email: '',
   videoType: 'from_audio',
-  durationMinutes: '15',
+  durationOption: '0_null',
   selectedBackground: '',
   folderIdOverride: '',
   videosPerDayPreset: '1',
@@ -47,21 +60,34 @@ const VIDEO_PER_DAY_OPTIONS: { value: VideoPerDayPreset; label: string }[] = [
   { value: '1-2', label: '1–2 (2 suất cuối tuần)' },
 ];
 
+const ALL_DURATION_OPTIONS = [
+  { value: '0_null', label: 'Tất cả' },
+  { value: '0_30', label: '0 - 30 phút' },
+  { value: '0_60', label: '0 - 60 phút' },
+  { value: '30_60', label: '30 - 60 phút' },
+  { value: '30_null', label: 'Từ 30 phút' },
+  { value: '60_null', label: 'Từ 60 phút' },
+];
+
 /** Payload gửi tới `addChannelFromForm` (không ghi bảng nháp index). */
 export interface ChannelAddSavePayload {
   channelUrl: string;
-  email: string;
-  videoType: 'from_audio' | 'reup_full';
-  durationMinutes: number;
-  background: string;
-  videosPerDayPreset: VideoPerDayPreset;
-  publishTimes: string[];
   folderIdOverride: string;
+  channels: {
+    email: string;
+    videoType: 'from_audio' | 'reup_full';
+    durationMinuteFrom: number;
+    durationMinuteTo: number | null;
+    background: string;
+    videosPerDayPreset: VideoPerDayPreset;
+    publishTimes: string[];
+  }[];
 }
 
 export interface ChannelAddDialogProps {
   indexHeaders: string[];
   backgroundFolders: string[];
+  indexRows?: ChannelRow[];
   onClose: () => void;
   /** Chế độ sửa: merge `row` và lưu index (trả về Promise nếu ghi file). */
   onAdd?: (row: ChannelRow) => void | Promise<void>;
@@ -74,22 +100,24 @@ export interface ChannelAddDialogProps {
 export function ChannelAddDialog({
   indexHeaders,
   backgroundFolders,
+  indexRows,
   onClose,
   onAdd,
   onSaveNewChannel,
   initialRow = null,
 }: ChannelAddDialogProps) {
   const isEditMode = initialRow != null;
-  const [form, setForm] = useState<ChannelAddDialogInitialFields>(() =>
-    initialRow != null ? channelAddDialogInitialFromIndexRow(initialRow, indexHeaders) : ADD_FORM_DEFAULT,
-  );
-  const { channelUrl, email, videoType, durationMinutes, selectedBackground, folderIdOverride, videosPerDayPreset, publishTimes } = form;
 
   const [formError, setFormError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
-
   /** Chế độ sửa: đã thử đọc `mavid-channel-config.json` trong thư mục kênh (để không ghi đè form bằng fetch muộn). */
   const [configHydrated, setConfigHydrated] = useState(!isEditMode);
+
+  const [form, setForm] = useState<ChannelAddDialogInitialFields>(() =>
+    initialRow != null ? channelAddDialogInitialFromIndexRow(initialRow, indexHeaders) : ADD_FORM_DEFAULT,
+  );
+
+  const { channelUrl, email, videoType, durationOption, selectedBackground, folderIdOverride, videosPerDayPreset, publishTimes } = form;
 
   const resolvedBackground = useMemo(() => {
     const pick = selectedBackground.trim();
@@ -100,10 +128,7 @@ export function ChannelAddDialog({
   }, [backgroundFolders, selectedBackground]);
 
   /** Chỉ khi sửa dòng index: cần đủ cột để build row. Thêm mới không cần file index — `addChannelFromForm` tạo/cập nhật index. */
-  const missingHeaders = useMemo(
-    () => (isEditMode ? indexHeadersMissingForAddChannel(indexHeaders) : []),
-    [isEditMode, indexHeaders],
-  );
+  const missingHeaders = useMemo(() => (isEditMode ? indexHeadersMissingForAddChannel(indexHeaders) : []), [isEditMode, indexHeaders]);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -118,36 +143,43 @@ export function ChannelAddDialog({
       setConfigHydrated(true);
       return;
     }
+
     const folder = channelFolderFromRow(initialRow, indexHeaders);
     if (!folder || typeof window.runner?.readMavidChannelConfig !== 'function') {
       setConfigHydrated(true);
       return;
     }
+
     let cancelled = false;
     setConfigHydrated(false);
     void (async () => {
       try {
         const cfg = await window.runner.readMavidChannelConfig(folder);
+        console.log('🚀 ~ ChannelAddDialog ~ cfg:', cfg, initialRow);
         if (cancelled || !cfg || typeof cfg !== 'object') return;
+
         setForm(prev => {
           const next = { ...prev };
-          if (typeof cfg.email === 'string' && cfg.email.trim()) next.email = cfg.email.trim();
-          if (cfg.videoType === 'from_audio' || cfg.videoType === 'reup_full') next.videoType = cfg.videoType;
-          if (
-            typeof cfg.durationMinutes === 'number' &&
-            Number.isFinite(cfg.durationMinutes) &&
-            (INDEX_VIDEO_DURATION_MINUTES as readonly number[]).includes(cfg.durationMinutes)
-          ) {
-            next.durationMinutes = String(cfg.durationMinutes);
+          const ch: any =
+            Array.isArray(cfg.channels) && cfg.channels.length > 0 ? cfg.channels.find(channel => channel.email === initialRow.EMAIL) : cfg;
+
+          if (!ch) return next;
+
+          if (typeof ch.email === 'string' && ch.email.trim()) next.email = ch.email.trim();
+          if (ch.videoType === 'from_audio' || ch.videoType === 'reup_full') next.videoType = ch.videoType;
+
+          if (ch.durationMinuteFrom !== undefined) {
+            next.durationOption = `${ch.durationMinuteFrom}_${ch.durationMinuteTo === null ? 'null' : ch.durationMinuteTo}`;
           }
-          if (typeof cfg.background === 'string') next.selectedBackground = cfg.background;
-          if (typeof cfg.videosPerDayPreset === 'string' && cfg.videosPerDayPreset.trim()) {
-            next.videosPerDayPreset = parseVideoPerDayCell(cfg.videosPerDayPreset);
+
+          if (typeof ch.background === 'string') next.selectedBackground = ch.background;
+          if (typeof ch.videosPerDayPreset === 'string' && ch.videosPerDayPreset.trim()) {
+            next.videosPerDayPreset = parseVideoPerDayCell(ch.videosPerDayPreset);
           }
-          if (Array.isArray(cfg.publishTimes) && cfg.publishTimes.length > 0) {
+          if (Array.isArray(ch.publishTimes) && ch.publishTimes.length > 0) {
             const preset = next.videosPerDayPreset;
             const slots = timeSlotCountForVideoPerDayPreset(preset);
-            let times = cfg.publishTimes.map(t => normalizeWallClockTimeToHHmm(String(t)));
+            let times = ch.publishTimes.map((t: string) => normalizeWallClockTimeToHHmm(String(t)));
             while (times.length < slots) times.push('09:00');
             times = times.slice(0, slots);
             next.publishTimes = times;
@@ -179,10 +211,73 @@ export function ChannelAddDialog({
     { value: 'reup_full', label: 'reup_full' },
   ];
 
-  const durationMinuteOptions = INDEX_VIDEO_DURATION_MINUTES.map(m => ({
-    value: String(m),
-    label: `${m} phút`,
-  }));
+  /** Email trùng lặp (reactive, hiển thị inline). */
+  const emailDuplicateWarning = useMemo(() => {
+    if (!indexRows?.length) return '';
+    const inputEmail = email.trim().toLowerCase();
+    if (!inputEmail) return '';
+    const emailKey = findIndexHeaderKey(indexHeaders, 'EMAIL');
+    if (!emailKey) return '';
+    for (const r of indexRows) {
+      if (isEditMode && initialRow === r) continue;
+      const cell = String(r[emailKey] ?? '').toLowerCase();
+      const existing = cell
+        .split(',')
+        .map(e => e.trim())
+        .filter(Boolean);
+      if (existing.includes(inputEmail)) {
+        return 'Email đã tồn tại trong index.xlsx.';
+      }
+    }
+    return '';
+  }, [email, indexRows, indexHeaders, isEditMode, initialRow]);
+
+  /** Duration options đã dùng cho cùng URL trong index. */
+  const usedDurationOptions = useMemo(() => {
+    const used = new Set<string>();
+    if (!indexRows?.length) return used;
+    const linkKey = findIndexHeaderKey(indexHeaders, 'LINK');
+    const durKey = findIndexHeaderKey(indexHeaders, 'THỜI GIAN VIDEO');
+    if (!linkKey || !durKey) return used;
+    const normUrlRaw = channelUrl.trim();
+    const normUrl = /^https?:\/\//i.test(normUrlRaw) ? normUrlRaw : normUrlRaw ? `https://${normUrlRaw}` : '';
+    if (!normUrl) return used;
+    for (const r of indexRows) {
+      if (isEditMode && initialRow === r) continue;
+      const rowUrlRaw = String(r[linkKey] ?? '').trim();
+      const rowUrl = /^https?:\/\//i.test(rowUrlRaw) ? rowUrlRaw : rowUrlRaw ? `https://${rowUrlRaw}` : '';
+      if (rowUrl === normUrl) {
+        const label = String(r[durKey] ?? '').trim();
+        if (label) used.add(durationLabelToOption(label));
+      }
+    }
+    return used;
+  }, [channelUrl, indexRows, indexHeaders, isEditMode, initialRow]);
+
+  /** Lọc các option thời gian không bị overlap với đã dùng. */
+  const durationMinuteOptions = useMemo(() => {
+    if (usedDurationOptions.size === 0) return ALL_DURATION_OPTIONS;
+    return ALL_DURATION_OPTIONS.filter(opt => {
+      // Giữ lại option hiện tại đang chọn (edit mode)
+      if (opt.value === durationOption) return true;
+      // Loại nếu overlap bất kỳ option đã dùng
+      for (const used of usedDurationOptions) {
+        if (isDurationOverlap(opt.value, used)) return false;
+      }
+      return true;
+    });
+  }, [usedDurationOptions, durationOption]);
+
+  /** Thông báo lỗi inline cho duration nếu option hiện tại overlap. */
+  const durationOverlapError = useMemo(() => {
+    if (usedDurationOptions.size === 0) return '';
+    for (const used of usedDurationOptions) {
+      if (isDurationOverlap(durationOption, used)) {
+        return 'Khoảng thời gian đã tồn tại cho URL kênh này.';
+      }
+    }
+    return '';
+  }, [durationOption, usedDurationOptions]);
 
   const backgroundOptions = backgroundFolders.map(bg => ({ value: bg, label: bg }));
 
@@ -200,12 +295,13 @@ export function ChannelAddDialog({
         setFormError('Chọn loại video.');
         return;
       }
-      const parsedMinutes = parseInt(durationMinutes, 10);
-      const allowedMinutes = INDEX_VIDEO_DURATION_MINUTES as readonly number[];
-      if (!Number.isFinite(parsedMinutes) || !allowedMinutes.includes(parsedMinutes)) {
+      if (!durationOption) {
         setFormError('Chọn thời gian video (phút).');
         return;
       }
+      const [fromStr, toStr] = durationOption.split('_');
+      const from = Number(fromStr);
+      const to = toStr === 'null' ? null : Number(toStr);
       if (requireBackground && !resolvedBackground.trim()) {
         setFormError('Chọn background.');
         return;
@@ -218,6 +314,58 @@ export function ChannelAddDialog({
             : 'Chọn đủ giờ upload (HH:mm) cho từng video trong ngày.',
         );
         return;
+      }
+
+      if (indexRows && indexRows.length > 0) {
+        let hasDuplicateEmail = false;
+        let hasDurationOverlap = false;
+
+        const normUrlRaw = channelUrl.trim();
+        const normUrl = /^https?:\/\//i.test(normUrlRaw) ? normUrlRaw : normUrlRaw ? `https://${normUrlRaw}` : '';
+        const inputEmail = email.trim().toLowerCase();
+
+        const emailKey = findIndexHeaderKey(indexHeaders, 'EMAIL');
+        const linkKey = findIndexHeaderKey(indexHeaders, 'LINK');
+        const durationColumnKey = findIndexHeaderKey(indexHeaders, 'THỜI GIAN VIDEO');
+
+        for (const r of indexRows) {
+          if (isEditMode && initialRow === r) continue;
+
+          if (inputEmail && emailKey) {
+            const cell = String(r[emailKey] ?? '').toLowerCase();
+            const existingEmails = cell
+              .split(',')
+              .map(e => e.trim())
+              .filter(Boolean);
+            if (existingEmails.includes(inputEmail)) {
+              hasDuplicateEmail = true;
+            }
+          }
+
+          if (linkKey && durationColumnKey) {
+            const rowUrlRaw = String(r[linkKey] ?? '').trim();
+            const rowNormUrl = /^https?:\/\//i.test(rowUrlRaw) ? rowUrlRaw : rowUrlRaw ? `https://${rowUrlRaw}` : '';
+            if (normUrl && rowNormUrl === normUrl) {
+              const rowDurationLabel = String(r[durationColumnKey] ?? '').trim();
+              if (rowDurationLabel) {
+                const rowOpt = durationLabelToOption(rowDurationLabel);
+                if (isDurationOverlap(durationOption, rowOpt)) {
+                  hasDurationOverlap = true;
+                }
+              }
+            }
+          }
+        }
+
+        if (hasDuplicateEmail) {
+          setFormError('Email đã được sử dụng trong index.xlsx. Vui lòng chọn email khác hoặc để trống.');
+          return;
+        }
+
+        if (hasDurationOverlap) {
+          setFormError('URL này đã tồn tại với khoảng thời gian bị trùng lặp trong index.xlsx. Hãy chọn thời gian khác.');
+          return;
+        }
       }
 
       if (isEditMode) {
@@ -233,7 +381,7 @@ export function ChannelAddDialog({
           channelUrl,
           email,
           videoType: videoType as 'from_audio' | 'reup_full',
-          durationMinutes: parsedMinutes,
+          durationOption,
           background: resolvedBackground.trim(),
           videosPerDayPreset,
           publishTimes: times,
@@ -255,12 +403,17 @@ export function ChannelAddDialog({
           await window.runner.writeMavidChannelConfig({
             channelFolder: folder.trim(),
             patch: {
-              email: email.trim(),
-              videoType: videoType as 'from_audio' | 'reup_full',
-              durationMinutes: parsedMinutes,
-              background: resolvedBackground.trim(),
-              videosPerDayPreset,
-              publishTimes: times,
+              channels: [
+                {
+                  email: email.trim(),
+                  videoType: videoType as 'from_audio' | 'reup_full',
+                  durationMinuteFrom: from,
+                  durationMinuteTo: to,
+                  background: resolvedBackground.trim(),
+                  videosPerDayPreset,
+                  publishTimes: times,
+                },
+              ],
             },
           });
           onClose();
@@ -286,24 +439,27 @@ export function ChannelAddDialog({
       try {
         const registered = await window.runner.listRegisteredChannelEmails();
         const normalizedEmail = email.trim().toLowerCase();
-        if (!normalizedEmail) {
-          setFormError('Nhập email tạo kênh.');
-          return;
-        }
-        if (registered.includes(normalizedEmail)) {
-          setFormError('Email đã được dùng cho kênh khác (index hoặc file trong thư mục kênh). Chọn email khác.');
+        // Skip uniqueness warning if empty or if it was already handled locally
+        if (normalizedEmail && registered.includes(normalizedEmail)) {
+          // Double check since we only checked indexRows locally, there might be other channel config files without index.xlsx record
+          setFormError('Email đã được dùng cho kênh khác (trong thư mục kênh). Chọn email khác.');
           return;
         }
 
         await onSaveNewChannel({
           channelUrl,
-          email: email.trim(),
-          videoType: videoType as 'from_audio' | 'reup_full',
-          durationMinutes: parsedMinutes,
-          background: resolvedBackground.trim(),
-          videosPerDayPreset,
-          publishTimes: times,
           folderIdOverride,
+          channels: [
+            {
+              email: email.trim(),
+              videoType: videoType as 'from_audio' | 'reup_full',
+              durationMinuteFrom: from,
+              durationMinuteTo: to,
+              background: resolvedBackground.trim(),
+              videosPerDayPreset,
+              publishTimes: times,
+            },
+          ],
         });
         onClose();
       } catch (e) {
@@ -314,7 +470,7 @@ export function ChannelAddDialog({
     })();
   }, [
     channelUrl,
-    durationMinutes,
+    durationOption,
     email,
     folderIdOverride,
     requireBackground,
@@ -329,6 +485,8 @@ export function ChannelAddDialog({
     slotCount,
     videoType,
     videosPerDayPreset,
+    indexRows,
+    initialRow,
   ]);
 
   const inputClass = 'w-full rounded-xl px-3 py-2.5 text-base outline-none border transition-colors duration-150';
@@ -343,8 +501,8 @@ export function ChannelAddDialog({
       role='presentation'
     >
       <div
-        className='max-w-4xl w-full my-8 rounded-2xl p-6 sm:p-8 shadow-xl overflow-visible relative z-1 max-h-[min(90vh,760px)] flex flex-col min-h-0'
-        style={{ background: 'var(--card-bg)', border: '1px solid var(--border)' }}
+        className='w-full !max-w-48 my-8 rounded-2xl p-6 sm:p-8 shadow-xl overflow-visible relative z-1 max-h-[min(90vh,760px)] min-h-0'
+        style={{ background: 'var(--card-bg)', border: '1px solid var(--border)', maxWidth: '680px' }}
         onClick={e => e.stopPropagation()}
         role='dialog'
         aria-modal
@@ -354,20 +512,19 @@ export function ChannelAddDialog({
           {isEditMode ? 'Sửa channel' : 'Thêm channel'}
         </h2>
         <p className='text-sm leading-snug mt-2 shrink-0' style={{ color: 'var(--text-muted)' }}>
-          {isEditMode
-            ? 'Khi mở: đọc `MaVidMedia/channels/<ID>/mavid-channel-config.json` để điền form. «Cập nhật»: ghi `index.xlsx` rồi cập nhật JSON. URL kênh chỉ đọc.'
-            : 'Save: kiểm tra email trùng, gọi addChannelFromForm — tạo thư mục kênh, Excel kênh, mavid-channel-config.json và tạo/cập nhật MaVidMedia/channels/index.xlsx (không cần có sẵn file index).'}
+          Mỗi channel có thể có nhiều email, nhưng khoảng thời gian video khác nhau
         </p>
 
         {isEditMode && missingHeaders.length > 0 ? (
           <p className='text-sm mt-3 shrink-0' style={{ color: '#fecaca' }}>
-            Thiếu cột trong index: {missingHeaders.join(', ')}. Thêm vào <code className='text-xs'>MaVidMedia/channels/index.xlsx</code> rồi Tải lại.
+            Thiếu cột trong index: {missingHeaders.join(', ')}. Thêm vào <code className='text-xs'>MaVidMedia/channels/index.xlsx</code> rồi
+            Tải lại.
           </p>
         ) : null}
 
-        <div className='grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-4 mt-4 overflow-y-auto min-h-0 flex-1 pr-1 content-start'>
-          <div className='min-w-0'>
-            <label className='block text-sm font-medium mb-1.5' style={{ color: 'var(--text-h)' }} htmlFor='add-channel-url'>
+        <div className='grid grid-cols-1 lg:grid-cols-2 gap-x-8 gap-y-4 mt-4 overflow-y-auto min-h-0 flex-1 pr-1 content-start'>
+          <div className='mb-4'>
+            <label className='block text-sm font-medium mb-2' style={{ color: 'var(--text-h)' }} htmlFor='add-channel-url'>
               URL kênh
             </label>
             <input
@@ -392,8 +549,8 @@ export function ChannelAddDialog({
             />
           </div>
 
-          <div className='min-w-0'>
-            <label className='block text-sm font-medium mb-1.5' style={{ color: 'var(--text-h)' }} htmlFor='add-email'>
+          <div className='mb-4'>
+            <label className='block text-sm font-medium mb-2' style={{ color: 'var(--text-h)' }} htmlFor='add-email'>
               Email tạo kênh
             </label>
             <input
@@ -406,13 +563,18 @@ export function ChannelAddDialog({
               style={{
                 background: 'var(--code-bg)',
                 color: 'var(--text-h)',
-                borderColor: 'var(--border)',
+                borderColor: emailDuplicateWarning ? '#f87171' : 'var(--border)',
               }}
             />
+            {emailDuplicateWarning ? (
+              <p className='text-xs mt-1' style={{ color: '#fecaca' }}>
+                {emailDuplicateWarning}
+              </p>
+            ) : null}
           </div>
 
-          <div className='min-w-0'>
-            <div className='block text-sm font-medium mb-1.5' style={{ color: 'var(--text-h)' }}>
+          <div className='mb-4'>
+            <div className='block text-sm font-medium mb-2' style={{ color: 'var(--text-h)' }}>
               Loại video
             </div>
             <CustomSelect
@@ -424,27 +586,32 @@ export function ChannelAddDialog({
             />
           </div>
 
-          <div className='min-w-0'>
-            <div className='block text-sm font-medium mb-1.5' style={{ color: 'var(--text-h)' }}>
+          <div className='mb-4'>
+            <div className='block text-sm font-medium mb-2' style={{ color: 'var(--text-h)' }}>
               Tạo video với thời gian từ (thời lượng)
             </div>
             <CustomSelect
-              value={durationMinutes}
+              value={durationOption}
               options={durationMinuteOptions}
-              onChange={v => setForm(f => ({ ...f, durationMinutes: v }))}
+              onChange={v => setForm(f => ({ ...f, durationOption: v }))}
               placeholder='Phút'
               menuZIndex={100}
             />
+            {durationOverlapError ? (
+              <p className='text-xs mt-1' style={{ color: '#fecaca' }}>
+                {durationOverlapError}
+              </p>
+            ) : null}
           </div>
 
           {showBackgroundField ? (
-            <div className='min-w-0'>
-              <div className='block text-sm font-medium mb-1.5' style={{ color: 'var(--text-h)' }}>
+            <div className='mb-4'>
+              <div className='block text-sm font-medium mb-2' style={{ color: 'var(--text-h)' }}>
                 Background
               </div>
               {backgroundFolders.length === 0 ? (
                 <p className='text-sm' style={{ color: 'var(--text-muted)' }}>
-                  Chưa có thư mục stock trong MaVidMedia/backgrounds (Settings → lưu trữ video).
+                  Chưa có thư mục stocks (video/image) trong MaVidMedia/backgrounds (Settings → LƯU TRỮ VIDEO).
                 </p>
               ) : (
                 <CustomSelect
@@ -458,8 +625,8 @@ export function ChannelAddDialog({
             </div>
           ) : null}
 
-          <div className='min-w-0'>
-            <div className='block text-sm font-medium mb-1.5' style={{ color: 'var(--text-h)' }}>
+          <div className='mb-4'>
+            <div className='block text-sm font-medium mb-2' style={{ color: 'var(--text-h)' }}>
               Số lượng video upload mỗi ngày
             </div>
             <CustomSelect
@@ -480,14 +647,15 @@ export function ChannelAddDialog({
             />
           </div>
 
-          <div className='md:col-span-2 min-w-0 space-y-3'>
+          <div className='lg:col-span-2 space-y-3'>
             <div className='text-sm font-medium' style={{ color: 'var(--text-h)' }}>
               Giờ upload
               {videosPerDayPreset === '1-2' ? ' — 1 suất ngày thường + 2 suất cuối tuần' : ` (${slotCount} suất/ngày)`}
             </div>
-            <div className='grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-3'>
+
+            <div className='grid grid-cols-1 sm:grid-cols-2 gap-x-8'>
               {publishTimes.slice(0, slotCount).map((t, i) => (
-                <div key={i} className='flex flex-col gap-1.5 min-w-0'>
+                <div key={i} className='flex flex-col gap-1.5 mb-2'>
                   <label className='text-sm' style={{ color: 'var(--text-muted)' }} htmlFor={`add-time-${i}`}>
                     {labelForPublishTimeSlot(videosPerDayPreset, i)}
                   </label>
@@ -515,7 +683,10 @@ export function ChannelAddDialog({
           ) : null}
         </div>
 
-        <div className='flex flex-wrap justify-end gap-2 mt-6 pt-4 shrink-0 border-t' style={{ borderColor: 'var(--border)' }}>
+        <div
+          className='flex flex-wrap justify-end gap-2 shrink-0 border-t'
+          style={{ marginTop: '12px', paddingTop: '12px', borderColor: 'var(--border)' }}
+        >
           <AppButton type='button' variant='neutral' onClick={() => onClose()}>
             Hủy
           </AppButton>
@@ -525,7 +696,7 @@ export function ChannelAddDialog({
             onClick={handleConfirm}
             disabled={(isEditMode && missingHeaders.length > 0) || saving || (isEditMode && !configHydrated)}
           >
-            {saving ? 'Đang xử lý…' : isEditMode ? 'Cập nhật' : 'Save'}
+            {saving ? 'Đang xử lý…' : isEditMode ? 'Cập nhật' : 'Lưu'}
           </AppButton>
         </div>
       </div>

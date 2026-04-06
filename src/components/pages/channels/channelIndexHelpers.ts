@@ -4,10 +4,30 @@ import { buildMavidEnvForReupFull } from '../../../utils/reupFullEnv';
 
 /** Khớp dropdown trong getInfoChannel / electron write-channel-index */
 export const INDEX_VIDEO_TYPE_VALUES = ['from_audio', 'reup_full'] as const;
-/** Giá trị phút (dropdown) khớp cột THỜI GIAN VIDEO trong index / getInfoChannel. */
-export const INDEX_VIDEO_DURATION_MINUTES = [15, 20, 30, 60] as const;
-/** @deprecated Dùng INDEX_VIDEO_DURATION_MINUTES */
-export const INDEX_THOI_GIAN_MINUTES = INDEX_VIDEO_DURATION_MINUTES;
+/** Giá trị nhãn (dropdown) khớp cột THỜI GIAN VIDEO trong index / getInfoChannel. */
+export const INDEX_VIDEO_DURATION_LABELS = ['Tất cả', '0 - 30 phút', '0 - 60 phút', '30 - 60 phút', 'Từ 30 phút', 'Từ 60 phút'] as const;
+/** @deprecated Dùng INDEX_VIDEO_DURATION_LABELS */
+export const INDEX_THOI_GIAN_MINUTES = INDEX_VIDEO_DURATION_LABELS as any;
+
+export function durationLabelToOption(label: string): string {
+  if (label === 'Tất cả') return '0_null';
+  if (label === '0 - 30 phút') return '0_30';
+  if (label === '0 - 60 phút') return '0_60';
+  if (label === '30 - 60 phút') return '30_60';
+  if (label === 'Từ 30 phút') return '30_null';
+  if (label === 'Từ 60 phút') return '60_null';
+  return '0_null'; // fallback
+}
+
+export function durationOptionToLabel(option: string): string {
+  if (option === '0_null') return 'Tất cả';
+  if (option === '0_30') return '0 - 30 phút';
+  if (option === '0_60') return '0 - 60 phút';
+  if (option === '30_60') return '30 - 60 phút';
+  if (option === '30_null') return 'Từ 30 phút';
+  if (option === '60_null') return 'Từ 60 phút';
+  return 'Tất cả'; // fallback
+}
 
 export const SCRIPT_FROM_AUDIO: ScriptId = 'tao-batch-video-tu-audio';
 export const SCRIPT_REUP_FULL: ScriptId = 'tao-batch-video-reup-full';
@@ -160,7 +180,7 @@ export interface ChannelAddFormInput {
   channelUrl: string;
   email: string;
   videoType: 'from_audio' | 'reup_full';
-  durationMinutes: number;
+  durationOption: string;
   background: string;
   videosPerDayPreset: VideoPerDayPreset;
   publishTimes: string[];
@@ -173,8 +193,8 @@ export interface ChannelAddDialogInitialFields {
   channelUrl: string;
   email: string;
   videoType: string;
-  /** Chuỗi phút khớp dropdown (vd. "15"). */
-  durationMinutes: string;
+  /** Chuỗi cấu hình duration (vd. "0_30"). */
+  durationOption: string;
   selectedBackground: string;
   folderIdOverride: string;
   videosPerDayPreset: VideoPerDayPreset;
@@ -218,12 +238,7 @@ export function coercePublishTimesCellToParsableString(raw: unknown): string {
   if (raw == null || raw === '') return '';
   if (typeof raw === 'string') {
     const t = raw.trim();
-    if (
-      t &&
-      !t.includes(',') &&
-      !t.includes(';') &&
-      /^\d{4}-\d{2}-\d{2}/.test(t)
-    ) {
+    if (t && !t.includes(',') && !t.includes(';') && /^\d{4}-\d{2}-\d{2}/.test(t)) {
       const d = new Date(t);
       if (!Number.isNaN(d.getTime())) {
         return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
@@ -252,7 +267,10 @@ export function coercePublishTimesCellToParsableString(raw: unknown): string {
 export function parseIndexPublishTimesCell(raw: unknown): string[] {
   const s = coercePublishTimesCellToParsableString(raw);
   if (!s) return ['09:00'];
-  const parts = s.split(/[,;]/).map(p => p.trim()).filter(Boolean);
+  const parts = s
+    .split(/[,;]/)
+    .map(p => p.trim())
+    .filter(Boolean);
   const out: string[] = [];
   for (const p of parts) {
     const m = p.match(/^(\d{1,2}):(\d{2})(?::\d{2})?$/);
@@ -273,11 +291,14 @@ export function channelAddDialogInitialFromIndexRow(row: ChannelRow, headers: st
   if (!videoType) videoType = 'from_audio';
 
   const durationColumnKey = findIndexHeaderKey(headers, 'THỜI GIAN VIDEO');
-  let durationMinutes = '15';
+  let durationOption = '0_null';
   if (durationColumnKey != null && row[durationColumnKey] != null && row[durationColumnKey] !== '') {
-    const n = Number(row[durationColumnKey]);
-    if (Number.isFinite(n) && (INDEX_VIDEO_DURATION_MINUTES as readonly number[]).includes(n)) {
-      durationMinutes = String(n);
+    const v = String(row[durationColumnKey]);
+    // It might be a label from the new format, or numbers from the old format
+    if (['15', '20', '30', '60'].includes(v)) {
+      durationOption = '0_null'; // Or mapping for legacy? "0_null" is safest
+    } else {
+      durationOption = durationLabelToOption(v);
     }
   }
 
@@ -287,19 +308,12 @@ export function channelAddDialogInitialFromIndexRow(row: ChannelRow, headers: st
   const folder = channelFolderFromRow(row, headers) ?? '';
   const urlRaw = channelUrl.trim();
   const normalizedUrl = urlRaw && /^https?:\/\//i.test(urlRaw) ? urlRaw : urlRaw ? `https://${urlRaw}` : '';
-  const inferred =
-    folderFromChannelUrl(urlRaw) || (normalizedUrl ? folderFromChannelUrl(normalizedUrl) : null);
+  const inferred = folderFromChannelUrl(urlRaw) || (normalizedUrl ? folderFromChannelUrl(normalizedUrl) : null);
   const folderIdOverride = !folder ? '' : inferred === folder ? '' : folder;
 
-  const videosPerDayColumnKey = findIndexHeaderKeyAny(headers, [
-    'SỐ VIDEO MỖI NGÀY',
-    'VIDEO MỖI NGÀY',
-    'SỐ VIDEO UPDATE MỖI NGÀY',
-  ]);
+  const videosPerDayColumnKey = findIndexHeaderKeyAny(headers, ['SỐ VIDEO MỖI NGÀY', 'VIDEO MỖI NGÀY', 'SỐ VIDEO UPDATE MỖI NGÀY']);
   const videosPerDayPreset =
-    videosPerDayColumnKey != null &&
-    row[videosPerDayColumnKey] != null &&
-    String(row[videosPerDayColumnKey]).trim() !== ''
+    videosPerDayColumnKey != null && row[videosPerDayColumnKey] != null && String(row[videosPerDayColumnKey]).trim() !== ''
       ? parseVideoPerDayCell(row[videosPerDayColumnKey])
       : '1';
 
@@ -314,7 +328,7 @@ export function channelAddDialogInitialFromIndexRow(row: ChannelRow, headers: st
     channelUrl,
     email,
     videoType,
-    durationMinutes,
+    durationOption,
     selectedBackground,
     folderIdOverride,
     videosPerDayPreset,
@@ -322,10 +336,7 @@ export function channelAddDialogInitialFromIndexRow(row: ChannelRow, headers: st
   };
 }
 
-export function buildChannelRowFromAddForm(
-  headers: string[],
-  input: ChannelAddFormInput,
-): { row: ChannelRow; error?: string } {
+export function buildChannelRowFromAddForm(headers: string[], input: ChannelAddFormInput): { row: ChannelRow; error?: string } {
   const row: ChannelRow = {};
   for (const h of headers) row[h] = '';
 
@@ -334,10 +345,7 @@ export function buildChannelRowFromAddForm(
 
   const normalizedUrl = /^https?:\/\//i.test(urlRaw) ? urlRaw : `https://${urlRaw}`;
 
-  const folder =
-    input.folderIdOverride.trim() ||
-    folderFromChannelUrl(urlRaw) ||
-    folderFromChannelUrl(normalizedUrl);
+  const folder = input.folderIdOverride.trim() || folderFromChannelUrl(urlRaw) || folderFromChannelUrl(normalizedUrl);
   if (!folder) {
     return {
       row,
@@ -355,7 +363,7 @@ export function buildChannelRowFromAddForm(
   if (videoTypeColumnKey) row[videoTypeColumnKey] = input.videoType;
 
   const durationColumnKey = findIndexHeaderKey(headers, 'THỜI GIAN VIDEO');
-  if (durationColumnKey) row[durationColumnKey] = input.durationMinutes;
+  if (durationColumnKey) row[durationColumnKey] = durationOptionToLabel(input.durationOption);
 
   const bgKey = findIndexHeaderKey(headers, 'BACKGROUND');
   if (bgKey) row[bgKey] = input.background.trim();
@@ -365,11 +373,7 @@ export function buildChannelRowFromAddForm(
   const chKey = headers.find(h => headerNorm(h) === 'CHANNEL');
   if (chKey) row[chKey] = folder;
 
-  const videosPerDayColumnKey = findIndexHeaderKeyAny(headers, [
-    'SỐ VIDEO MỖI NGÀY',
-    'VIDEO MỖI NGÀY',
-    'SỐ VIDEO UPDATE MỖI NGÀY',
-  ]);
+  const videosPerDayColumnKey = findIndexHeaderKeyAny(headers, ['SỐ VIDEO MỖI NGÀY', 'VIDEO MỖI NGÀY', 'SỐ VIDEO UPDATE MỖI NGÀY']);
   if (videosPerDayColumnKey) row[videosPerDayColumnKey] = input.videosPerDayPreset;
 
   const publishTimesColumnKey = findIndexHeaderKeyAny(headers, ['GIỜ UPDATE', 'GIỜ UPLOAD MỖI NGÀY', 'GIỜ UPLOAD']);
@@ -380,17 +384,14 @@ export function buildChannelRowFromAddForm(
 
 export function channelFolderFromRow(row: ChannelRow, headers: string[]): string | null {
   const idKey = headers.find(h => headerNorm(h) === 'ID');
-  if (idKey) {
-    const raw = row[idKey];
-    if (raw != null) {
-      const s = String(raw).trim();
-      if (s) return s;
-    }
+
+  if (!idKey) return null;
+
+  const raw = row[idKey];
+  if (raw != null) {
+    const s = String(raw).trim();
+    if (s) return s;
   }
-  const chKey = headers.find(h => headerNorm(h) === 'CHANNEL');
-  if (!chKey) return null;
-  const v = row[chKey];
-  if (v == null) return null;
-  const s = String(v).trim();
-  return s || null;
+
+  return null;
 }
