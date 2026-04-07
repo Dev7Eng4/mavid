@@ -36,7 +36,7 @@ function getProfileDir(profileNum) {
 export async function openChromeProfile(options = {}) {
   const { profile = 1, headless = false, windowPosition, visible = true } = options;
 
-  const profileDir = getProfileDir(profile);
+  const profileDir = path.resolve(getProfileDir(profile));
   if (!fs.existsSync(profileDir)) {
     fs.mkdirSync(profileDir, { recursive: true });
   }

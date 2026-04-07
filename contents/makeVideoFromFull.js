@@ -6,6 +6,7 @@ import { MAKE_VIDEO_MODE } from './constants/index.js';
 import { GPU_INFO } from './utils/hardware.util.js';
 import { OVERLAY_OPTIONS } from './constants/overlayOptions.js';
 import { resolveChannelsDir } from './utils/channelsStoragePath.js';
+import { unlinkProgressSidecarForSpreadsheet } from './syncProgressToSpreadsheet.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.join(__dirname, '..');
@@ -105,7 +106,7 @@ function getPreprocessedImageOverlay(imagePath, width, height, opacity, overlayC
   try {
     execSync(
       `ffmpeg -hide_banner -loglevel error -y -i "${imagePath}" -vf "scale=${width}:${height},format=rgba,colorchannelmixer=aa=${opacity}" -frames:v 1 "${cachePath}"`,
-      { encoding: 'utf-8', stdio: 'pipe' },
+      { encoding: 'utf-8', stdio: 'pipe' }
     );
     console.log(`Đã tạo cache: ${path.basename(cachePath)}`);
   } catch (err) {
@@ -181,7 +182,7 @@ async function remakeVideo(videoPath, imagePath, overlayVideoPath, outputPath, o
       '[outv]',
       '-map',
       '0:a?',
-      '-shortest',
+      '-shortest'
     );
 
     args.push(...GPU_INFO.videoEncodeArgs);
@@ -202,21 +203,18 @@ async function remakeVideo(videoPath, imagePath, overlayVideoPath, outputPath, o
   });
 }
 
-/**
- * @param {boolean} [options.syncProgressToSpreadsheet=true] — ghi cột STATUS vào Excel/CSV sau mỗi video
- */
 async function main(options = {}) {
-  const syncProgressToSpreadsheet = options.syncProgressToSpreadsheet !== false;
   const inputFile = options.inputFile || null;
   const items = options.items || [];
+
   if (items.length === 0) {
     console.log('Không có items để xử lý batch.');
     return;
   }
 
   const overlayResolved = resolveOverlayByName(options.overlay);
+
   const { dir: OVERLAY_DIR, imageOpacity, videoOpacity, cacheDir: overlayCacheDir } = overlayResolved;
-  console.log(`[overlay] NAME="${overlayResolved.opt.NAME}" → ${OVERLAY_DIR}`);
   ensureOverlayDirs(OVERLAY_DIR, overlayCacheDir);
 
   const videoCropPercent = normalizeVideoCropPercent(options.videoCropPercent);
@@ -249,7 +247,7 @@ async function main(options = {}) {
   /** @type {{ syncProgressStatusToSpreadsheet?: (f: string, d: object) => Promise<void> } | null} */
   let syncProgressModule = null;
   async function flushProgressToSpreadsheet() {
-    if (!syncProgressToSpreadsheet || !actualInputFile) return;
+    if (!actualInputFile) return;
     try {
       if (!syncProgressModule) {
         syncProgressModule = await import('./syncProgressToSpreadsheet.js');
@@ -286,14 +284,16 @@ async function main(options = {}) {
 
     const result = await downloadSingleVideo(url, {
       mode: MAKE_VIDEO_MODE.REUP_FULL, // Tải cả video
-      callback: ({ title: gemTitle, description: gemDesc, tags: gemTags }) => {
+      thumbnailChannelRoot: destFolder,
+      callback: ({ title: gemTitle, description: gemDesc, tags: gemTags, summary: gemSummary }) => {
         const tagsStr = typeof gemTags === 'string' ? gemTags : Array.isArray(gemTags) ? gemTags.join(', ') : '';
         geminiByUrl[url] = {
           title: gemTitle || '',
           description: gemDesc || '',
           tags: tagsStr,
+          summary: gemSummary || '',
         };
-        console.log('Đã nhận title/description/tags từ Gemini.');
+        console.log('Đã nhận title/description/tags/summary từ Gemini (sẽ ghi video-meta.json sau khi render).');
       },
     });
 
@@ -314,7 +314,7 @@ async function main(options = {}) {
       try {
         await remakeVideo(videoPath, overlayImage, overlayClip, finalVideoPath, overlayRender);
 
-        // Copy thumbnail nếu có
+        // Thumbnail YouTube (downloads) → thumbnail.{ext}; Flow → flow-thumbnail.jpg (cùng tồn tại)
         if (fs.existsSync(DOWNLOADS_DIR)) {
           const downloadFiles = fs.readdirSync(DOWNLOADS_DIR);
           const thumbFile = downloadFiles.find(f => /\.(jpg|jpeg|png|webp)$/i.test(f));
@@ -322,8 +322,12 @@ async function main(options = {}) {
             const thumbExt = path.extname(thumbFile);
             const thumbDestPath = path.join(perVideoDir, `thumbnail${thumbExt}`);
             fs.copyFileSync(path.join(DOWNLOADS_DIR, thumbFile), thumbDestPath);
-            console.log(`>>> Đã copy thumbnail: ${thumbDestPath}`);
+            console.log(`>>> Đã copy thumbnail YouTube: ${thumbDestPath}`);
           }
+        }
+        const flowThumbJpg = path.join(perVideoDir, 'flow-thumbnail.jpg');
+        if (fs.existsSync(flowThumbJpg)) {
+          console.log(`>>> Đã có thumbnail Flow: ${flowThumbJpg}`);
         }
 
         // Lưu metadata
@@ -335,6 +339,7 @@ async function main(options = {}) {
           titleGemini: gem.title || '',
           descriptionGemini: gem.description || '',
           tagsGemini: gem.tags || '',
+          summaryGemini: gem.summary || '',
         };
         const metaPath = path.join(perVideoDir, 'video-meta.json');
         fs.writeFileSync(metaPath, JSON.stringify(metaPayload, null, 2), 'utf8');
@@ -359,6 +364,9 @@ async function main(options = {}) {
       }
     }
   }
+
+  await flushProgressToSpreadsheet();
+  unlinkProgressSidecarForSpreadsheet(actualInputFile);
 
   console.log(`\nHoàn thành xử lý ${items.length} video.`);
 }

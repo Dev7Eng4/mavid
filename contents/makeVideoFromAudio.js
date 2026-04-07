@@ -19,6 +19,7 @@ import { resolveStockBackgroundsDir } from './utils/stockBackgroundsPath.js';
 import { resolveChannelsDir } from './utils/channelsStoragePath.js';
 import { convertAudioFile } from './convertAudio.js';
 import { GPU_INFO } from './utils/hardware.util.js';
+import { unlinkProgressSidecarForSpreadsheet } from './syncProgressToSpreadsheet.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.join(__dirname, '..');
@@ -617,7 +618,7 @@ async function processOne(bgNameArg, options = {}) {
     fs.copyFileSync(outputPath, destVideoPath);
     console.log(`>>> Đã xuất video vào folder ID: ${destVideoPath}`);
 
-    // Copy thumbnail nếu có
+    // Thumbnail YouTube (downloads) → thumbnail.{ext}; Flow → flow-thumbnail.jpg (cùng tồn tại)
     if (fs.existsSync(DOWNLOADS_DIR)) {
       const downloadFiles = fs.readdirSync(DOWNLOADS_DIR);
       const thumbFile = downloadFiles.find(f => /\.(jpg|jpeg|png|webp)$/i.test(f));
@@ -625,8 +626,12 @@ async function processOne(bgNameArg, options = {}) {
         const thumbExt = path.extname(thumbFile);
         const thumbDestPath = path.join(perVideoDir, `thumbnail${thumbExt}`);
         fs.copyFileSync(path.join(DOWNLOADS_DIR, thumbFile), thumbDestPath);
-        console.log(`>>> Đã copy thumbnail: ${thumbDestPath}`);
+        console.log(`>>> Đã copy thumbnail YouTube: ${thumbDestPath}`);
       }
+    }
+    const flowThumbJpg = path.join(perVideoDir, 'flow-thumbnail.jpg');
+    if (fs.existsSync(flowThumbJpg)) {
+      console.log(`>>> Đã có thumbnail Flow: ${flowThumbJpg}`);
     }
 
     // Đợi 1 chút để Gemini callback có thời gian cập nhật (nếu đang chạy song song)
@@ -788,6 +793,7 @@ async function main(options = {}) {
 
     const result = await downloadSingleVideo(url, {
       mode: MAKE_VIDEO_MODE.FROM_AUDIO,
+      thumbnailChannelRoot: destFolder,
       callback: ({ title: gemTitle, description: gemDesc, tags: gemTags, summary: gemSummary }) => {
         const tagsStr = typeof gemTags === 'string' ? gemTags : Array.isArray(gemTags) ? gemTags.join(', ') : '';
         geminiByUrl[url] = {
@@ -839,6 +845,12 @@ async function main(options = {}) {
       }
     }
   }
+
+  if (syncProgressToSpreadsheet) {
+    await flushProgressToSpreadsheet();
+    unlinkProgressSidecarForSpreadsheet(actualInputFile);
+  }
+
   console.log(`\nHoàn thành xử lý ${items.length} video.`);
 }
 

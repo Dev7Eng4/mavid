@@ -162,12 +162,10 @@ export type VideoFromAudioBackgroundSource = 'stock' | 'auto';
 
 export interface VideoReupFullConfig {
   channel: string;
-  overlay: string;
-  videoCropPercent: number;
+  email: string;
   maxVideosPerBatch: number;
-  /** 0 = không lọc; >0 = chỉ dòng có cột DURATION ≥ N phút. */
-  minDurationMinute?: number;
-  maxDurationMinute?: number;
+  /** Tên preset khớp `OVERLAY_OPTIONS[].NAME` (vd. Option 1). */
+  overlay?: string;
 }
 
 export interface VideoFromAudioConfig {
@@ -224,6 +222,10 @@ export interface AddChannelFromFormParams {
       durationMinuteFrom: number;
       durationMinuteTo: number | null;
       background: string;
+      /** Chỉ dùng khi `videoType === 'reup_full'` — tên trong OVERLAY_OPTIONS. */
+      overlay?: string;
+      /** Khớp `THUMBNAIL_STYLE_OPTIONS[].value` trong contents/constants/index.js */
+      thumbnailStyle?: string;
       videosPerDayPreset: string;
       publishTimes: string[];
     }[];
@@ -253,6 +255,10 @@ export interface MavidChannelConfigItem {
   durationMinuteFrom?: number;
   durationMinuteTo?: number | null;
   background?: string;
+  /** Preset reup full — khớp OVERLAY_OPTIONS[].NAME */
+  overlay?: string;
+  /** Khớp THUMBNAIL_STYLE_OPTIONS (Flow / thumbnail). */
+  thumbnailStyle?: string;
   videosPerDayPreset?: string;
   publishTimes?: string[];
 }

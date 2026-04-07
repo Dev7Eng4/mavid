@@ -175,10 +175,11 @@ export function ChannelUploadVideoDialog({ channels, onClose, onConfirm }: Chann
         payloads.push({ channelFolder: folderPick, totalVideos: total, gpmProfileId });
       }
 
-      await onConfirm(payloads);
       if (typeof window.runner?.minimizeApp === 'function') {
         window.runner.minimizeApp();
       }
+      await onConfirm(payloads);
+
       onClose();
     } catch (e) {
       setFormError(e instanceof Error ? e.message : 'Không chạy được upload.');
@@ -212,9 +213,9 @@ export function ChannelUploadVideoDialog({ channels, onClose, onConfirm }: Chann
         </h2>
         <p className='text-sm leading-snug mt-2 shrink-0' style={{ color: 'var(--text-muted)' }}>
           Profile GPM được chọn tự động theo <code className='text-xs'>email</code> của kênh trong{' '}
-          <code className='text-xs'>index.xlsx</code>. Hệ thống sẽ tìm trong API <code className='text-xs'>listProfiles</code>{' '}
-          dòng có <code className='text-xs'>name</code> trùng email (bạn cần cấu hình tên profile = email trong GPM). Sau đó mở YouTube và upload từng .mp4 trong các thư mục con của kênh (sắp xếp theo tên). Để trống «Số
-          lượng» = tất cả thư mục có .mp4.
+          <code className='text-xs'>index.xlsx</code>. Hệ thống sẽ tìm trong API <code className='text-xs'>listProfiles</code> dòng có{' '}
+          <code className='text-xs'>name</code> trùng email (bạn cần cấu hình tên profile = email trong GPM). Sau đó mở YouTube và upload
+          từng .mp4 trong các thư mục con của kênh (sắp xếp theo tên). Để trống «Số lượng» = tất cả thư mục có .mp4.
         </p>
 
         <div className='grid grid-cols-1 gap-y-4 mt-4 overflow-y-auto min-h-0 flex-1 pr-1 content-start'>

@@ -13,12 +13,13 @@ export const VIDEO_TYPE = {
 
 export const flowSettings = {
   "FLOW_URL": "https://labs.google/fx/vi/tools/flow/project/",
-  "FLOW_PROJECT_ID": "3550d75f-a7ac-41ec-9ec7-0c23bc5efb95"
+  "FLOW_PROJECT_ID": "3550d75f-a7ac-41ec-9ec7-0c23bc5efb95",
+  "FLOW_CHROME_PROFILE": 1
 };
 
 export const GEMINI_CONFIG = {
   "URL": "https://gemini.google.com/app",
-  "MAX_CONCURRENT": 3
+  "MAX_CONCURRENT": 4
 };
 
 export const GEMINI_CHUNK_SIZE = {
@@ -70,4 +71,4 @@ export const LOGO = {
   "MARGIN_RIGHT": 20
 };
 
-export const VIDEO_STORAGE_ROOT = "D:\\MaVidMedia";
+export const VIDEO_STORAGE_ROOT = "E:\\mavid\\MaVidMedia";

@@ -15,17 +15,18 @@ function extractUrlFromCell(rawVal) {
 /**
  * @param {string} inputFile - .xlsx hoặc .csv
  * @param {Record<string, { status?: string }>} progressData
+ * @returns {Promise<boolean>} true nếu đã ghi file spreadsheet
  */
 export async function syncProgressStatusToSpreadsheet(inputFile, progressData) {
   if (!inputFile || !fs.existsSync(inputFile)) {
     console.warn('[sync] Không có file spreadsheet, bỏ qua đồng bộ STATUS.');
-    return;
+    return false;
   }
   const pd = progressData && typeof progressData === 'object' ? progressData : {};
   const hasAny = Object.keys(pd).some(k => pd[k]?.status);
   if (!hasAny) {
     console.log('[sync] progress không có status để ghi, bỏ qua.');
-    return;
+    return false;
   }
 
   const lower = inputFile.toLowerCase();
@@ -36,7 +37,7 @@ export async function syncProgressStatusToSpreadsheet(inputFile, progressData) {
     const sheet = workbook.worksheets[0];
     if (!sheet || sheet.rowCount < 2) {
       console.warn('[sync] Excel không có dữ liệu.');
-      return;
+      return false;
     }
     const headerRow = sheet.getRow(1);
     const videoIdx = headerRow.values.findIndex(v => String(v || '').toLowerCase() === 'link video');
@@ -47,7 +48,7 @@ export async function syncProgressStatusToSpreadsheet(inputFile, progressData) {
     );
     if (videoIdx < 1 || statusIdx < 1) {
       console.warn('[sync] Excel: không tìm thấy cột LINK VIDEO hoặc STATUS.');
-      return;
+      return false;
     }
     let updated = 0;
     for (let i = 2; i <= sheet.rowCount; i++) {
@@ -62,20 +63,20 @@ export async function syncProgressStatusToSpreadsheet(inputFile, progressData) {
     }
     await workbook.xlsx.writeFile(inputFile);
     console.log(`[sync] Đã đồng bộ STATUS từ progress → ${path.basename(inputFile)} (${updated} dòng).`);
-    return;
+    return true;
   }
 
   if (lower.endsWith('.csv')) {
     const content = fs.readFileSync(inputFile, 'utf-8').replace(/^\uFEFF/, '');
     const lines = content.split('\n').map(l => l.trimEnd()).filter(l => l.trim());
-    if (lines.length < 2) return;
+    if (lines.length < 2) return false;
     const parseLine = line => line.split(',').map(c => c.trim().replace(/^"|"$/g, ''));
     const headers = parseLine(lines[0]);
     const videoIdx = headers.findIndex(h => h.toLowerCase() === 'link video');
     const statusIdx = headers.findIndex(h => h.toLowerCase().includes('status'));
     if (videoIdx < 0 || statusIdx < 0) {
       console.warn('[sync] CSV: không tìm thấy LINK VIDEO hoặc STATUS.');
-      return;
+      return false;
     }
     const out = [lines[0]];
     let updated = 0;
@@ -97,6 +98,23 @@ export async function syncProgressStatusToSpreadsheet(inputFile, progressData) {
     }
     fs.writeFileSync(inputFile, out.join('\n'), 'utf-8');
     console.log(`[sync] Đã đồng bộ STATUS từ progress → ${path.basename(inputFile)} (${updated} dòng CSV).`);
+    return true;
+  }
+  return false;
+}
+
+/** Xóa `<tên>.xlsx|csv` → `<tên>_progress.json` sau khi đã ghi STATUS xong. */
+export function unlinkProgressSidecarForSpreadsheet(inputFile) {
+  if (!inputFile || typeof inputFile !== 'string') return;
+  if (!/\.(xlsx|csv)$/i.test(inputFile)) return;
+  const progressPath = inputFile.replace(/\.(xlsx|csv)$/i, '_progress.json');
+  try {
+    if (fs.existsSync(progressPath)) {
+      fs.unlinkSync(progressPath);
+      console.log(`[sync] Đã xóa ${path.basename(progressPath)}.`);
+    }
+  } catch (e) {
+    console.warn('[sync] Không xóa được file progress:', e.message);
   }
 }
 
@@ -119,5 +137,13 @@ export async function syncProgressFromFileToSpreadsheet(inputFile) {
     console.warn('[sync] Không đọc được progress.json:', e.message);
     return;
   }
-  await syncProgressStatusToSpreadsheet(inputFile, pd);
+  const wrote = await syncProgressStatusToSpreadsheet(inputFile, pd);
+  if (wrote && fs.existsSync(progressPath)) {
+    try {
+      fs.unlinkSync(progressPath);
+      console.log(`[sync] Đã xóa ${path.basename(progressPath)} sau khi ghi STATUS.`);
+    } catch (e) {
+      console.warn('[sync] Không xóa được file progress:', e.message);
+    }
+  }
 }

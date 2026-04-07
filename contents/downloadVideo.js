@@ -16,6 +16,52 @@ const DEFAULT_OUTPUT_DIR = path.join(__dirname, '..', 'downloads');
 const INPUT_FILE = path.join(__dirname, '..', 'input.txt');
 const OUTPUT_FILE = path.join(DEFAULT_OUTPUT_DIR, 'output.json');
 
+/** Ngưỡng tối ưu JPEG flow-thumbnail (bytes). */
+const FLOW_THUMB_OPTIMIZE_MIN_BYTES = 1024 * 1024;
+
+/**
+ * Nếu `flow-thumbnail.jpg` ≥ 1MB — nén JPEG (giảm quality), vẫn lớn thì thu nhỏ chiều ngang.
+ */
+async function optimizeFlowThumbnailJpegIfLarge(filePath) {
+  try {
+    if (!filePath || !fs.existsSync(filePath)) return;
+    const before = fs.statSync(filePath).size;
+    if (before < FLOW_THUMB_OPTIMIZE_MIN_BYTES) return;
+
+    const sharp = (await import('sharp')).default;
+    let buf;
+    let quality = 85;
+    while (quality >= 40) {
+      buf = await sharp(filePath).jpeg({ quality, mozjpeg: true, chromaSubsampling: '4:2:0' }).toBuffer();
+      if (buf.length < FLOW_THUMB_OPTIMIZE_MIN_BYTES) break;
+      quality -= quality > 55 ? 10 : 5;
+    }
+
+    if (buf.length >= FLOW_THUMB_OPTIMIZE_MIN_BYTES) {
+      for (const maxW of [1280, 1024, 800, 640]) {
+        buf = await sharp(buf)
+          .resize(maxW, null, { withoutEnlargement: true })
+          .jpeg({ quality: 72, mozjpeg: true, chromaSubsampling: '4:2:0' })
+          .toBuffer();
+        if (buf.length < FLOW_THUMB_OPTIMIZE_MIN_BYTES) break;
+      }
+    }
+
+    if (buf.length < before) {
+      fs.writeFileSync(filePath, buf);
+      console.log(
+        `[thumbnail-flow] Đã tối ưu flow-thumbnail: ${(before / FLOW_THUMB_OPTIMIZE_MIN_BYTES).toFixed(2)}MB → ${(
+          buf.length / FLOW_THUMB_OPTIMIZE_MIN_BYTES
+        ).toFixed(2)}MB (${before} → ${buf.length} bytes)`
+      );
+    } else if (before >= FLOW_THUMB_OPTIMIZE_MIN_BYTES) {
+      console.warn('[thumbnail-flow] Không giảm được kích thước flow-thumbnail sau tối ưu; giữ file gốc.');
+    }
+  } catch (e) {
+    console.warn('[thumbnail-flow] Lỗi tối ưu kích thước thumbnail:', e.message);
+  }
+}
+
 /**
  * Lấy thông tin video đơn lẻ
  */
@@ -142,7 +188,16 @@ async function downloadThumbnail(url, options = {}) {
 async function processVttTranscriptsWithGemini(
   url,
   outputDir,
-  { updateTranscript = true, videoTitle, description, tags, callback, language },
+  {
+    updateTranscript = true,
+    videoTitle,
+    description,
+    tags,
+    callback,
+    language,
+    thumbnailFlowOutputDir = null,
+    generateThumbnailWithFlow = true,
+  }
 ) {
   const { cleanSrt } = await import('./utils/srt.util.js');
   const { updateContentWithGemini } = await import('./updateContentWithGemini2CH.js');
@@ -178,11 +233,44 @@ async function processVttTranscriptsWithGemini(
               description: geminiOut.description ?? '',
               tags: geminiOut.tags ?? '',
               summary: geminiOut.summary ?? '',
-            }),
+            })
           );
           console.log('✅ Đã gửi title/description/tags/summary (Gemini) qua callback.');
         } catch (cbErr) {
           console.warn('callback:', cbErr.message);
+        }
+      }
+
+      console.log(
+        '[thumbnail-flow] generateThumbnailWithFlow:',
+        generateThumbnailWithFlow,
+        'thumbnailFlowOutputDir:',
+        thumbnailFlowOutputDir,
+        'geminiOut.title:',
+        geminiOut.title,
+        'geminiOut.summary:',
+        geminiOut.summary
+      );
+
+      if (generateThumbnailWithFlow && thumbnailFlowOutputDir && geminiOut.title != null && geminiOut.summary != null) {
+        const titleG = String(geminiOut.title).trim();
+        const summaryG = String(geminiOut.summary).trim();
+        if (titleG && summaryG) {
+          console.log('[thumbnail-flow] Tạo thumbnail từ title/summary Gemini →', path.basename(thumbnailFlowOutputDir));
+          try {
+            const { runCreateThumbnailFlow } = await import('./scripts/createThumbnailFlow.js');
+            const { createPromptToCreateThumbnail } = await import('./promts/ja/createImage.js');
+            await runCreateThumbnailFlow({
+              prompt: createPromptToCreateThumbnail(titleG, summaryG),
+              pathSave: thumbnailFlowOutputDir,
+              exportName: 'flow-thumbnail',
+            });
+            const flowThumbPath = path.join(thumbnailFlowOutputDir, 'flow-thumbnail.jpg');
+            await optimizeFlowThumbnailJpegIfLarge(flowThumbPath);
+            console.log('[thumbnail-flow] Đã lưu flow-thumbnail.jpg trong folder video.');
+          } catch (thumbErr) {
+            console.warn('[thumbnail-flow]', thumbErr.message);
+          }
         }
       }
     } catch (err) {
@@ -214,6 +302,8 @@ async function downloadTranscript(url, options = {}) {
     tags = [],
     callback,
     vttOnlyClean = false,
+    thumbnailFlowOutputDir = null,
+    generateThumbnailWithFlow = true,
   } = options;
   if (!fs.existsSync(outputDir)) fs.mkdirSync(outputDir, { recursive: true });
 
@@ -259,8 +349,8 @@ async function downloadTranscript(url, options = {}) {
   if (updateTranscript && transcriptLang != null && !needsGeminiTranscriptUpdate) {
     console.log(
       `Phụ đề ${String(transcriptLang).toUpperCase()}: bỏ chỉnh từng dòng qua Gemini (chỉ áp dụng: ${LANGUAGES_NEED_UPDATE_TRANSCRIPT.join(
-        ', ',
-      )}). Vẫn chạy metadata/title nếu có.`,
+        ', '
+      )}). Vẫn chạy metadata/title nếu có.`
     );
   }
 
@@ -281,6 +371,8 @@ async function downloadTranscript(url, options = {}) {
         tags,
         callback,
         language: transcriptLang,
+        thumbnailFlowOutputDir,
+        generateThumbnailWithFlow,
       });
     }
   }
@@ -333,10 +425,12 @@ async function downloadAudio(url, options = {}) {
  * @param {string} url - Link YouTube
  * @param {object} [options]
  * @param {(p: { url: string, title: string, description: string, tags: string }) => void | Promise<void>} [options.callback] - Truyền xuống downloadTranscript (batch: cập nhật progress từ makeVideoFromAudio)
+ * @param {string} [options.thumbnailChannelRoot] — thư mục kênh (cha của từng folder video-id); nếu có, sau Gemini gọi Flow lưu `flow-thumbnail.jpg` trong `thumbnailChannelRoot/<videoId>/` (thumbnail YouTube vẫn tải về downloads, batch copy thành `thumbnail.*`)
+ * @param {boolean} [options.generateThumbnailWithFlow=true] — tắt nếu không muốn chạy Flow
  * @returns {Promise<(object & { filePath?: string }) | null>} - Thông tin video; `filePath` = file video trong downloads/ (khi tải được)
  */
 async function downloadSingleVideo(url, options = {}) {
-  const { callback, mode = MAKE_VIDEO_MODE.REUP_FULL } = options;
+  const { callback, mode = MAKE_VIDEO_MODE.REUP_FULL, thumbnailChannelRoot = null, generateThumbnailWithFlow = true } = options;
   if (!fs.existsSync(DEFAULT_OUTPUT_DIR)) {
     fs.mkdirSync(DEFAULT_OUTPUT_DIR, { recursive: true });
   } else {
@@ -353,6 +447,13 @@ async function downloadSingleVideo(url, options = {}) {
 
   try {
     const result = await getVideoInfo(url);
+
+    let thumbnailFlowOutputDir = null;
+    if (generateThumbnailWithFlow && thumbnailChannelRoot && result.metadata?.id) {
+      thumbnailFlowOutputDir = path.join(thumbnailChannelRoot, result.metadata.id);
+      fs.mkdirSync(thumbnailFlowOutputDir, { recursive: true });
+    }
+
     await downloadThumbnail(url, { outputDir: DEFAULT_OUTPUT_DIR });
     if (mode === MAKE_VIDEO_MODE.FROM_AUDIO) {
       await downloadAudio(url, { outputDir: DEFAULT_OUTPUT_DIR });
@@ -368,6 +469,8 @@ async function downloadSingleVideo(url, options = {}) {
         description: result.description,
         tags: result.tags,
         callback,
+        thumbnailFlowOutputDir,
+        generateThumbnailWithFlow,
       });
     } catch (err) {
       console.warn('Không tải được transcript:', err.message);

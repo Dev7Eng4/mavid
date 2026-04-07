@@ -1,7 +1,15 @@
 import fs from 'fs';
+import path from 'path';
 import { openChromeProfile } from '../scripts/makeChromeProfile.js';
 import { delay, clickElement } from './dom.util.js';
 import { flowSettings } from '../constants/index.js';
+
+/** Profile Playwright dùng cho Flow (thư mục chrome-profile/profile{N}). Ưu tiên env MAVID_CHROME_PROFILE. */
+function resolveFlowChromeProfile(cfg) {
+  const raw = process.env.MAVID_CHROME_PROFILE ?? cfg.FLOW_CHROME_PROFILE ?? 1;
+  const n = parseInt(String(raw), 10);
+  return Number.isFinite(n) && n >= 1 ? n : 1;
+}
 
 async function superClear(page, context) {
   try {
@@ -11,11 +19,13 @@ async function superClear(page, context) {
   }
 }
 
-export async function generateImageThumbnailWithFlow(prompt, pathSave, FROM_GEMINI, setting = {}) {
+export async function generateImageWithFlow(prompt, pathSave, exportName, setting = {}) {
   const cfg = { ...flowSettings, ...setting };
-  console.log('🔄 Đang generate ảnh thumbnail từ flow...');
+  const chromeProfile = resolveFlowChromeProfile(cfg);
+  console.log('🔄 Đang generate ảnh thumbnail từ Flow...');
+  console.log(`[flow] Dùng Chrome profile${chromeProfile} (FLOW_CHROME_PROFILE / MAVID_CHROME_PROFILE).`);
 
-  const { context, page } = await openChromeProfile({ visible: true });
+  const { context, page } = await openChromeProfile({ profile: chromeProfile, visible: true });
 
   try {
     await page.goto(cfg.FLOW_URL + cfg.FLOW_PROJECT_ID);
@@ -84,7 +94,7 @@ export async function generateImageThumbnailWithFlow(prompt, pathSave, FROM_GEMI
           }
           return false;
         },
-        { timeout: 3 * 60 * 1000 },
+        { timeout: 3 * 60 * 1000 }
       ),
     ]);
 
@@ -95,7 +105,8 @@ export async function generateImageThumbnailWithFlow(prompt, pathSave, FROM_GEMI
     const imageData = await fetch(imageUrl);
     const imageBuffer = await imageData.arrayBuffer();
     const imageBase64 = Buffer.from(imageBuffer).toString('base64');
-    const base64OutputPath = `${pathSave}/images/${FROM_GEMINI}.jpg`;
+    const base64OutputPath = path.join(pathSave, `${exportName}.jpg`);
+    fs.mkdirSync(pathSave, { recursive: true });
     fs.writeFileSync(base64OutputPath, imageBase64, 'base64');
     console.log('✅ Đã lưu ảnh vào file:', base64OutputPath);
   } catch (error) {

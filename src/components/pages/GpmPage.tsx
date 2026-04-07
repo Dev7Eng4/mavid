@@ -38,7 +38,7 @@ function mapGpmApiProfileRow(row: unknown): GpmProfileRow | null {
 
 export function GpmPage() {
   const [profiles, setProfiles] = useState<GpmProfileRow[]>([]);
-  const [message, setMessage] = useState<string | null>(null);
+  const [, setMessage] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   /** Profile id (GPM) đã mở thành công qua API trong phiên này — GPM có thể đóng tay ngoài app. */
   const [openProfileIds, setOpenProfileIds] = useState<Set<string>>(() => new Set());

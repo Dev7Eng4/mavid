@@ -1,4 +1,6 @@
 import type { ChannelRow, ScriptId } from '../../../types';
+import { THUMBNAIL_STYLE_OPTIONS } from '@contents/constants/index.js';
+import { OVERLAY_OPTIONS } from '@contents/constants/overlayOptions.js';
 import { buildMavidEnvForVideoFromAudio, defaultBackgroundFolder } from '../../../utils/videoFromAudioEnv';
 import { buildMavidEnvForReupFull } from '../../../utils/reupFullEnv';
 
@@ -114,13 +116,35 @@ export function resolveIndexRowVideoType(row: ChannelRow, headers: string[]): 'f
   return '';
 }
 
+/** Ô EMAIL index có thể chứa nhiều địa chỉ phân tách dấu phẩy. */
+export function parseIndexEmailCell(raw: unknown): string[] {
+  return String(raw ?? '')
+    .split(',')
+    .map(e => e.trim())
+    .filter(Boolean);
+}
+
+/** So khớp một email đã chọn với dòng index (không phân biệt hoa thường). */
+export function indexRowMatchesPickedEmail(row: ChannelRow, emailHeaderKey: string | undefined, pickedEmail: string): boolean {
+  if (!emailHeaderKey) return false;
+  const norm = pickedEmail.trim().toLowerCase();
+  if (!norm) return false;
+  return parseIndexEmailCell(row[emailHeaderKey]).some(e => e.toLowerCase() === norm);
+}
+
 export function buildExtraEnvForIndexChannelRow(
   row: ChannelRow,
   headers: string[],
   folder: string,
   videoType: 'from_audio' | 'reup_full',
   bgList: string[],
+  opts?: { maxVideosPerBatch?: number }
 ): Record<string, string> {
+  const maxBatch = opts?.maxVideosPerBatch ?? 5;
+
+  const emailKey = findIndexHeaderKey(headers, 'EMAIL');
+  const email = emailKey ? String(row[emailKey] ?? '').trim() : '';
+
   const bgKey = findIndexHeaderKey(headers, 'BACKGROUND');
   const bgRaw = bgKey ? String(row[bgKey] ?? '').trim() : '';
   const background = bgRaw || defaultBackgroundFolder(bgList);
@@ -132,18 +156,19 @@ export function buildExtraEnvForIndexChannelRow(
         backgroundSource: 'stock',
         stockVideoCount: 0,
         audioSpeed: 0.91,
-        maxVideosPerBatch: 5,
+        maxVideosPerBatch: maxBatch,
         minDurationMinutes: 0,
         showLogo: false,
       },
-      bgList,
+      bgList
     );
   }
+  const overlayReup = videoType === 'reup_full' ? bgRaw : '';
   return buildMavidEnvForReupFull({
     channel: folder,
-    overlay: '',
-    videoCropPercent: 0,
-    maxVideosPerBatch: 5,
+    email,
+    maxVideosPerBatch: maxBatch,
+    ...(overlayReup ? { overlay: overlayReup } : {}),
   });
 }
 
@@ -180,7 +205,12 @@ export interface ChannelAddFormInput {
   email: string;
   videoType: 'from_audio' | 'reup_full';
   durationOption: string;
+  /** from_audio — tên folder trong MaVidMedia/backgrounds */
   background: string;
+  /** reup_full — khớp OVERLAY_OPTIONS[].NAME */
+  overlay: string;
+  /** Khớp THUMBNAIL_STYLE_OPTIONS[].value */
+  thumbnailStyle: string;
   videosPerDayPreset: VideoPerDayPreset;
   publishTimes: string[];
   /** Nếu có — ghi đè suy luận từ URL cho ID/CHANNEL */
@@ -195,9 +225,50 @@ export interface ChannelAddDialogInitialFields {
   /** Chuỗi cấu hình duration (vd. "0_30"). */
   durationOption: string;
   selectedBackground: string;
+  /** reup_full — tên preset overlay */
+  reupOverlayOption: string;
+  /** Style thumbnail — THUMBNAIL_STYLE_OPTIONS */
+  thumbnailStyle: string;
   folderIdOverride: string;
   videosPerDayPreset: VideoPerDayPreset;
   publishTimes: string[];
+}
+
+/** Danh sách NAME hợp lệ cho dropdown Reup (đồng bộ makeVideoFromFull). */
+export function reupOverlaySelectOptions(): { value: string; label: string }[] {
+  return OVERLAY_OPTIONS.map(o => {
+    const name = String(o.NAME).trim();
+    return { value: name, label: name };
+  });
+}
+
+export function defaultReupOverlayName(): string {
+  const first = OVERLAY_OPTIONS[0];
+  return first ? String(first.NAME).trim() : 'Option 1';
+}
+
+export function isValidReupOverlayName(name: string): boolean {
+  const t = name.trim();
+  if (!t) return false;
+  return OVERLAY_OPTIONS.some(o => String(o.NAME).trim() === t);
+}
+
+export function defaultThumbnailStyle(): string {
+  const first = THUMBNAIL_STYLE_OPTIONS[0];
+  return first ? String(first.value) : '2chPeopleStyle';
+}
+
+export function isValidThumbnailStyle(name: string): boolean {
+  const t = name.trim();
+  if (!t) return false;
+  return THUMBNAIL_STYLE_OPTIONS.some(o => String(o.value) === t);
+}
+
+export function thumbnailStyleSelectOptions(): { value: string; label: string }[] {
+  return THUMBNAIL_STYLE_OPTIONS.map(o => ({
+    value: String(o.value),
+    label: String(o.label),
+  }));
 }
 
 /**
@@ -302,13 +373,12 @@ export function channelAddDialogInitialFromIndexRow(row: ChannelRow, headers: st
   }
 
   const bgKey = findIndexHeaderKey(headers, 'BACKGROUND');
-  const selectedBackground = bgKey ? String(row[bgKey] ?? '').trim() : '';
+  const bgCell = bgKey ? String(row[bgKey] ?? '').trim() : '';
+  const overlayNames = new Set(OVERLAY_OPTIONS.map(o => String(o.NAME).trim()));
+  const selectedBackground = videoType === 'reup_full' ? '' : bgCell;
+  const reupOverlayOption = videoType === 'reup_full' && bgCell && overlayNames.has(bgCell) ? bgCell : defaultReupOverlayName();
 
   const folder = channelFolderFromRow(row, headers) ?? '';
-  const urlRaw = channelUrl.trim();
-  const normalizedUrl = urlRaw && /^https?:\/\//i.test(urlRaw) ? urlRaw : urlRaw ? `https://${urlRaw}` : '';
-  const inferred = folderFromChannelUrl(urlRaw) || (normalizedUrl ? folderFromChannelUrl(normalizedUrl) : null);
-  const folderIdOverride = !folder ? '' : inferred === folder ? '' : folder;
 
   const videosPerDayColumnKey = findIndexHeaderKeyAny(headers, ['SỐ VIDEO MỖI NGÀY', 'VIDEO MỖI NGÀY', 'SỐ VIDEO UPDATE MỖI NGÀY']);
   const videosPerDayPreset =
@@ -329,13 +399,19 @@ export function channelAddDialogInitialFromIndexRow(row: ChannelRow, headers: st
     videoType,
     durationOption,
     selectedBackground,
-    folderIdOverride,
+    reupOverlayOption,
+    thumbnailStyle: defaultThumbnailStyle(),
+    folderIdOverride: folder,
     videosPerDayPreset,
     publishTimes,
   };
 }
 
-export function buildChannelRowFromAddForm(headers: string[], input: ChannelAddFormInput): { row: ChannelRow; error?: string } {
+export function buildChannelRowFromAddForm(
+  headers: string[],
+  input: ChannelAddFormInput,
+  opts?: { preserveChannelFromRow?: ChannelRow | null }
+): { row: ChannelRow; error?: string } {
   const row: ChannelRow = {};
   for (const h of headers) row[h] = '';
 
@@ -365,12 +441,18 @@ export function buildChannelRowFromAddForm(headers: string[], input: ChannelAddF
   if (durationColumnKey) row[durationColumnKey] = durationOptionToLabel(input.durationOption);
 
   const bgKey = findIndexHeaderKey(headers, 'BACKGROUND');
-  if (bgKey) row[bgKey] = input.background.trim();
+  if (bgKey) {
+    if (input.videoType === 'reup_full') row[bgKey] = input.overlay.trim();
+    else row[bgKey] = input.background.trim();
+  }
 
   const idKey = headers.find(h => headerNorm(h) === 'ID');
   if (idKey) row[idKey] = folder;
   const chKey = headers.find(h => headerNorm(h) === 'CHANNEL');
-  if (chKey) row[chKey] = folder;
+  if (chKey) {
+    const prev = opts?.preserveChannelFromRow ? String(opts.preserveChannelFromRow[chKey] ?? '').trim() : '';
+    row[chKey] = prev || folder;
+  }
 
   const videosPerDayColumnKey = findIndexHeaderKeyAny(headers, ['SỐ VIDEO MỖI NGÀY', 'VIDEO MỖI NGÀY', 'SỐ VIDEO UPDATE MỖI NGÀY']);
   if (videosPerDayColumnKey) row[videosPerDayColumnKey] = input.videosPerDayPreset;

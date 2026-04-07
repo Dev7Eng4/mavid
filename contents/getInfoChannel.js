@@ -27,8 +27,29 @@ const INDEX_VIDEO_TYPE_OPTIONS = ['from_audio', 'reup_full'];
 /** index.xlsx: thời lượng video phút (dropdown) */
 const INDEX_THOI_GIAN_OPTIONS = ['Tất cả', '0 - 30 phút', '0 - 60 phút', '30 - 60 phút', 'Từ 30 phút', 'Từ 60 phút'];
 
-/** Headers cho file index.xlsx */
+/** Headers cho file index.xlsx — cột ID = tên thư mục kênh (MaVidMedia/channels/<ID>/) */
 const INDEX_HEADERS = ['CHANNEL', 'LINK', 'ID', 'EMAIL', 'LOẠI VIDEO', 'THỜI GIAN VIDEO', 'BACKGROUND', 'LAST UPLOAD'];
+
+/** Bản index từng có cột THƯ MỤC (cột 9): gộp về cột ID rồi bỏ cột 9. */
+const UC_INDEX_ID_RE = /^UC[A-Za-z0-9_-]{22}$/;
+function migrateDropThucMucColumnIfPresent(sheet) {
+  const r1 = sheet.getRow(1);
+  const h9 = String(r1.getCell(9).value || '')
+    .trim()
+    .toUpperCase();
+  if (h9 !== 'THƯ MỤC' && h9 !== 'FOLDER') return;
+
+  for (let i = 2; i <= sheet.rowCount; i++) {
+    const row = sheet.getRow(i);
+    const idVal = String(row.getCell(3).value || '').trim();
+    const folderVal = String(row.getCell(9).value || '').trim();
+    if (folderVal && (UC_INDEX_ID_RE.test(idVal) || !idVal)) {
+      row.getCell(3).value = folderVal;
+    }
+    row.getCell(9).value = null;
+  }
+  r1.getCell(9).value = null;
+}
 
 /** Thời gian video tối thiểu để lấy vào danh sách (giây) */
 const MIN_DURATION_SECONDS = 300;
@@ -105,6 +126,7 @@ function resolveIndexMetaColumns(channelData) {
  * Cập nhật hoặc thêm channel vào file index.xlsx
  * @param {Object} channelData
  * @param {string} [channelData.email] — nếu có (kể cả `''`), coi là luồng form: ghi đầy đủ cột D–G
+ * @param {string} channelData.id — tên thư mục kênh (khớp thư mục trong MaVidMedia/channels/)
  */
 async function updateIndexFile(channelData) {
   const { name, link, id, lastUpload } = channelData;
@@ -122,10 +144,18 @@ async function updateIndexFile(channelData) {
     await workbook.xlsx.readFile(INDEX_FILE);
     sheet = workbook.worksheets[0];
     migrateIndexSheetIfNeeded(sheet);
+    migrateDropThucMucColumnIfPresent(sheet);
 
-    // Đồng bộ dòng tiêu đề nếu thiếu (sau migrate hoặc file chỉnh tay)
+    // Đồng bộ dòng tiêu đề nếu lệch INDEX_HEADERS (sau migrate hoặc file chỉnh tay)
     const r1 = sheet.getRow(1);
-    if (String(r1.getCell(5).value || '').trim() !== 'LOẠI VIDEO') {
+    let headerMismatch = false;
+    for (let c = 1; c <= INDEX_HEADERS.length; c++) {
+      if (String(r1.getCell(c).value || '').trim() !== INDEX_HEADERS[c - 1]) {
+        headerMismatch = true;
+        break;
+      }
+    }
+    if (headerMismatch) {
       r1.values = [undefined, ...INDEX_HEADERS];
     }
 
@@ -155,6 +185,7 @@ async function updateIndexFile(channelData) {
       const row = sheet.getRow(existingRowIndex);
       row.getCell(1).value = name;
       row.getCell(2).value = link;
+      row.getCell(3).value = id;
       row.getCell(8).value = lastUpload;
       if ('email' in channelData) {
         row.getCell(4).value = meta.c4;
@@ -318,6 +349,53 @@ export async function getChannelInfo(url) {
   };
 }
 
+function decodeUrlTry(s) {
+  try {
+    return decodeURIComponent(String(s ?? '').trim());
+  } catch {
+    return String(s ?? '').trim();
+  }
+}
+
+/** Handle sau `@` trong URL kênh (ASCII hoặc Unicode, vd. `@건강박사2025`). */
+function handleFromYoutubeAtUrl(str) {
+  const dec = decodeUrlTry(str);
+  let m = dec.match(/@([a-zA-Z0-9_.-]+)/);
+  if (m?.[1]) return m[1];
+  m = dec.match(/@([^/@?#\s]+)/);
+  return m?.[1] ? m[1] : '';
+}
+
+/**
+ * Tên thư mục kênh (index cột ID / `MaVidMedia/channels/<tên>/`).
+ * Trước đây: nếu `uploader_url` có `@` nhưng handle không khớp regex ASCII,
+ * nhánh `else if` chặn → không dùng được `uploader_id` / `channel_id` → `unknown_id`.
+ */
+function resolveChannelFolderNameFromResult(url, result) {
+  const meta = result?.metadata;
+
+  if (meta.channel_id) return meta.channel_id;
+
+  let name = handleFromYoutubeAtUrl(url);
+  if (name) return name;
+
+  if (meta?.uploader_url) {
+    name = handleFromYoutubeAtUrl(meta.uploader_url);
+    if (name) return name;
+  }
+
+  if (meta?.uploader_id) {
+    let up = String(meta.uploader_id).trim();
+    if (up.startsWith('@')) up = up.slice(1);
+    if (up) return up;
+  }
+
+  const cid = meta?.channel_id || meta?.id;
+  if (cid) return String(cid);
+
+  return 'unknown_id';
+}
+
 /**
  * Thêm kênh từ form app: gọi getChannelInfo, ghi `MaVidMedia/channels/index.xlsx` (giống luồng getInfoChannel),
  * tạo thư mục `MaVidMedia/channels/<folder>/`, file Excel kênh và `mavid-channel-config.json`.
@@ -341,9 +419,6 @@ export async function addChannelFromForm(options = {}) {
   const channelsConfig = Array.isArray(formMeta.channels) && formMeta.channels.length > 0 ? formMeta.channels : [formMeta];
   const channelItem = channelsConfig[0];
   const seedEmail = (channelItem.email || '').trim();
-  // if (!seedEmail) {
-  //   throw new Error('Thiếu email.');
-  // }
 
   const urlType = detectUrlType(url);
   if (urlType === 'video') {
@@ -352,12 +427,17 @@ export async function addChannelFromForm(options = {}) {
 
   console.log(`[addChannelFromForm] Đang lấy thông tin: ${url}`);
   const result = await getChannelInfo(url);
+  console.log('🚀 ~ addChannelFromForm ~ result:', result);
 
   let usernameId = result.metadata?.uploader_id || '';
   if (usernameId.startsWith('@')) usernameId = usernameId.slice(1);
+  if (!usernameId) {
+    const uh = handleFromYoutubeAtUrl(url);
+    if (uh) usernameId = uh;
+  }
   if (!usernameId && result.metadata?.uploader_url) {
-    const match = result.metadata.uploader_url.match(/@([a-zA-Z0-9_.-]+)/);
-    if (match) usernameId = match[1];
+    const uh = handleFromYoutubeAtUrl(result.metadata.uploader_url);
+    if (uh) usernameId = uh;
   }
   if (!usernameId) usernameId = result.metadata?.channel_id || '';
 
@@ -375,19 +455,7 @@ export async function addChannelFromForm(options = {}) {
     }
   }
 
-  let excelFilename = 'unknown_id';
-  const matchUrl = url.match(/@([a-zA-Z0-9_.-]+)/);
-  if (matchUrl) {
-    excelFilename = matchUrl[1];
-  } else if (result.metadata?.uploader_url && result.metadata.uploader_url.includes('@')) {
-    const m2 = result.metadata.uploader_url.match(/@([a-zA-Z0-9_.-]+)/);
-    if (m2) excelFilename = m2[1];
-  } else if (result.metadata?.uploader_id) {
-    excelFilename = result.metadata.uploader_id;
-    if (excelFilename.startsWith('@')) excelFilename = excelFilename.substring(1);
-  } else if (result.metadata?.channel_id || result.metadata?.id) {
-    excelFilename = result.metadata.channel_id || result.metadata.id;
-  }
+  const excelFilename = resolveChannelFolderNameFromResult(url, result);
 
   const override = typeof formMeta.folderIdOverride === 'string' ? formMeta.folderIdOverride.trim() : '';
   const folderName = override || excelFilename;
@@ -529,12 +597,15 @@ export async function addChannelFromForm(options = {}) {
   await updateIndexFile({
     name: channelName,
     link: channelLink,
-    id: usernameId,
+    id: folderName,
     lastUpload,
     email: seedEmail,
     videoType: channelItem.videoType,
     durationMinutes: durationLabel,
-    background: channelItem.background,
+    background:
+      channelItem.videoType === 'reup_full'
+        ? String(channelItem.overlay ?? channelItem.background ?? '').trim()
+        : String(channelItem.background ?? '').trim(),
   });
   console.log(`[addChannelFromForm] Đã cập nhật ${path.relative(path.join(__dirname, '..'), INDEX_FILE)}`);
 
@@ -546,7 +617,7 @@ export async function addChannelFromForm(options = {}) {
         url,
         type: urlType,
         channelName: result.name,
-        channelId: usernameId,
+        channelId: folderName,
         channelLink,
         videoCount: videoLinks.length,
         outputFile: outputExcelPath,
@@ -610,9 +681,13 @@ async function main(options = {}) {
     // ID người dùng (không có @)
     let usernameId = result.metadata?.uploader_id || '';
     if (usernameId.startsWith('@')) usernameId = usernameId.slice(1);
+    if (!usernameId) {
+      const uh = handleFromYoutubeAtUrl(url);
+      if (uh) usernameId = uh;
+    }
     if (!usernameId && result.metadata?.uploader_url) {
-      const match = result.metadata.uploader_url.match(/@([a-zA-Z0-9_.-]+)/);
-      if (match) usernameId = match[1];
+      const uh = handleFromYoutubeAtUrl(result.metadata.uploader_url);
+      if (uh) usernameId = uh;
     }
     if (!usernameId) usernameId = result.metadata?.channel_id || '';
 
@@ -634,10 +709,12 @@ async function main(options = {}) {
       }
     }
 
+    const excelFilename = resolveChannelFolderNameFromResult(url, result);
+
     await updateIndexFile({
       name: result.name || '',
       link: channelLink,
-      id: usernameId,
+      id: excelFilename,
       lastUpload,
     });
 
@@ -647,20 +724,6 @@ async function main(options = {}) {
 
     const channelName = result.name || '';
     const channelTagsStr = (result.tags || []).join(', ');
-
-    let excelFilename = 'unknown_id';
-    const matchUrl = url.match(/@([a-zA-Z0-9_.-]+)/);
-    if (matchUrl) {
-      excelFilename = matchUrl[1];
-    } else if (result.metadata?.uploader_url && result.metadata.uploader_url.includes('@')) {
-      const m2 = result.metadata.uploader_url.match(/@([a-zA-Z0-9_.-]+)/);
-      if (m2) excelFilename = m2[1];
-    } else if (result.metadata?.uploader_id) {
-      excelFilename = result.metadata.uploader_id;
-      if (excelFilename.startsWith('@')) excelFilename = excelFilename.substring(1);
-    } else if (result.metadata?.channel_id || result.metadata?.id) {
-      excelFilename = result.metadata.channel_id || result.metadata.id;
-    }
 
     // Thư mục lưu kết quả: MaVidMedia/channels/<Tên người dùng>/
     const channelDir = path.join(DEFAULT_OUTPUT_DIR, excelFilename);
@@ -704,7 +767,7 @@ async function main(options = {}) {
           url,
           type: urlType,
           channelName: result.name,
-          channelId: usernameId,
+          channelId: excelFilename,
           channelLink,
           videoCount: 0,
           newVideos: 0,
@@ -797,7 +860,7 @@ async function main(options = {}) {
       url,
       type: urlType,
       channelName: result.name,
-      channelId: usernameId,
+      channelId: excelFilename,
       channelLink,
       videoCount: videoLinks.length,
       outputFile: outputExcelPath,

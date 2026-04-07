@@ -383,7 +383,10 @@ ipcMain.handle('select-gpm-browser-exe', async () => {
     title: 'Chọn trình duyệt GPM (browser.exe hoặc chrome.exe)',
     filters:
       process.platform === 'win32'
-        ? [{ name: 'Executable', extensions: ['exe'] }, { name: 'Tất cả', extensions: ['*'] }]
+        ? [
+            { name: 'Executable', extensions: ['exe'] },
+            { name: 'Tất cả', extensions: ['*'] },
+          ]
         : [{ name: 'Tất cả', extensions: ['*'] }],
   });
   if (r.canceled || !r.filePaths?.length) return { ok: false, cancelled: true };
@@ -651,7 +654,9 @@ async function resolvePathUnderChannelsDir(filePath) {
   if (path.isAbsolute(filePath)) {
     return { channelsDir, abs: path.normalize(filePath) };
   }
-  let rel = String(filePath).replace(/^[/\\]+/, '').replace(/\\/g, '/');
+  let rel = String(filePath)
+    .replace(/^[/\\]+/, '')
+    .replace(/\\/g, '/');
   const prefix = 'channels/';
   if (rel.toLowerCase().startsWith(prefix)) {
     rel = rel.slice(prefix.length);
@@ -1138,53 +1143,54 @@ ipcMain.handle('write-mavid-channel-config', async (_event, { channelFolder, pat
   for (const k of allowed) {
     if (Object.prototype.hasOwnProperty.call(patch, k)) clean[k] = patch[k];
   }
-  
-  if (clean.channels != null) {
-      if (!Array.isArray(clean.channels)) throw new Error('channels phải là mảng.');
-      for (const ch of clean.channels) {
-          if (ch.email != null && typeof ch.email !== 'string') throw new Error('email không hợp lệ.');
-          if (ch.videoType != null && ch.videoType !== 'from_audio' && ch.videoType !== 'reup_full') {
-            throw new Error('videoType không hợp lệ.');
-          }
-          if (ch.durationMinuteFrom != null && (typeof ch.durationMinuteFrom !== 'number' || !Number.isFinite(ch.durationMinuteFrom))) {
-            throw new Error('durationMinuteFrom không hợp lệ.');
-          }
-          if (ch.durationMinuteTo != null && (typeof ch.durationMinuteTo !== 'number' || !Number.isFinite(ch.durationMinuteTo))) {
-            throw new Error('durationMinuteTo không hợp lệ.');
-          }
-          if (ch.background != null && typeof ch.background !== 'string') throw new Error('background không hợp lệ.');
-          if (ch.videosPerDayPreset != null && typeof ch.videosPerDayPreset !== 'string') {
-            throw new Error('videosPerDayPreset không hợp lệ.');
-          }
-          if (ch.publishTimes != null && !Array.isArray(ch.publishTimes)) throw new Error('publishTimes phải là mảng.');
-      }
 
-      // Preserve upload tracking fields from old channels (match by email) or from root-level (backward compat)
-      const oldChannels = Array.isArray(base.channels) ? base.channels : [];
-      const uploadTrackingKeys = ['lastUpload', 'uploadedVideos', 'latestUploadDate', 'latestUploadTime'];
-      clean.channels = clean.channels.map(ch => {
-        const email = (ch.email || '').trim().toLowerCase();
-        const oldCh = email ? oldChannels.find(o => (o.email || '').trim().toLowerCase() === email) : null;
-        const merged = { ...ch };
-        for (const key of uploadTrackingKeys) {
-          if (merged[key] === undefined) {
-            // Try old channel first, then root-level fallback
-            if (oldCh && oldCh[key] !== undefined) {
-              merged[key] = oldCh[key];
-            } else if (base[key] !== undefined) {
-              merged[key] = base[key];
-            } else {
-              // Default values
-              if (key === 'uploadedVideos') merged[key] = 0;
-              else if (key === 'latestUploadTime') merged[key] = '00:00';
-              else merged[key] = '';
-            }
+  if (clean.channels != null) {
+    if (!Array.isArray(clean.channels)) throw new Error('channels phải là mảng.');
+    for (const ch of clean.channels) {
+      if (ch.email != null && typeof ch.email !== 'string') throw new Error('email không hợp lệ.');
+      if (ch.videoType != null && ch.videoType !== 'from_audio' && ch.videoType !== 'reup_full') {
+        throw new Error('videoType không hợp lệ.');
+      }
+      if (ch.durationMinuteFrom != null && (typeof ch.durationMinuteFrom !== 'number' || !Number.isFinite(ch.durationMinuteFrom))) {
+        throw new Error('durationMinuteFrom không hợp lệ.');
+      }
+      if (ch.durationMinuteTo != null && (typeof ch.durationMinuteTo !== 'number' || !Number.isFinite(ch.durationMinuteTo))) {
+        throw new Error('durationMinuteTo không hợp lệ.');
+      }
+      if (ch.background != null && typeof ch.background !== 'string') throw new Error('background không hợp lệ.');
+      if (ch.overlay != null && typeof ch.overlay !== 'string') throw new Error('overlay không hợp lệ.');
+      if (ch.videosPerDayPreset != null && typeof ch.videosPerDayPreset !== 'string') {
+        throw new Error('videosPerDayPreset không hợp lệ.');
+      }
+      if (ch.publishTimes != null && !Array.isArray(ch.publishTimes)) throw new Error('publishTimes phải là mảng.');
+    }
+
+    // Preserve upload tracking fields from old channels (match by email) or from root-level (backward compat)
+    const oldChannels = Array.isArray(base.channels) ? base.channels : [];
+    const uploadTrackingKeys = ['lastUpload', 'uploadedVideos', 'latestUploadDate', 'latestUploadTime'];
+    clean.channels = clean.channels.map(ch => {
+      const email = (ch.email || '').trim().toLowerCase();
+      const oldCh = email ? oldChannels.find(o => (o.email || '').trim().toLowerCase() === email) : null;
+      const merged = { ...ch };
+      for (const key of uploadTrackingKeys) {
+        if (merged[key] === undefined) {
+          // Try old channel first, then root-level fallback
+          if (oldCh && oldCh[key] !== undefined) {
+            merged[key] = oldCh[key];
+          } else if (base[key] !== undefined) {
+            merged[key] = base[key];
+          } else {
+            // Default values
+            if (key === 'uploadedVideos') merged[key] = 0;
+            else if (key === 'latestUploadTime') merged[key] = '00:00';
+            else merged[key] = '';
           }
         }
-        return merged;
-      });
+      }
+      return merged;
+    });
   }
-  
+
   const next = { ...base, ...clean };
   // Remove root-level upload tracking fields (now inside channels)
   delete next.lastUpload;

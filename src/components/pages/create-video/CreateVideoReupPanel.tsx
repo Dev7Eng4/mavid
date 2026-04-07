@@ -105,6 +105,7 @@ export function CreateVideoReupPanel({
 
     const config = {
       channel,
+      email: '',
       overlay: overlay.trim(),
       videoCropPercent,
       maxVideosPerBatch,
