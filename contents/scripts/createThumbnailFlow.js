@@ -23,7 +23,7 @@ const ROOT = path.join(__dirname, '..', '..');
  * @param {string} [opts.exportName='flow-thumbnail']
  * @param {object} [opts.flowExtraSettings] — merge vào flowSettings
  */
-export async function runCreateThumbnailFlow({ prompt, pathSave, exportName = 'flow-thumbnail', flowExtraSettings = {} }) {
+export async function runCreateThumbnailFlow({ prompt, pathSave, exportName = 'flow-thumbnail', flowExtraSettings = {}, isNeedImage = false }) {
   if (!prompt || typeof prompt !== 'string' || !String(prompt).trim()) {
     throw new Error('runCreateThumbnailFlow: thiếu prompt hợp lệ');
   }
@@ -32,7 +32,7 @@ export async function runCreateThumbnailFlow({ prompt, pathSave, exportName = 'f
   }
   const abs = path.resolve(pathSave);
   fs.mkdirSync(abs, { recursive: true });
-  await generateImageWithFlow(prompt, abs, exportName, { ...flowSettings, ...flowExtraSettings });
+  await generateImageWithFlow(prompt, abs, exportName, { ...flowSettings, ...flowExtraSettings }, isNeedImage);
 }
 
 async function cliMain() {

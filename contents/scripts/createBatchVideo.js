@@ -41,6 +41,31 @@ function resolveMaxDurationMinutes(props = {}) {
 }
 
 /**
+ * Tự động tìm GPM Profile ID bằng cách khớp Name Profile = Email trong config.
+ * @param {string} email
+ * @returns {Promise<string | null>}
+ */
+async function resolveGpmProfileIdByEmail(email) {
+  if (!email || !email.trim()) return null;
+  const normEmail = email.trim().toLowerCase();
+  const apiBase = process.env.GPM_API_BASE || 'http://127.0.0.1:19995';
+  const url = apiBase.replace(/\/+$/, '') + '/api/v3/profiles?per_page=500';
+
+  try {
+    const res = await fetch(url, { headers: { Accept: 'application/json' } });
+    if (!res.ok) return null;
+    const json = await res.json();
+    if (json.success && Array.isArray(json.data)) {
+      const hit = json.data.find(p => String(p.name || '').trim().toLowerCase() === normEmail);
+      return hit?.id || null;
+    }
+  } catch (e) {
+    console.warn(`[gpm] Không thể tự động lấy danh sách profiles từ GPM Local API: ${e.message}`);
+  }
+  return null;
+}
+
+/**
  * @param {{ minDurationMinutes?: number; maxDurationMinutes?: number }} options — giá trị đã resolve (0 = tắt)
  * @returns {{ hasMin: boolean; hasMax: boolean; minSec: number; maxSec: number; needsColumn: boolean }}
  */
@@ -147,7 +172,7 @@ export async function readVideoUrlsFromFile(inputFile = null, options = {}) {
     const trangThaiIdx = headerRow.values.findIndex(v =>
       String(v || '')
         .toLowerCase()
-        .includes('status')
+        .includes('status'),
     );
     const bgIdx = headerRow.values.findIndex(v => String(v || '').toLowerCase() === 'background video');
     const startIdx = headerRow.values.findIndex(v => String(v || '').toLowerCase() === 'start from');
@@ -155,7 +180,7 @@ export async function readVideoUrlsFromFile(inputFile = null, options = {}) {
       v =>
         String(v || '')
           .trim()
-          .toLowerCase() === 'duration'
+          .toLowerCase() === 'duration',
     );
 
     let hasFoundStart = startIdx < 0; // Nếu không có cột START FROM thì coi như đã bắt đầu ngay lập tức
@@ -385,6 +410,11 @@ function mergeChannelConfigIntoProps(baseProps, item) {
   if (overlayPropEmpty && overlayEnvEmpty && item.overlay != null && String(item.overlay).trim() !== '') {
     o.overlay = String(item.overlay).trim();
   }
+
+  const thumbEmpty = o.thumbnailPrompt == null || String(o.thumbnailPrompt).trim() === '';
+  if (thumbEmpty && item.thumbnailPrompt != null && String(item.thumbnailPrompt).trim() !== '') {
+    o.thumbnailPrompt = String(item.thumbnailPrompt).trim();
+  }
   return o;
 }
 
@@ -439,9 +469,10 @@ async function main(props = {}) {
     const folderPath = path.join(CHANNELS_DIR, channelParam);
     if (fs.existsSync(folderPath)) {
       const cfg = readMavidChannelConfigFromFolder(folderPath);
+      let configItem = null;
       if (cfg) {
-        const item = pickChannelConfigItem(cfg, email);
-        mergedProps = mergeChannelConfigIntoProps(mergedProps, item);
+        configItem = pickChannelConfigItem(cfg, email);
+        mergedProps = mergeChannelConfigIntoProps(mergedProps, configItem);
         console.log(`[MaVid] Đã đọc ${MAVID_CHANNEL_CONFIG_FILENAME} trong folder "${channelParam}".`);
       }
       const files = fs.readdirSync(folderPath).filter(f => f.endsWith('.xlsx') || f.endsWith('.csv'));
@@ -516,7 +547,7 @@ async function main(props = {}) {
         ? `Không có link video nào thỏa điều kiện độ dài (${minDurationMinutes > 0 ? `tối thiểu ${minDurationMinutes} phút` : ''}${
             minDurationMinutes > 0 && maxDurationMinutes > 0 ? ', ' : ''
           }${maxDurationMinutes > 0 ? `tối đa ${maxDurationMinutes} phút` : ''}) trong CSV/Excel.`
-        : 'Không có link video nào trong CSV/Excel.'
+        : 'Không có link video nào trong CSV/Excel.',
     );
   }
 
@@ -528,7 +559,7 @@ async function main(props = {}) {
 
   if (videoType !== MAKE_VIDEO_MODE.FROM_AUDIO && videoType !== MAKE_VIDEO_MODE.REUP_FULL) {
     throw new Error(
-      'Thiếu hoặc không hợp lệ videoType (from_audio | reup_full). Truyền props.videoType hoặc ghi videoType trong mavid-channel-config.json khi chạy với MAVID_CHANNEL.'
+      'Thiếu hoặc không hợp lệ videoType (from_audio | reup_full). Truyền props.videoType hoặc ghi videoType trong mavid-channel-config.json khi chạy với MAVID_CHANNEL.',
     );
   }
 
@@ -540,6 +571,7 @@ async function main(props = {}) {
         inputFile,
         items,
         batchLimit,
+        thumbnailPrompt: mergedProps.thumbnailPrompt,
         ...buildMakeVideoFromAudioOptions(mergedProps, effectiveChannelName),
       });
     } else if (videoType === MAKE_VIDEO_MODE.REUP_FULL) {
@@ -548,6 +580,7 @@ async function main(props = {}) {
         inputFile,
         items,
         batchLimit,
+        thumbnailPrompt: mergedProps.thumbnailPrompt,
         ...(mergedProps.overlay != null && String(mergedProps.overlay).trim() !== ''
           ? { overlay: String(mergedProps.overlay).trim() }
           : {}),
@@ -562,6 +595,25 @@ async function main(props = {}) {
       await syncProgressFromFileToSpreadsheet(inputFile);
     } catch (e) {
       console.warn('[sync] Đồng bộ STATUS từ progress → Excel/CSV:', e.message);
+    }
+  }
+
+  if (result && result.success && result.processedCount > 0 && mergedProps.email) {
+    try {
+      const gpmProfileId = await resolveGpmProfileIdByEmail(mergedProps.email);
+      if (gpmProfileId) {
+        console.log(`\n[upload] Đã hoàn thành batch ${result.processedCount} video. Bắt đầu upload lên YouTube qua GPM profile: ${gpmProfileId}`);
+        const { default: uploadYoutubeViaGpm } = await import('./youtubeUploadViaGpm.js');
+        await uploadYoutubeViaGpm({
+          gpmProfileId,
+          channelFolder: effectiveChannelName,
+          maxUploads: result.processedCount,
+        });
+      } else {
+        console.warn(`[upload] Không tìm thấy Profile GPM có tên khớp với email «${mergedProps.email}». Bỏ qua tự động upload.`);
+      }
+    } catch (e) {
+      console.error('[upload] Lỗi trong quá trình tự động upload:', e.message);
     }
   }
 

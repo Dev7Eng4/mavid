@@ -285,6 +285,7 @@ async function main(options = {}) {
     const result = await downloadSingleVideo(url, {
       mode: MAKE_VIDEO_MODE.REUP_FULL, // Tải cả video
       thumbnailChannelRoot: destFolder,
+      thumbnailPrompt: options.thumbnailPrompt,
       callback: ({ title: gemTitle, description: gemDesc, tags: gemTags, summary: gemSummary }) => {
         const tagsStr = typeof gemTags === 'string' ? gemTags : Array.isArray(gemTags) ? gemTags.join(', ') : '';
         geminiByUrl[url] = {

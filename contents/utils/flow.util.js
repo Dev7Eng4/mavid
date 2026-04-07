@@ -1,8 +1,13 @@
 import fs from 'fs';
 import path from 'path';
+import { execFile } from 'child_process';
+import { fileURLToPath } from 'url';
 import { openChromeProfile } from '../scripts/makeChromeProfile.js';
 import { delay, clickElement } from './dom.util.js';
 import { flowSettings } from '../constants/index.js';
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const DOWNLOADS_DIR = path.join(__dirname, '..', '..', 'downloads');
 
 /** Profile Playwright dùng cho Flow (thư mục chrome-profile/profile{N}). Ưu tiên env MAVID_CHROME_PROFILE. */
 function resolveFlowChromeProfile(cfg) {
@@ -19,7 +24,7 @@ async function superClear(page, context) {
   }
 }
 
-export async function generateImageWithFlow(prompt, pathSave, exportName, setting = {}) {
+export async function generateImageWithFlow(prompt, pathSave, exportName, setting = {}, isNeedImage = false) {
   const cfg = { ...flowSettings, ...setting };
   const chromeProfile = resolveFlowChromeProfile(cfg);
   console.log('🔄 Đang generate ảnh thumbnail từ Flow...');
@@ -65,11 +70,43 @@ export async function generateImageWithFlow(prompt, pathSave, exportName, settin
     await clickElement(page, 'html/body/div[4]/div/div[1]/div');
     await page.keyboard.press('Escape');
 
-    const areaXpath = 'html/body/div[1]/div[1]/div[5]/div/div/div[1]';
+    const areaXpath = '/html/body/div[1]/div[1]/div[5]/div/div/div[1]/div';
     await clickElement(page, areaXpath);
     await delay(1000);
     // await page.keyboard.type(prompt);
     await page.keyboard.insertText(prompt);
+
+    await delay(500);
+
+    if (isNeedImage && fs.existsSync(DOWNLOADS_DIR)) {
+      const files = fs.readdirSync(DOWNLOADS_DIR);
+      const thumbFile = files.find(f => f.startsWith('thumbnail.'));
+
+      if (thumbFile) {
+        await clickElement(page, '/html/body/div[1]/div[1]/div[5]/div/div/div[2]/div[1]/button');
+
+        await clickElement(page, '/html/body/div[1]/div[2]/div/div/div/div[2]/div[1]/div/div[2]');
+
+        await delay(2000);
+
+        execFile('uploadImageFlow.exe', [DOWNLOADS_DIR, thumbFile]);
+
+        await delay(2900);
+
+        console.log('[flow] Đang chờ nút xử lý được enable (upload hoàn tất)...');
+        const btnXpath = '/html/body/div[1]/div[1]/div[5]/div/div/div[3]/div[2]/button[2]';
+        await page.waitForFunction(
+          xpath => {
+            const btn = document.evaluate(xpath, document, null, XPathResult.FIRST_ORDERED_NODE_TYPE, null).singleNodeValue;
+            return btn && !btn.disabled;
+          },
+          btnXpath,
+          { timeout: 60000 },
+        );
+        console.log('✅ Nút đã sẵn sàng!');
+      }
+    }
+
     await page.keyboard.press('Enter');
 
     const [response] = await Promise.all([
@@ -94,7 +131,7 @@ export async function generateImageWithFlow(prompt, pathSave, exportName, settin
           }
           return false;
         },
-        { timeout: 3 * 60 * 1000 }
+        { timeout: 3 * 60 * 1000 },
       ),
     ]);
 

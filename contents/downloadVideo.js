@@ -52,7 +52,7 @@ async function optimizeFlowThumbnailJpegIfLarge(filePath) {
       console.log(
         `[thumbnail-flow] Đã tối ưu flow-thumbnail: ${(before / FLOW_THUMB_OPTIMIZE_MIN_BYTES).toFixed(2)}MB → ${(
           buf.length / FLOW_THUMB_OPTIMIZE_MIN_BYTES
-        ).toFixed(2)}MB (${before} → ${buf.length} bytes)`
+        ).toFixed(2)}MB (${before} → ${buf.length} bytes)`,
       );
     } else if (before >= FLOW_THUMB_OPTIMIZE_MIN_BYTES) {
       console.warn('[thumbnail-flow] Không giảm được kích thước flow-thumbnail sau tối ưu; giữ file gốc.');
@@ -168,7 +168,7 @@ async function downloadThumbnail(url, options = {}) {
   const { outputDir = DEFAULT_OUTPUT_DIR } = options;
   if (!fs.existsSync(outputDir)) fs.mkdirSync(outputDir, { recursive: true });
 
-  const outputTemplate = path.join(outputDir, '%(title)s-%(id)s.%(ext)s');
+  const outputTemplate = path.join(outputDir, 'thumbnail.%(ext)s');
   console.log('Đang tải thumbnail...');
 
   await youtubedl(url, {
@@ -197,10 +197,12 @@ async function processVttTranscriptsWithGemini(
     language,
     thumbnailFlowOutputDir = null,
     generateThumbnailWithFlow = true,
-  }
+    thumbnailPrompt = null,
+  },
 ) {
   const { cleanSrt } = await import('./utils/srt.util.js');
   const { updateContentWithGemini } = await import('./updateContentWithGemini2CH.js');
+  const { PROMPTS_CREATE_THUMBNAIL, PROMPTS_NEED_IMAGE } = await import('./promts/index.js');
 
   const vttFiles = fs.readdirSync(outputDir).filter(f => f.endsWith('.vtt'));
   for (const file of vttFiles) {
@@ -233,24 +235,13 @@ async function processVttTranscriptsWithGemini(
               description: geminiOut.description ?? '',
               tags: geminiOut.tags ?? '',
               summary: geminiOut.summary ?? '',
-            })
+            }),
           );
           console.log('✅ Đã gửi title/description/tags/summary (Gemini) qua callback.');
         } catch (cbErr) {
           console.warn('callback:', cbErr.message);
         }
       }
-
-      console.log(
-        '[thumbnail-flow] generateThumbnailWithFlow:',
-        generateThumbnailWithFlow,
-        'thumbnailFlowOutputDir:',
-        thumbnailFlowOutputDir,
-        'geminiOut.title:',
-        geminiOut.title,
-        'geminiOut.summary:',
-        geminiOut.summary
-      );
 
       if (generateThumbnailWithFlow && thumbnailFlowOutputDir && geminiOut.title != null && geminiOut.summary != null) {
         const titleG = String(geminiOut.title).trim();
@@ -259,11 +250,22 @@ async function processVttTranscriptsWithGemini(
           console.log('[thumbnail-flow] Tạo thumbnail từ title/summary Gemini →', path.basename(thumbnailFlowOutputDir));
           try {
             const { runCreateThumbnailFlow } = await import('./scripts/createThumbnailFlow.js');
-            const { createPromptToCreateThumbnail } = await import('./promts/ja/createImage.js');
+
+            let promptFn = PROMPTS_CREATE_THUMBNAIL[thumbnailPrompt];
+            if (!promptFn) {
+              console.warn(
+                `[thumbnail-flow] thumbnailPrompt "${thumbnailPrompt}" không hợp lệ hoặc thiếu, dùng fallback ja2CHFromOldThumbnail`,
+              );
+              promptFn = PROMPTS_CREATE_THUMBNAIL.ja2CHFromOldThumbnail;
+            }
+
+            const isNeedImage = PROMPTS_NEED_IMAGE.includes(thumbnailPrompt);
+
             await runCreateThumbnailFlow({
-              prompt: createPromptToCreateThumbnail(titleG, summaryG),
+              prompt: promptFn(titleG, summaryG),
               pathSave: thumbnailFlowOutputDir,
               exportName: 'flow-thumbnail',
+              isNeedImage,
             });
             const flowThumbPath = path.join(thumbnailFlowOutputDir, 'flow-thumbnail.jpg');
             await optimizeFlowThumbnailJpegIfLarge(flowThumbPath);
@@ -304,6 +306,7 @@ async function downloadTranscript(url, options = {}) {
     vttOnlyClean = false,
     thumbnailFlowOutputDir = null,
     generateThumbnailWithFlow = true,
+    thumbnailPrompt = null,
   } = options;
   if (!fs.existsSync(outputDir)) fs.mkdirSync(outputDir, { recursive: true });
 
@@ -339,7 +342,10 @@ async function downloadTranscript(url, options = {}) {
     }
   }
 
+  console.log('harrrrrr');
+
   if (lastErr) throw lastErr;
+  console.log('1111111111111');
 
   const needsGeminiTranscriptUpdate =
     updateTranscript &&
@@ -349,8 +355,8 @@ async function downloadTranscript(url, options = {}) {
   if (updateTranscript && transcriptLang != null && !needsGeminiTranscriptUpdate) {
     console.log(
       `Phụ đề ${String(transcriptLang).toUpperCase()}: bỏ chỉnh từng dòng qua Gemini (chỉ áp dụng: ${LANGUAGES_NEED_UPDATE_TRANSCRIPT.join(
-        ', '
-      )}). Vẫn chạy metadata/title nếu có.`
+        ', ',
+      )}). Vẫn chạy metadata/title nếu có.`,
     );
   }
 
@@ -373,6 +379,7 @@ async function downloadTranscript(url, options = {}) {
         language: transcriptLang,
         thumbnailFlowOutputDir,
         generateThumbnailWithFlow,
+        thumbnailPrompt,
       });
     }
   }
@@ -388,6 +395,7 @@ async function downloadAudio(url, options = {}) {
   if (!fs.existsSync(outputDir)) fs.mkdirSync(outputDir, { recursive: true });
 
   const outputTemplate = path.join(outputDir, '%(title)s-%(id)s.%(ext)s');
+
   console.log('Đang tải audio...');
 
   const subprocess = youtubedl.exec(url, {
@@ -430,7 +438,13 @@ async function downloadAudio(url, options = {}) {
  * @returns {Promise<(object & { filePath?: string }) | null>} - Thông tin video; `filePath` = file video trong downloads/ (khi tải được)
  */
 async function downloadSingleVideo(url, options = {}) {
-  const { callback, mode = MAKE_VIDEO_MODE.REUP_FULL, thumbnailChannelRoot = null, generateThumbnailWithFlow = true } = options;
+  const {
+    callback,
+    mode = MAKE_VIDEO_MODE.REUP_FULL,
+    thumbnailChannelRoot = null,
+    generateThumbnailWithFlow = true,
+    thumbnailPrompt = null,
+  } = options;
   if (!fs.existsSync(DEFAULT_OUTPUT_DIR)) {
     fs.mkdirSync(DEFAULT_OUTPUT_DIR, { recursive: true });
   } else {
@@ -447,6 +461,7 @@ async function downloadSingleVideo(url, options = {}) {
 
   try {
     const result = await getVideoInfo(url);
+    console.log('🚀 ~ downloadSingleVideo ~ result:', result);
 
     let thumbnailFlowOutputDir = null;
     if (generateThumbnailWithFlow && thumbnailChannelRoot && result.metadata?.id) {
@@ -471,6 +486,7 @@ async function downloadSingleVideo(url, options = {}) {
         callback,
         thumbnailFlowOutputDir,
         generateThumbnailWithFlow,
+        thumbnailPrompt,
       });
     } catch (err) {
       console.warn('Không tải được transcript:', err.message);
