@@ -144,7 +144,6 @@ export function buildExtraEnvForIndexChannelRow(
     overlay: '',
     videoCropPercent: 0,
     maxVideosPerBatch: 5,
-    minDurationMinutes: 0,
   });
 }
 

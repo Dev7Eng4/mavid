@@ -135,9 +135,7 @@ export interface GpmPlaywrightStartFolderPayload {
   startUrl?: string;
 }
 
-export type GpmPlaywrightStartFolderResult =
-  | { ok: true; resolvedDir: string }
-  | { ok: false; reason: string; detail?: string };
+export type GpmPlaywrightStartFolderResult = { ok: true; resolvedDir: string } | { ok: false; reason: string; detail?: string };
 
 export type GpmPlaywrightStopFolderResult = { ok: true } | { ok: false; reason: string };
 
@@ -151,9 +149,7 @@ export interface SelectGpmDataFolderResult {
   path?: string;
 }
 
-export type SelectGpmBrowserExeResult =
-  | { ok: true; path: string }
-  | { ok: false; cancelled?: boolean; reason?: string };
+export type SelectGpmBrowserExeResult = { ok: true; path: string } | { ok: false; cancelled?: boolean; reason?: string };
 
 /** Dữ liệu đọc từ `MaVidMedia/channels/{channelFolder}/*.xlsx|*.csv` (file đầu tiên). */
 export interface ChannelFolderDataResult extends ChannelData {
@@ -170,7 +166,8 @@ export interface VideoReupFullConfig {
   videoCropPercent: number;
   maxVideosPerBatch: number;
   /** 0 = không lọc; >0 = chỉ dòng có cột DURATION ≥ N phút. */
-  minDurationMinutes?: number;
+  minDurationMinute?: number;
+  maxDurationMinute?: number;
 }
 
 export interface VideoFromAudioConfig {
@@ -270,7 +267,7 @@ export interface MavidChannelConfig {
   lastUpload?: string;
   youtube?: { usernameId?: string; channelId?: string | null };
   createdAt?: string;
-  
+
   // Backward compatibility properties
   email?: string;
   videoType?: string;
@@ -300,10 +297,7 @@ declare global {
         channelFolder: string;
         patch: Pick<MavidChannelConfig, 'channels'>;
       }) => Promise<{ ok: boolean }>;
-      setChannelFolderStartFromRow: (
-        channelFolder: string,
-        dataRowIndex: number,
-      ) => Promise<{ ok: boolean; fileName?: string }>;
+      setChannelFolderStartFromRow: (channelFolder: string, dataRowIndex: number) => Promise<{ ok: boolean; fileName?: string }>;
       listBackgrounds: () => Promise<string[]>;
       listChannelFolders: () => Promise<string[]>;
       /** Email đã có trong index.xlsx hoặc file kênh con (tránh trùng khi thêm kênh). */

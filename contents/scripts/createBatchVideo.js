@@ -103,7 +103,12 @@ export async function readVideoUrlsFromFile(inputFile = null, options = {}) {
     );
     const bgIdx = headerRow.values.findIndex(v => String(v || '').toLowerCase() === 'background video');
     const startIdx = headerRow.values.findIndex(v => String(v || '').toLowerCase() === 'start from');
-    const durationIdx = headerRow.values.findIndex(v => String(v || '').trim().toLowerCase() === 'duration');
+    const durationIdx = headerRow.values.findIndex(
+      v =>
+        String(v || '')
+          .trim()
+          .toLowerCase() === 'duration',
+    );
 
     const minMin = Number(options.minDurationMinutes);
     const filterByDuration = Number.isFinite(minMin) && minMin > 0;
@@ -286,14 +291,17 @@ function buildMakeVideoFromAudioOptions(props, channelFolderName) {
  * @param {number} [props.minDurationMinutes] — chỉ xử lý video có độ dài (cột DURATION) ≥ N phút; 0 = không lọc; env MAVID_MIN_DURATION_MINUTES
  */
 async function main(props = {}) {
+  console.log('🚀 ~ main ~ props:', props);
   const { MAKE_VIDEO_MODE } = await import('../constants/index.js');
   const { videoType } = props;
   const batchLimit = resolveBatchLimit(props);
   const minDurationMinutes = resolveMinDurationMinutes(props);
 
   const channelParam = props.channel || process.env.MAVID_CHANNEL;
+  console.log('🚀 ~ main ~ channelParam:', channelParam);
   const overlayReup = props.overlay ?? process.env.MAVID_OVERLAY;
   const videoCropReup = props.videoCropPercent ?? process.env.MAVID_VIDEO_CROP_PERCENT;
+  console.log('🚀 ~ main ~ videoCropReup:', process.env);
 
   let inputFile = null;
   let effectiveChannelName = channelParam || null;
