@@ -1,5 +1,5 @@
 import type { ChannelRow, ScriptId } from '../../../types';
-import { THUMBNAIL_STYLE_OPTIONS } from '@contents/constants/index.js';
+import { PROMPTS_CREATE_THUMBNAIL_OPTIONS } from '@contents/promts/index.js';
 import { OVERLAY_OPTIONS } from '@contents/constants/overlayOptions.js';
 import { buildMavidEnvForVideoFromAudio, defaultBackgroundFolder } from '../../../utils/videoFromAudioEnv';
 import { buildMavidEnvForReupFull } from '../../../utils/reupFullEnv';
@@ -138,7 +138,7 @@ export function buildExtraEnvForIndexChannelRow(
   folder: string,
   videoType: 'from_audio' | 'reup_full',
   bgList: string[],
-  opts?: { maxVideosPerBatch?: number }
+  opts?: { maxVideosPerBatch?: number },
 ): Record<string, string> {
   const maxBatch = opts?.maxVideosPerBatch ?? 5;
 
@@ -160,7 +160,7 @@ export function buildExtraEnvForIndexChannelRow(
         minDurationMinutes: 0,
         showLogo: false,
       },
-      bgList
+      bgList,
     );
   }
   const overlayReup = videoType === 'reup_full' ? bgRaw : '';
@@ -209,8 +209,8 @@ export interface ChannelAddFormInput {
   background: string;
   /** reup_full — khớp OVERLAY_OPTIONS[].NAME */
   overlay: string;
-  /** Khớp THUMBNAIL_STYLE_OPTIONS[].value */
-  thumbnailStyle: string;
+  /** Khớp `PROMPTS_CREATE_THUMBNAIL_OPTIONS[].value` (contents/promts/index.js). */
+  thumbnailPrompt: string;
   videosPerDayPreset: VideoPerDayPreset;
   publishTimes: string[];
   /** Nếu có — ghi đè suy luận từ URL cho ID/CHANNEL */
@@ -227,8 +227,8 @@ export interface ChannelAddDialogInitialFields {
   selectedBackground: string;
   /** reup_full — tên preset overlay */
   reupOverlayOption: string;
-  /** Style thumbnail — THUMBNAIL_STYLE_OPTIONS */
-  thumbnailStyle: string;
+  /** Style thumbnail — `PROMPTS_CREATE_THUMBNAIL_OPTIONS` */
+  thumbnailPrompt: string;
   folderIdOverride: string;
   videosPerDayPreset: VideoPerDayPreset;
   publishTimes: string[];
@@ -253,22 +253,15 @@ export function isValidReupOverlayName(name: string): boolean {
   return OVERLAY_OPTIONS.some(o => String(o.NAME).trim() === t);
 }
 
-export function defaultThumbnailStyle(): string {
-  const first = THUMBNAIL_STYLE_OPTIONS[0];
-  return first ? String(first.value) : 'text';
+export function defaultthumbnailPrompt(): string {
+  const first = PROMPTS_CREATE_THUMBNAIL_OPTIONS[0];
+  return first ? String(first.value) : '';
 }
 
-export function isValidThumbnailStyle(name: string): boolean {
+export function isValidthumbnailPrompt(name: string): boolean {
   const t = name.trim();
   if (!t) return false;
-  return THUMBNAIL_STYLE_OPTIONS.some(o => String(o.value) === t);
-}
-
-export function thumbnailStyleSelectOptions(): { value: string; label: string }[] {
-  return THUMBNAIL_STYLE_OPTIONS.map(o => ({
-    value: String(o.value),
-    label: String(o.label),
-  }));
+  return PROMPTS_CREATE_THUMBNAIL_OPTIONS.some(o => String(o.value) === t);
 }
 
 /**
@@ -400,7 +393,7 @@ export function channelAddDialogInitialFromIndexRow(row: ChannelRow, headers: st
     durationOption,
     selectedBackground,
     reupOverlayOption,
-    thumbnailStyle: defaultThumbnailStyle(),
+    thumbnailPrompt: defaultthumbnailPrompt(),
     folderIdOverride: folder,
     videosPerDayPreset,
     publishTimes,
@@ -410,7 +403,7 @@ export function channelAddDialogInitialFromIndexRow(row: ChannelRow, headers: st
 export function buildChannelRowFromAddForm(
   headers: string[],
   input: ChannelAddFormInput,
-  opts?: { preserveChannelFromRow?: ChannelRow | null }
+  opts?: { preserveChannelFromRow?: ChannelRow | null },
 ): { row: ChannelRow; error?: string } {
   const row: ChannelRow = {};
   for (const h of headers) row[h] = '';

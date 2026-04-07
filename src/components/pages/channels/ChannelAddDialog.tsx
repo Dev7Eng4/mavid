@@ -1,3 +1,4 @@
+import { PROMPTS_CREATE_THUMBNAIL_OPTIONS } from '@contents/promts/index.js';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { ChannelRow } from '../../../types';
 import { AppButton } from '../../ui/AppButton';
@@ -7,19 +8,18 @@ import {
   channelAddDialogInitialFromIndexRow,
   channelFolderFromRow,
   defaultReupOverlayName,
-  defaultThumbnailStyle,
+  defaultthumbnailPrompt,
   durationLabelToOption,
   findIndexHeaderKey,
   INDEX_VIDEO_TYPE_VALUES,
   indexHeadersMissingForAddChannel,
   isValidPublishScheduleTime,
   isValidReupOverlayName,
-  isValidThumbnailStyle,
+  isValidthumbnailPrompt,
   labelForPublishTimeSlot,
   normalizeWallClockTimeToHHmm,
   parseVideoPerDayCell,
   reupOverlaySelectOptions,
-  thumbnailStyleSelectOptions,
   timeSlotCountForVideoPerDayPreset,
   type ChannelAddDialogInitialFields,
   type VideoPerDayPreset,
@@ -56,7 +56,7 @@ const ADD_FORM_DEFAULT: ChannelAddDialogInitialFields = {
   durationOption: '0_null',
   selectedBackground: '',
   reupOverlayOption: defaultReupOverlayName(),
-  thumbnailStyle: defaultThumbnailStyle(),
+  thumbnailPrompt: defaultthumbnailPrompt(),
   folderIdOverride: '',
   videosPerDayPreset: '1',
   publishTimes: ['09:00'],
@@ -88,7 +88,7 @@ export interface ChannelAddSavePayload {
     durationMinuteTo: number | null;
     background: string;
     overlay?: string;
-    thumbnailStyle: string;
+    thumbnailPrompt: string;
     videosPerDayPreset: VideoPerDayPreset;
     publishTimes: string[];
   }[];
@@ -124,7 +124,7 @@ export function ChannelAddDialog({
   const [configHydrated, setConfigHydrated] = useState(!isEditMode);
 
   const [form, setForm] = useState<ChannelAddDialogInitialFields>(() =>
-    initialRow != null ? channelAddDialogInitialFromIndexRow(initialRow, indexHeaders) : ADD_FORM_DEFAULT
+    initialRow != null ? channelAddDialogInitialFromIndexRow(initialRow, indexHeaders) : ADD_FORM_DEFAULT,
   );
 
   const {
@@ -134,7 +134,7 @@ export function ChannelAddDialog({
     durationOption,
     selectedBackground,
     reupOverlayOption,
-    thumbnailStyle,
+    thumbnailPrompt,
     folderIdOverride,
     videosPerDayPreset,
     publishTimes,
@@ -150,7 +150,14 @@ export function ChannelAddDialog({
   }, [backgroundFolders, selectedBackground]);
 
   const reupOverlayOptionsList = useMemo(() => reupOverlaySelectOptions(), []);
-  const thumbnailStyleOptionsList = useMemo(() => thumbnailStyleSelectOptions(), []);
+  const thumbnailPromptOptionsList = useMemo(
+    () =>
+      PROMPTS_CREATE_THUMBNAIL_OPTIONS.map(o => ({
+        value: String(o.value),
+        label: String(o.label),
+      })),
+    [],
+  );
 
   const resolvedReupOverlay = useMemo(() => {
     const pick = reupOverlayOption.trim();
@@ -158,11 +165,11 @@ export function ChannelAddDialog({
     return defaultReupOverlayName();
   }, [reupOverlayOption]);
 
-  const resolvedThumbnailStyle = useMemo(() => {
-    const pick = thumbnailStyle.trim();
-    if (pick && isValidThumbnailStyle(pick)) return pick;
-    return defaultThumbnailStyle();
-  }, [thumbnailStyle]);
+  const resolvedthumbnailPrompt = useMemo(() => {
+    const pick = thumbnailPrompt.trim();
+    if (pick && isValidthumbnailPrompt(pick)) return pick;
+    return defaultthumbnailPrompt();
+  }, [thumbnailPrompt]);
 
   /** Chỉ khi sửa dòng index: cần đủ cột để build row. Thêm mới không cần file index — `addChannelFromForm` tạo/cập nhật index. */
   const missingHeaders = useMemo(() => (isEditMode ? indexHeadersMissingForAddChannel(indexHeaders) : []), [isEditMode, indexHeaders]);
@@ -213,8 +220,8 @@ export function ChannelAddDialog({
           if (typeof ch.overlay === 'string' && ch.overlay.trim() && isValidReupOverlayName(ch.overlay)) {
             next.reupOverlayOption = ch.overlay.trim();
           }
-          if (typeof ch.thumbnailStyle === 'string' && ch.thumbnailStyle.trim() && isValidThumbnailStyle(ch.thumbnailStyle)) {
-            next.thumbnailStyle = ch.thumbnailStyle.trim();
+          if (typeof ch.thumbnailPrompt === 'string' && ch.thumbnailPrompt.trim() && isValidthumbnailPrompt(ch.thumbnailPrompt)) {
+            next.thumbnailPrompt = ch.thumbnailPrompt.trim();
           }
           if (typeof ch.videosPerDayPreset === 'string' && ch.videosPerDayPreset.trim()) {
             next.videosPerDayPreset = parseVideoPerDayCell(ch.videosPerDayPreset);
@@ -250,8 +257,8 @@ export function ChannelAddDialog({
   }, []);
 
   const videoTypeOptions = [
-    { value: 'from_audio', label: 'from_audio' },
-    { value: 'reup_full', label: 'reup_full' },
+    { value: 'from_audio', label: 'Tạo video từ audio' },
+    { value: 'reup_full', label: 'Tạo video reup toàn bộ' },
   ];
 
   /** Email trùng lặp (reactive, hiển thị inline). */
@@ -360,7 +367,7 @@ export function ChannelAddDialog({
         setFormError(
           videosPerDayPreset === '1-2'
             ? 'Chọn đủ 3 giờ (HH:mm): 1 suất ngày thường + 2 suất cuối tuần.'
-            : 'Chọn đủ giờ upload (HH:mm) cho từng video trong ngày.'
+            : 'Chọn đủ giờ upload (HH:mm) cho từng video trong ngày.',
         );
         return;
       }
@@ -435,12 +442,12 @@ export function ChannelAddDialog({
             durationOption,
             background: videoType === 'from_audio' ? resolvedBackground.trim() : '',
             overlay: videoType === 'reup_full' ? resolvedReupOverlay.trim() : '',
-            thumbnailStyle: resolvedThumbnailStyle.trim(),
+            thumbnailPrompt: resolvedthumbnailPrompt.trim(),
             videosPerDayPreset,
             publishTimes: times,
             folderIdOverride,
           },
-          { preserveChannelFromRow: initialRow }
+          { preserveChannelFromRow: initialRow },
         );
         if (error) {
           setFormError(error);
@@ -466,7 +473,7 @@ export function ChannelAddDialog({
                   durationMinuteTo: to,
                   background: videoType === 'from_audio' ? resolvedBackground.trim() : '',
                   ...(videoType === 'reup_full' ? { overlay: resolvedReupOverlay.trim() } : {}),
-                  thumbnailStyle: resolvedThumbnailStyle.trim(),
+                  thumbnailPrompt: resolvedthumbnailPrompt.trim(),
                   videosPerDayPreset,
                   publishTimes: times,
                 },
@@ -514,7 +521,7 @@ export function ChannelAddDialog({
               durationMinuteTo: to,
               background: videoType === 'from_audio' ? resolvedBackground.trim() : '',
               ...(videoType === 'reup_full' ? { overlay: resolvedReupOverlay.trim() } : {}),
-              thumbnailStyle: resolvedThumbnailStyle.trim(),
+              thumbnailPrompt: resolvedthumbnailPrompt.trim(),
               videosPerDayPreset,
               publishTimes: times,
             },
@@ -535,7 +542,7 @@ export function ChannelAddDialog({
     requireBackground,
     requireReupOverlay,
     resolvedReupOverlay,
-    resolvedThumbnailStyle,
+    resolvedthumbnailPrompt,
     indexHeaders,
     isEditMode,
     missingHeaders,
@@ -563,7 +570,7 @@ export function ChannelAddDialog({
       role='presentation'
     >
       <div
-        className='w-full !max-w-48 my-8 rounded-2xl p-6 sm:p-8 shadow-xl overflow-visible relative z-1 max-h-[min(90vh,760px)] min-h-0'
+        className='w-full my-8 rounded-2xl p-6 sm:p-8 shadow-xl overflow-visible relative z-1 max-h-[min(90vh,760px)] min-h-0'
         style={{ background: 'var(--card-bg)', border: '1px solid var(--border)', maxWidth: '680px' }}
         onClick={e => e.stopPropagation()}
         role='dialog'
@@ -713,9 +720,9 @@ export function ChannelAddDialog({
               Style Thumbnail
             </div>
             <CustomSelect
-              value={resolvedThumbnailStyle}
-              options={thumbnailStyleOptionsList}
-              onChange={v => setForm(f => ({ ...f, thumbnailStyle: v }))}
+              value={resolvedthumbnailPrompt}
+              options={thumbnailPromptOptionsList}
+              onChange={v => setForm(f => ({ ...f, thumbnailPrompt: v }))}
               placeholder='Chọn style'
               menuZIndex={100}
             />

@@ -224,8 +224,8 @@ export interface AddChannelFromFormParams {
       background: string;
       /** Chỉ dùng khi `videoType === 'reup_full'` — tên trong OVERLAY_OPTIONS. */
       overlay?: string;
-      /** Khớp `THUMBNAIL_STYLE_OPTIONS[].value` trong contents/constants/index.js */
-      thumbnailStyle?: string;
+      /** Khớp `PROMPTS_CREATE_THUMBNAIL_OPTIONS[].value` trong contents/promts/index.js */
+      thumbnailPrompt?: string;
       videosPerDayPreset: string;
       publishTimes: string[];
     }[];
@@ -257,8 +257,8 @@ export interface MavidChannelConfigItem {
   background?: string;
   /** Preset reup full — khớp OVERLAY_OPTIONS[].NAME */
   overlay?: string;
-  /** Khớp THUMBNAIL_STYLE_OPTIONS (Flow / thumbnail). */
-  thumbnailStyle?: string;
+  /** Khớp `PROMPTS_CREATE_THUMBNAIL_OPTIONS[].value` (Flow / thumbnail). */
+  thumbnailPrompt?: string;
   videosPerDayPreset?: string;
   publishTimes?: string[];
 }

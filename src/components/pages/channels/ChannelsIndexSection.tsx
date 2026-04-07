@@ -1,31 +1,8 @@
-import type { ChannelRow } from '../../../types';
+import type { ChannelsIndexSectionProps } from './channelsIndexSection.model';
 import { SpinnerIcon } from '../../ui/Icons';
 import { TablePaginationBar } from '../../ui/TablePaginationBar';
 import { channelFolderFromRow } from './channelIndexHelpers';
-
-/** Cột hiển thị bảng index (cố định; khớp MaVidMedia/channels/index.xlsx). */
-export const CHANNELS_INDEX_TABLE_HEADERS = ['ID', 'LINK', 'EMAIL', 'LOẠI VIDEO', 'THỜI GIAN VIDEO', 'LAST UPLOAD'] as const;
-
-export interface ChannelsIndexPagination {
-  page: number;
-  totalPages: number;
-  setPage: (p: number) => void;
-  pageSize: number;
-  startIndex: number;
-}
-
-export interface ChannelsIndexSectionProps {
-  indexListError: string | null;
-  indexLoading: boolean;
-  indexSaving: boolean;
-  indexDraftRows: ChannelRow[];
-  pageIndexRows: ChannelRow[];
-  indexPag: ChannelsIndexPagination;
-  /** colSpan ô trống / loading — giữ đồng bộ với logic indexHeaders ở page. */
-  indexColCount: number;
-  onEditRow: (globalIndex: number) => void;
-  onOpenChannel: (folder: string) => void;
-}
+import { CHANNELS_INDEX_TABLE_HEADERS } from './channelsIndexSection.model';
 
 export function ChannelsIndexSection({
   indexListError,
@@ -158,7 +135,7 @@ export function ChannelsIndexSection({
                 })
               ) : (
                 <tr>
-                  <td colSpan={indexColCount} className='px-4 py-8 text-center' style={{ color: 'var(--text-muted)' }}>
+                  <td colSpan={headers.length + 1} className='px-4 py-8 text-center' style={{ color: 'var(--text-muted)' }}>
                     Chưa có dữ liệu trong index. Hãy thêm channel từ Pipeline.
                   </td>
                 </tr>

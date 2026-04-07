@@ -173,10 +173,15 @@ export function CustomSelect({ value, options, onChange, placeholder, emptyText,
             return (
               <button
                 key={opt.value}
-                ref={el => { itemRefs.current[idx] = el; }}
+                ref={el => {
+                  itemRefs.current[idx] = el;
+                }}
                 role='option'
                 aria-selected={active}
-                onClick={() => { onChange(opt.value); setOpen(false); }}
+                onClick={() => {
+                  onChange(opt.value);
+                  setOpen(false);
+                }}
                 onMouseEnter={() => setHighlightIdx(idx)}
                 className='w-full flex items-center gap-2.5 px-3 py-[7px] text-sm text-left cursor-pointer transition-colors duration-100'
                 style={{
