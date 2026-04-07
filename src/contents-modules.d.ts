@@ -10,7 +10,9 @@ declare module '@contents/constants/overlayOptions.js' {
 
 declare module '@contents/constants/index.js' {
   export const THUMBNAIL_STYLE: {
-    readonly '2CH_PEOPLE_STYLE': string;
+    readonly TEXT: string;
+    readonly REMAKE: string;
+    readonly NEW: string;
   };
   export const THUMBNAIL_STYLE_OPTIONS: readonly { label: string; value: string }[];
 }

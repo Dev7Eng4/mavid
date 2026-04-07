@@ -71,7 +71,9 @@ export const LOGO: {
 export const VIDEO_STORAGE_ROOT: string;
 
 export const THUMBNAIL_STYLE: {
-  readonly '2CH_PEOPLE_STYLE': string;
+  readonly TEXT: string;
+  readonly REMAKE: string;
+  readonly NEW: string;
 };
 
 export const THUMBNAIL_STYLE_OPTIONS: readonly { label: string; value: string }[];

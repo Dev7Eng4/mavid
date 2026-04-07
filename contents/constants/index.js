@@ -72,3 +72,15 @@ export const LOGO = {
 };
 
 export const VIDEO_STORAGE_ROOT = "E:\\mavid\\MaVidMedia";
+
+export const THUMBNAIL_STYLE = {
+  TEXT: 'text',
+  REMAKE: 'remake',
+  NEW: 'new',
+};
+
+export const THUMBNAIL_STYLE_OPTIONS = [
+  { label: 'TEXT', value: THUMBNAIL_STYLE.TEXT },
+  { label: 'LÀM LẠI ẢNH', value: THUMBNAIL_STYLE.REMAKE },
+  { label: 'TẠO ẢNH MỚI', value: THUMBNAIL_STYLE.NEW },
+];

@@ -255,7 +255,7 @@ export function isValidReupOverlayName(name: string): boolean {
 
 export function defaultThumbnailStyle(): string {
   const first = THUMBNAIL_STYLE_OPTIONS[0];
-  return first ? String(first.value) : '2chPeopleStyle';
+  return first ? String(first.value) : 'text';
 }
 
 export function isValidThumbnailStyle(name: string): boolean {
