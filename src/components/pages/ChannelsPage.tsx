@@ -6,13 +6,15 @@ import { PageHeader } from '../ui/PageHeader';
 import { ChannelAddDialog } from './channels/ChannelAddDialog';
 import { ChannelCreateVideoDialog } from './channels/ChannelCreateVideoDialog';
 import { ChannelUploadVideoDialog, type ChannelUploadVideoPayload, type ChannelItem } from './channels/ChannelUploadVideoDialog';
-import { ChannelsDetailSection, DETAIL_TABLE_LOADING_HEADERS } from './channels/ChannelsDetailSection';
+import { ChannelsDetailSection } from './channels/ChannelsDetailSection';
+import { DETAIL_TABLE_LOADING_HEADERS } from './channels/channelsDetailSectionShared';
 import { ChannelsIndexSection } from './channels/ChannelsIndexSection';
 import { ChannelsPageHeaderActions } from './channels/ChannelsPageHeaderActions';
-import { parseDurationToSeconds } from './channels/channelDurationFormat';
+import { durationPresetToSecRange, parseDurationToSeconds } from './channels/channelDurationFormat';
 import { gpmApi } from '../../services';
 import {
   buildExtraEnvForIndexChannelRow,
+  CHANNEL_ADD_DURATION_SELECT_OPTIONS,
   channelFolderFromRow,
   findIndexHeaderKey,
   headerNorm,
@@ -30,9 +32,9 @@ export function ChannelsPage() {
   const [selectedChannel, setSelectedChannel] = useState<string | null>(null);
   const [detail, setDetail] = useState<ChannelFolderDataResult | null>(null);
   const [detailLoading, setDetailLoading] = useState(false);
-  const [durationSliderMin, setDurationSliderMin] = useState(0);
-  const [durationSliderMax, setDurationSliderMax] = useState(0);
-  const [filterStatus, setFilterStatus] = useState<string>('__all__');
+  const [detailLinkFilter, setDetailLinkFilter] = useState('');
+  const [detailDurationPreset, setDetailDurationPreset] = useState('0_null');
+  const [detailStatusFilter, setDetailStatusFilter] = useState<string>('__all__');
   const [startMarkingIndex, setStartMarkingIndex] = useState<number | null>(null);
   const [detailActionError, setDetailActionError] = useState<string | null>(null);
 
@@ -109,7 +111,9 @@ export function ChannelsPage() {
   }, [selectedChannel, loadDetail]);
 
   useEffect(() => {
-    setFilterStatus('__all__');
+    setDetailLinkFilter('');
+    setDetailDurationPreset('0_null');
+    setDetailStatusFilter('__all__');
     setDetailActionError(null);
     setUploadVideoOpen(false);
     setCreateVideoOpen(false);
@@ -270,6 +274,7 @@ export function ChannelsPage() {
         showEmail: false,
         showChannelName: false,
         showTags: false,
+        linkVideoKey: undefined as string | undefined,
         durationKey: undefined as string | undefined,
         statusKey: undefined as string | undefined,
         startFromKey: undefined as string | undefined,
@@ -306,83 +311,45 @@ export function ChannelsPage() {
       showEmail: Boolean(emailKey),
       showChannelName: Boolean(nameKey),
       showTags: Boolean(tagsKey),
+      linkVideoKey: findKey('LINK VIDEO'),
       durationKey: findKey('DURATION'),
       statusKey: findKey('STATUS'),
       startFromKey: findKey('START FROM'),
     };
   }, [detail]);
 
-  const durationBounds = useMemo(() => {
-    const key = detailLayout.durationKey;
-    if (!key || !detail?.rows?.length) {
-      return { min: 0, max: 0, hasData: false };
-    }
-    let min = Infinity;
-    let max = -Infinity;
-    for (const row of detail.rows) {
-      const sec = parseDurationToSeconds(String(row[key] ?? ''));
-      if (sec != null) {
-        min = Math.min(min, sec);
-        max = Math.max(max, sec);
-      }
-    }
-    if (min === Infinity) return { min: 0, max: 0, hasData: false };
-    return { min, max, hasData: true };
-  }, [detail?.rows, detailLayout.durationKey]);
-
-  useEffect(() => {
-    if (!durationBounds.hasData) return;
-    setDurationSliderMin(durationBounds.min);
-    setDurationSliderMax(durationBounds.max);
-  }, [selectedChannel, detail?.fileName, durationBounds.min, durationBounds.max, durationBounds.hasData]);
-
-  const statusOptions = useMemo(() => {
-    const key = detailLayout.statusKey;
-    if (!key || !detail?.rows?.length) return [] as string[];
-    const set = new Set<string>();
-    for (const row of detail.rows) {
-      const v = String(row[key] ?? '').trim();
-      if (v) set.add(v);
-    }
-    return [...set].sort((a, b) => a.localeCompare(b, undefined, { sensitivity: 'base' }));
-  }, [detail?.rows, detailLayout.statusKey]);
-
   const filteredRowsWithIndex = useMemo(() => {
     if (!detail?.rows?.length) return [];
+    const lk = detailLayout.linkVideoKey;
     const dk = detailLayout.durationKey;
     const sk = detailLayout.statusKey;
-    const slidersNotSyncedYet =
-      durationBounds.hasData && durationSliderMin === 0 && durationSliderMax === 0 && (durationBounds.min > 0 || durationBounds.max > 0);
-    const effDurMin = slidersNotSyncedYet ? durationBounds.min : durationSliderMin;
-    const effDurMax = slidersNotSyncedYet ? durationBounds.max : durationSliderMax;
-    const durationFullSpan = !durationBounds.hasData || (effDurMin <= durationBounds.min && effDurMax >= durationBounds.max);
+    const linkQ = detailLinkFilter.trim().toLowerCase();
+    const durRange = durationPresetToSecRange(detailDurationPreset);
     return detail.rows
       .map((row, originalIndex) => ({ row, originalIndex }))
       .filter(({ row }) => {
-        if (dk && durationBounds.hasData) {
-          const sec = parseDurationToSeconds(String(row[dk] ?? ''));
-          if (sec == null) {
-            if (!durationFullSpan) return false;
-          } else if (sec < effDurMin || sec > effDurMax) {
-            return false;
-          }
+        if (lk && linkQ) {
+          const url = String(row[lk] ?? '').toLowerCase();
+          if (!url.includes(linkQ)) return false;
         }
-        if (sk && filterStatus !== '__all__') {
+        if (dk && durRange) {
+          const sec = parseDurationToSeconds(String(row[dk] ?? ''));
+          if (sec == null || sec < durRange.min || sec > durRange.max) return false;
+        }
+        if (sk && detailStatusFilter !== '__all__') {
           const s = String(row[sk] ?? '').trim();
-          if (s !== filterStatus) return false;
+          if (s !== detailStatusFilter) return false;
         }
         return true;
       });
   }, [
     detail?.rows,
+    detailLayout.linkVideoKey,
     detailLayout.durationKey,
     detailLayout.statusKey,
-    durationBounds.hasData,
-    durationBounds.min,
-    durationBounds.max,
-    durationSliderMin,
-    durationSliderMax,
-    filterStatus,
+    detailLinkFilter,
+    detailDurationPreset,
+    detailStatusFilter,
   ]);
 
   const indexPag = useClientPagination(indexDraftRows.length);
@@ -391,10 +358,21 @@ export function ChannelsPage() {
     [indexDraftRows, indexPag.startIndex, indexPag.pageSize]
   );
 
-  const detailPag = useClientPagination(filteredRowsWithIndex.length);
+  const {
+    page: detailPageNum,
+    setPage: setDetailPage,
+    startIndex: detailStartIndex,
+    totalPages: detailTotalPages,
+    pageSize: detailPageSize,
+  } = useClientPagination(filteredRowsWithIndex.length);
+
+  useEffect(() => {
+    setDetailPage(1);
+  }, [detailLinkFilter, detailDurationPreset, detailStatusFilter, selectedChannel, setDetailPage]);
+
   const pageDetailRows = useMemo(
-    () => filteredRowsWithIndex.slice(detailPag.startIndex, detailPag.startIndex + detailPag.pageSize),
-    [filteredRowsWithIndex, detailPag.startIndex, detailPag.pageSize]
+    () => filteredRowsWithIndex.slice(detailStartIndex, detailStartIndex + detailPageSize),
+    [filteredRowsWithIndex, detailStartIndex, detailPageSize]
   );
 
   const canSetStartFrom = Boolean(detail?.fileName?.toLowerCase().endsWith('.xlsx') && detailLayout.startFromKey);
@@ -472,7 +450,7 @@ export function ChannelsPage() {
       <PageHeader
         align='start'
         title='Channels'
-        description={selectedChannel ? `Chi tiết: MaVidMedia/channels/${selectedChannel}/` : 'Danh sách từ MaVidMedia/channels/index.xlsx'}
+        description={selectedChannel ? `Chi tiết: MaVidMedia/channels/${selectedChannel}` : 'Danh sách từ MaVidMedia/channels/index.xlsx'}
         actions={
           <ChannelsPageHeaderActions
             selectedChannel={selectedChannel}
@@ -567,23 +545,22 @@ export function ChannelsPage() {
           detailLayout={detailLayout}
           showDetailMetaAbove={showDetailMetaAbove}
           detailActionError={detailActionError}
-          durationBounds={durationBounds}
-          durationSliderMin={durationSliderMin}
-          durationSliderMax={durationSliderMax}
-          onDurationSliderMinChange={v => setDurationSliderMin(v)}
-          onDurationSliderMaxChange={v => setDurationSliderMax(v)}
-          filterStatus={filterStatus}
-          onFilterStatusChange={setFilterStatus}
-          statusOptions={statusOptions}
+          filterLink={detailLinkFilter}
+          onFilterLinkChange={setDetailLinkFilter}
+          filterDurationPreset={detailDurationPreset}
+          onFilterDurationPresetChange={setDetailDurationPreset}
+          filterStatusFixed={detailStatusFilter}
+          onFilterStatusFixedChange={setDetailStatusFilter}
+          durationSelectOptions={CHANNEL_ADD_DURATION_SELECT_OPTIONS}
           detailTheadHeaders={detailTheadHeaders}
           detailColCount={detailColCount}
           pageDetailRows={pageDetailRows}
           filteredRowsCount={filteredRowsWithIndex.length}
           detailPag={{
-            page: detailPag.page,
-            totalPages: detailPag.totalPages,
-            setPage: detailPag.setPage,
-            pageSize: detailPag.pageSize,
+            page: detailPageNum,
+            totalPages: detailTotalPages,
+            setPage: setDetailPage,
+            pageSize: detailPageSize,
           }}
           canSetStartFrom={canSetStartFrom}
           startMarkingIndex={startMarkingIndex}

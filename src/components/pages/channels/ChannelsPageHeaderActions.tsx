@@ -98,7 +98,7 @@ export function ChannelsPageHeaderActions({
       )}
       {selectedChannel && (
         <AppButton type='button' variant='neutral' onClick={onBackToIndex}>
-          ← Danh sách (index)
+          ← Danh sách
         </AppButton>
       )}
       <AppButton type='button' variant='secondary' onClick={() => void onRefresh()} disabled={refreshBusy}>

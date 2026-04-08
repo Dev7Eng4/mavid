@@ -1,58 +1,10 @@
-import type { ChannelRow } from '../../../types';
+import { CustomSelect } from '../../ui/CustomSelect';
 import { SpinnerIcon } from '../../ui/Icons';
 import { TablePaginationBar } from '../../ui/TablePaginationBar';
-import { formatSecondsAsDuration } from './channelDurationFormat';
+import type { ChannelsDetailSectionProps } from './channelsDetailSectionShared';
+import { DETAIL_STATUS_FILTER_OPTIONS } from './channelsDetailSectionShared';
 
-export const DETAIL_TABLE_LOADING_HEADERS = ['LINK VIDEO', 'VIEWS', 'DURATION', 'STATUS', 'START FROM'] as const;
-
-export interface ChannelDetailLayoutModel {
-  meta: { email: string; channelName: string; channelTags: string };
-  tableHeaders: string[];
-  showEmail: boolean;
-  showChannelName: boolean;
-  showTags: boolean;
-  durationKey?: string;
-  statusKey?: string;
-  startFromKey?: string;
-}
-
-export interface DurationBoundsModel {
-  min: number;
-  max: number;
-  hasData: boolean;
-}
-
-export interface ChannelsDetailPagination {
-  page: number;
-  totalPages: number;
-  setPage: (p: number) => void;
-  pageSize: number;
-}
-
-export interface ChannelsDetailSectionProps {
-  detailFileName: string | null | undefined;
-  detailLoading: boolean;
-  detailRowsLength: number;
-  detailLayout: ChannelDetailLayoutModel;
-  showDetailMetaAbove: boolean;
-  detailActionError: string | null;
-  durationBounds: DurationBoundsModel;
-  durationSliderMin: number;
-  durationSliderMax: number;
-  onDurationSliderMinChange: (v: number) => void;
-  onDurationSliderMaxChange: (v: number) => void;
-  filterStatus: string;
-  onFilterStatusChange: (v: string) => void;
-  statusOptions: string[];
-  detailTheadHeaders: readonly string[];
-  detailColCount: number;
-  pageDetailRows: { row: ChannelRow; originalIndex: number }[];
-  filteredRowsCount: number;
-  detailPag: ChannelsDetailPagination;
-  canSetStartFrom: boolean;
-  startMarkingIndex: number | null;
-  onSetStartFromRow: (dataRowIndex: number) => void;
-}
+const inputClass = 'w-full rounded-xl px-3 py-2.5 text-sm outline-none border transition-colors duration-150';
 
 export function ChannelsDetailSection({
   detailFileName,
@@ -61,14 +13,13 @@ export function ChannelsDetailSection({
   detailLayout,
   showDetailMetaAbove,
   detailActionError,
-  durationBounds,
-  durationSliderMin,
-  durationSliderMax,
-  onDurationSliderMinChange,
-  onDurationSliderMaxChange,
-  filterStatus,
-  onFilterStatusChange,
-  statusOptions,
+  filterLink,
+  onFilterLinkChange,
+  filterDurationPreset,
+  onFilterDurationPresetChange,
+  filterStatusFixed,
+  onFilterStatusFixedChange,
+  durationSelectOptions,
   detailTheadHeaders,
   detailColCount,
   pageDetailRows,
@@ -78,58 +29,14 @@ export function ChannelsDetailSection({
   startMarkingIndex,
   onSetStartFromRow,
 }: ChannelsDetailSectionProps) {
+  const lk = detailLayout.linkVideoKey;
   const dk = detailLayout.durationKey;
   const sk = detailLayout.statusKey;
-  const showFilterBar =
-    !detailLoading &&
-    detailRowsLength > 0 &&
-    ((dk && durationBounds.hasData) || (sk && statusOptions.length > 0));
+  const showSearchBar =
+    !detailLoading && detailRowsLength > 0 && detailLayout.tableHeaders.length > 0 && (Boolean(lk) || Boolean(dk) || Boolean(sk));
 
   return (
     <div className='space-y-4 w-full min-w-0'>
-      {detailFileName ? (
-        <p className='text-sm' style={{ color: 'var(--text-muted)' }}>
-          File: <span style={{ color: 'var(--text-h)' }}>{detailFileName}</span>
-        </p>
-      ) : null}
-
-      {showDetailMetaAbove && (
-        <div className='rounded-2xl p-5 w-full min-w-0' style={{ background: 'var(--card-bg)', border: '1px solid var(--border)' }}>
-          <div className='grid grid-cols-1 md:grid-cols-3 gap-5'>
-            {detailLayout.showEmail && (
-              <div className='min-w-0'>
-                <div className='text-sm font-medium uppercase tracking-wider mb-2' style={{ color: 'var(--text-muted)' }}>
-                  Email
-                </div>
-                <div className='text-base wrap-break-word' style={{ color: 'var(--text-h)' }}>
-                  {detailLayout.meta.email || '—'}
-                </div>
-              </div>
-            )}
-            {detailLayout.showChannelName && (
-              <div className='min-w-0'>
-                <div className='text-sm font-medium uppercase tracking-wider mb-2' style={{ color: 'var(--text-muted)' }}>
-                  Channel name
-                </div>
-                <div className='text-base wrap-break-word' style={{ color: 'var(--text-h)' }}>
-                  {detailLayout.meta.channelName || '—'}
-                </div>
-              </div>
-            )}
-            {detailLayout.showTags && (
-              <div className='min-w-0 md:col-span-1'>
-                <div className='text-sm font-medium uppercase tracking-wider mb-2' style={{ color: 'var(--text-muted)' }}>
-                  Channel tags
-                </div>
-                <div className='text-base wrap-break-word' style={{ color: 'var(--text-h)' }}>
-                  {detailLayout.meta.channelTags || '—'}
-                </div>
-              </div>
-            )}
-          </div>
-        </div>
-      )}
-
       {detailActionError && (
         <div
           className='rounded-2xl px-4 py-3 text-base wrap-break-word'
@@ -143,97 +50,64 @@ export function ChannelsDetailSection({
         </div>
       )}
 
-      {showFilterBar ? (
+      {showSearchBar ? (
         <div
-          className='flex flex-wrap items-end gap-6 rounded-2xl p-4 w-full min-w-0'
+          className='rounded-2xl p-4 w-full min-w-0 space-y-3'
           style={{ background: 'var(--card-bg)', border: '1px solid var(--border)' }}
         >
-          {dk && durationBounds.hasData ? (
-            <div className='min-w-56 flex-1 space-y-3'>
-              <div className='text-sm font-medium uppercase tracking-wider' style={{ color: 'var(--text-muted)' }}>
-                Lọc duration (kéo min / max)
-              </div>
-              <div className='flex flex-wrap items-center justify-between gap-2 text-base' style={{ color: 'var(--text-h)' }}>
-                <span>
-                  Từ <strong style={{ color: 'var(--accent)' }}>{formatSecondsAsDuration(durationSliderMin)}</strong>
+          <div className='text-sm font-medium uppercase tracking-wider' style={{ color: 'var(--text-muted)' }}>
+            Tìm & lọc
+          </div>
+          <div className='grid grid-cols-1 md:grid-cols-3 gap-4 items-end'>
+            {lk ? (
+              <label className='block min-w-0'>
+                <span className='block text-sm mb-2' style={{ color: 'var(--text-h)' }}>
+                  Link video
                 </span>
-                <span>
-                  Đến <strong style={{ color: 'var(--accent)' }}>{formatSecondsAsDuration(durationSliderMax)}</strong>
-                </span>
-              </div>
-              <div className='space-y-1'>
-                <label className='text-sm' style={{ color: 'var(--text-muted)' }} htmlFor='ch-dur-min'>
-                  Tối thiểu
-                </label>
                 <input
-                  id='ch-dur-min'
-                  type='range'
-                  min={durationBounds.min}
-                  max={durationBounds.max}
-                  step={1}
-                  value={durationSliderMin}
-                  onChange={e => {
-                    const v = Number(e.target.value);
-                    onDurationSliderMinChange(Math.min(v, durationSliderMax));
+                  type='search'
+                  value={filterLink}
+                  onChange={e => onFilterLinkChange(e.target.value)}
+                  placeholder='Tìm trong URL / link…'
+                  autoComplete='off'
+                  className={inputClass}
+                  style={{
+                    background: 'var(--code-bg)',
+                    color: 'var(--text-h)',
+                    borderColor: 'var(--border)',
                   }}
-                  className='w-full h-2 rounded-lg cursor-pointer'
-                  style={{ accentColor: 'var(--accent)' }}
                 />
-              </div>
-              <div className='space-y-1'>
-                <label className='text-sm' style={{ color: 'var(--text-muted)' }} htmlFor='ch-dur-max'>
-                  Tối đa
-                </label>
-                <input
-                  id='ch-dur-max'
-                  type='range'
-                  min={durationBounds.min}
-                  max={durationBounds.max}
-                  step={1}
-                  value={durationSliderMax}
-                  onChange={e => {
-                    const v = Number(e.target.value);
-                    onDurationSliderMaxChange(Math.max(v, durationSliderMin));
-                  }}
-                  className='w-full h-2 rounded-lg cursor-pointer'
-                  style={{ accentColor: 'var(--accent)' }}
-                />
-              </div>
-              <p className='text-sm leading-snug' style={{ color: 'var(--text-muted)' }}>
-                Phạm vi trong file: {formatSecondsAsDuration(durationBounds.min)} — {formatSecondsAsDuration(durationBounds.max)}. Dòng không đọc
-                được duration chỉ hiện khi khoảng trùng toàn bộ phạm vi.
-              </p>
-            </div>
-          ) : null}
-          {sk && statusOptions.length > 0 && (
-            <div className='min-w-44 flex-1'>
-              <label
-                className='block text-sm font-medium uppercase tracking-wider mb-2'
-                style={{ color: 'var(--text-muted)' }}
-                htmlFor='ch-filter-status'
-              >
-                Lọc status
               </label>
-              <select
-                id='ch-filter-status'
-                value={filterStatus}
-                onChange={e => onFilterStatusChange(e.target.value)}
-                className='w-full rounded-xl px-3 py-2.5 text-sm outline-none cursor-pointer'
-                style={{
-                  background: 'var(--code-bg)',
-                  color: 'var(--text-h)',
-                  border: '1px solid var(--border)',
-                }}
-              >
-                <option value='__all__'>Tất cả</option>
-                {statusOptions.map(s => (
-                  <option key={s} value={s}>
-                    {s}
-                  </option>
-                ))}
-              </select>
-            </div>
-          )}
+            ) : null}
+            {dk ? (
+              <div className='min-w-0'>
+                <div className='text-sm mb-2' style={{ color: 'var(--text-h)' }}>
+                  Thời lượng (khoảng)
+                </div>
+                <CustomSelect
+                  value={filterDurationPreset}
+                  options={durationSelectOptions}
+                  onChange={onFilterDurationPresetChange}
+                  placeholder='Chọn khoảng'
+                  menuZIndex={100}
+                />
+              </div>
+            ) : null}
+            {sk ? (
+              <div className='min-w-0'>
+                <div className='text-sm mb-2' style={{ color: 'var(--text-h)' }}>
+                  Status
+                </div>
+                <CustomSelect
+                  value={filterStatusFixed}
+                  options={DETAIL_STATUS_FILTER_OPTIONS}
+                  onChange={onFilterStatusFixedChange}
+                  placeholder='Status'
+                  menuZIndex={100}
+                />
+              </div>
+            ) : null}
+          </div>
         </div>
       ) : null}
 
@@ -276,7 +150,7 @@ export function ChannelsDetailSection({
                 ) : filteredRowsCount === 0 ? (
                   <tr>
                     <td colSpan={detailColCount} className='px-4 py-8 text-center' style={{ color: 'var(--text-muted)' }}>
-                      Không có dòng nào khớp bộ lọc duration / status.
+                      Không có dòng nào khớp bộ lọc (link / thời lượng / status).
                     </td>
                   </tr>
                 ) : (

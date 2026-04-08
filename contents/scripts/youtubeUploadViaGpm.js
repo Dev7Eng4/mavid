@@ -6,6 +6,7 @@
  * @param {string} params.gpmProfileId — id profile GPM (UUID)
  * @param {string} params.channelFolder — tên thư mục kênh (an toàn, không ..)
  * @param {number | null | undefined} params.maxUploads — giới hạn số video; null/undefined = tất cả thư mục hợp lệ
+ * @param {string[]} [params.uploadFolderNames] — nếu có: chỉ upload các thư mục con này, đúng thứ tự (khớp batch vừa tạo)
  * @param {string} [params.gpmApiBase] — ví dụ http://127.0.0.1:19995/api/v3
  */
 import fs from 'fs';
@@ -45,13 +46,42 @@ function firstMp4InDir(dir) {
   return files.length ? path.join(dir, files[0]) : null;
 }
 
+/** @param {string} name */
+function assertSafeSubfolderName(name) {
+  const t = String(name || '').trim();
+  if (!t) return null;
+  if (t.includes('..') || t.includes('/') || t.includes('\\')) return null;
+  return t;
+}
+
 /**
- * Danh sách thư mục con có .mp4, sắp xếp tên (ổn định).
+ * Danh sách thư mục con có .mp4.
+ * - Có `folderNamesOrder`: theo đúng thứ tự danh sách (chỉ thư mục có .mp4), tối đa `maxUploads` nếu có.
+ * - Không có: quét thư mục kênh, sắp xếp tên tăng dần, lấy từ trên xuống tới `maxUploads`.
  * @param {string} channelAbs
  * @param {number | null} maxUploads
+ * @param {string[] | null | undefined} folderNamesOrder
  */
-function listUploadJobs(channelAbs, maxUploads) {
+function listUploadJobs(channelAbs, maxUploads, folderNamesOrder) {
   if (!fs.existsSync(channelAbs)) throw new Error(`Không tìm thấy thư mục kênh: ${channelAbs}`);
+
+  if (Array.isArray(folderNamesOrder) && folderNamesOrder.length > 0) {
+    const jobs = [];
+    for (const raw of folderNamesOrder) {
+      const name = assertSafeSubfolderName(raw);
+      if (!name) continue;
+      const sub = path.join(channelAbs, name);
+      const mp4 = firstMp4InDir(sub);
+      if (!mp4) {
+        console.warn(`[upload] Bỏ qua «${name}» — không có file .mp4 trong thư mục.`);
+        continue;
+      }
+      jobs.push({ folderName: name, folderPath: sub, mp4Path: mp4 });
+      if (maxUploads != null && Number.isFinite(maxUploads) && maxUploads > 0 && jobs.length >= maxUploads) break;
+    }
+    return jobs;
+  }
+
   const entries = fs.readdirSync(channelAbs, { withFileTypes: true });
   const dirs = entries
     .filter(e => e.isDirectory() && !e.name.startsWith('.'))
@@ -117,13 +147,13 @@ async function openUploadAndSelectFile(page, mp4Path) {
   console.log('[upload] Step 3: Chọn mục Tải video lên...');
   await clickElement(
     page,
-    '/html/body/ytd-app/ytd-popup-container/tp-yt-iron-dropdown/div/ytd-multi-page-menu-renderer/div[3]/div[1]/yt-multi-page-menu-section-renderer/div[2]/ytd-compact-link-renderer[1]/a',
+    '/html/body/ytd-app/ytd-popup-container/tp-yt-iron-dropdown/div/ytd-multi-page-menu-renderer/div[3]/div[1]/yt-multi-page-menu-section-renderer/div[2]/ytd-compact-link-renderer[1]/a'
   );
   await delay(getRandomNumber(3000));
 
   await clickElement(
     page,
-    '/html/body/ytcp-uploads-dialog/tp-yt-paper-dialog/div/ytcp-uploads-file-picker/div/ytcp-button/ytcp-button-shape/button',
+    '/html/body/ytcp-uploads-dialog/tp-yt-paper-dialog/div/ytcp-uploads-file-picker/div/ytcp-button/ytcp-button-shape/button'
   );
 
   // await moveToTopLeft(page, 100, 100);
@@ -310,7 +340,7 @@ async function fillVideoDetails(page, videoFolderPath) {
       await scrollUntilVisible(
         page,
         '/html/body/ytcp-uploads-dialog/tp-yt-paper-dialog/div/ytcp-animatable[1]/ytcp-ve/ytcp-video-metadata-editor/div/ytcp-video-metadata-editor-advanced/div[7]/ytcp-form-input-container',
-        true,
+        true
       );
     }
 
@@ -326,7 +356,7 @@ async function fillVideoDetails(page, videoFolderPath) {
   console.log('[edit] ✓ Hoàn thành điền thông tin video! Sang bước tiếp theo');
   await clickElement(
     page,
-    '/html/body/ytcp-uploads-dialog/tp-yt-paper-dialog/div/ytcp-animatable[2]/div/div[2]/ytcp-button[2]/ytcp-button-shape/button',
+    '/html/body/ytcp-uploads-dialog/tp-yt-paper-dialog/div/ytcp-animatable[2]/div/div[2]/ytcp-button[2]/ytcp-button-shape/button'
   );
 }
 
@@ -336,7 +366,7 @@ async function addRelatedVideo(page, videoFolderPath) {
   // thêm video liên quan
   await clickElement(
     page,
-    '/html/body/ytcp-uploads-dialog/tp-yt-paper-dialog/div/ytcp-animatable[1]/ytcp-uploads-video-elements/div[3]/ytcp-button[2]/ytcp-button-shape/button',
+    '/html/body/ytcp-uploads-dialog/tp-yt-paper-dialog/div/ytcp-animatable[1]/ytcp-uploads-video-elements/div[3]/ytcp-button[2]/ytcp-button-shape/button'
   );
 
   await delay(3000);
@@ -344,14 +374,14 @@ async function addRelatedVideo(page, videoFolderPath) {
   // chọn template đầu tiên
   await clickElement(
     page,
-    '/html/body/ytve-endscreen-modal/ytve-modal-host/ytcp-dialog/tp-yt-paper-dialog/div[2]/div/ytve-editor/div[1]/div/ytve-endscreen-editor-options-panel/div[2]/div/ytve-endscreen-template-picker/div/div/div/div[1]/div[1]',
+    '/html/body/ytve-endscreen-modal/ytve-modal-host/ytcp-dialog/tp-yt-paper-dialog/div[2]/div/ytve-editor/div[1]/div/ytve-endscreen-editor-options-panel/div[2]/div/ytve-endscreen-template-picker/div/div/div/div[1]/div[1]'
   );
 
   if (meta?.uploadedVideos && meta?.uploadedVideos === 2) {
     // click element
     await clickElement(
       page,
-      '/html/body/ytve-endscreen-modal/ytve-modal-host/ytcp-dialog/tp-yt-paper-dialog/div[2]/div/ytve-editor/div[1]/div/ytve-endscreen-editor-options-panel/div[1]/ytcp-button/ytcp-button-shape/button',
+      '/html/body/ytve-endscreen-modal/ytve-modal-host/ytcp-dialog/tp-yt-paper-dialog/div[2]/div/ytve-editor/div[1]/div/ytve-endscreen-editor-options-panel/div[1]/ytcp-button/ytcp-button-shape/button'
     );
 
     await delay(500);
@@ -362,7 +392,7 @@ async function addRelatedVideo(page, videoFolderPath) {
   // save
   await clickElement(
     page,
-    '/html/body/ytve-endscreen-modal/ytve-modal-host/ytcp-dialog/tp-yt-paper-dialog/div[1]/div/div[2]/div/div[2]/ytcp-button/ytcp-button-shape/button',
+    '/html/body/ytve-endscreen-modal/ytve-modal-host/ytcp-dialog/tp-yt-paper-dialog/div[1]/div/div[2]/div/div[2]/ytcp-button/ytcp-button-shape/button'
   );
 
   await delay(5000);
@@ -370,7 +400,7 @@ async function addRelatedVideo(page, videoFolderPath) {
   // goto check video
   await clickElement(
     page,
-    '/html/body/ytcp-uploads-dialog/tp-yt-paper-dialog/div/ytcp-animatable[2]/div/div[2]/ytcp-button[2]/ytcp-button-shape/button',
+    '/html/body/ytcp-uploads-dialog/tp-yt-paper-dialog/div/ytcp-animatable[2]/div/div[2]/ytcp-button[2]/ytcp-button-shape/button'
   );
 
   await delay(2000);
@@ -379,7 +409,7 @@ async function addRelatedVideo(page, videoFolderPath) {
   await clickElement(
     page,
 
-    '/html/body/ytcp-uploads-dialog/tp-yt-paper-dialog/div/ytcp-animatable[2]/div/div[2]/ytcp-button[2]/ytcp-button-shape/button',
+    '/html/body/ytcp-uploads-dialog/tp-yt-paper-dialog/div/ytcp-animatable[2]/div/div[2]/ytcp-button[2]/ytcp-button-shape/button'
   );
 }
 
@@ -387,7 +417,7 @@ async function chooseVisibility(page) {
   // chọn Schedule
   await clickElement(
     page,
-    '/html/body/ytcp-uploads-dialog/tp-yt-paper-dialog/div/ytcp-animatable[1]/ytcp-uploads-review/div[2]/div[1]/ytcp-video-visibility-select/div[3]',
+    '/html/body/ytcp-uploads-dialog/tp-yt-paper-dialog/div/ytcp-animatable[1]/ytcp-uploads-review/div[2]/div[1]/ytcp-video-visibility-select/div[3]'
   );
 
   await delay(1500);
@@ -407,12 +437,16 @@ export default async function main(raw = {}) {
 
   const apiBase = apiRootForPlaywright(typeof raw.gpmApiBase === 'string' ? raw.gpmApiBase : process.env.GPM_API_BASE);
 
+  const uploadFolderNames = Array.isArray(raw.uploadFolderNames)
+    ? raw.uploadFolderNames.map(x => String(x ?? '').trim()).filter(Boolean)
+    : null;
+
   const channelAbs = path.join(resolveChannelsDir(), channelFolder);
-  const jobs = listUploadJobs(channelAbs, maxUploads);
+  const jobs = listUploadJobs(channelAbs, maxUploads, uploadFolderNames && uploadFolderNames.length > 0 ? uploadFolderNames : null);
 
   if (jobs.length === 0) {
     throw new Error(
-      `Không có thư mục con nào chứa file .mp4 trong ${channelAbs} (đã giới hạn ${maxUploads == null ? 'tất cả' : maxUploads} video).`,
+      `Không có thư mục con nào chứa file .mp4 trong ${channelAbs} (đã giới hạn ${maxUploads == null ? 'tất cả' : maxUploads} video).`
     );
   }
 

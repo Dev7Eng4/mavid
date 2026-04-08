@@ -209,6 +209,8 @@ export interface UploadYoutubeViaGpmParams {
   channelFolder: string;
   /** null/undefined = upload tất cả thư mục con có .mp4 */
   maxUploads?: number | null;
+  /** Thứ tự upload cố định (vd. batch vừa tạo); không truyền = quét thư mục, sort tên, lấy từ trên xuống theo maxUploads */
+  uploadFolderNames?: string[];
   /** Base API GPM, ví dụ `http://127.0.0.1:19995/api/v3` */
   gpmApiBase?: string;
 }

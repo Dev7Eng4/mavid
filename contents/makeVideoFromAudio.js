@@ -718,8 +718,11 @@ async function main(options = {}) {
   const items = options.items || [];
   if (items.length === 0) {
     console.log('Không có items để xử lý batch.');
-    return;
+    return { success: false, processedCount: 0, processedFolderNames: [] };
   }
+
+  /** Tên thư mục con trong kênh (video ID), theo thứ tự tạo thành công — dùng cho upload GPM. */
+  const processedFolderNames = [];
 
   const { downloadSingleVideo } = await import('./downloadVideo.js');
 
@@ -841,6 +844,7 @@ async function main(options = {}) {
         };
         fs.writeFileSync(progressFile, JSON.stringify(progressData, null, 2), 'utf8');
         await flushProgressToSpreadsheet();
+        processedFolderNames.push(String(videoId).trim() || 'unknown_id');
       } catch (err) {
         console.error('Lỗi tạo video:', err.message);
       }
@@ -853,6 +857,12 @@ async function main(options = {}) {
   }
 
   console.log(`\nHoàn thành xử lý ${items.length} video.`);
+
+  return {
+    success: processedFolderNames.length > 0,
+    processedCount: processedFolderNames.length,
+    processedFolderNames,
+  };
 }
 
 export default main;

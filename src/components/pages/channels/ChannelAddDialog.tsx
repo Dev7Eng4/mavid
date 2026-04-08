@@ -5,6 +5,7 @@ import { AppButton } from '../../ui/AppButton';
 import { CustomSelect } from '../../ui/CustomSelect';
 import {
   buildChannelRowFromAddForm,
+  CHANNEL_ADD_DURATION_SELECT_OPTIONS,
   channelAddDialogInitialFromIndexRow,
   channelFolderFromRow,
   defaultReupOverlayName,
@@ -66,15 +67,6 @@ const VIDEO_PER_DAY_OPTIONS: { value: VideoPerDayPreset; label: string }[] = [
   { value: '1', label: '1' },
   { value: '2', label: '2' },
   { value: '1-2', label: '1–2 (2 suất cuối tuần)' },
-];
-
-const ALL_DURATION_OPTIONS = [
-  { value: '0_null', label: 'Tất cả' },
-  { value: '0_30', label: '0 - 30 phút' },
-  { value: '0_60', label: '0 - 60 phút' },
-  { value: '30_60', label: '30 - 60 phút' },
-  { value: '30_null', label: 'Từ 30 phút' },
-  { value: '60_null', label: 'Từ 60 phút' },
 ];
 
 /** Payload gửi tới `addChannelFromForm` (không ghi bảng nháp index). */
@@ -306,8 +298,8 @@ export function ChannelAddDialog({
 
   /** Lọc các option thời gian không bị overlap với đã dùng. */
   const durationMinuteOptions = useMemo(() => {
-    if (usedDurationOptions.size === 0) return ALL_DURATION_OPTIONS;
-    return ALL_DURATION_OPTIONS.filter(opt => {
+    if (usedDurationOptions.size === 0) return CHANNEL_ADD_DURATION_SELECT_OPTIONS;
+    return CHANNEL_ADD_DURATION_SELECT_OPTIONS.filter(opt => {
       // Giữ lại option hiện tại đang chọn (edit mode)
       if (opt.value === durationOption) return true;
       // Loại nếu overlap bất kỳ option đã dùng

@@ -25,6 +25,23 @@ export function parseDurationToSeconds(raw: string): number | null {
   return null;
 }
 
+/**
+ * Chuyển preset giống form thêm kênh (`0_30`, `30_null`, …) → khoảng giây [min, max].
+ * `0_null` hoặc không hợp lệ → `null` (không lọc theo preset).
+ */
+export function durationPresetToSecRange(preset: string): { min: number; max: number } | null {
+  const p = String(preset ?? '').trim();
+  if (p === '0_null' || p === '') return null;
+  const parts = p.split('_');
+  if (parts.length !== 2) return null;
+  const [a, b] = parts;
+  const fromMin = a === 'null' ? 0 : Number(a) * 60;
+  const toMax = b === 'null' ? Number.POSITIVE_INFINITY : Number(b) * 60;
+  if (!Number.isFinite(fromMin) || fromMin < 0) return null;
+  if (b !== 'null' && (!Number.isFinite(toMax) || toMax < 0)) return null;
+  return { min: fromMin, max: toMax };
+}
+
 /** Hiển thị giây dạng đọc được (có giờ nếu ≥ 1h). */
 export function formatSecondsAsDuration(totalSec: number): string {
   if (!Number.isFinite(totalSec) || totalSec < 0) return '0:00';

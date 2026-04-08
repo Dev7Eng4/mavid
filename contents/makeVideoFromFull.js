@@ -209,8 +209,11 @@ async function main(options = {}) {
 
   if (items.length === 0) {
     console.log('Không có items để xử lý batch.');
-    return;
+    return { success: false, processedCount: 0, processedFolderNames: [] };
   }
+
+  /** Tên thư mục con trong kênh (video ID), theo thứ tự tạo thành công — dùng cho upload GPM. */
+  const processedFolderNames = [];
 
   const overlayResolved = resolveOverlayByName(options.overlay);
 
@@ -350,6 +353,7 @@ async function main(options = {}) {
         await flushProgressToSpreadsheet();
 
         console.log(`ĐÃ HOÀN THÀNH VIDEO: ${url}`);
+        processedFolderNames.push(String(videoId).trim() || 'unknown_id');
       } catch (err) {
         console.error('Lỗi remake video:', err.message);
       } finally {
@@ -370,6 +374,12 @@ async function main(options = {}) {
   unlinkProgressSidecarForSpreadsheet(actualInputFile);
 
   console.log(`\nHoàn thành xử lý ${items.length} video.`);
+
+  return {
+    success: processedFolderNames.length > 0,
+    processedCount: processedFolderNames.length,
+    processedFolderNames,
+  };
 }
 
 if (process.argv[1] && fileURLToPath(import.meta.url) === path.resolve(process.argv[1])) {

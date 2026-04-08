@@ -31,6 +31,16 @@ export function durationOptionToLabel(option: string): string {
   return 'Tất cả'; // fallback
 }
 
+/** Giống dropdown «Tạo video với thời gian» trong ChannelAddDialog — value dạng `0_30`, `0_null` = không lọc preset. */
+export const CHANNEL_ADD_DURATION_SELECT_OPTIONS: { value: string; label: string }[] = [
+  { value: '0_null', label: 'Tất cả' },
+  { value: '0_30', label: '0 - 30 phút' },
+  { value: '0_60', label: '0 - 60 phút' },
+  { value: '30_60', label: '30 - 60 phút' },
+  { value: '30_null', label: 'Từ 30 phút' },
+  { value: '60_null', label: 'Từ 60 phút' },
+];
+
 export const SCRIPT_FROM_AUDIO: ScriptId = 'tao-batch-video-tu-audio';
 export const SCRIPT_REUP_FULL: ScriptId = 'tao-batch-video-reup-full';
 
