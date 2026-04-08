@@ -1,280 +1,189 @@
-export const createPromptSummaryContent = (currentContent, previousSummaries = '') =>
-  `
-# Role:
+export const promptCreateSummaryChunk = transcript => `
+You are a highly skilled Japanese content analyst and professional content writer with deep understanding of nuance, context, and implicit meaning in Japanese language.
 
-あなたは2ch/5chスカッと・修羅場系動画の構成作家です。
-どんなジャンルでも文脈を正確に理解し、視聴者の感情を引き込む要約を作成します。
+Your task is to summarize a chunk of Japanese transcript accurately while preserving the original meaning and important insights.
 
-# Task:
+## INPUT
 
-「これまでのあらすじ」に続く今回のトランスクリプトを要約してください。
-挨拶・説明は一切禁止。
+Transcript (Japanese):
+${transcript}
 
-# Context（これまでのあらすじ）:
+## INSTRUCTIONS
 
-${previousSummaries ?? '物語の始まり'}
+* Preserve ALL key ideas, facts, arguments, and important details
+* Do NOT add any new information or assumptions
+* Do NOT interpret beyond what is explicitly or implicitly stated
+* Maintain the original intent and nuance of the speaker
+* Capture emotional tone if relevant (e.g., concern, excitement, warning)
+* Keep important keywords, names, concepts, and domain-specific terms
+* If there are examples, keep them in short form
+* If there are lists or steps, preserve them as structured bullets
 
-# Input Transcript:
+## STYLE
 
-${currentContent}
+* Write in Japanese
+* Use concise and clear bullet points
+* Each bullet = one idea
+* Avoid redundancy
+* Avoid long sentences
+* Prioritize clarity over elegance
 
-# Instructions:
+## OUTPUT FORMAT (STRICT)
 
-1. ジャンル自動判定（最重要）:
-   以下のどれに該当するか判断する
+* You MUST wrap the entire output inside a single Markdown code block using triple backticks (\`\`\`)
+* Do NOT write anything before or after the code block
+* Do NOT include explanations, comments, or extra text
+* The first character of your response MUST be \`\`\`
+* The last character of your response MUST be \`\`\`
 
-* 嫁姑・義実家トラブル
-* 不倫・浮気・裏切り
-* その他の人間関係トラブル
-
-※文脈から最も近いものを1つ選択
-
-2. 整合性:
-
-* これまでのあらすじと矛盾しないようにする
-* ストーリーを自然に接続
-
-3. 事実ベース:
-
-* トランスクリプトの内容のみ使用
-* 情報の捏造・追加は禁止
-
-4. 感情の強調（ジャンル別）:
-
-* 嫁姑系 → 嫌味・ストレス・支配・無関心
-* 不倫系 → 裏切り・疑念・証拠・違和感
-* その他 → 対立・不公平・衝突
-
-5. 緊張感の上昇:
-
-* 前パートより状況が悪化・深刻化するように描写
-
-6. 不穏な要素:
-
-* 小さな違和感・伏線・意味深な言動を必ず拾う
-
-7. 引き（最重要）:
-   以下のいずれかで終える
-
-* 決定的な一言の直前
-* 真実が明らかになる直前
-* 関係が崩壊する直前
-
-# Output Format（厳守）:
-
-必ずコードブロック内のみ出力
+## OUTPUT EXAMPLE
 
 \`\`\`
-【ジャンル】:
-（自動判定結果）
-
-【起きた出来事】:
-（今回の進展）
-
-【対立・問題点】:
-（何が問題になっているか）
-
-【胸糞ポイント】:
-（最もイラつく言動）
-
-【主人公の状態】:
-（感情・変化）
-
-【不穏な伏線】:
-（違和感・意味深要素）
-
-【引き】:
-（次を見たくなる終わり方）
-
-【サムネ用パワーワード】:
-（2〜3個）
+- ポイント1
+- ポイント2
+- ポイント3
 \`\`\`
 `;
 
-export const createPromptToMergeSummaryContent = allPartSummaries => `
-# Role:
+export const promptCreateFinalSummary = summaries => `
+You are an expert Japanese content editor and senior content strategist with strong ability to restructure information into clear, engaging, and meaningful narratives.
 
-あなたはスカッと系・修羅場系YouTube動画の統括ディレクターです。
-ジャンル（嫁姑・不倫・人間関係）に応じて、最適な感情構造で物語を完成させます。
+Your task is to create a FINAL, well-structured summary based on multiple partial summaries of a Japanese video transcript.
 
-# Context:
+## INPUT
 
-${allPartSummaries}
+Partial Summaries (Japanese):
+${summaries}
 
-# Task:
+## OBJECTIVE
 
-1. 全パートを統合し、自然で一貫性のあるストーリーに再構成する
-2. ジャンルに応じて感情の流れを最適化する
-3. クライマックス（スカッと場面）を最大化する
+Transform the fragmented summaries into a coherent, structured, and easy-to-understand final summary that preserves all key insights and important information.
 
-# Instructions:
+## INSTRUCTIONS
 
-1. ジャンル判定:
-   各パートの【ジャンル】を参考に、全体のメインジャンルを決定する
+* Preserve ALL important ideas and insights from the input summaries
+* Do NOT add new information or fabricate details
+* Merge overlapping points and remove redundancy
+* Organize content into logical groups (themes, steps, or sections)
+* Ensure the flow is natural and easy to follow
+* Highlight key takeaways clearly
+* Maintain the original intent and nuance of the content
 
-2. 原文準拠（最重要）:
+## STYLE
 
-* 要約内容から逸脱しない
-* 情報の捏造は禁止
+* Write in Japanese
+* Use structured bullet points
+* Group related ideas under clear headings if applicable
+* Keep sentences concise and readable
+* Balance clarity and completeness
 
-3. 一貫性:
+## OUTPUT FORMAT (STRICT)
 
-* 人物の性格・関係性・行動ロジックを維持
+* You MUST wrap the entire output inside a single Markdown code block using triple backticks (\`\`\`)
+* Do NOT write anything before or after the code block
+* Do NOT include explanations, comments, or extra text
+* The first character of your response MUST be \`\`\`
+* The last character of your response MUST be \`\`\`
 
-4. ジャンル別構成最適化:
-
-■ 嫁姑・義実家系:
-
-* 小さなストレス → 蓄積 → 限界 → 逆転 → スカッと
-
-■ 不倫・浮気系:
-
-* 違和感 → 疑念 → 証拠 → 発覚 → 崩壊 → スカッと
-
-■ その他:
-
-* 対立 → 悪化 → 転機 → 解決
-
-5. 伏線回収:
-
-* 各パートの「不穏な伏線」を回収し、繋がりを明確にする
-
-6. スカッとの質:
-
-* なぜ逆転できたかを論理的に説明
-* ご都合主義を避ける
-
-# Output Format（厳守）:
-
-コードブロック内のみ出力
+## OUTPUT EXAMPLE
 
 \`\`\`
-【ジャンル】:
-（最終判定）
+【概要】
+- 全体の要点1
+- 全体の要点2
 
-【全体プロット】:
-（起承転結 300〜400字）
+【主なポイント】
+- ポイント1
+- ポイント2
 
-【ストーリー構造】:
-（ジャンルに応じた流れを整理）
-
-【対立の本質】:
-（何が問題だったのか）
-
-【クライマックス】:
-（最も盛り上がる瞬間）
-
-【スカッとポイント】:
-（爽快感の理由）
-
-【伏線と回収】:
-（前半→後半の繋がり）
-
-【登場人物の結末】:
-（主人公・敵対者それぞれ）
-
-【量産用パターン】:
-（この話の型）
+【結論・気づき】
+- 気づき1
+- 気づき2
 \`\`\`
 `;
 
-export const createPromptCreateMetaInfo = (title, summary) =>
-  `
-# Role:
+export const promptCreateVideoMeta = summary => `
+You are a top-tier Japanese YouTube content strategist, SEO expert, and viral content creator with deep understanding of audience psychology in the Japanese market.
 
-あなたはスカッと系・修羅場系YouTube動画で100万再生を連発するプロ作家です。
-ジャンルに応じて、クリック率と視聴維持率を最大化するタイトル・説明文・タグを作成します。
+Your task is to analyze a FINAL summary of a Japanese video and generate high-performance YouTube metadata optimized for CTR and SEO.
 
-# Task:
+## INPUT
 
-提供された最終要約を分析し、「タイトル」「動画説明文」「タグ」を作成してください。
-挨拶・解説は一切不要。
+Final Summary (Japanese):
+${summary}
 
-# Input:
+## OBJECTIVES
 
-* 最終要約: ${summary}
-* 旧タイトル: ${title}
+1. Detect the most accurate and valuable content niche of the video
+2. Create a highly clickable title (CTR-focused)
+3. Write an SEO-optimized description
+4. Generate relevant and powerful tags (short + long-tail)
 
-# Instructions:
+## INSTRUCTIONS
 
-1. ジャンル判定（最重要）:
-   以下のいずれかを判定
+### 1. NICHE DETECTION
 
-* 嫁姑・義実家トラブル
-* 不倫・浮気・裏切り
-* その他の人間関係
+* Identify the core niche of the content (e.g., 健康, ビジネス, 自己啓発, ダイエット, 投資, 習慣, メンタル, 教育, etc.)
+* Be specific (e.g., 腸活ダイエット instead of just 健康)
+* Reflect the true intent of the content
 
-→ 判定結果に応じて表現・キーワードを最適化
+---
 
-2. タイトル作成:
+### 2. TITLE (ONLY 1)
 
-* ネタバレ禁止
-* 感情を強く刺激（怒り・違和感・衝撃）
-* 必ずジャンルに合ったワードを含める
-* **100文字未満（YouTube最適化）**
+* Maximum 90 characters
+* High CTR (curiosity-driven, emotionally engaging)
+* Use power words if relevant (例：驚愕、知らないと損、今すぐやめて)
+* Include core keyword naturally
+* Match Japanese audience style (not overly aggressive, but still compelling)
 
-■ 嫁姑系:
-* 姑・義実家・夫
-* 嫌味・限界・崩壊
+* MUST start with a Japanese bracket tag using this format: 【〇〇】
+* The content inside 【】 should be a short, powerful keyword or phrase that represents the main topic or hook (e.g., 朝習慣, 腸活, 知らないと損, 実は, 絶対NG)
+* Use ONLY ONE bracket tag
+* The rest of the title (after 【】) must be specific, clear, and compelling (no vague phrasing)
 
-■ 不倫系:
-* 浮気・不倫・裏切り
-* 発覚・証拠・バレた瞬間
+---
 
-■ その他:
-* 裏切り・非常識・衝突
+### 3. DESCRIPTION (SEO OPTIMIZED)
 
-3. 説明文:
+* Write in Japanese
+* Start with EXACTLY 3 main hashtags (relevant to niche)
+* Then write a natural, engaging, SEO-optimized paragraph (150–300 words equivalent in Japanese)
+* Include important keywords naturally (avoid keyword stuffing)
+* At the end, add additional related hashtags (5–10)
 
-以下の構成で作成
+---
 
-① 冒頭にメインハッシュタグ（3つ）
-（例：#スカッと #修羅場 #2ch）
+### 4. TAGS
 
-② 導入（ジャンル別）
-* 嫁姑 → 共感・ストレス
-* 不倫 → 疑念・違和感
-* その他 → 問題提起
+* Write in Japanese
+* Include:
 
-③ あらすじ（ネタバレなし）
+  * Short tags (1–2 words)
+  * Long-tail tags (natural search phrases)
+* Closely related to content and niche
+* Comma-separated format
+* Include variations of main keywords
 
-④ 視聴者への問いかけ
-（あなたならどうする？系）
+---
 
-⑤ 定型文（チャンネル説明）
+## OUTPUT FORMAT (STRICT)
 
-⑥ 文末にサブハッシュタグ（3〜6個）
-（例：#嫁姑問題 #不倫 #スカッとする話 など）
+* You MUST wrap the entire output inside a single Markdown code block using triple backticks (\`\`\`)
+* Do NOT write anything before or after the code block
+* Do NOT include explanations or comments
+* The first character of your response MUST be \'\'\'
+* The last character of your response MUST be \'\'\'
 
-4. タグ:
-
-* 15〜20個
-* 短文＋長文タグ混合
-* ジャンル特化キーワードを優先
-* カンマ区切り
-
-# Output Format（厳守）:
-
-必ずコードブロック内のみ出力
+## OUTPUT STRUCTURE
 
 \`\`\`
 Niche
-（判定結果）
 
 Title
-（1案）
 
 Description
-#スカッと #修羅場 #2ch
-
-（導入）
-（あらすじ）
-（問いかけ）
-（定型文）
-
-#ハッシュタグ #修羅場 
 
 Tags
-（カンマ区切り）
-\`\`\`
+\'\'\'
 `;

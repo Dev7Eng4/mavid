@@ -1,3 +1,12 @@
+import { clearContent, clickElement } from './dom.util.js';
+
+const GEMINI_SELECTOR = {
+  editor: 'div[role="textbox"]',
+  btnSelectMode: 'button[data-test-id="bard-mode-picker-button"]',
+  thinkingMode: 'button[data-test-id="bard-mode-option-thinking"]',
+  btnUpload: 'button[aria-controls="upload-file-menu"]',
+};
+
 export async function waitForGeminiResponse(page, timeoutMs = 120000) {
   await page.waitForSelector('.model-response-text, .response-content, .message-content', {
     timeout: timeoutMs,
@@ -26,7 +35,7 @@ export async function extractGeminiResponse(page) {
 
   return page.evaluate(() => {
     const responses = Array.from(
-      document.querySelectorAll('.model-response-text, .response-content, .message-content, div[data-message-author-role="model"]'),
+      document.querySelectorAll('.model-response-text, .response-content, .message-content, div[data-message-author-role="model"]')
     );
 
     if (responses.length === 0) return '';
@@ -46,4 +55,27 @@ export async function extractGeminiResponse(page) {
 
     return (lastResponse.innerText || lastResponse.textContent || '').trim();
   });
+}
+
+export async function chooseThinkingMode(page) {
+  await clickElement(page, GEMINI_SELECTOR.btnSelectMode);
+  await page.waitForTimeout(500);
+  await clickElement(page, GEMINI_SELECTOR.thinkingMode);
+}
+
+export async function sendPromptToGemini(page, prompt) {
+  await page.keyboard.press('Escape');
+
+  await clickElement(page, GEMINI_SELECTOR.editor);
+  await page.waitForTimeout(500);
+  await clearContent(page);
+  await page.waitForTimeout(500);
+  await page.keyboard.insertText(prompt);
+  await page.waitForTimeout(300);
+  await page.keyboard.press('Enter');
+
+  await waitForGeminiResponse(page, 150000);
+
+  const result = await extractGeminiResponse(page);
+  return result;
 }

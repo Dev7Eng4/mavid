@@ -1,4 +1,5 @@
 export const getRandomNumber = number => number + Math.random() * 1000;
+const randomBetween = (min, max) => min + Math.random() * (max - min);
 
 function bezier(t, p0, p1, p2, p3) {
   const u = 1 - t;
@@ -25,7 +26,7 @@ export async function moveToTopLeft(
     minDelay: 8,
     maxDelay: 20,
     overshoot: true,
-  },
+  }
 ) {
   const { steps = 60, minDelay = 8, maxDelay = 20, overshoot = true } = options;
 
@@ -43,7 +44,7 @@ export async function moveToTopLeft(
         window.__mouseX = e.clientX;
         window.__mouseY = e.clientY;
       },
-      { once: false },
+      { once: false }
     );
   });
 
@@ -82,23 +83,42 @@ export async function moveToTopLeft(
   }
 }
 
-export const clickElement = async (page, xpath, isLocator = false) => {
-  const getPosition = async (page, xpath) => {
-    const element = !isLocator ? page.locator(`xpath=${xpath}`) : page.locator(xpath);
-    const box = await element.boundingBox();
-    if (!box) throw new Error('Element not found');
-    return box;
+export const clickElement = async (page, selector, isXpath = false) => {
+  const element = isXpath ? page.locator(`xpath=${selector}`) : page.locator(selector);
+
+  const box = await element.boundingBox();
+
+  if (!box) throw new Error('Element not found');
+
+  const targetPosition = {
+    x: box.x + box.width * randomBetween(0.3, 0.7),
+    y: box.y + box.height * randomBetween(0.3, 0.7),
   };
 
-  const box = await getPosition(page, xpath);
-  const position = {
-    x: box.x + box.width / 2,
-    y: box.y + box.height / 2,
+  const steps = Math.floor(randomBetween(20, 35));
+
+  await page.mouse.move(targetPosition.x, targetPosition.y, { steps });
+
+  const jitterCount = Math.floor(randomBetween(2, 5));
+
+  for (let i = 0; i < jitterCount; i++) {
+    await page.mouse.move(targetPosition.x + randomBetween(-2, 2), targetPosition.y + randomBetween(-2, 2));
+    await delay(randomBetween(30, 80));
+  }
+
+  await delay(randomBetween(150, 600));
+
+  const clickTarget = {
+    x: targetPosition.x + randomBetween(-3, 3),
+    y: targetPosition.y + randomBetween(-3, 3),
   };
 
-  await page.mouse.move(position.x, position.y, { steps: 20 });
-  await delay(1000);
-  await page.mouse.click(position.x, position.y);
+  await page.mouse.move(clickTarget.x, clickTarget.y);
+
+  // await page.mouse.click(position.x, position.y);
+  await page.mouse.down();
+  await delay(randomBetween(50, 180));
+  await page.mouse.up();
 };
 
 async function humanScroll(page, distance) {
@@ -145,4 +165,13 @@ export async function scrollUntilVisible(page, selector, isFullXpath = false, ju
   }
 
   throw new Error(`Không tìm thấy "${selector}"`);
+}
+
+export async function clearContent(page) {
+  await page.keyboard.down('Control');
+  await page.keyboard.press('A');
+  await page.keyboard.up('Control');
+  await page.waitForTimeout(100);
+  await page.keyboard.press('Backspace');
+  await page.waitForTimeout(100);
 }

@@ -9,6 +9,8 @@ import { flowSettings } from '../constants/index.js';
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const DOWNLOADS_DIR = path.join(__dirname, '..', '..', 'downloads');
 
+const FLOW_SELECTOR = {};
+
 /** Profile Playwright dùng cho Flow (thư mục chrome-profile/profile{N}). Ưu tiên env MAVID_CHROME_PROFILE. */
 function resolveFlowChromeProfile(cfg) {
   const raw = process.env.MAVID_CHROME_PROFILE ?? cfg.FLOW_CHROME_PROFILE ?? 1;
@@ -89,7 +91,14 @@ export async function generateImageWithFlow(prompt, pathSave, exportName, settin
 
         await delay(2000);
 
-        execFile('uploadImageFlow.exe', [DOWNLOADS_DIR, thumbFile]);
+        // execFile('uploadImageFlow.exe', [DOWNLOADS_DIR, thumbFile]);
+
+        const [fileChooser] = await Promise.all([
+          page.waitForEvent('filechooser'),
+          clickElement(page, '/html/body/div[1]/div[2]/div/div/div/div[2]/div[1]/div/div[2]'),
+        ]);
+
+        await fileChooser.setFiles(path.join(DOWNLOADS_DIR, thumbFile));
 
         await delay(2900);
 
@@ -101,7 +110,7 @@ export async function generateImageWithFlow(prompt, pathSave, exportName, settin
             return btn && !btn.disabled;
           },
           btnXpath,
-          { timeout: 60000 },
+          { timeout: 60000 }
         );
         console.log('✅ Nút đã sẵn sàng!');
       }
@@ -131,7 +140,7 @@ export async function generateImageWithFlow(prompt, pathSave, exportName, settin
           }
           return false;
         },
-        { timeout: 3 * 60 * 1000 },
+        { timeout: 3 * 60 * 1000 }
       ),
     ]);
 

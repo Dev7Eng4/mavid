@@ -1,136 +1,263 @@
-export const createPromptSummaryContent = (currentContent, previousSummaries = '') =>
-  `
-당신은 한국형 영상 콘텐츠를 전문으로 요약하는 전문가입니다.
+export const promptCreateSummaryChunk = transcript => `
+You are a top-tier Korean content writer, script analyst, and storytelling expert with deep understanding of Korean media style, audience psychology, and narrative structure.
 
-현재 당신은 하나의 영상 일부를 처리하고 있습니다. (전체 영상일 수도 있고, 일부 구간일 수도 있습니다)
+Your task is to analyze a PARTIAL TRANSCRIPT (chunk) of a Korean video and produce a high-quality summary that preserves key meaning, emotional tone, and useful information.
 
-이전 내용 요약 (없을 수도 있음):
-${previousSummaries}
+## INPUT
 
-현재 구간의 트랜스크립트:
-${currentContent}
+Transcript Chunk (Korean):
+${transcript}
 
-작업 지침:
-- 이전 요약이 없는 경우:
-  → 이 내용이 영상의 시작 또는 전체일 수 있다고 판단하고 핵심 내용을 빠짐없이 요약하세요
+## OBJECTIVES
 
-- 이전 요약이 있는 경우:
-  → 현재 구간을 요약하되 이전 내용과 자연스럽게 연결하고, 중복 없이 흐름을 유지하세요
+1. Extract the core message of this chunk
+2. Identify important details, insights, or instructions
+3. Preserve the original intent and tone (informative, emotional, persuasive, etc.)
+4. Remove filler, repetition, and unnecessary speech patterns
+5. Make the summary clear, structured, and easy to use for later aggregation
 
-요구 사항:
-- 하나의 자연스러운 문단으로 작성하세요
-- 간결하고 명확하게 핵심만 전달하세요
-- 한국 영상 스타일의 부드럽고 친근한 톤 유지
+## INSTRUCTIONS
 
-출력 규칙 (매우 중요):
-- 반드시 하나의 코드 블록( \`\`\` ) 안에만 출력하세요
-- 코드 블록 밖에는 어떤 텍스트도 절대 출력하지 마세요
-- 코드 블록 안에는 요약 텍스트만 작성하세요
-- JSON, 설명, 제목 금지
-- 이미지 생성 금지
-- 이모지 금지
+### 1. SUMMARY STYLE
 
-형식 예시 (반드시 이 형식을 따르세요):
+* Write in Korean
+* Use clear, natural, and concise Korean
+* Maintain the original meaning accurately
+* Do NOT translate to another language
+* Do NOT add new information that is not in the transcript
+
+---
+
+### 2. STRUCTURE
+
+* Start with a short header summarizing the main idea of the chunk (one sentence)
+* Then provide bullet points for key details
+
+---
+
+### 3. CONTENT RULES
+
+* Focus on:
+
+  * Key ideas
+  * Important explanations
+  * Steps / processes (if any)
+  * Notable examples or evidence
+* Remove:
+
+  * Fillers (음…, 그…, 약간…)
+  * Repetitions
+  * Off-topic الكلام
+
+---
+
+### 4. LENGTH
+
+* Keep it concise but informative
+* Typically 3–6 bullet points depending on content density
+
+---
+
+## OUTPUT FORMAT (STRICT)
+
+* You MUST wrap the entire output inside a single Markdown code block using triple backticks (\`\`\`)
+* Do NOT write anything before or after the code block
+* Do NOT include explanations or comments
+* The first character of your response MUST be \`\`\`
+* The last character of your response MUST be \`\`\`
+
+## OUTPUT STRUCTURE
+
+\`\`\`
+{한 줄 요약}
+
+- 핵심 포인트 1
+- 핵심 포인트 2
+- 핵심 포인트 3
+- ...
+\`\`\`
 `;
 
-export const createPromptToMergeSummaryContent = allPartSummaries => `
-당신은 한국형 영상 콘텐츠를 전문으로 요약하는 전문가입니다.
+export const promptCreateFinalSummary = summaries => `
+You are a top-tier Korean content strategist, professional editor, and narrative synthesizer with deep understanding of Korean video content, audience psychology, and information structuring.
 
-아래는 하나의 영상에서 추출된 여러 개의 요약입니다 (각 줄은 하나의 요약입니다):
+Your task is to create a FINAL SUMMARY of a Korean video based on the provided input. The input may be either multiple chunk summaries or a single full transcript.
 
-${allPartSummaries}
+## INPUT
 
-작업 지침:
-- 모든 요약을 종합하여 하나의 최종 요약으로 만드세요
-- 전체 흐름이 자연스럽게 이어지도록 재구성하세요
-- 중복되는 내용은 제거하세요
-- 핵심 메시지를 명확하게 전달하세요
+Content (Korean):
+${summaries}
 
-요구 사항:
-- 하나의 자연스러운 문단으로 작성하세요
-- 간결하지만 전체 내용을 충분히 반영하세요
-- 한국 영상 스타일에 맞는 부드럽고 친근한 톤 유지
-- 제공된 내용 외에는 추측하지 마세요
+## OBJECTIVES
 
-출력 규칙 (매우 중요):
-- 반드시 하나의 코드 블록( \`\`\` ) 안에만 출력하세요
-- 코드 블록 밖에는 어떤 텍스트도 절대 출력하지 마세요
-- 코드 블록 안에는 최종 요약 텍스트만 작성하세요
-- 제목, 설명, JSON, 추가 문장 금지
-- 이미지 생성 금지
-- 이모지 금지
+1. Produce a single, cohesive FINAL SUMMARY
+2. Identify the overall theme and core message of the video
+3. Preserve key insights, important details, and logical flow
+4. Remove redundancy and unnecessary repetition
+5. Make the final summary clear, structured, and useful for downstream tasks (title, SEO, content creation)
 
-형식 예시 (반드시 이 형식을 따르세요):
+## INSTRUCTIONS
+
+### 1. LANGUAGE & STYLE
+
+* Write entirely in Korean
+* Use natural, clear, and professional Korean writing style
+* Maintain the original tone (educational, emotional, persuasive, etc.)
+* Do NOT add new information not present in the input
+
+---
+
+### 2. STRUCTURE
+
+* Start with a strong overall summary (2–3 sentences capturing the entire video)
+* Then organize the content into structured bullet points
+
+---
+
+### 3. CONTENT ORGANIZATION
+
+* If input is chunk summaries:
+  - Merge and deduplicate overlapping ideas
+  - Reconstruct logical flow across chunks
+
+* If input is a full transcript:
+  - Extract and condense key ideas
+  - Ignore fillers, repetitions, and off-topic parts
+
+* In all cases:
+  - Group similar ideas together
+  - Maintain logical progression (e.g., problem → explanation → solution → result)
+
+---
+
+### 4. KEY ELEMENTS TO INCLUDE
+
+* Core message
+* Key insights
+* Important steps or methods (if any)
+* Notable conclusions or outcomes
+
+---
+
+### 5. CLARITY & QUALITY
+
+* Eliminate duplication
+* Avoid vague or generic phrasing
+* Make each bullet point meaningful and information-dense
+
+---
+
+### 6. LENGTH
+
+* Keep it comprehensive but concise
+* Typically 5–10 bullet points depending on content depth
+
+---
+
+## OUTPUT FORMAT (STRICT)
+
+* You MUST wrap the entire output inside a single Markdown code block using triple backticks (\`\`\`)
+* Do NOT write anything before or after the code block
+* Do NOT include explanations or comments
+* The first character of your response MUST be \`\`\`
+* The last character of your response MUST be \`\`\`
+
+## OUTPUT STRUCTURE
+
+\`\`\`
+{전체 내용을 요약한 2~3문장}
+
+- 핵심 내용 1
+- 핵심 내용 2
+- 핵심 내용 3
+- ...
+\`\`\`
 `;
 
-export const createPromptCreateMetaInfo = (title, summary) => `
-당신은 한국 YouTube 콘텐츠 마케팅 전문가이며, 실제 한국에서 통하는 클릭률(CTR)과 검색 최적화(SEO)를 극대화하는 것이 목표입니다.
+export const promptCreateVideoMeta = summary => `
+You are a top-tier Korean YouTube content strategist, SEO expert, and viral content creator with deep understanding of Korean audience psychology, trends, and high-CTR content patterns.
 
-다음은 영상 정보입니다:
+Your task is to analyze a FINAL SUMMARY of a Korean video and generate high-performance YouTube metadata optimized for CTR and SEO.
 
-기존 제목:
-${title}
+## INPUT
 
-영상 요약:
+Final Summary (Korean):
 ${summary}
 
-작업 지침:
+## OBJECTIVES
 
-0. 니치 분석:
-- 영상의 주제를 분석하여 하나의 니치로 정의할 것
-- 반드시 1줄로 간단하고 명확하게 작성할 것
-(예: 건강, 자기계발, 리뷰, 브이로그, 스토리, 엔터테인먼트 등)
+1. Detect the most accurate and valuable content niche of the video
+2. Create ONE highly clickable title (CTR-focused, curiosity-driven)
+3. Write an SEO-optimized description
+4. Generate highly relevant and powerful tags (short + long-tail)
 
-1. 제목:
-- 반드시 해당 니치에 맞는 스타일로 작성할 것
-- 한국 YouTube에서 실제로 사용되는 자연스럽고 인간적인 제목 스타일로 작성할 것
-- AI가 작성한 것처럼 보이는 어색한 문장은 절대 금지
-- 첫 문장에서 강한 후킹 요소를 포함할 것
-- 사람들이 "왜?"라고 생각하게 만드는 구조로 작성할 것
-- 구체적인 상황, 대상, 결과를 포함할 것
-- 과장되지 않으면서도 현실감 있게 작성할 것
-- 40~65자 사이로 작성할 것
+## INSTRUCTIONS
 
-[니치별 제목 전략]
-- 건강/정보: 경고, 위험성, 잘못된 상식, 전문가 언급 포함
-- 스토리: 감정 + 반전 + 궁금증 유도
-- 리뷰: 솔직함 + 실제 경험 중심
-- 브이로그: 자연스럽고 공감형
-- 엔터: 놀라움 + 흥미 요소 강조
+### 1. NICHE DETECTION
 
-2. 설명:
-- 첫 줄에 핵심 해시태그 3개를 작성할 것
-- 본문은 자연스럽고 읽기 쉽게 작성할 것
-- 시청을 유도하는 문장을 반드시 포함할 것
-- 실제 사람들이 검색하는 키워드를 중심으로 자연스럽게 문장에 포함할 것
-- 지나치게 딱딱하거나 설명문 같은 문장은 절대 금지
-- 영상 내용을 기반으로 신뢰감 있게 작성할 것
-- 마지막에는 추가 해시태그 5~10개를 작성할 것
+* Identify the core niche of the content (e.g., 건강, 자기계발, 다이어트, 투자, 습관, 멘탈, 공부, 인간관계, etc.)
+* Be specific (e.g., 장건강 루틴, 아침 습관 개선, 생산성 향상법)
+* Reflect the true intent and value of the content
 
-3. 태그:
-- 최소 10개 이상 작성할 것
-- 핵심 키워드, 롱테일 키워드, 상황 키워드를 반드시 포함할 것
-- 실제 검색에 사용되는 키워드 중심으로 작성할 것
-- 쉼표(,)로 구분할 것
+---
 
-출력 규칙 (매우 중요):
-- 반드시 하나의 코드 블록( \`\`\` ) 안에만 출력할 것
-- 코드 블록 밖에는 어떤 텍스트도 작성하지 말 것
-- 아래 형식을 반드시 그대로 사용할 것 (단어 수정 금지)
+### 2. TITLE (ONLY 1)
 
+* Maximum 90 characters
+* High CTR (curiosity-driven, emotionally engaging)
+* Use strong Korean hook phrases if relevant (e.g., "모르면 손해", "지금 당장 끊어야 할", "충격적인 진실", "99%가 모르는")
+* Include core keyword naturally
+* Must match Korean audience style (natural, not overly exaggerated but still compelling)
+* Avoid vague or generic phrasing
+* The title should clearly hint at a benefit, result, or hidden truth
+
+---
+
+### 3. DESCRIPTION (SEO OPTIMIZED)
+
+* Write in Korean
+* First line must contain EXACTLY 3 main hashtags (strongly related to niche)
+* Then write a natural, engaging, SEO-optimized paragraph (150–300 words equivalent in Korean)
+* Include important keywords naturally (avoid keyword stuffing)
+* Clearly communicate value and what viewers will gain
+* End with 5–10 additional related hashtags
+
+---
+
+### 4. TAGS
+
+* Write in Korean
+* Include:
+
+  * Short tags (1–2 words)
+  * Long-tail tags (natural search phrases)
+* Highly relevant to niche and content
+* Include keyword variations and search-intent phrases
+* Comma-separated format
+
+---
+
+## OUTPUT FORMAT (STRICT)
+
+* You MUST wrap the entire output inside a single Markdown code block using triple backticks (\`\`\`)
+* Do NOT write anything before or after the code block
+* Do NOT include explanations or comments
+* The first character of your response MUST be \`\`\`
+* The last character of your response MUST be \`\`\`
+
+## OUTPUT STRUCTURE
+
+\`\`\`
 Niche
-- [내용]
+{niche}
 
 Title
-[내용]
+{title}
 
 Description
-#[해시태그1] #[해시태그2] #[해시태그3]
-
-[본문]
-
-#[해시태그4] #[해시태그5] #[해시태그6] #[해시태그7] #[해시태그8]
+{description}
 
 Tags
-tag1, tag2, tag3, tag4, tag5, tag6, tag7, tag8, tag9, tag10
+{tags}
+\`\`\`
 `;
