@@ -1,4 +1,4 @@
-import { PROMPTS_CREATE_THUMBNAIL_OPTIONS } from '@contents/promts/index.js';
+import { PROMPTS_CREATE_THUMBNAIL_OPTIONS } from '@contents/prompts/index.js';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { ChannelRow } from '../../../types';
 import { AppButton } from '../../ui/AppButton';

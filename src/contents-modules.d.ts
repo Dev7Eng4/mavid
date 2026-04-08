@@ -17,7 +17,7 @@ declare module '@contents/constants/index.js' {
   export const THUMBNAIL_STYLE_OPTIONS: readonly { label: string; value: string }[];
 }
 
-declare module '@contents/promts/index.js' {
+declare module '@contents/prompts/index.js' {
   /** Key = id style lưu trong channel; value = hàm tạo prompt. */
   export const PROMPTS_CREATE_THUMBNAIL: Record<string, (...args: unknown[]) => string>;
   export const PROMPTS_CREATE_THUMBNAIL_OPTIONS: readonly { label: string; value: string }[];

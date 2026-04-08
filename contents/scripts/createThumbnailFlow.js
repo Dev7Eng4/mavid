@@ -23,7 +23,13 @@ const ROOT = path.join(__dirname, '..', '..');
  * @param {string} [opts.exportName='flow-thumbnail']
  * @param {object} [opts.flowExtraSettings] — merge vào flowSettings
  */
-export async function runCreateThumbnailFlow({ prompt, pathSave, exportName = 'flow-thumbnail', flowExtraSettings = {}, isNeedImage = false }) {
+export async function runCreateThumbnailFlow({
+  prompt,
+  pathSave,
+  exportName = 'flow-thumbnail',
+  flowExtraSettings = {},
+  isNeedImage = false,
+}) {
   if (!prompt || typeof prompt !== 'string' || !String(prompt).trim()) {
     throw new Error('runCreateThumbnailFlow: thiếu prompt hợp lệ');
   }
@@ -39,7 +45,7 @@ async function cliMain() {
   const argv = process.argv.slice(2);
   const pathSave = path.resolve(argv[0] || path.join(ROOT, 'downloads'));
   const exportName = argv[1] || 'image-created-by-flow';
-  const { createPromptReCreateThumbnail } = await import('../promts/ja/createImage.js');
+  const { createPromptReCreateThumbnail } = await import('../prompts/ja/createImage.js');
   await runCreateThumbnailFlow({
     prompt: createPromptReCreateThumbnail(),
     pathSave,

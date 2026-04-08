@@ -226,7 +226,7 @@ export interface AddChannelFromFormParams {
       background: string;
       /** Chỉ dùng khi `videoType === 'reup_full'` — tên trong OVERLAY_OPTIONS. */
       overlay?: string;
-      /** Khớp `PROMPTS_CREATE_THUMBNAIL_OPTIONS[].value` trong contents/promts/index.js */
+      /** Khớp `PROMPTS_CREATE_THUMBNAIL_OPTIONS[].value` trong contents/prompts/index.js */
       thumbnailPrompt?: string;
       videosPerDayPreset: string;
       publishTimes: string[];

@@ -1,10 +1,17 @@
+import path from 'path';
+import { GEMINI_CONFIG } from '../constants/index.js';
 import { clearContent, clickElement } from './dom.util.js';
+import { fileURLToPath } from 'url';
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const DOWNLOADS_DIR = path.join(__dirname, '..', '..', 'outputs');
 
 const GEMINI_SELECTOR = {
   editor: 'div[role="textbox"]',
-  btnSelectMode: 'button[data-test-id="bard-mode-picker-button"]',
+  btnSelectMode: 'button[data-test-id="bard-mode-menu-button"]',
   thinkingMode: 'button[data-test-id="bard-mode-option-thinking"]',
   btnUpload: 'button[aria-controls="upload-file-menu"]',
+  btnUploadFile: 'button[data-test-id="local-images-files-uploader-button"]',
 };
 
 export async function waitForGeminiResponse(page, timeoutMs = 120000) {
@@ -35,7 +42,7 @@ export async function extractGeminiResponse(page) {
 
   return page.evaluate(() => {
     const responses = Array.from(
-      document.querySelectorAll('.model-response-text, .response-content, .message-content, div[data-message-author-role="model"]')
+      document.querySelectorAll('.model-response-text, .response-content, .message-content, div[data-message-author-role="model"]'),
     );
 
     if (responses.length === 0) return '';
@@ -66,6 +73,14 @@ export async function chooseThinkingMode(page) {
 export async function sendPromptToGemini(page, prompt) {
   await page.keyboard.press('Escape');
 
+  // await clickElement(page, GEMINI_SELECTOR.btnUpload);
+
+  // await page.waitForTimeout(500);
+
+  // const [fileChooser] = await Promise.all([page.waitForEvent('filechooser'), clickElement(page, GEMINI_SELECTOR.btnUploadFile)]);
+
+  // await fileChooser.setFiles(path.join(DOWNLOADS_DIR, 'test.png'));
+
   await clickElement(page, GEMINI_SELECTOR.editor);
   await page.waitForTimeout(500);
   await clearContent(page);
@@ -78,4 +93,12 @@ export async function sendPromptToGemini(page, prompt) {
 
   const result = await extractGeminiResponse(page);
   return result;
+}
+
+export async function openGeminiPage(page) {
+  await page.goto(GEMINI_CONFIG.URL, { waitUntil: 'domcontentloaded', timeout: 30000 });
+
+  await page.waitForTimeout(500);
+
+  await chooseThinkingMode(page);
 }

@@ -9,7 +9,21 @@ import { flowSettings } from '../constants/index.js';
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const DOWNLOADS_DIR = path.join(__dirname, '..', '..', 'downloads');
 
-const FLOW_SELECTOR = {};
+const FLOW_SELECTOR = {
+  btnCreateWithFlow: '/html/body/div[1]/div[1]/div/section[1]/div[1]/div[2]/button',
+  btnNewProject: '/html/body/div[1]/div[2]/div/div/button',
+  btnConfig: '/html/body/div[1]/div[1]/div[5]/div/div/div[2]/div[2]/button[1]',
+  btnOptionImage: '/html/body/div[3]/div/div[1]/div/button[1]',
+  btnOptionRatio: '/html/body/div[3]/div/div[2]/div/button[1]',
+  btnOptionQuantity: '/html/body/div[3]/div/div[3]/div/button[1]',
+  btnOptionModel: '/html/body/div[3]/div/button',
+  btnOptionModelPro: '/html/body/div[4]/div/div[1]/div/button',
+  btnAttach: '/html/body/div[1]/div[1]/div[5]/div/div/div[2]/div[1]/button',
+  btnUploadImage: '/html/body/div[1]/div[2]/div/div/div/div[2]/div[1]/div/div[2]',
+  btnCreate: '/html/body/div[1]/div[1]/div[4]/div/div/div[2]/div[2]/button[2]',
+  btnCreateHaveImage: '/html/body/div[1]/div[1]/div[4]/div/div/div[3]/div[2]/button[2]',
+  textbox: 'div[role="textbox"]',
+};
 
 /** Profile Playwright dùng cho Flow (thư mục chrome-profile/profile{N}). Ưu tiên env MAVID_CHROME_PROFILE. */
 function resolveFlowChromeProfile(cfg) {
@@ -26,19 +40,23 @@ async function superClear(page, context) {
   }
 }
 
+export async function openFlowPage(page, projectUrl) {
+  await page.goto(projectUrl, { waitUntil: 'domcontentloaded' }, { timeout: 30000 });
+  await page.waitForTimeout(500);
+
+  await page.keyboard.press('Escape');
+  // await delay(8000);
+}
+
 export async function generateImageWithFlow(prompt, pathSave, exportName, setting = {}, isNeedImage = false) {
   const cfg = { ...flowSettings, ...setting };
   const chromeProfile = resolveFlowChromeProfile(cfg);
   console.log('🔄 Đang generate ảnh thumbnail từ Flow...');
-  console.log(`[flow] Dùng Chrome profile${chromeProfile} (FLOW_CHROME_PROFILE / MAVID_CHROME_PROFILE).`);
 
   const { context, page } = await openChromeProfile({ profile: chromeProfile, visible: true });
 
   try {
-    await page.goto(cfg.FLOW_URL + cfg.FLOW_PROJECT_ID);
-    await page.waitForLoadState('domcontentloaded');
-    await page.keyboard.press('Escape');
-    await delay(8000);
+    await openFlowPage(page, cfg.FLOW_URL + cfg.FLOW_PROJECT_ID);
 
     const dialogs = page.locator("div[data-state='open'][role='dialog']");
     const count = await dialogs.count();
@@ -58,63 +76,60 @@ export async function generateImageWithFlow(prompt, pathSave, exportName, settin
     if (await createWithFlowText.isVisible()) {
       console.log('🔄 Đang Create with Flow...');
       await delay(3000);
-      await clickElement(page, 'html/body/div[1]/div[1]/div/section[1]/div[1]/div[2]/button');
+      await clickElement(page, FLOW_SELECTOR.btnCreateWithFlow, true);
     }
 
-    await clickElement(page, 'html/body/div[1]/div[1]/div[5]/div/div/div[2]/div[2]/button[1]'); //button select type image/video
+    await clickElement(page, FLOW_SELECTOR.btnConfig, true); //button select type image/video
+    // await clickElement(page, FLOW_SELECTOR.btnOptionImage, true); // select image
+    await clickElement(page, FLOW_SELECTOR.btnOptionRatio, true); // select ratio
+    await clickElement(page, FLOW_SELECTOR.btnOptionQuantity, true); // select quantity
+    await clickElement(page, FLOW_SELECTOR.btnOptionModel, true); // select model
+    await clickElement(page, FLOW_SELECTOR.btnOptionModelPro, true); // select model pro
 
-    await clickElement(page, '/html/body/div[3]/div/div[2]/div/button[1]'); // select ratio
-
-    await clickElement(page, 'html/body/div[3]/div/div[2]/div/button[1]'); // select quantity
-    await clickElement(page, 'html/body/div[3]/div/div[3]/div/button[1]');
-
-    await clickElement(page, 'html/body/div[3]/div/button'); // select model
-    await clickElement(page, 'html/body/div[4]/div/div[1]/div');
     await page.keyboard.press('Escape');
-
-    const areaXpath = '/html/body/div[1]/div[1]/div[5]/div/div/div[1]/div';
-    await clickElement(page, areaXpath);
-    await delay(1000);
-    // await page.keyboard.type(prompt);
-    await page.keyboard.insertText(prompt);
 
     await delay(500);
 
-    if (isNeedImage && fs.existsSync(DOWNLOADS_DIR)) {
+    console.log('🔄 Đang check file exists...', isNeedImage, fs.existsSync(DOWNLOADS_DIR));
+
+    if (fs.existsSync(DOWNLOADS_DIR)) {
+      console.log('🔄 Đang attach ảnh thumbnail...');
       const files = fs.readdirSync(DOWNLOADS_DIR);
       const thumbFile = files.find(f => f.startsWith('thumbnail.'));
 
       if (thumbFile) {
-        await clickElement(page, '/html/body/div[1]/div[1]/div[5]/div/div/div[2]/div[1]/button');
-
-        await clickElement(page, '/html/body/div[1]/div[2]/div/div/div/div[2]/div[1]/div/div[2]');
+        console.log('🔄 Đang click button attach...');
+        await clickElement(page, FLOW_SELECTOR.btnAttach, true);
 
         await delay(2000);
 
+        console.log('🔄 Đang click button upload image...');
         // execFile('uploadImageFlow.exe', [DOWNLOADS_DIR, thumbFile]);
 
-        const [fileChooser] = await Promise.all([
-          page.waitForEvent('filechooser'),
-          clickElement(page, '/html/body/div[1]/div[2]/div/div/div/div[2]/div[1]/div/div[2]'),
-        ]);
-
+        const [fileChooser] = await Promise.all([page.waitForEvent('filechooser'), clickElement(page, FLOW_SELECTOR.btnUploadImage, true)]);
+        console.log('🔄 Đang set files...');
         await fileChooser.setFiles(path.join(DOWNLOADS_DIR, thumbFile));
-
+        console.log('🔄 Đã set files...');
         await delay(2900);
 
         console.log('[flow] Đang chờ nút xử lý được enable (upload hoàn tất)...');
-        const btnXpath = '/html/body/div[1]/div[1]/div[5]/div/div/div[3]/div[2]/button[2]';
         await page.waitForFunction(
           xpath => {
             const btn = document.evaluate(xpath, document, null, XPathResult.FIRST_ORDERED_NODE_TYPE, null).singleNodeValue;
             return btn && !btn.disabled;
           },
-          btnXpath,
-          { timeout: 60000 }
+          FLOW_SELECTOR.btnCreateHaveImage,
+          { timeout: 60000 },
         );
         console.log('✅ Nút đã sẵn sàng!');
+
+        await delay(2000);
       }
     }
+
+    await clickElement(page, FLOW_SELECTOR.textbox);
+    await delay(1000);
+    await page.keyboard.insertText(prompt);
 
     await page.keyboard.press('Enter');
 
@@ -140,7 +155,7 @@ export async function generateImageWithFlow(prompt, pathSave, exportName, settin
           }
           return false;
         },
-        { timeout: 3 * 60 * 1000 }
+        { timeout: 3 * 60 * 1000 },
       ),
     ]);
 

@@ -52,7 +52,7 @@ async function optimizeFlowThumbnailJpegIfLarge(filePath) {
       console.log(
         `[thumbnail-flow] Đã tối ưu flow-thumbnail: ${(before / FLOW_THUMB_OPTIMIZE_MIN_BYTES).toFixed(2)}MB → ${(
           buf.length / FLOW_THUMB_OPTIMIZE_MIN_BYTES
-        ).toFixed(2)}MB (${before} → ${buf.length} bytes)`
+        ).toFixed(2)}MB (${before} → ${buf.length} bytes)`,
       );
     } else if (before >= FLOW_THUMB_OPTIMIZE_MIN_BYTES) {
       console.warn('[thumbnail-flow] Không giảm được kích thước flow-thumbnail sau tối ưu; giữ file gốc.');
@@ -198,11 +198,11 @@ async function processVttTranscriptsWithGemini(
     thumbnailFlowOutputDir = null,
     generateThumbnailWithFlow = true,
     thumbnailPrompt = null,
-  }
+  },
 ) {
   const { cleanSrt } = await import('./utils/srt.util.js');
-  const { updateContentWithGemini } = await import('./updateContentWithGemini2CH.js');
-  const { PROMPTS_CREATE_THUMBNAIL, PROMPTS_NEED_IMAGE } = await import('./promts/index.js');
+  const { updateVideoInfo } = await import('./updateContentWithGemini.js');
+  const { PROMPTS_CREATE_THUMBNAIL, PROMPTS_NEED_IMAGE } = await import('./prompts/index.js');
 
   const vttFiles = fs.readdirSync(outputDir).filter(f => f.endsWith('.vtt'));
   for (const file of vttFiles) {
@@ -218,7 +218,7 @@ async function processVttTranscriptsWithGemini(
     let finalSrt = content;
 
     try {
-      const geminiOut = await updateContentWithGemini(content, {
+      const geminiOut = await updateVideoInfo(content, {
         updateTranscript,
         title: videoTitle,
         description,
@@ -235,7 +235,7 @@ async function processVttTranscriptsWithGemini(
               description: geminiOut.description ?? '',
               tags: geminiOut.tags ?? '',
               summary: geminiOut.summary ?? '',
-            })
+            }),
           );
           console.log('✅ Đã gửi title/description/tags/summary (Gemini) qua callback.');
         } catch (cbErr) {
@@ -254,7 +254,7 @@ async function processVttTranscriptsWithGemini(
             let promptFn = PROMPTS_CREATE_THUMBNAIL[thumbnailPrompt];
             if (!promptFn) {
               console.warn(
-                `[thumbnail-flow] thumbnailPrompt "${thumbnailPrompt}" không hợp lệ hoặc thiếu, dùng fallback ja2CHFromOldThumbnail`
+                `[thumbnail-flow] thumbnailPrompt "${thumbnailPrompt}" không hợp lệ hoặc thiếu, dùng fallback ja2CHFromOldThumbnail`,
               );
               promptFn = PROMPTS_CREATE_THUMBNAIL.ja2CHFromOldThumbnail;
             }
@@ -352,8 +352,8 @@ async function downloadTranscript(url, options = {}) {
   if (updateTranscript && transcriptLang != null && !needsGeminiTranscriptUpdate) {
     console.log(
       `Phụ đề ${String(transcriptLang).toUpperCase()}: bỏ chỉnh từng dòng qua Gemini (chỉ áp dụng: ${LANGUAGES_NEED_UPDATE_TRANSCRIPT.join(
-        ', '
-      )}). Vẫn chạy metadata/title nếu có.`
+        ', ',
+      )}). Vẫn chạy metadata/title nếu có.`,
     );
   }
 

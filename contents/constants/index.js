@@ -28,3 +28,5 @@ export const DEFAULT_VIDEO = {
 };
 
 export const AUDIO_SPEED = 0.91;
+
+export const DEFAULT_PROMPT_LANG = 'ja';

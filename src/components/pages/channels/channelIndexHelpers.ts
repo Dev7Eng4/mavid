@@ -1,5 +1,5 @@
 import type { ChannelRow, ScriptId } from '../../../types';
-import { PROMPTS_CREATE_THUMBNAIL_OPTIONS } from '@contents/promts/index.js';
+import { PROMPTS_CREATE_THUMBNAIL_OPTIONS } from '@contents/prompts/index.js';
 import { OVERLAY_OPTIONS } from '@contents/constants/overlayOptions.js';
 import { buildMavidEnvForVideoFromAudio, defaultBackgroundFolder } from '../../../utils/videoFromAudioEnv';
 import { buildMavidEnvForReupFull } from '../../../utils/reupFullEnv';
@@ -219,7 +219,7 @@ export interface ChannelAddFormInput {
   background: string;
   /** reup_full — khớp OVERLAY_OPTIONS[].NAME */
   overlay: string;
-  /** Khớp `PROMPTS_CREATE_THUMBNAIL_OPTIONS[].value` (contents/promts/index.js). */
+  /** Khớp `PROMPTS_CREATE_THUMBNAIL_OPTIONS[].value` (contents/prompts/index.js). */
   thumbnailPrompt: string;
   videosPerDayPreset: VideoPerDayPreset;
   publishTimes: string[];

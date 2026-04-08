@@ -19,7 +19,7 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 
 import { getVideoInfo, downloadTranscript } from '../downloadVideo.js';
-import { updateVideoMetaWithGemini } from '../updateContentWithGemini.js';
+import { updateVideoMeta } from '../updateContentWithGemini.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.join(__dirname, '..', '..');
@@ -103,8 +103,7 @@ async function main() {
   console.log(`Đã đọc: ${path.basename(srtPath)} (${srtContent.length} ký tự)`);
 
   console.log('Đang mở Gemini: tóm tắt → niche, title, description, tags...');
-  const meta = await updateVideoMetaWithGemini({
-    title: info.title,
+  const meta = await updateVideoMeta({
     srtContent,
     language: 'ja',
   });

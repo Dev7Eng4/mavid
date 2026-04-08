@@ -124,6 +124,89 @@ export function srtToPlainText(srtContent) {
     .join('\n\n');
 }
 
+const SRT_TIMELINE_LINE_RE = /^\d{2}:\d{2}:\d{2}[.,]\d{3}\s*-->\s*\d{2}:\d{2}:\d{2}[.,]\d{3}/;
+
+/**
+ * Kiểm tra SRT sau merge: số thứ tự cue (dòng đầu mỗi block) phải liên tục 1..N, không thiếu, không trùng.
+ * Chỉ tính các block có dòng 1 là số nguyên dương và dòng 2 khớp timeline SRT.
+ *
+ * @param {string} srtContent
+ * @returns {{ ok: boolean, cueCount: number, maxIndex: number, missing: number[], duplicateIndices: number[], invalidBlockCount: number }}
+ */
+export function checkSrtMergedCueIndexSequence(srtContent) {
+  const empty = {
+    ok: false,
+    cueCount: 0,
+    maxIndex: 0,
+    missing: [],
+    duplicateIndices: [],
+    invalidBlockCount: 0,
+  };
+
+  const raw = String(srtContent ?? '').replace(/\r/g, '');
+  const blocks = raw
+    .split(/\n\n+/)
+    .map(b => b.trim())
+    .filter(Boolean);
+
+  let invalidBlockCount = 0;
+  const indices = [];
+
+  for (const block of blocks) {
+    const lines = block
+      .split('\n')
+      .map(l => l.trim())
+      .filter(Boolean);
+    if (lines.length < 3) {
+      invalidBlockCount++;
+      continue;
+    }
+    const idxLine = lines[0];
+    const timeLine = lines[1];
+    if (!/^\d+$/.test(idxLine) || !SRT_TIMELINE_LINE_RE.test(timeLine)) {
+      invalidBlockCount++;
+      continue;
+    }
+    indices.push(parseInt(idxLine, 10));
+  }
+
+  if (indices.length === 0) {
+    return { ...empty, invalidBlockCount };
+  }
+
+  const maxIndex = Math.max(...indices);
+  const seen = new Map();
+  for (const n of indices) {
+    seen.set(n, (seen.get(n) || 0) + 1);
+  }
+
+  const missing = [];
+  for (let i = 1; i <= maxIndex; i++) {
+    if (!seen.has(i)) missing.push(i);
+  }
+
+  const duplicateIndices = [];
+  for (const [k, count] of seen) {
+    if (count > 1) duplicateIndices.push(k);
+  }
+  duplicateIndices.sort((a, b) => a - b);
+
+  const cueCount = indices.length;
+  const ok =
+    missing.length === 0 &&
+    duplicateIndices.length === 0 &&
+    maxIndex === cueCount;
+
+  return {
+    ok,
+    cueCount,
+    maxIndex,
+    missing,
+    duplicateIndices,
+    invalidBlockCount,
+  };
+}
+
 /**
  * Đọc folder downloads, lấy file VTT và làm sạch → xuất SRT
  */

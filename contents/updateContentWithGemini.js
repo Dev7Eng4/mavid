@@ -3,26 +3,11 @@
  * KẾT HỢP TUẦN TỰ (dưới 30 phút) VÀ SONG SONG (trên 30 phút).
  */
 
-import { GEMINI_CHUNK_SIZE, GEMINI_CONFIG, META_DATA } from './constants/index.js';
-import { checkContentSrt, createPromptUpdateShortTranscript } from './promts/updateContent.js';
+import { DEFAULT_PROMPT_LANG, META_DATA, GEMINI_CONFIG, GEMINI_CHUNK_SIZE } from './constants/index.js';
+import { loadPromptByLanguage } from './prompts/index.js';
 import { openChromeProfile } from './scripts/makeChromeProfile.js';
-import { sendPromptToGemini } from './utils/gemini.util.js';
-import { srtToPlainText } from './utils/srt.util.js';
-
-const DEFAULT_PROMPT_LANG = 'ja';
-
-/**
- * Dynamic import prompts theo ngôn ngữ.
- * Thử load từ ./promts/<lang>/createVideoInfo.js, nếu không có thì fallback về ./promts/createVideoInfo.js (ja).
- */
-async function loadVideoInfoPrompts(language) {
-  const lang = String(language || DEFAULT_PROMPT_LANG).toLowerCase();
-  try {
-    return await import(`./promts/${lang}/createVideoInfo.js`);
-  } catch {
-    return await import('./promts/createVideoInfo.js');
-  }
-}
+import { openGeminiPage, sendPromptToGemini } from './utils/gemini.util.js';
+import { checkSrtMergedCueIndexSequence, srtToPlainText } from './utils/srt.util.js';
 
 /**
  * Láy thời lượng video (tính bằng phút) dựa vào dòng cue SRT cuối cùng
@@ -47,13 +32,11 @@ function getSrtDurationInMinutes(cuesArray) {
  * (Dùng cho cơ chế đa tab đồng thời)
  */
 async function processChunkOnPage(page, chunk, index, totalChunks) {
-  const prompt = checkContentSrt(chunk);
+  const prompt = promptUpdateTranscript(chunk);
   console.log(`\n--- Đang mở Gemini và gửi prompt phần ${index + 1}/${totalChunks} ---`);
 
   // Mở trang Gemini thẳng luôn trên tab được giao
-  await page.goto(GEMINI_CONFIG.URL, { waitUntil: 'domcontentloaded', timeout: 30000 });
-  await page.waitForTimeout(500);
-  await chooseThinkingMode(page);
+  await openGeminiPage(page);
 
   const result = await sendPromptToGemini(page, prompt);
 
@@ -61,7 +44,7 @@ async function processChunkOnPage(page, chunk, index, totalChunks) {
 }
 
 /**
- * Parse phản hồi đúng theo # Output Format trong createPromptCreateMetaInfo:
+ * Parse phản hồi đúng theo # Output Format trong promptCreateVideoMeta:
  * Niche → Title → Description → Tags (mỗi nhãn nằm trên 1 dòng riêng, nội dung phía dưới).
  * Tìm vị trí từng label rồi cắt text giữa chúng — tránh regex lazy + multiline flag gây cắt sai.
  */
@@ -98,12 +81,12 @@ function parseCreateMetaInfoResponse(metaRaw) {
 
 /**
  * Trên cùng một tab Gemini: tóm tắt SRT theo chunk (500 cues) → metadata tổng hợp (createVideoInfo.js).
- * Giống luồng updateContentWithGemini2CH.js, prompt từ createPromptSummaryContent / createPromptCreateMetaInfo.
  */
-async function runGeminiVideoMetaPrompts(page, { title, srtContent, language }) {
-  const prompts = await loadVideoInfoPrompts(language);
+async function runGeminiVideoMetaPrompts(page, { srtContent, language }) {
   const lang = String(language || DEFAULT_PROMPT_LANG).toUpperCase();
-  console.log(`\n--- Gemini [${lang}]: tóm tắt cuốn chiếu (500 cues/lần) → metadata tổng hợp ---`);
+
+  const prompts = await loadPromptByLanguage(lang);
+
   await page.waitForTimeout(1500);
 
   const cues = srtContent
@@ -112,7 +95,6 @@ async function runGeminiVideoMetaPrompts(page, { title, srtContent, language }) 
     .filter(Boolean);
 
   const summaries = [];
-  let lastSummary = '';
   const totalChunks = Math.ceil(cues.length / GEMINI_CHUNK_SIZE.SUMMARY_CONTENT) || 1;
 
   for (let i = 0; i < cues.length; i += GEMINI_CHUNK_SIZE.SUMMARY_CONTENT) {
@@ -123,12 +105,11 @@ async function runGeminiVideoMetaPrompts(page, { title, srtContent, language }) 
 
     const plainChunk = srtToPlainText(chunk);
 
-    const prompt = prompts.createPromptSummaryContent(plainChunk, lastSummary);
+    const prompt = prompts.promptCreateSummaryChunk(plainChunk);
     const result = await sendPromptToGemini(page, prompt);
 
     const cleanResult = result.trim();
     summaries.push(cleanResult);
-    lastSummary = cleanResult;
 
     if (i + GEMINI_CHUNK_SIZE.SUMMARY_CONTENT < cues.length) {
       await page.waitForTimeout(2000);
@@ -138,27 +119,19 @@ async function runGeminiVideoMetaPrompts(page, { title, srtContent, language }) 
   let finalSummaryForMeta = summaries.join('\n');
 
   if (summaries.length >= 2) {
-    console.log(`\nCó ${summaries.length} bản tóm tắt, đang gửi prompt merge các bản tóm tắt...`);
-    const mergePrompt = prompts.createPromptToMergeSummaryContent(finalSummaryForMeta);
+    const mergePrompt = prompts.promptCreateFinalSummary(finalSummaryForMeta);
     finalSummaryForMeta = await sendPromptToGemini(page, mergePrompt);
     await page.waitForTimeout(1500);
   }
 
   console.log('\nĐang tạo metadata từ bản tóm tắt tổng hợp...');
 
-  const metaRaw = await sendPromptToGemini(
-    page,
-    prompts.createPromptCreateMetaInfo(title, finalSummaryForMeta),
-    'metadata video (niche, title, desc, tags)'
-  );
+  const metaRaw = await sendPromptToGemini(page, prompts.promptCreateVideoMeta(finalSummaryForMeta));
 
   const parsed = parseCreateMetaInfoResponse(metaRaw);
 
   return {
-    niche: parsed.niche,
-    title: parsed.title || title,
-    description: parsed.description,
-    tags: parsed.tags,
+    ...parsed,
     summary: finalSummaryForMeta,
   };
 }
@@ -167,18 +140,20 @@ async function runGeminiVideoMetaPrompts(page, { title, srtContent, language }) 
  * INTERNAL: Xử lý Meta (Title, Description, Tags) trên 1 page có sẵn
  */
 async function internalUpdateVideoMeta(page, options = {}) {
-  const { title = '', srtContent = '', language } = options;
+  const { srtContent = '', language } = options;
 
-  await page.goto(GEMINI_CONFIG.URL, { waitUntil: 'domcontentloaded', timeout: 30000 });
-  const meta = await runGeminiVideoMetaPrompts(page, { title, srtContent, language });
+  await openGeminiPage(page);
+
+  const meta = await runGeminiVideoMetaPrompts(page, { srtContent, language });
   return meta;
 }
 
 /**
  * INTERNAL: Xử lý Transcript SRT trên một context có sẵn
  */
-async function internalUpdateTranscript(context, initialPage, rawSrtContent, options = {}) {
-  const { title = '' } = options;
+async function internalUpdateTranscript(context, page, rawSrtContent, options = {}) {
+  const { language } = options;
+  const prompts = await loadPromptByLanguage(language);
 
   // Tách chunk từ file srt gốc
   const cues =
@@ -190,7 +165,6 @@ async function internalUpdateTranscript(context, initialPage, rawSrtContent, opt
       : rawSrtContent;
 
   const durationMin = getSrtDurationInMinutes(cues);
-  console.log(`Độ dài video check được qua SRT cuối: ~${durationMin.toFixed(1)} phút`);
 
   const chunks = [];
   for (let i = 0; i < cues.length; i += GEMINI_CHUNK_SIZE.UPDATE_TRANSCRIPT) {
@@ -202,24 +176,20 @@ async function internalUpdateTranscript(context, initialPage, rawSrtContent, opt
 
   if (durationMin < 30) {
     console.log(`Video < 30 phút, Xử lý TUẦN TỰ trên 1 tab...`);
-    await initialPage.goto(GEMINI_CONFIG.URL, { waitUntil: 'domcontentloaded', timeout: 30000 });
-
-    await page.waitForTimeout(500);
-
-    await chooseThinkingMode(initialPage);
+    await openGeminiPage(page);
 
     for (let i = 0; i < totalChunks; i++) {
       const chunk = chunks[i];
-      let prompt = createPromptUpdateShortTranscript(title, chunk, `phần ${i + 1}/${totalChunks}`);
-      const result = await sendPromptToGemini(initialPage, prompt);
+      let prompt = prompts.promptUpdateTranscript(chunk);
+      const result = await sendPromptToGemini(page, prompt);
       finalResults[i] = result;
-      if (i < totalChunks - 1) await initialPage.waitForTimeout(2000);
+      if (i < totalChunks - 1) await page.waitForTimeout(2000);
     }
   } else {
     const activeConcurrency = Math.min(GEMINI_CONFIG.MAX_CONCURRENT, totalChunks);
     console.log(`Video >= 30 phút, Xử lý ĐỒNG THỜI (${activeConcurrency} tabs song song)...`);
 
-    const pages = [initialPage];
+    const pages = [page];
     for (let i = 1; i < activeConcurrency; i++) {
       pages.push(await context.newPage());
     }
@@ -237,47 +207,36 @@ async function internalUpdateTranscript(context, initialPage, rawSrtContent, opt
     for (let i = 1; i < pages.length; i++) await pages[i].close();
   }
 
-  // Ghép nối SRT
-  let finalSrt = '';
-  for (let i = 0; i < chunks.length; i++) {
-    const processedChunk = finalResults[i];
-    if (processedChunk && processedChunk.trim() !== '') {
-      const origBlocks = chunks[i]
-        .split(/\n\n+/)
-        .map(b => b.trim())
-        .filter(Boolean);
-      let procBlocks = processedChunk
-        .replace(/```(srt)?/gi, '')
-        .split(/\n\n+/)
-        .map(b => b.trim())
-        .filter(Boolean);
-      const procMap = {};
-      for (const pb of procBlocks) {
-        const lines = pb.split('\n');
-        const index = parseInt(lines[0].trim(), 10);
-        if (!isNaN(index) && lines.length >= 3) procMap[index] = lines.slice(2).join('\n');
-      }
-      const mergedBlocks = [];
-      for (const ob of origBlocks) {
-        const lines = ob.split('\n');
-        const index = parseInt(lines[0].trim(), 10);
-        if (!isNaN(index) && lines.length >= 3) {
-          if (procMap[index]) lines.splice(2, lines.length - 2, procMap[index]);
-        }
-        mergedBlocks.push(lines.join('\n'));
-      }
-      finalSrt += mergedBlocks.join('\n\n') + '\n\n';
-    } else {
-      finalSrt += chunks[i] + '\n\n';
-    }
+  /** Bỏ fence markdown nếu Gemini bọc ``` / ```srt. */
+  function stripSrtCodeFence(text) {
+    let t = String(text ?? '').trim();
+    t = t
+      .replace(/^```[^\n]*\n?/i, '')
+      .replace(/\n?```\s*$/i, '')
+      .trim();
+    return t;
   }
-  return finalSrt.trim();
+
+  // Ghép nối SRT: nối tuần tự từng phản hồi (prompt đã yêu cầu đầu ra SRT chuẩn từng chunk).
+  const mergedParts = [];
+  for (let i = 0; i < totalChunks; i++) {
+    const cleaned = stripSrtCodeFence(finalResults[i]);
+    mergedParts.push(cleaned || chunks[i]);
+  }
+  const mergedSrt = mergedParts.join('\n\n').trim();
+
+  const indexCheck = checkSrtMergedCueIndexSequence(mergedSrt);
+  if (!indexCheck.ok) {
+    console.warn('[SRT merge] Số thứ tự cue không liên tục 1..N:', indexCheck);
+  }
+
+  return mergedSrt;
 }
 
 /**
  * Standalone xử lý Meta
  */
-export async function updateVideoMetaWithGemini(options = {}) {
+export async function updateVideoMeta(options = {}) {
   const { context, page } = await openChromeProfile({ visible: true });
   try {
     return await internalUpdateVideoMeta(page, options);
@@ -289,10 +248,10 @@ export async function updateVideoMetaWithGemini(options = {}) {
 /**
  * Standalone xử lý Transcript
  */
-export async function updateTranscriptWithGemini(rawSrtContent, options = {}) {
-  const { context, page: initialPage } = await openChromeProfile({ visible: true });
+export async function updateTranscript(rawSrtContent, options = {}) {
+  const { context, page } = await openChromeProfile({ visible: true });
   try {
-    return await internalUpdateTranscript(context, initialPage, rawSrtContent, options);
+    return await internalUpdateTranscript(context, page, rawSrtContent, options);
   } finally {
     await context.close();
   }
@@ -302,36 +261,31 @@ export async function updateTranscriptWithGemini(rawSrtContent, options = {}) {
  * Combined function hỗ trợ tham số updateTranscript
  * Có transcript: xử lý transcript xong trên tab đầu, sau đó mới mở tab mới cho meta (không song song).
  */
-export async function updateContentWithGemini(rawSrtContent, options = {}) {
+export async function updateVideoInfo(rawSrtContent, options = {}) {
   const { updateTranscript = true } = options;
 
-  console.log('Đang mở Chrome để xử lý Gemini...');
+  console.log('Đang mở Chrome để xử lý...');
   const { context, page } = await openChromeProfile({ visible: true });
 
   try {
     let srtOut = rawSrtContent;
+    let targetPage = page;
 
     if (updateTranscript) {
       srtOut = await internalUpdateTranscript(context, page, rawSrtContent, options);
       console.log('Đã xong transcript, mở tab mới cho metadata (title/description/tags)...');
-      const metaPage = await context.newPage();
-      try {
-        const meta = await internalUpdateVideoMeta(metaPage, {
-          ...options,
-          srtContent: srtOut,
-        });
-        return { srt: srtOut, ...meta };
-      } finally {
-        await metaPage.close().catch(() => {});
-      }
+      targetPage = await context.newPage();
     }
 
-    console.log('Bỏ qua bước xử lý Transcript theo yêu cầu.');
-    const meta = await internalUpdateVideoMeta(page, {
-      ...options,
-      srtContent: rawSrtContent,
-    });
-    return { srt: srtOut, ...meta };
+    try {
+      const meta = await internalUpdateVideoMeta(targetPage, {
+        ...options,
+        srtContent: srtOut,
+      });
+      return { srt: srtOut, ...meta };
+    } finally {
+      if (targetPage !== page) await targetPage.close().catch(() => {});
+    }
   } finally {
     await context.close();
   }

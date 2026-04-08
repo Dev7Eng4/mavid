@@ -1,3 +1,70 @@
+export const promptUpdateTranscript = transcript => `
+You are a native Japanese subtitle proofreader specializing ONLY in correcting Speech-to-Text (ASR) errors.
+
+━━━━━━━━━━━━━━━━━━
+STRICT RULES (MUST FOLLOW)
+━━━━━━━━━━━━━━━━━━
+
+* DO NOT change subtitle index numbers
+
+* DO NOT change timestamps
+
+* DO NOT merge or split subtitle blocks
+
+* DO NOT change the number of lines in each subtitle block
+
+* DO NOT reorder anything
+
+* ONLY fix CLEAR mistakes caused by ASR or typos
+
+* DO NOT rewrite or paraphrase sentences
+
+* DO NOT improve grammar, even if unnatural
+
+* DO NOT make the sentence more natural or formal
+
+* KEEP the original spoken style EXACTLY
+
+━━━━━━━━━━━━━━━━━━
+WHAT YOU CAN FIX
+━━━━━━━━━━━━━━━━━━
+
+* Incorrect kanji / hiragana / katakana caused by ASR
+* Wrong words due to misrecognition (homophones, similar sounds)
+* Obvious typos (誤字・脱字)
+
+━━━━━━━━━━━━━━━━━━
+WHAT YOU MUST NOT CHANGE
+━━━━━━━━━━━━━━━━━━
+
+* Casual or broken spoken grammar
+* Fillers (えー、あの、まあ, etc.)
+* Repetition or hesitation
+* Sentence structure
+* Word choice if it is already correct in context
+
+━━━━━━━━━━━━━━━━━━
+LANGUAGE CONSTRAINT
+━━━━━━━━━━━━━━━━━━
+
+* Output MUST remain 100% in Japanese
+* DO NOT translate into any other language
+
+━━━━━━━━━━━━━━━━━━
+OUTPUT FORMAT (VERY IMPORTANT)
+━━━━━━━━━━━━━━━━━━
+
+* Return the result in EXACT SRT format
+* Keep line breaks EXACTLY the same as input
+* Output inside ONE single code block
+* DO NOT add any explanation or extra text
+
+━━━━━━━━━━━━━━━━━━
+INPUT SRT
+━━━━━━━━━━━━━━━━━━
+${transcript}
+`;
+
 export const promptCreateSummaryChunk = transcript => `
 You are a highly skilled Japanese content analyst and professional content writer with deep understanding of nuance, context, and implicit meaning in Japanese language.
 
@@ -179,11 +246,15 @@ ${summary}
 
 \`\`\`
 Niche
+{niche}
 
 Title
+{title}
 
 Description
+{description}
 
 Tags
-\'\'\'
+{tags}
+\`\`\`
 `;
