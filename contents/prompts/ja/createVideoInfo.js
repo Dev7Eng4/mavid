@@ -258,3 +258,115 @@ Tags
 {tags}
 \`\`\`
 `;
+
+export const promptCreateStructureVideo = summaries => `
+You are a professional video content analyst specialized in breaking down long-form Japanese content into detailed visual sequences.
+
+## INPUT
+
+Partial Summaries (Japanese):
+${summaries}
+
+## OBJECTIVE
+
+Create a detailed, structured flow that preserves FULL content coverage and is suitable for generating visual scenes.
+
+## INSTRUCTIONS
+
+* Preserve ALL ideas from the input (IMPORTANT)
+* Do NOT aggressively merge or compress content
+* Do NOT remove details just for conciseness
+* Maintain the natural progression of the original content
+* Keep small but meaningful details if they contribute to visualization
+* Avoid combining multiple ideas into one bullet
+* Each bullet should represent ONE clear moment, idea, or beat
+* Keep the flow chronological and logical
+* Target a HIGH number of bullets (important for scene generation)
+
+## STYLE
+
+* Write in Japanese
+* Use bullet points only
+* Each bullet = one idea / one moment
+* Keep sentences short and clear
+* No grouping into large sections (flat structure preferred)
+
+## OUTPUT FORMAT (STRICT)
+
+* Wrap everything in a single markdown code block (\`\`\`)
+* No text before or after
+* First character MUST be \`\`\`
+* Last character MUST be \`\`\`
+
+## OUTPUT EXAMPLE
+
+\`\`\`
+- 朝起きてすぐに水を飲む習慣の重要性
+- 腸を目覚めさせることで1日のパフォーマンスが変わる
+- 前日の夜に準備しておくことで朝のストレスを減らせる
+- 忙しい朝でも続けられる簡単なルーティン
+\`\`\`
+`;
+
+export const promptBreakdownScenes = structuredFlow => `
+You are a professional Japanese video director and visual storyteller.
+
+Your task is to convert a structured Japanese content flow into a sequence of cinematic visual scenes suitable for AI image generation.
+
+## INPUT
+
+Structured Flow (Japanese):
+${structuredFlow}
+
+## OBJECTIVE
+
+Transform each idea into a clear, visually distinct scene that can be illustrated with a single image.
+
+## INSTRUCTIONS
+
+* Each scene must represent ONE clear idea, moment, or emotional beat
+* Do NOT merge multiple ideas into one scene
+* Preserve the original flow and progression
+* Ensure full content coverage (do not skip important parts)
+* Add light visual interpretation (environment, subject, mood) WITHOUT changing meaning
+* Focus on scenes that can be visually expressed (avoid abstract-only ideas)
+
+## VISUAL ENRICHMENT (IMPORTANT)
+
+For each scene, subtly include:
+* Subject (人物 / 主体)
+* Setting (場所 / 環境)
+* Action (何をしているか)
+* Mood / emotion (雰囲気)
+
+## STYLE
+
+* Write in Japanese
+* Each scene = 1–2 sentences
+* Clear, concrete, visual language
+* Avoid vague or abstract phrasing
+* Keep natural Japanese tone (not robotic)
+
+## OUTPUT FORMAT (STRICT)
+
+* Wrap everything in ONE markdown code block (\`\`\`)
+* No text before or after
+* First character MUST be \`\`\`
+* Last character MUST be \`\`\`
+
+## OUTPUT FORMAT
+
+\`\`\`
+Scene 1: ...
+Scene 2: ...
+Scene 3: ...
+\`\`\`
+
+## EXAMPLE
+
+\`\`\`
+Scene 1: 朝の静かな部屋で、若い女性が目を覚まし、ゆっくりとベッドから起き上がる。柔らかい朝日がカーテン越しに差し込む。
+Scene 2: キッチンでコップ一杯の水を飲みながら、体を目覚めさせる様子。表情は少し眠そうだが落ち着いている。
+Scene 3: 前の夜に準備された朝食を見て、安心した表情を浮かべる。
+\`\`\`
+`;

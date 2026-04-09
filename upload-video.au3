@@ -1,29 +1,23 @@
 #include <MsgBoxConstants.au3>
+#include <ClipBoard.au3>
 
 $sPath = $CmdLine[1]
 $sFileName = $CmdLine[2]
 
 Local $fullPath = $sPath & "\" & $sFileName
 
-; Chờ popup (Open / File Upload)
 Local $hWnd = WinWait("[CLASS:#32770]", "", 15)
 If $hWnd = 0 Then Exit 1
 
-; Kích hoạt cửa sổ (không bắt buộc nhưng nên có)
 WinActivate($hWnd)
 WinWaitActive($hWnd)
 
-Sleep(200)
+Sleep(1000)
 
-; Set đường dẫn trực tiếp vào input
 ControlFocus($hWnd, "", "Edit1")
-Sleep(100)
+Sleep(500)
 
 ControlSetText($hWnd, "", "Edit1", $fullPath)
-Sleep(200)
+Sleep(1000)
 
-; Click nút Open
-ControlClick($hWnd, "", "Button1")
-
-; Optional delay nhẹ
-Sleep(300)
+Send("{ENTER}")

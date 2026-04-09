@@ -43,8 +43,7 @@ function sleep(ms) {
  * @returns {{ host: string, port: number }}
  */
 function cdpUrlToHostPort(cdpHttpUrl) {
-  const href =
-    cdpHttpUrl.startsWith('http://') || cdpHttpUrl.startsWith('https://') ? cdpHttpUrl : `http://${cdpHttpUrl}`;
+  const href = cdpHttpUrl.startsWith('http://') || cdpHttpUrl.startsWith('https://') ? cdpHttpUrl : `http://${cdpHttpUrl}`;
   const u = new URL(href);
   const port = u.port;
   if (!port) throw new Error(`CDP URL thiếu cổng: ${cdpHttpUrl}`);
@@ -63,6 +62,7 @@ function cdpUrlToHostPort(cdpHttpUrl) {
  * @param {number} [opts.timeoutMs=120000]
  * @param {number} [opts.pollMs=400]
  */
+
 async function waitForCdpPort(host, port, { timeoutMs = 120000, pollMs = 400 } = {}) {
   const start = Date.now();
   /** @type {string} */
@@ -78,7 +78,7 @@ async function waitForCdpPort(host, port, { timeoutMs = 120000, pollMs = 400 } =
         () => {
           socket.destroy();
           resolve(true);
-        },
+        }
       );
       const t = Math.min(2500, Math.max(200, pollMs * 2));
       socket.setTimeout(t);
@@ -97,9 +97,7 @@ async function waitForCdpPort(host, port, { timeoutMs = 120000, pollMs = 400 } =
     }
     await sleep(pollMs);
   }
-  throw new Error(
-    `CDP chưa lắng nghe tại ${host}:${port} sau ${timeoutMs}ms (lỗi: ${lastErr}). Đợi GPM mở xong profile hoặc thử lại.`,
-  );
+  throw new Error(`CDP chưa lắng nghe tại ${host}:${port} sau ${timeoutMs}ms (lỗi: ${lastErr}). Đợi GPM mở xong profile hoặc thử lại.`);
 }
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -152,7 +150,7 @@ function gpmBrowserPathsUnderRoot(root) {
  * @returns {string}
  */
 export function resolveGpmChromiumExecutable(profileDir, dataRoot, preferredExe) {
-  const explicit = (preferredExe?.trim() || process.env.GPM_CHROMIUM_PATH?.trim()) || '';
+  const explicit = preferredExe?.trim() || process.env.GPM_CHROMIUM_PATH?.trim() || '';
   if (explicit) {
     const x = tryExistingFile(explicit);
     if (x) return x;
@@ -182,7 +180,7 @@ export function resolveGpmChromiumExecutable(profileDir, dataRoot, preferredExe)
   }
 
   throw new Error(
-    'Không tìm thấy trình duyệt GPM (browser.exe / chrome.exe). Trong tab GPM hãy «Chọn browser GPM», hoặc đặt biến môi trường GPM_CHROMIUM_PATH trỏ tới file .exe của GPM.',
+    'Không tìm thấy trình duyệt GPM (browser.exe / chrome.exe). Trong tab GPM hãy «Chọn browser GPM», hoặc đặt biến môi trường GPM_CHROMIUM_PATH trỏ tới file .exe của GPM.'
   );
 }
 
@@ -258,15 +256,11 @@ export async function startGpmProfile(profileId, options = {}) {
 
   const addr = d.remote_debugging_address;
   if (!addr || typeof addr !== 'string' || !String(addr).trim()) {
-    throw new Error(
-      'GPM không trả `remote_debugging_address` trong `data`. Kiểm tra profile / GPM đang chạy.',
-    );
+    throw new Error('GPM không trả `remote_debugging_address` trong `data`. Kiểm tra profile / GPM đang chạy.');
   }
 
   if (d.success === false) {
-    console.warn(
-      '[GPM] `data.success === false` nhưng envelope OK và có remote_debugging_address — vẫn dùng connectOverCDP.',
-    );
+    console.warn('[GPM] `data.success === false` nhưng envelope OK và có remote_debugging_address — vẫn dùng connectOverCDP.');
   }
 
   const cdpHttpUrl = gpmRemoteDebuggingAddressToCdpUrl(addr);

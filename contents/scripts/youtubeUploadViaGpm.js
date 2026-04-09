@@ -20,54 +20,36 @@ import { connectPlaywrightToGpmProfile } from './openGpmPlaywright.js';
 import { execFile } from 'child_process';
 
 const YOUTUBE_SELECTOR = {
-  btnCreate: '/html/body/ytd-app/div[1]/div[2]/ytd-masthead/div[4]/div[3]/div[2]/ytd-button-renderer/yt-button-shape/button',
-  btnUploadVideo:
-    '/html/body/ytd-app/ytd-popup-container/tp-yt-iron-dropdown/div/ytd-multi-page-menu-renderer/div[3]/div[1]/yt-multi-page-menu-section-renderer/div[2]/ytd-compact-link-renderer[1]/a',
-  btnSelectFile: '/html/body/ytcp-uploads-dialog/tp-yt-paper-dialog/div/ytcp-uploads-file-picker/div/ytcp-button/ytcp-button-shape/button',
+  btnCreate: '#buttons ytd-button-renderer button',
+  btnUploadVideo: '#items ytd-compact-link-renderer:nth-of-type(1) a',
+  btnSelectFile: '#select-files-button button',
   formDetails: 'ytcp-uploads-dialog:not([workflow-step="SELECT_FILES"])',
-  titleBox:
-    '/html/body/ytcp-uploads-dialog/tp-yt-paper-dialog/div/ytcp-animatable[1]/ytcp-ve/ytcp-video-metadata-editor/div/ytcp-video-metadata-editor-basics/div[1]/ytcp-video-title/div/ytcp-social-suggestions-textbox/ytcp-form-input-container/div[1]/div[2]/div/ytcp-social-suggestion-input/div',
-  descriptionBox:
-    '/html/body/ytcp-uploads-dialog/tp-yt-paper-dialog/div/ytcp-animatable[1]/ytcp-ve/ytcp-video-metadata-editor/div/ytcp-video-metadata-editor-basics/div[2]/ytcp-video-description/div/ytcp-social-suggestions-textbox/ytcp-form-input-container/div[1]/div[2]/div/ytcp-social-suggestion-input/div',
-  thumbnailBox:
-    '/html/body/ytcp-uploads-dialog/tp-yt-paper-dialog/div/ytcp-animatable[1]/ytcp-ve/ytcp-video-metadata-editor/div/ytcp-video-metadata-editor-basics/div[3]/ytcp-video-thumbnail-editor/div[4]/ytcp-video-custom-still-editor/div/ytcp-thumbnail-uploader/ytcp-thumbnail-editor/div[1]/ytcp-ve/button',
-  boxUpload: '/html/body/ytcp-uploads-dialog/tp-yt-paper-dialog/div/ytcp-animatable[1]',
-  btnShowMore:
-    '/html/body/ytcp-uploads-dialog/tp-yt-paper-dialog/div/ytcp-animatable[1]/ytcp-ve/ytcp-video-metadata-editor/div/div/ytcp-button/ytcp-button-shape/button',
-  tagsBox:
-    '/html/body/ytcp-uploads-dialog/tp-yt-paper-dialog/div/ytcp-animatable[1]/ytcp-ve/ytcp-video-metadata-editor/div/ytcp-video-metadata-editor-advanced/div[7]/ytcp-form-input-container',
-  tagsInput:
-    '/html/body/ytcp-uploads-dialog/tp-yt-paper-dialog/div/ytcp-animatable[1]/ytcp-ve/ytcp-video-metadata-editor/div/ytcp-video-metadata-editor-advanced/div[7]/ytcp-form-input-container/div[1]/div/ytcp-free-text-chip-bar/ytcp-chip-bar/div/input',
-  btnNextToRelatedStep:
-    '/html/body/ytcp-uploads-dialog/tp-yt-paper-dialog/div/ytcp-animatable[2]/div/div[2]/ytcp-button[2]/ytcp-button-shape/button',
-  btnAddVideoRelated:
-    '/html/body/ytcp-uploads-dialog/tp-yt-paper-dialog/div/ytcp-animatable[1]/ytcp-uploads-video-elements/div[3]/ytcp-button[2]/ytcp-button-shape/button',
-  btnChooseTemplate:
-    '/html/body/ytve-endscreen-modal/ytve-modal-host/ytcp-dialog/tp-yt-paper-dialog/div[2]/div/ytve-editor/div[1]/div/ytve-endscreen-editor-options-panel/div[2]/div/ytve-endscreen-template-picker/div/div/div/div[1]/div[1]',
-  btnSelectElement:
-    '/html/body/ytve-endscreen-modal/ytve-modal-host/ytcp-dialog/tp-yt-paper-dialog/div[2]/div/ytve-editor/div[1]/div/ytve-endscreen-editor-options-panel/div[1]/ytcp-button/ytcp-button-shape/button',
-  btnSelectVideo: '/html/body/ytcp-text-menu/tp-yt-paper-dialog/div/tp-yt-paper-listbox/tp-yt-paper-item[1]',
-  btnSaveRelatedVideo:
-    '/html/body/ytve-endscreen-modal/ytve-modal-host/ytcp-dialog/tp-yt-paper-dialog/div[1]/div/div[2]/div/div[2]/ytcp-button/ytcp-button-shape/button',
-  btnNextToCheckStep:
-    '/html/body/ytcp-uploads-dialog/tp-yt-paper-dialog/div/ytcp-animatable[2]/div/div[2]/ytcp-button[2]/ytcp-button-shape/button',
-  btnNextToVisibilityStep:
-    '/html/body/ytcp-uploads-dialog/tp-yt-paper-dialog/div/ytcp-animatable[2]/div/div[2]/ytcp-button[2]/ytcp-button-shape/button',
-  btnChooseSchedule:
-    '/html/body/ytcp-uploads-dialog/tp-yt-paper-dialog/div/ytcp-animatable[1]/ytcp-uploads-review/div[2]/div[1]/ytcp-video-visibility-select/div[3]',
-  btnSelectDate:
-    '/html/body/ytcp-uploads-dialog/tp-yt-paper-dialog/div/ytcp-animatable[1]/ytcp-uploads-review/div[2]/div[1]/ytcp-video-visibility-select/div[3]/div[2]/ytcp-visibility-scheduler/div[1]/ytcp-datetime-picker/div/div[1]/ytcp-text-dropdown-trigger/ytcp-dropdown-trigger/div',
-  inputDate:
-    '/html/body/ytcp-date-picker/tp-yt-paper-dialog/div/form/tp-yt-paper-input/tp-yt-paper-input-container/div[2]/div/tp-yt-iron-input/input',
-  inputTime:
-    '/html/body/ytcp-uploads-dialog/tp-yt-paper-dialog/div/ytcp-animatable[1]/ytcp-uploads-review/div[2]/div[1]/ytcp-video-visibility-select/div[3]/div[2]/ytcp-visibility-scheduler/div[1]/ytcp-datetime-picker/div/div[2]/form/ytcp-form-input-container/div[1]/div/tp-yt-paper-input/tp-yt-paper-input-container/div[2]/div/tp-yt-iron-input/input',
-  btnSelectTime:
-    '/html/body/ytcp-uploads-dialog/tp-yt-paper-dialog/div/ytcp-animatable[1]/ytcp-uploads-review/div[2]/div[1]/ytcp-video-visibility-select/div[3]/div[2]/ytcp-visibility-scheduler/div[1]/ytcp-datetime-picker/div/div[2]/form/ytcp-form-input-container/div[1]',
-  btnSaveSchedule:
-    '/html/body/ytcp-uploads-dialog/tp-yt-paper-dialog/div/ytcp-animatable[2]/div/div[2]/ytcp-button[3]/ytcp-button-shape/button',
-  popupScheduleSuccess: '/html/body/ytcp-video-share-dialog/ytcp-dialog/tp-yt-paper-dialog',
-  btnClosePopupScheduleSuccess:
-    '/html/body/ytcp-video-share-dialog/ytcp-dialog/tp-yt-paper-dialog/div[3]/ytcp-button/ytcp-button-shape/button',
+  titleBox: '#title-wrapper #textbox',
+  descriptionBox: '#description-wrapper #textbox',
+  thumbnailBox: '#custom-still-editor-wrapper #select-button',
+  boxUpload: '#scrollable-content',
+  btnShowMore: '#toggle-button button',
+  tagsBox: '#tags-container',
+  tagsInput: '#tags-container input',
+  btnNextToRelatedStep: '#next-button button',
+  btnAddVideoRelated: '#endscreens-button button',
+  btnChooseTemplate: '#cards-row > div:nth-of-type(1) .template-preview',
+  btnSelectElement: '#add-element-menu-button button',
+  btnSelectVideo: '#paper-list #text-item-0',
+  btnSaveRelatedVideo: '#save-button button',
+  btnNextToCheckStep: '#next-button button',
+  btnNextToVisibilityStep: '#next-button button',
+  btnChooseSchedule: '#visibility-container #second-container',
+  btnSelectDate: '#datepicker-trigger div',
+  inputDate: 'ytcp-date-picker #labelAndInputContainer input',
+  inputTime: '.ytcp-datetime-picker input',
+  btnSaveSchedule: '#done-button button',
+  popupScheduleSuccess: '#dialog ytcp-video-thumbnail-with-info',
+  popupProcessing: 'ytcp-uploads-still-processing-dialog #dialog',
+  // btnClosePopupProcessing: 'ytcp-uploads-still-processing-dialog #close-button button',
+  // btnClosePopupScheduleSuccess: '#close-button button',
+  popupWarning: 'ytcp-prechecks-warning-dialog #dialog',
+  btnGotItWarning: 'ytcp-prechecks-warning-dialog #primary-action-button button',
 };
 
 /**
@@ -179,13 +161,30 @@ async function humanWarmup(page) {
   }
 }
 
+async function getMetaInfo(videoFolderPath) {
+  const metaPath = path.join(videoFolderPath, 'video-meta.json');
+  if (!fs.existsSync(metaPath)) {
+    console.warn(`[edit] ⚠ Không tìm thấy ${metaPath} — bỏ qua edit details.`);
+    return;
+  }
+
+  try {
+    const meta = JSON.parse(fs.readFileSync(metaPath, 'utf8'));
+
+    return meta;
+  } catch (e) {
+    console.warn(`[edit] ⚠ Lỗi đọc video-meta.json: ${e.message}`);
+    return;
+  }
+}
+
 /**
  * youtube.com → nút Tạo → «Tải video lên» → chọn file mp4 (giống người dùng).
  * Mỗi step dùng clickElement riêng biệt, dễ quản lý & debug.
  * @param {import('playwright').Page} page
  * @param {string} mp4Path — đường dẫn tuyệt đối đến file .mp4 cần upload
  */
-async function openUploadAndSelectFile(page, mp4Path) {
+async function openYoutubeUpload(page, mp4Path) {
   // ── Step 1: Mở trang YouTube ──────────────────────────────────────────
   console.log('[upload] Step 1: Mở trang YouTube...');
   await page.goto('https://www.youtube.com/', { waitUntil: 'domcontentloaded', timeout: 60000 });
@@ -200,15 +199,19 @@ async function openUploadAndSelectFile(page, mp4Path) {
 
   // ── Step 2: Bấm nút "Tạo" (Create) trên thanh masthead ──────────────
   console.log('[upload] Step 2: Bấm nút Tạo (Create)...');
-  await clickXPathElement(page, YOUTUBE_SELECTOR.btnCreate);
+  await clickElement(page, YOUTUBE_SELECTOR.btnCreate);
   await delay(500);
 
   // ── Step 3: Chọn mục "Tải video lên" (Upload videos) trong menu ─────
   console.log('[upload] Step 3: Chọn mục Tải video lên...');
-  await clickXPathElement(page, YOUTUBE_SELECTOR.btnUploadVideo);
+  await clickElement(page, YOUTUBE_SELECTOR.btnUploadVideo);
   await delay(3000);
 
-  await clickXPathElement(page, YOUTUBE_SELECTOR.btnSelectFile);
+  await selectFile(page, mp4Path);
+}
+
+async function selectFile(page, mp4Path) {
+  await clickElement(page, YOUTUBE_SELECTOR.btnSelectFile);
   // const [fileChooser] = await Promise.all([page.waitForEvent('filechooser'), clickXPathElement(page, YOUTUBE_SELECTOR.btnSelectFile)]);
   // const fileChooser = await page.waitForEvent('filechooser');
   // console.log('fileChooser', fileChooser);
@@ -217,17 +220,13 @@ async function openUploadAndSelectFile(page, mp4Path) {
   //   YOUTUBE_SELECTOR.btnSelectFile
   // );
 
-  await page.mouse.move(200, 200, { steps: 20 });
-
-  await delay(4000);
+  await page.mouse.move(getRandomNumber(100), getRandomNumber(300), { steps: 20 });
 
   // await fileChooser.setFiles(mp4Path);
 
-  // execFile('uploadVideoTest.exe', [path.dirname(mp4Path), path.basename(mp4Path)]);
-  execFile('uploadVideo.exe', [
-    'E:\\mavid\\MaVidMedia\\channels\\UCZkK8tFfoedlr4LcNN2UxpA\\AfLVpCPsuqU',
-    '【悲報】ワイ「ワイら家族やろ？？」→結果wwwwwwwwww【2ch面白いスレ】.mp4',
-  ]);
+  execFile('uploadFile.exe', [path.dirname(mp4Path), path.basename(mp4Path)]);
+
+  await delay(2500);
 
   console.log(`[upload] ✓ Đã set file: ${mp4Path}`);
 
@@ -247,23 +246,6 @@ async function openUploadAndSelectFile(page, mp4Path) {
   console.log('[upload] ✓ Form chi tiết đã xuất hiện — sẵn sàng edit title/description');
 }
 
-async function getMetaInfo(videoFolderPath) {
-  const metaPath = path.join(videoFolderPath, 'video-meta.json');
-  if (!fs.existsSync(metaPath)) {
-    console.warn(`[edit] ⚠ Không tìm thấy ${metaPath} — bỏ qua edit details.`);
-    return;
-  }
-
-  try {
-    const meta = JSON.parse(fs.readFileSync(metaPath, 'utf8'));
-
-    return meta;
-  } catch (e) {
-    console.warn(`[edit] ⚠ Lỗi đọc video-meta.json: ${e.message}`);
-    return;
-  }
-}
-
 /**
  * Đọc video-meta.json từ folder video và điền title, description, tags vào form YouTube Studio.
  * Mỗi step riêng biệt, dễ quản lý & debug.
@@ -272,7 +254,8 @@ async function getMetaInfo(videoFolderPath) {
  */
 async function fillVideoDetails(page, videoFolderPath) {
   // ── Đọc video-meta.json ─────────────────────────────────────────────────
-  const meta = getMetaInfo(videoFolderPath);
+  const meta = await getMetaInfo(videoFolderPath);
+  console.log('🚀 ~ fillVideoDetails ~ meta:', meta);
 
   const title = meta.titleGemini || meta.title || '';
   const description = meta.descriptionGemini || meta.description || '';
@@ -283,7 +266,7 @@ async function fillVideoDetails(page, videoFolderPath) {
   if (title) {
     console.log('[edit] Step 1: Nhập Title...');
 
-    await clickXPathElement(page, YOUTUBE_SELECTOR.titleBox);
+    await clickElement(page, YOUTUBE_SELECTOR.titleBox);
     await delay(500);
     await clearContent(page);
     // Nhập title mới
@@ -296,7 +279,7 @@ async function fillVideoDetails(page, videoFolderPath) {
   if (description) {
     console.log('[edit] Step 2: Nhập Description...');
 
-    await clickXPathElement(page, YOUTUBE_SELECTOR.descriptionBox);
+    await clickElement(page, YOUTUBE_SELECTOR.descriptionBox);
     await delay(500);
     await clearContent(page);
     await page.keyboard.insertText(description);
@@ -311,7 +294,7 @@ async function fillVideoDetails(page, videoFolderPath) {
     /* ignore */
   }
 
-  await scrollUntilVisible(page, YOUTUBE_SELECTOR.thumbnailBox, true, 50);
+  await scrollUntilVisible(page, YOUTUBE_SELECTOR.thumbnailBox, false, 50);
 
   // await clickXPathElement(page, YOUTUBE_SELECTOR.thumbnailBox);
 
@@ -328,7 +311,7 @@ async function fillVideoDetails(page, videoFolderPath) {
     // execFile('uploadVideoTest.exe', [videoFolderPath, imageFile]);
     // console.log(`[edit] ✓ Gọi uploadVideo.exe cho thumbnail: ${imageFile}`);
 
-    const [fileChooser] = await Promise.all([page.waitForEvent('filechooser'), clickXPathElement(page, YOUTUBE_SELECTOR.thumbnailBox)]);
+    const [fileChooser] = await Promise.all([page.waitForEvent('filechooser'), clickElement(page, YOUTUBE_SELECTOR.thumbnailBox)]);
 
     await delay(1000);
 
@@ -361,7 +344,7 @@ async function fillVideoDetails(page, videoFolderPath) {
   console.log('[edit] Step 3: Click "Hiển thị thêm" (Show more)...');
 
   // Scroll xuống để nút "Show more" hiện ra
-  const box = await page.locator(`xpath=${YOUTUBE_SELECTOR.boxUpload}`).boundingBox();
+  const box = await page.locator(`${YOUTUBE_SELECTOR.boxUpload}`).boundingBox();
 
   if (box) {
     await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
@@ -376,7 +359,7 @@ async function fillVideoDetails(page, videoFolderPath) {
   //   if (dialog) dialog.scrollTop = dialog.scrollHeight;
   // });
   await delay(1000);
-  await clickXPathElement(page, YOUTUBE_SELECTOR.btnShowMore);
+  await clickElement(page, YOUTUBE_SELECTOR.btnShowMore);
   console.log('[edit] ✓ Đã click "Hiển thị thêm"');
   await delay(1500);
 
@@ -392,50 +375,50 @@ async function fillVideoDetails(page, videoFolderPath) {
       // await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
       await page.mouse.move(box.x + box.width / 2 + (Math.random() * 20 - 10), box.y + box.height / 2 + (Math.random() * 20 - 10));
 
-      await scrollUntilVisible(page, YOUTUBE_SELECTOR.tagsBox, true);
+      await scrollUntilVisible(page, YOUTUBE_SELECTOR.tagsBox);
     }
 
-    await clickXPathElement(page, YOUTUBE_SELECTOR.tagsInput);
+    await clickElement(page, YOUTUBE_SELECTOR.tagsInput);
     await delay(500);
 
     await page.keyboard.insertText(tagsGemini);
-    await delay(500);
+    await delay(1500);
   }
 
   console.log('[edit] ✓ Hoàn thành điền thông tin video! Sang bước tiếp theo');
-  await clickXPathElement(page, YOUTUBE_SELECTOR.btnNextToRelatedStep);
+  await clickElement(page, YOUTUBE_SELECTOR.btnNextToRelatedStep);
 }
 
 async function addRelatedVideo(page, isNeedAddRelatedVideo = false) {
   // thêm video liên quan
-  await clickXPathElement(page, YOUTUBE_SELECTOR.btnAddVideoRelated);
+  await clickElement(page, YOUTUBE_SELECTOR.btnAddVideoRelated);
 
   await delay(3000);
 
   // chọn template đầu tiên
-  await clickXPathElement(page, YOUTUBE_SELECTOR.btnChooseTemplate);
+  await clickElement(page, YOUTUBE_SELECTOR.btnChooseTemplate);
 
-  if (isNeedAddRelatedVideo) {
-    // click element
-    await clickXPathElement(page, YOUTUBE_SELECTOR.btnSelectElement);
+  // if (isNeedAddRelatedVideo) {
+  // click element
+  await clickElement(page, YOUTUBE_SELECTOR.btnSelectElement);
 
-    await delay(500);
-    // chọn video
-    await clickXPathElement(page, YOUTUBE_SELECTOR.btnSelectVideo);
-  }
+  await delay(500);
+  // chọn video
+  await clickElement(page, YOUTUBE_SELECTOR.btnSelectVideo);
+  // }
 
   // save
-  await clickXPathElement(page, YOUTUBE_SELECTOR.btnSaveRelatedVideo);
+  await clickElement(page, YOUTUBE_SELECTOR.btnSaveRelatedVideo);
 
   await delay(5000);
 
   // goto check video
-  await clickXPathElement(page, YOUTUBE_SELECTOR.btnNextToCheckStep);
+  await clickElement(page, YOUTUBE_SELECTOR.btnNextToCheckStep);
 
   await delay(2000);
 
   // goto visibility
-  await clickXPathElement(page, YOUTUBE_SELECTOR.btnNextToVisibilityStep);
+  await clickElement(page, YOUTUBE_SELECTOR.btnNextToVisibilityStep);
 }
 
 /**
@@ -446,45 +429,38 @@ async function addRelatedVideo(page, isNeedAddRelatedVideo = false) {
 async function chooseVisibility(page, ctx) {
   const slot = ctx?.slot;
 
-  if (!slot || (!slot.date && !slot.time)) {
-    await clickXPathElement(page, YOUTUBE_SELECTOR.btnSaveSchedule);
+  if (slot?.date && slot?.time) {
+    await clickElement(page, YOUTUBE_SELECTOR.btnChooseSchedule);
+    await delay(1500);
+    await clickElement(page, YOUTUBE_SELECTOR.btnSelectDate);
+    await delay(500);
+    await clickElement(page, YOUTUBE_SELECTOR.inputDate);
+    await clearContent(page);
+    await delay(500);
+    await page.keyboard.insertText(slot.date);
+    await delay(500);
+    await page.keyboard.press('Enter');
+    await page.keyboard.press('Escape');
 
-    await page.waitForSelector(YOUTUBE_SELECTOR.popupScheduleSuccess, {
-      state: 'visible',
-      timeout: 60000,
-    });
-    await delay(1000);
-    await clickXPathElement(page, YOUTUBE_SELECTOR.btnClosePopupScheduleSuccess);
-    return;
+    await clickElement(page, YOUTUBE_SELECTOR.inputTime);
+    await clearContent(page);
+    await delay(500);
+    await page.keyboard.insertText(slot.time);
+    await delay(500);
+    await page.keyboard.press('Enter');
   }
 
-  await clickXPathElement(page, YOUTUBE_SELECTOR.btnChooseSchedule);
-  await delay(1500);
-  await clickXPathElement(page, YOUTUBE_SELECTOR.btnSelectDate);
-  await delay(500);
-  await clickXPathElement(page, YOUTUBE_SELECTOR.inputDate);
-  await clearContent(page);
-  await delay(500);
-  await page.keyboard.insertText(slot.date);
-  await delay(500);
-  await page.keyboard.press('Enter');
-  await page.keyboard.press('Escape');
+  await clickElement(page, YOUTUBE_SELECTOR.btnSaveSchedule);
 
-  await clickXPathElement(page, YOUTUBE_SELECTOR.inputTime);
-  await clearContent(page);
-  await delay(500);
-  await page.keyboard.insertText(slot.time);
-  await delay(500);
-  await page.keyboard.press('Enter');
-
-  await clickXPathElement(page, YOUTUBE_SELECTOR.btnSaveSchedule);
-
-  await page.waitForSelector(YOUTUBE_SELECTOR.popupScheduleSuccess, {
+  await page.waitForSelector(YOUTUBE_SELECTOR.popupWarning, {
     state: 'visible',
-    timeout: 60000,
+    timeout: 30000,
   });
   await delay(1000);
-  await clickXPathElement(page, YOUTUBE_SELECTOR.btnClosePopupScheduleSuccess);
+  await clickElement(page, YOUTUBE_SELECTOR.btnGotItWarning);
+  await delay(2000);
+
+  await page.reload();
 }
 
 /**
@@ -556,7 +532,7 @@ export default async function main(raw = {}) {
       console.log(`[upload] (${i + 1}/${jobs.length}) Thư mục «${folderName}» → ${path.basename(mp4Path)}`);
 
       try {
-        await openUploadAndSelectFile(page, mp4Path);
+        (await i) === 0 ? openYoutubeUpload(page, mp4Path) : selectFile(page, mp4Path);
 
         // Sau khi upload xong → điền title, description, tags
         await fillVideoDetails(page, folderPath);

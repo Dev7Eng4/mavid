@@ -84,7 +84,8 @@ export async function moveToTopLeft(
 }
 
 export const clickElement = async (page, selector, isXpath = false) => {
-  const element = isXpath ? page.locator(`xpath=${selector}`) : page.locator(selector);
+  const element = isXpath ? page.locator(`xpath=${selector}`) : selectElement(page, selector);
+  console.log('🚀 ~ clickElement ~ element:', element);
 
   const box = await element.boundingBox();
 
@@ -123,6 +124,10 @@ export const clickElement = async (page, selector, isXpath = false) => {
 
 export const clickXPathElement = async (page, selector) => {
   await clickElement(page, selector, true);
+};
+
+export const selectElement = (page, selector) => {
+  return page.locator(selector).first();
 };
 
 async function humanScroll(page, distance) {
