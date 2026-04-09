@@ -596,6 +596,7 @@ export function ChannelsPage() {
               await window.runner.runScript('uploadYoutubeViaGpm', {
                 gpmProfileId: p.gpmProfileId,
                 channelFolder: p.channelFolder,
+                email: p.email,
                 maxUploads: p.totalVideos,
                 gpmApiBase: gpmApi.getBaseUrl(),
               });

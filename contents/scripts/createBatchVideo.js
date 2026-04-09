@@ -614,6 +614,7 @@ async function main(props = {}) {
         await uploadYoutubeViaGpm({
           gpmProfileId,
           channelFolder: effectiveChannelName,
+          email: mergedProps.email,
           maxUploads: result.processedCount,
           ...(Array.isArray(result.processedFolderNames) && result.processedFolderNames.length > 0
             ? { uploadFolderNames: result.processedFolderNames }

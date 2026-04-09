@@ -58,6 +58,8 @@ function resolveGpmProfileIdByEmail(profiles: GpmProfileRow[], email: string): s
 export interface ChannelUploadVideoPayload {
   /** Một kênh cụ thể (thư mục MaVidMedia/channels/…). */
   channelFolder: string;
+  /** Email kênh (index / config) — script upload dùng để lấy lịch publish. */
+  email: string;
   /** `null` = mọi thư mục con có .mp4 (theo thứ tự tên). */
   totalVideos: number | null;
   /** GPM profile id — suy ra từ email trong mavid-channel-config.json khớp `name` profile. */
@@ -155,7 +157,7 @@ export function ChannelUploadVideoDialog({ channels, onClose, onConfirm }: Chann
             setFormError(`Kênh ${ch.folder}: Không tìm thấy profile GPM có trường name trùng email «${email}».`);
             return;
           }
-          payloads.push({ channelFolder: ch.folder, totalVideos: total, gpmProfileId });
+          payloads.push({ channelFolder: ch.folder, email, totalVideos: total, gpmProfileId });
         }
         if (payloads.length === 0) {
           setFormError('Không có kênh nào có email hợp lệ.');
@@ -172,7 +174,7 @@ export function ChannelUploadVideoDialog({ channels, onClose, onConfirm }: Chann
           setFormError(`Không tìm thấy profile GPM có trường name trùng email «${email}». Trong GPM hãy đặt tên profile = email.`);
           return;
         }
-        payloads.push({ channelFolder: folderPick, totalVideos: total, gpmProfileId });
+        payloads.push({ channelFolder: folderPick, email, totalVideos: total, gpmProfileId });
       }
 
       if (typeof window.runner?.minimizeApp === 'function') {
