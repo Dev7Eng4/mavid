@@ -92,7 +92,7 @@ export function SettingsPage({ disabled }: Props) {
           setDirty(false);
         }
       } catch {
-        if (!cancelled) setMsg('Không đọc được constants (index.js / appSettings.js).');
+        if (!cancelled) setMsg('Không đọc được constants (index.js / overlay).');
       } finally {
         if (!cancelled) setConstantsLoading(false);
       }
