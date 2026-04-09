@@ -14,8 +14,9 @@ import fs from 'fs';
 import path from 'path';
 import { clearContent, clickElement, clickXPathElement, delay, getRandomNumber, scrollUntilVisible } from '../utils/dom.util.js';
 import { resolveChannelsDir } from '../utils/channelsStoragePath.js';
+import { syncChannelAfterYoutubeUpload } from '../utils/youtubeUploadAfterSync.js';
 import { getYoutubePublishPlan } from '../utils/youtube.util.js';
-import { connectPlaywrightToGpmProfile, stopGpmProfile } from './openGpmPlaywright.js';
+import { connectPlaywrightToGpmProfile } from './openGpmPlaywright.js';
 import { execFile } from 'child_process';
 
 const YOUTUBE_SELECTOR = {
@@ -405,9 +406,7 @@ async function fillVideoDetails(page, videoFolderPath) {
   await clickXPathElement(page, YOUTUBE_SELECTOR.btnNextToRelatedStep);
 }
 
-async function addRelatedVideo(page, videoFolderPath) {
-  const meta = getMetaInfo(videoFolderPath);
-
+async function addRelatedVideo(page, isNeedAddRelatedVideo = false) {
   // thêm video liên quan
   await clickXPathElement(page, YOUTUBE_SELECTOR.btnAddVideoRelated);
 
@@ -416,7 +415,7 @@ async function addRelatedVideo(page, videoFolderPath) {
   // chọn template đầu tiên
   await clickXPathElement(page, YOUTUBE_SELECTOR.btnChooseTemplate);
 
-  if (meta?.uploadedVideos && meta?.uploadedVideos === 2) {
+  if (isNeedAddRelatedVideo) {
     // click element
     await clickXPathElement(page, YOUTUBE_SELECTOR.btnSelectElement);
 
@@ -447,7 +446,7 @@ async function addRelatedVideo(page, videoFolderPath) {
 async function chooseVisibility(page, ctx) {
   const slot = ctx?.slot;
 
-  if (!slot.date && !slot.time) {
+  if (!slot || (!slot.date && !slot.time)) {
     await clickXPathElement(page, YOUTUBE_SELECTOR.btnSaveSchedule);
 
     await page.waitForSelector(YOUTUBE_SELECTOR.popupScheduleSuccess, {
@@ -520,14 +519,19 @@ export default async function main(raw = {}) {
 
   /** @type {Array<{ date: string, time: string, iso: string }> | null} */
   let publishSchedule = null;
+  /** `uploadedVideos` trong config trước batch (cho addRelatedVideo). */
+  let baselineUploadedVideosFromConfig = 0;
   if (scheduleEmail) {
     try {
-      const { schedule } = getYoutubePublishPlan({
+      const { schedule, settings } = getYoutubePublishPlan({
         channelFolder,
         email: scheduleEmail,
         uploadCount: jobs.length,
       });
       publishSchedule = schedule;
+      baselineUploadedVideosFromConfig = Number.isFinite(Number(settings?.uploadedVideos))
+        ? Math.max(0, Math.floor(Number(settings.uploadedVideos)))
+        : 0;
       console.log(`[upload] getYoutubePublishPlan: ${schedule.length} mốc (email «${scheduleEmail}»).`);
     } catch (e) {
       console.warn('[upload] getYoutubePublishPlan:', e instanceof Error ? e.message : e);
@@ -544,6 +548,9 @@ export default async function main(raw = {}) {
     browser = connected.browser;
     let page = connected.page;
 
+    /** Thư mục video đã chạy xong toàn bộ bước upload + schedule (theo thứ tự jobs). */
+    const successfulFolderNames = [];
+
     for (let i = 0; i < jobs.length; i++) {
       const { folderName, folderPath, mp4Path } = jobs[i];
       console.log(`[upload] (${i + 1}/${jobs.length}) Thư mục «${folderName}» → ${path.basename(mp4Path)}`);
@@ -553,12 +560,13 @@ export default async function main(raw = {}) {
 
         // Sau khi upload xong → điền title, description, tags
         await fillVideoDetails(page, folderPath);
-        await addRelatedVideo(page, folderPath);
+        await addRelatedVideo(page, baselineUploadedVideosFromConfig === 2);
         await chooseVisibility(page, {
           slot: publishSchedule?.[i] ?? null,
           jobIndex: i,
           totalJobs: jobs.length,
         });
+        successfulFolderNames.push(folderName);
       } catch (e) {
         console.warn('[upload]', e instanceof Error ? e.message : e);
       }
@@ -567,6 +575,13 @@ export default async function main(raw = {}) {
         await delay(2500 + Math.random() * 1500);
       }
     }
+
+    await syncChannelAfterYoutubeUpload({
+      channelFolder,
+      email: scheduleEmail,
+      successfulFolderNames,
+      publishSchedule,
+    });
 
     // await browser.close().catch(() => {});
     // browser = null;
@@ -580,6 +595,7 @@ export default async function main(raw = {}) {
     return {
       ok: true,
       uploaded: jobs.length,
+      uploadedSuccessful: successfulFolderNames.length,
       channelFolder,
       jobs: jobs.map(j => ({ folder: j.folderName, file: path.basename(j.mp4Path) })),
     };
