@@ -7,22 +7,81 @@
  * @param {string} params.channelFolder — tên thư mục kênh (an toàn, không ..)
  * @param {number | null | undefined} params.maxUploads — giới hạn số video; null/undefined = tất cả thư mục hợp lệ
  * @param {string[]} [params.uploadFolderNames] — nếu có: chỉ upload các thư mục con này, đúng thứ tự (khớp batch vừa tạo)
- * @param {string} [params.gpmApiBase] — ví dụ http://127.0.0.1:19995/api/v3
+ * @param {string} [params.gpmApiBase] — ưu tiên; nếu thiếu dùng `process.env.GPM_API_BASE` (vd. http://127.0.0.1:19995/api/v3), sau đó `GPM_API_ORIGIN` (chỉ origin), cuối cùng mặc định cục bộ — không cần build lại app khi đổi qua biến môi trường.
+ * @param {string} [params.email] — email kênh trong `mavid-channel-config.json` → `getYoutubePublishPlan` (ngày/giờ public) ở bước Schedule.
  */
 import fs from 'fs';
 import path from 'path';
-import { clickElement, delay, getRandomNumber, scrollUntilVisible } from '../utils/dom.util.js';
+import { clearContent, clickElement, clickXPathElement, delay, getRandomNumber, scrollUntilVisible } from '../utils/dom.util.js';
 import { resolveChannelsDir } from '../utils/channelsStoragePath.js';
+import { getYoutubePublishPlan } from '../utils/youtube.util.js';
 import { connectPlaywrightToGpmProfile, stopGpmProfile } from './openGpmPlaywright.js';
 import { execFile } from 'child_process';
 
-/** @param {string} base */
-function apiRootForPlaywright(base) {
-  const s = String(base || '')
-    .trim()
-    .replace(/\/+$/, '');
+const YOUTUBE_SELECTOR = {
+  btnCreate: '/html/body/ytd-app/div[1]/div[2]/ytd-masthead/div[4]/div[3]/div[2]/ytd-button-renderer/yt-button-shape/button',
+  btnUploadVideo:
+    '/html/body/ytd-app/ytd-popup-container/tp-yt-iron-dropdown/div/ytd-multi-page-menu-renderer/div[3]/div[1]/yt-multi-page-menu-section-renderer/div[2]/ytd-compact-link-renderer[1]/a',
+  btnSelectFile: '/html/body/ytcp-uploads-dialog/tp-yt-paper-dialog/div/ytcp-uploads-file-picker/div/ytcp-button/ytcp-button-shape/button',
+  formDetails: 'ytcp-uploads-dialog:not([workflow-step="SELECT_FILES"])',
+  titleBox:
+    '/html/body/ytcp-uploads-dialog/tp-yt-paper-dialog/div/ytcp-animatable[1]/ytcp-ve/ytcp-video-metadata-editor/div/ytcp-video-metadata-editor-basics/div[1]/ytcp-video-title/div/ytcp-social-suggestions-textbox/ytcp-form-input-container/div[1]/div[2]/div/ytcp-social-suggestion-input/div',
+  descriptionBox:
+    '/html/body/ytcp-uploads-dialog/tp-yt-paper-dialog/div/ytcp-animatable[1]/ytcp-ve/ytcp-video-metadata-editor/div/ytcp-video-metadata-editor-basics/div[2]/ytcp-video-description/div/ytcp-social-suggestions-textbox/ytcp-form-input-container/div[1]/div[2]/div/ytcp-social-suggestion-input/div',
+  thumbnailBox:
+    '/html/body/ytcp-uploads-dialog/tp-yt-paper-dialog/div/ytcp-animatable[1]/ytcp-ve/ytcp-video-metadata-editor/div/ytcp-video-metadata-editor-basics/div[3]/ytcp-video-thumbnail-editor/div[4]/ytcp-video-custom-still-editor/div/ytcp-thumbnail-uploader/ytcp-thumbnail-editor/div[1]/ytcp-ve/button',
+  boxUpload: '/html/body/ytcp-uploads-dialog/tp-yt-paper-dialog/div/ytcp-animatable[1]',
+  btnShowMore:
+    '/html/body/ytcp-uploads-dialog/tp-yt-paper-dialog/div/ytcp-animatable[1]/ytcp-ve/ytcp-video-metadata-editor/div/div/ytcp-button/ytcp-button-shape/button',
+  tagsBox:
+    '/html/body/ytcp-uploads-dialog/tp-yt-paper-dialog/div/ytcp-animatable[1]/ytcp-ve/ytcp-video-metadata-editor/div/ytcp-video-metadata-editor-advanced/div[7]/ytcp-form-input-container',
+  tagsInput:
+    '/html/body/ytcp-uploads-dialog/tp-yt-paper-dialog/div/ytcp-animatable[1]/ytcp-ve/ytcp-video-metadata-editor/div/ytcp-video-metadata-editor-advanced/div[7]/ytcp-form-input-container/div[1]/div/ytcp-free-text-chip-bar/ytcp-chip-bar/div/input',
+  btnNextToRelatedStep:
+    '/html/body/ytcp-uploads-dialog/tp-yt-paper-dialog/div/ytcp-animatable[2]/div/div[2]/ytcp-button[2]/ytcp-button-shape/button',
+  btnAddVideoRelated:
+    '/html/body/ytcp-uploads-dialog/tp-yt-paper-dialog/div/ytcp-animatable[1]/ytcp-uploads-video-elements/div[3]/ytcp-button[2]/ytcp-button-shape/button',
+  btnChooseTemplate:
+    '/html/body/ytve-endscreen-modal/ytve-modal-host/ytcp-dialog/tp-yt-paper-dialog/div[2]/div/ytve-editor/div[1]/div/ytve-endscreen-editor-options-panel/div[2]/div/ytve-endscreen-template-picker/div/div/div/div[1]/div[1]',
+  btnSelectElement:
+    '/html/body/ytve-endscreen-modal/ytve-modal-host/ytcp-dialog/tp-yt-paper-dialog/div[2]/div/ytve-editor/div[1]/div/ytve-endscreen-editor-options-panel/div[1]/ytcp-button/ytcp-button-shape/button',
+  btnSelectVideo: '/html/body/ytcp-text-menu/tp-yt-paper-dialog/div/tp-yt-paper-listbox/tp-yt-paper-item[1]',
+  btnSaveRelatedVideo:
+    '/html/body/ytve-endscreen-modal/ytve-modal-host/ytcp-dialog/tp-yt-paper-dialog/div[1]/div/div[2]/div/div[2]/ytcp-button/ytcp-button-shape/button',
+  btnNextToCheckStep:
+    '/html/body/ytcp-uploads-dialog/tp-yt-paper-dialog/div/ytcp-animatable[2]/div/div[2]/ytcp-button[2]/ytcp-button-shape/button',
+  btnNextToVisibilityStep:
+    '/html/body/ytcp-uploads-dialog/tp-yt-paper-dialog/div/ytcp-animatable[2]/div/div[2]/ytcp-button[2]/ytcp-button-shape/button',
+  btnChooseSchedule:
+    '/html/body/ytcp-uploads-dialog/tp-yt-paper-dialog/div/ytcp-animatable[1]/ytcp-uploads-review/div[2]/div[1]/ytcp-video-visibility-select/div[3]',
+  btnSelectDate:
+    '/html/body/ytcp-uploads-dialog/tp-yt-paper-dialog/div/ytcp-animatable[1]/ytcp-uploads-review/div[2]/div[1]/ytcp-video-visibility-select/div[3]/div[2]/ytcp-visibility-scheduler/div[1]/ytcp-datetime-picker/div/div[1]/ytcp-text-dropdown-trigger/ytcp-dropdown-trigger/div',
+  inputDate:
+    '/html/body/ytcp-date-picker/tp-yt-paper-dialog/div/form/tp-yt-paper-input/tp-yt-paper-input-container/div[2]/div/tp-yt-iron-input/input',
+  inputTime:
+    '/html/body/ytcp-uploads-dialog/tp-yt-paper-dialog/div/ytcp-animatable[1]/ytcp-uploads-review/div[2]/div[1]/ytcp-video-visibility-select/div[3]/div[2]/ytcp-visibility-scheduler/div[1]/ytcp-datetime-picker/div/div[2]/form/ytcp-form-input-container/div[1]/div/tp-yt-paper-input/tp-yt-paper-input-container/div[2]/div/tp-yt-iron-input/input',
+  btnSelectTime:
+    '/html/body/ytcp-uploads-dialog/tp-yt-paper-dialog/div/ytcp-animatable[1]/ytcp-uploads-review/div[2]/div[1]/ytcp-video-visibility-select/div[3]/div[2]/ytcp-visibility-scheduler/div[1]/ytcp-datetime-picker/div/div[2]/form/ytcp-form-input-container/div[1]',
+  btnSaveSchedule:
+    '/html/body/ytcp-uploads-dialog/tp-yt-paper-dialog/div/ytcp-animatable[2]/div/div[2]/ytcp-button[3]/ytcp-button-shape/button',
+  popupScheduleSuccess: '/html/body/ytcp-video-share-dialog/ytcp-dialog/tp-yt-paper-dialog',
+  btnClosePopupScheduleSuccess:
+    '/html/body/ytcp-video-share-dialog/ytcp-dialog/tp-yt-paper-dialog/div[3]/ytcp-button/ytcp-button-shape/button',
+};
+
+/**
+ * Chuẩn hóa base GPM → origin cho Playwright (bỏ hậu tố /api/v3 nếu có).
+ * Thứ tự: tham số → `GPM_API_BASE` → `GPM_API_ORIGIN` → mặc định.
+ * @param {string} [explicitBase]
+ */
+function apiRootForPlaywright(explicitBase) {
+  const explicit = typeof explicitBase === 'string' ? explicitBase.trim() : '';
+  const fromEnv = (process.env.GPM_API_BASE || '').trim();
+  const s = (explicit || fromEnv).replace(/\/+$/, '');
   if (s.endsWith('/api/v3')) return s.slice(0, -'/api/v3'.length);
-  return s || 'http://127.0.0.1:19995';
+  if (s) return s;
+  const origin = (process.env.GPM_API_ORIGIN || '').trim().replace(/\/+$/, '');
+  return origin || 'http://127.0.0.1:19995';
 }
 
 /** @param {string} name */
@@ -140,32 +199,34 @@ async function openUploadAndSelectFile(page, mp4Path) {
 
   // ── Step 2: Bấm nút "Tạo" (Create) trên thanh masthead ──────────────
   console.log('[upload] Step 2: Bấm nút Tạo (Create)...');
-  await clickElement(page, '/html/body/ytd-app/div[1]/div[2]/ytd-masthead/div[4]/div[3]/div[2]/ytd-button-renderer/yt-button-shape/button');
-  await delay(getRandomNumber(500));
+  await clickXPathElement(page, YOUTUBE_SELECTOR.btnCreate);
+  await delay(500);
 
   // ── Step 3: Chọn mục "Tải video lên" (Upload videos) trong menu ─────
   console.log('[upload] Step 3: Chọn mục Tải video lên...');
-  await clickElement(
-    page,
-    '/html/body/ytd-app/ytd-popup-container/tp-yt-iron-dropdown/div/ytd-multi-page-menu-renderer/div[3]/div[1]/yt-multi-page-menu-section-renderer/div[2]/ytd-compact-link-renderer[1]/a'
-  );
-  await delay(getRandomNumber(3000));
+  await clickXPathElement(page, YOUTUBE_SELECTOR.btnUploadVideo);
+  await delay(3000);
 
-  await clickElement(
-    page,
-    '/html/body/ytcp-uploads-dialog/tp-yt-paper-dialog/div/ytcp-uploads-file-picker/div/ytcp-button/ytcp-button-shape/button'
-  );
+  await clickXPathElement(page, YOUTUBE_SELECTOR.btnSelectFile);
+  // const [fileChooser] = await Promise.all([page.waitForEvent('filechooser'), clickXPathElement(page, YOUTUBE_SELECTOR.btnSelectFile)]);
+  // const fileChooser = await page.waitForEvent('filechooser');
+  // console.log('fileChooser', fileChooser);
+  // await clickElement(
+  //   page,
+  //   YOUTUBE_SELECTOR.btnSelectFile
+  // );
 
-  // await moveToTopLeft(page, 100, 100);
   await page.mouse.move(200, 200, { steps: 20 });
 
   await delay(4000);
 
-  execFile('uploadVideoTest.exe', [path.dirname(mp4Path), path.basename(mp4Path)]);
-  // execFile('uploadVideo.exe', [
-  //   'D:\\yup\\channels\\2ch-qp3vc\\jnwgkjqgxHM',
-  //   '【2ch馴れ初め】お隣さんの美人女子大生を 住み込みで雇った結果、年下の彼女が出来た.mp4',
-  // ]);
+  // await fileChooser.setFiles(mp4Path);
+
+  // execFile('uploadVideoTest.exe', [path.dirname(mp4Path), path.basename(mp4Path)]);
+  execFile('uploadVideo.exe', [
+    'E:\\mavid\\MaVidMedia\\channels\\UCZkK8tFfoedlr4LcNN2UxpA\\AfLVpCPsuqU',
+    '【悲報】ワイ「ワイら家族やろ？？」→結果wwwwwwwwww【2ch面白いスレ】.mp4',
+  ]);
 
   console.log(`[upload] ✓ Đã set file: ${mp4Path}`);
 
@@ -177,7 +238,7 @@ async function openUploadAndSelectFile(page, mp4Path) {
 
   try {
     // Cách 1: Chờ workflow-step thay đổi (không còn SELECT_FILES)
-    await page.waitForSelector('ytcp-uploads-dialog:not([workflow-step="SELECT_FILES"])', {
+    await page.waitForSelector(YOUTUBE_SELECTOR.formDetails, {
       state: 'attached',
       timeout: 60000,
     });
@@ -220,15 +281,10 @@ async function fillVideoDetails(page, videoFolderPath) {
   // ── Step 1: Xóa title cũ và nhập title mới ────────────────────────────
   if (title) {
     console.log('[edit] Step 1: Nhập Title...');
-    const titleXpath =
-      '/html/body/ytcp-uploads-dialog/tp-yt-paper-dialog/div/ytcp-animatable[1]/ytcp-ve/ytcp-video-metadata-editor/div/ytcp-video-metadata-editor-basics/div[1]/ytcp-video-title/div/ytcp-social-suggestions-textbox/ytcp-form-input-container/div[1]/div[2]/div/ytcp-social-suggestion-input/div';
-    await clickElement(page, titleXpath);
+
+    await clickXPathElement(page, YOUTUBE_SELECTOR.titleBox);
     await delay(500);
-    // Chọn tất cả text cũ và xóa
-    await page.keyboard.press('Control+A');
-    await delay(200);
-    await page.keyboard.press('Backspace');
-    await delay(300);
+    await clearContent(page);
     // Nhập title mới
     await page.keyboard.insertText(title);
     console.log('[edit] ✓ Đã nhập Title');
@@ -238,14 +294,10 @@ async function fillVideoDetails(page, videoFolderPath) {
   // ── Step 2: Nhập Description ──────────────────────────────────────────
   if (description) {
     console.log('[edit] Step 2: Nhập Description...');
-    const descXpath =
-      '/html/body/ytcp-uploads-dialog/tp-yt-paper-dialog/div/ytcp-animatable[1]/ytcp-ve/ytcp-video-metadata-editor/div/ytcp-video-metadata-editor-basics/div[2]/ytcp-video-description/div/ytcp-social-suggestions-textbox/ytcp-form-input-container/div[1]/div[2]/div/ytcp-social-suggestion-input/div';
-    await clickElement(page, descXpath);
+
+    await clickXPathElement(page, YOUTUBE_SELECTOR.descriptionBox);
     await delay(500);
-    await page.keyboard.press('Control+A');
-    await delay(200);
-    await page.keyboard.press('Backspace');
-    await delay(300);
+    await clearContent(page);
     await page.keyboard.insertText(description);
     console.log('[edit] ✓ Đã nhập Description');
     await delay(500);
@@ -258,18 +310,13 @@ async function fillVideoDetails(page, videoFolderPath) {
     /* ignore */
   }
 
-  // upload thumbnail
-  const thumbXpath =
-    '/html/body/ytcp-uploads-dialog/tp-yt-paper-dialog/div/ytcp-animatable[1]/ytcp-ve/ytcp-video-metadata-editor/div/ytcp-video-metadata-editor-basics/div[3]/ytcp-video-thumbnail-editor/div[4]/ytcp-video-custom-still-editor/div/ytcp-thumbnail-uploader/ytcp-thumbnail-editor/div[1]/ytcp-ve/button';
+  await scrollUntilVisible(page, YOUTUBE_SELECTOR.thumbnailBox, true, 50);
 
-  await scrollUntilVisible(page, thumbXpath, true, 100);
+  // await clickXPathElement(page, YOUTUBE_SELECTOR.thumbnailBox);
 
-  // Lưu ý: Tôi đã thêm thao tác click gọi hộp thoại chọn file, vì thường phải click thì file dialog mới hiện ra.
-  await clickElement(page, thumbXpath);
+  // await page.mouse.move(200, 150, { steps: 20 });
 
-  await page.mouse.move(200, 150, { steps: 20 });
-
-  await delay(4000);
+  await delay(2000);
 
   // Tìm file ảnh trong folder (jpg, png,  jpeg)
   const imageExts = ['.jpg', '.jpeg', '.png'];
@@ -277,36 +324,43 @@ async function fillVideoDetails(page, videoFolderPath) {
   const imageFile = folderFiles.find(f => imageExts.includes(path.extname(f).toLowerCase()));
 
   if (imageFile) {
-    execFile('uploadVideoTest.exe', [videoFolderPath, imageFile]);
-    console.log(`[edit] ✓ Gọi uploadVideo.exe cho thumbnail: ${imageFile}`);
+    // execFile('uploadVideoTest.exe', [videoFolderPath, imageFile]);
+    // console.log(`[edit] ✓ Gọi uploadVideo.exe cho thumbnail: ${imageFile}`);
 
-    const btnUploadThumb = page.locator(`xpath=${thumbXpath}`);
-    let found = false;
+    const [fileChooser] = await Promise.all([page.waitForEvent('filechooser'), clickXPathElement(page, YOUTUBE_SELECTOR.thumbnailBox)]);
 
-    for (let i = 0; i < 15; i++) {
-      const count = await btnUploadThumb.count();
+    await delay(1000);
 
-      if (count <= 0) {
-        found = true;
-        break;
-      }
+    await fileChooser.setFiles(path.join(videoFolderPath, imageFile));
 
-      await page.waitForTimeout(1000);
-    }
+    // const btnUploadThumb = page.locator(`xpath=${thumbXpath}`);
+    // let found = false;
 
-    if (!found) {
-      console.log('Đã upload thumbnail thành công');
-    }
+    // for (let i = 0; i < 15; i++) {
+    //   const count = await btnUploadThumb.count();
+
+    //   if (count <= 0) {
+    //     found = true;
+    //     break;
+    //   }
+
+    //   await page.waitForTimeout(1000);
+    // }
+
+    // if (!found) {
+    //   console.log('Đã upload thumbnail thành công');
+    // }
   } else {
     console.log(`[edit] ⚠ Không tìm thấy file thumbnail (.jpg, .png...) trong ${videoFolderPath}`);
   }
 
+  await delay(4000);
+
   // ── Step 3: Scroll xuống cuối và click "Hiển thị thêm" (Show more) ────
   console.log('[edit] Step 3: Click "Hiển thị thêm" (Show more)...');
-  const showMoreXpath =
-    '/html/body/ytcp-uploads-dialog/tp-yt-paper-dialog/div/ytcp-animatable[1]/ytcp-ve/ytcp-video-metadata-editor/div/div/ytcp-button/ytcp-button-shape/button';
+
   // Scroll xuống để nút "Show more" hiện ra
-  const box = await page.locator('xpath=/html/body/ytcp-uploads-dialog/tp-yt-paper-dialog/div/ytcp-animatable[1]').boundingBox();
+  const box = await page.locator(`xpath=${YOUTUBE_SELECTOR.boxUpload}`).boundingBox();
 
   if (box) {
     await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
@@ -321,7 +375,7 @@ async function fillVideoDetails(page, videoFolderPath) {
   //   if (dialog) dialog.scrollTop = dialog.scrollHeight;
   // });
   await delay(1000);
-  await clickElement(page, showMoreXpath);
+  await clickXPathElement(page, YOUTUBE_SELECTOR.btnShowMore);
   console.log('[edit] ✓ Đã click "Hiển thị thêm"');
   await delay(1500);
 
@@ -337,16 +391,10 @@ async function fillVideoDetails(page, videoFolderPath) {
       // await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
       await page.mouse.move(box.x + box.width / 2 + (Math.random() * 20 - 10), box.y + box.height / 2 + (Math.random() * 20 - 10));
 
-      await scrollUntilVisible(
-        page,
-        '/html/body/ytcp-uploads-dialog/tp-yt-paper-dialog/div/ytcp-animatable[1]/ytcp-ve/ytcp-video-metadata-editor/div/ytcp-video-metadata-editor-advanced/div[7]/ytcp-form-input-container',
-        true
-      );
+      await scrollUntilVisible(page, YOUTUBE_SELECTOR.tagsBox, true);
     }
 
-    const tagsXpath =
-      '/html/body/ytcp-uploads-dialog/tp-yt-paper-dialog/div/ytcp-animatable[1]/ytcp-ve/ytcp-video-metadata-editor/div/ytcp-video-metadata-editor-advanced/div[7]/ytcp-form-input-container/div[1]/div/ytcp-free-text-chip-bar/ytcp-chip-bar/div/input';
-    await clickElement(page, tagsXpath);
+    await clickXPathElement(page, YOUTUBE_SELECTOR.tagsInput);
     await delay(500);
 
     await page.keyboard.insertText(tagsGemini);
@@ -354,73 +402,90 @@ async function fillVideoDetails(page, videoFolderPath) {
   }
 
   console.log('[edit] ✓ Hoàn thành điền thông tin video! Sang bước tiếp theo');
-  await clickElement(
-    page,
-    '/html/body/ytcp-uploads-dialog/tp-yt-paper-dialog/div/ytcp-animatable[2]/div/div[2]/ytcp-button[2]/ytcp-button-shape/button'
-  );
+  await clickXPathElement(page, YOUTUBE_SELECTOR.btnNextToRelatedStep);
 }
 
 async function addRelatedVideo(page, videoFolderPath) {
   const meta = getMetaInfo(videoFolderPath);
 
   // thêm video liên quan
-  await clickElement(
-    page,
-    '/html/body/ytcp-uploads-dialog/tp-yt-paper-dialog/div/ytcp-animatable[1]/ytcp-uploads-video-elements/div[3]/ytcp-button[2]/ytcp-button-shape/button'
-  );
+  await clickXPathElement(page, YOUTUBE_SELECTOR.btnAddVideoRelated);
 
   await delay(3000);
 
   // chọn template đầu tiên
-  await clickElement(
-    page,
-    '/html/body/ytve-endscreen-modal/ytve-modal-host/ytcp-dialog/tp-yt-paper-dialog/div[2]/div/ytve-editor/div[1]/div/ytve-endscreen-editor-options-panel/div[2]/div/ytve-endscreen-template-picker/div/div/div/div[1]/div[1]'
-  );
+  await clickXPathElement(page, YOUTUBE_SELECTOR.btnChooseTemplate);
 
   if (meta?.uploadedVideos && meta?.uploadedVideos === 2) {
     // click element
-    await clickElement(
-      page,
-      '/html/body/ytve-endscreen-modal/ytve-modal-host/ytcp-dialog/tp-yt-paper-dialog/div[2]/div/ytve-editor/div[1]/div/ytve-endscreen-editor-options-panel/div[1]/ytcp-button/ytcp-button-shape/button'
-    );
+    await clickXPathElement(page, YOUTUBE_SELECTOR.btnSelectElement);
 
     await delay(500);
     // chọn video
-    await clickElement(page, '/html/body/ytcp-text-menu/tp-yt-paper-dialog/div/tp-yt-paper-listbox/tp-yt-paper-item[1]');
+    await clickXPathElement(page, YOUTUBE_SELECTOR.btnSelectVideo);
   }
 
   // save
-  await clickElement(
-    page,
-    '/html/body/ytve-endscreen-modal/ytve-modal-host/ytcp-dialog/tp-yt-paper-dialog/div[1]/div/div[2]/div/div[2]/ytcp-button/ytcp-button-shape/button'
-  );
+  await clickXPathElement(page, YOUTUBE_SELECTOR.btnSaveRelatedVideo);
 
   await delay(5000);
 
   // goto check video
-  await clickElement(
-    page,
-    '/html/body/ytcp-uploads-dialog/tp-yt-paper-dialog/div/ytcp-animatable[2]/div/div[2]/ytcp-button[2]/ytcp-button-shape/button'
-  );
+  await clickXPathElement(page, YOUTUBE_SELECTOR.btnNextToCheckStep);
 
   await delay(2000);
 
   // goto visibility
-  await clickElement(
-    page,
-
-    '/html/body/ytcp-uploads-dialog/tp-yt-paper-dialog/div/ytcp-animatable[2]/div/div[2]/ytcp-button[2]/ytcp-button-shape/button'
-  );
+  await clickXPathElement(page, YOUTUBE_SELECTOR.btnNextToVisibilityStep);
 }
 
-async function chooseVisibility(page) {
-  // chọn Schedule
-  await clickElement(
-    page,
-    '/html/body/ytcp-uploads-dialog/tp-yt-paper-dialog/div/ytcp-animatable[1]/ytcp-uploads-review/div[2]/div[1]/ytcp-video-visibility-select/div[3]'
-  );
+/**
+ * Chọn «Lên lịch» (Schedule); nếu có `slot` (từ `getYoutubePublishPlan` ở `main`) thì điền ngày/giờ.
+ * @param {import('playwright').Page} page
+ * @param {{ slot?: { date: string, time: string, iso?: string } | null, jobIndex: number, totalJobs: number }} ctx — `slot.date` MM/DD/YYYY
+ */
+async function chooseVisibility(page, ctx) {
+  const slot = ctx?.slot;
 
+  if (!slot.date && !slot.time) {
+    await clickXPathElement(page, YOUTUBE_SELECTOR.btnSaveSchedule);
+
+    await page.waitForSelector(YOUTUBE_SELECTOR.popupScheduleSuccess, {
+      state: 'visible',
+      timeout: 60000,
+    });
+    await delay(1000);
+    await clickXPathElement(page, YOUTUBE_SELECTOR.btnClosePopupScheduleSuccess);
+    return;
+  }
+
+  await clickXPathElement(page, YOUTUBE_SELECTOR.btnChooseSchedule);
   await delay(1500);
+  await clickXPathElement(page, YOUTUBE_SELECTOR.btnSelectDate);
+  await delay(500);
+  await clickXPathElement(page, YOUTUBE_SELECTOR.inputDate);
+  await clearContent(page);
+  await delay(500);
+  await page.keyboard.insertText(slot.date);
+  await delay(500);
+  await page.keyboard.press('Enter');
+  await page.keyboard.press('Escape');
+
+  await clickXPathElement(page, YOUTUBE_SELECTOR.inputTime);
+  await clearContent(page);
+  await delay(500);
+  await page.keyboard.insertText(slot.time);
+  await delay(500);
+  await page.keyboard.press('Enter');
+
+  await clickXPathElement(page, YOUTUBE_SELECTOR.btnSaveSchedule);
+
+  await page.waitForSelector(YOUTUBE_SELECTOR.popupScheduleSuccess, {
+    state: 'visible',
+    timeout: 60000,
+  });
+  await delay(1000);
+  await clickXPathElement(page, YOUTUBE_SELECTOR.btnClosePopupScheduleSuccess);
 }
 
 /**
@@ -431,11 +496,12 @@ export default async function main(raw = {}) {
   if (!gpmProfileId) throw new Error('Thiếu gpmProfileId.');
 
   const channelFolder = assertSafeChannelFolder(typeof raw.channelFolder === 'string' ? raw.channelFolder : '');
+  const scheduleEmail = typeof raw.email === 'string' ? raw.email.trim() : '';
   const maxRaw = raw.maxUploads;
   const maxUploads =
     maxRaw == null || maxRaw === '' ? null : Number.isFinite(Number(maxRaw)) && Number(maxRaw) > 0 ? Math.floor(Number(maxRaw)) : null;
 
-  const apiBase = apiRootForPlaywright(typeof raw.gpmApiBase === 'string' ? raw.gpmApiBase : process.env.GPM_API_BASE);
+  const apiBase = apiRootForPlaywright(typeof raw.gpmApiBase === 'string' ? raw.gpmApiBase.trim() : '');
 
   const uploadFolderNames = Array.isArray(raw.uploadFolderNames)
     ? raw.uploadFolderNames.map(x => String(x ?? '').trim()).filter(Boolean)
@@ -451,6 +517,24 @@ export default async function main(raw = {}) {
   }
 
   console.log(`[upload] Kênh «${channelFolder}»: ${jobs.length} video — GPM profile ${gpmProfileId}`);
+
+  /** @type {Array<{ date: string, time: string, iso: string }> | null} */
+  let publishSchedule = null;
+  if (scheduleEmail) {
+    try {
+      const { schedule } = getYoutubePublishPlan({
+        channelFolder,
+        email: scheduleEmail,
+        uploadCount: jobs.length,
+      });
+      publishSchedule = schedule;
+      console.log(`[upload] getYoutubePublishPlan: ${schedule.length} mốc (email «${scheduleEmail}»).`);
+    } catch (e) {
+      console.warn('[upload] getYoutubePublishPlan:', e instanceof Error ? e.message : e);
+    }
+  } else {
+    console.warn('[upload] Thiếu email — không tính lịch publish, chỉ bấm Schedule.');
+  }
 
   const gpmOpts = { apiBase };
 
@@ -470,7 +554,11 @@ export default async function main(raw = {}) {
         // Sau khi upload xong → điền title, description, tags
         await fillVideoDetails(page, folderPath);
         await addRelatedVideo(page, folderPath);
-        await chooseVisibility(page);
+        await chooseVisibility(page, {
+          slot: publishSchedule?.[i] ?? null,
+          jobIndex: i,
+          totalJobs: jobs.length,
+        });
       } catch (e) {
         console.warn('[upload]', e instanceof Error ? e.message : e);
       }

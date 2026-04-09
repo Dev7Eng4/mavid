@@ -207,6 +207,8 @@ export interface GetInfoChannelParams {
 export interface UploadYoutubeViaGpmParams {
   gpmProfileId: string;
   channelFolder: string;
+  /** Khớp `channels[].email` trong `mavid-channel-config.json` — dùng cho lịch publish (getYoutubePublishPlan). */
+  email?: string;
   /** null/undefined = upload tất cả thư mục con có .mp4 */
   maxUploads?: number | null;
   /** Thứ tự upload cố định (vd. batch vừa tạo); không truyền = quét thư mục, sort tên, lấy từ trên xuống theo maxUploads */

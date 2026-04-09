@@ -13,7 +13,7 @@ function rand(min, max) {
 
 export const delay = ms =>
   new Promise(resolve => {
-    return setTimeout(resolve, ms);
+    return setTimeout(resolve, getRandomNumber(ms));
   });
 
 export async function moveToTopLeft(
@@ -121,6 +121,10 @@ export const clickElement = async (page, selector, isXpath = false) => {
   await page.mouse.up();
 };
 
+export const clickXPathElement = async (page, selector) => {
+  await clickElement(page, selector, true);
+};
+
 async function humanScroll(page, distance) {
   // Người thật không cuộn 1 cú wheel = 300px
   // Họ lăn nhiều tick nhỏ liên tiếp, tốc độ không đều
@@ -171,7 +175,7 @@ export async function clearContent(page) {
   await page.keyboard.down('Control');
   await page.keyboard.press('A');
   await page.keyboard.up('Control');
-  await page.waitForTimeout(100);
+  await page.waitForTimeout(300);
   await page.keyboard.press('Backspace');
-  await page.waitForTimeout(100);
+  await page.waitForTimeout(200);
 }
