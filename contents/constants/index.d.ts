@@ -70,6 +70,10 @@ export const LOGO: {
 
 export const VIDEO_STORAGE_ROOT: string;
 
+export const MAX_SCHEDULED_VIDEOS: number;
+
+export const MAX_VIDEOS_PREPARE_AHEAD: number;
+
 export const THUMBNAIL_STYLE: {
   readonly TEXT: string;
   readonly REMAKE: string;

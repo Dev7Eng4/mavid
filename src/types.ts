@@ -93,6 +93,10 @@ export interface ConstantsUiModel {
    * Rỗng trong file → app gợi ý mặc định (Windows: ổ không C:; macOS: volume ngoài hoặc HOME).
    */
   VIDEO_STORAGE_ROOT: string;
+  /** Số video được lên lịch đăng tối đa (cùng lúc / mỗi đợt — tùy luồng dùng hằng này). */
+  MAX_SCHEDULED_VIDEOS: number;
+  /** Số video tạo / chuẩn bị trước tối đa (buffer trước khi đăng). */
+  MAX_VIDEOS_PREPARE_AHEAD: number;
 }
 
 export interface ChannelFile {

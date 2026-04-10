@@ -21,7 +21,7 @@ const FLOW_SELECTOR = {
   btnAttach: '/html/body/div[1]/div[1]/div[5]/div/div/div[2]/div[1]/button',
   btnUploadImage: '/html/body/div[1]/div[2]/div/div/div/div[2]/div[1]/div/div[2]',
   btnCreate: '/html/body/div[1]/div[1]/div[4]/div/div/div[2]/div[2]/button[2]',
-  btnCreateHaveImage: '/html/body/div[1]/div[1]/div[4]/div/div/div[3]/div[2]/button[2]',
+  btnCreateHaveImage: '/html/body/div[1]/div[1]/div[5]/div/div/div[3]/div[2]/button[2]',
   textbox: 'div[role="textbox"]',
 };
 

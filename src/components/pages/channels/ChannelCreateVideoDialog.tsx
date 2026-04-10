@@ -28,7 +28,7 @@ function clampInt(n: number, min: number, max: number): number {
   return Math.min(max, Math.max(min, Math.trunc(n)));
 }
 
-const DEFAULT_MAX_VIDEOS = 5;
+const DEFAULT_MAX_VIDEOS = 4;
 const MAX_VIDEOS_CAP = 100;
 
 export function ChannelCreateVideoDialog({ channels, onClose, onConfirm }: ChannelCreateVideoDialogProps) {

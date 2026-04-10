@@ -52,7 +52,7 @@ function migrateDropThucMucColumnIfPresent(sheet) {
 }
 
 /** Thời gian video tối thiểu để lấy vào danh sách (giây) */
-const MIN_DURATION_SECONDS = 300;
+const MIN_DURATION_SECONDS = 480;
 
 /**
  * File index cũ (5 cột): LAST UPLOAD ở cột E → chèn 3 cột sau EMAIL, đẩy LAST UPLOAD sang cột H.

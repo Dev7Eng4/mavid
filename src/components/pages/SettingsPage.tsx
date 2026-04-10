@@ -63,6 +63,8 @@ const DEFAULT_MODEL: ConstantsUiModel = {
   },
   LOGO: { SIZE: 80, MARGIN_TOP: 20, MARGIN_RIGHT: 20 },
   VIDEO_STORAGE_ROOT: '',
+  MAX_SCHEDULED_VIDEOS: 20,
+  MAX_VIDEOS_PREPARE_AHEAD: 20,
 };
 
 type SettingsTab = 'common' | 'video';
@@ -228,6 +230,48 @@ export function SettingsPage({ disabled }: Props) {
               >
                 Chọn thư mục…
               </AppButton>
+            </div>
+          </SectionCard>
+
+          <SectionCard title='LÊN LỊCH ĐĂNG'>
+            <p className='text-sm leading-relaxed mb-3' style={{ color: 'var(--text-muted)' }}>
+              Giới hạn lịch đăng và số video tạo trước; các luồng trong app đọc{' '}
+              <code className='text-xs'>MAX_SCHEDULED_VIDEOS</code> và{' '}
+              <code className='text-xs'>MAX_VIDEOS_PREPARE_AHEAD</code> trong constants.
+            </p>
+            <div className='grid gap-3 sm:grid-cols-2'>
+              <Field label='Số video lên lịch tối đa'>
+                <input
+                  type='number'
+                  min={1}
+                  max={500}
+                  value={model.MAX_SCHEDULED_VIDEOS}
+                  disabled={!canEdit || constantsLoading}
+                  onChange={e => {
+                    const raw = toNum(e.target.value, model.MAX_SCHEDULED_VIDEOS);
+                    const n = Math.max(1, Math.min(500, Math.floor(raw)));
+                    patch('MAX_SCHEDULED_VIDEOS', n);
+                  }}
+                  className='w-full max-w-xs rounded-xl px-3 py-2 text-sm outline-none'
+                  style={inputStyle}
+                />
+              </Field>
+              <Field label='Số video tạo trước tối đa'>
+                <input
+                  type='number'
+                  min={1}
+                  max={500}
+                  value={model.MAX_VIDEOS_PREPARE_AHEAD}
+                  disabled={!canEdit || constantsLoading}
+                  onChange={e => {
+                    const raw = toNum(e.target.value, model.MAX_VIDEOS_PREPARE_AHEAD);
+                    const n = Math.max(1, Math.min(500, Math.floor(raw)));
+                    patch('MAX_VIDEOS_PREPARE_AHEAD', n);
+                  }}
+                  className='w-full max-w-xs rounded-xl px-3 py-2 text-sm outline-none'
+                  style={inputStyle}
+                />
+              </Field>
             </div>
           </SectionCard>
 
