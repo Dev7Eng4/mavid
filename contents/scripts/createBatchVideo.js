@@ -60,7 +60,7 @@ async function resolveGpmProfileIdByEmail(email) {
         p =>
           String(p.name || '')
             .trim()
-            .toLowerCase() === normEmail,
+            .toLowerCase() === normEmail
       );
       return hit?.id || null;
     }
@@ -177,7 +177,7 @@ export async function readVideoUrlsFromFile(inputFile = null, options = {}) {
     const trangThaiIdx = headerRow.values.findIndex(v =>
       String(v || '')
         .toLowerCase()
-        .includes('status'),
+        .includes('status')
     );
     const bgIdx = headerRow.values.findIndex(v => String(v || '').toLowerCase() === 'background video');
     const startIdx = headerRow.values.findIndex(v => String(v || '').toLowerCase() === 'start from');
@@ -185,7 +185,7 @@ export async function readVideoUrlsFromFile(inputFile = null, options = {}) {
       v =>
         String(v || '')
           .trim()
-          .toLowerCase() === 'duration',
+          .toLowerCase() === 'duration'
     );
 
     let hasFoundStart = startIdx < 0; // Nếu không có cột START FROM thì coi như đã bắt đầu ngay lập tức
@@ -420,6 +420,11 @@ function mergeChannelConfigIntoProps(baseProps, item) {
   if (thumbEmpty && item.thumbnailPrompt != null && String(item.thumbnailPrompt).trim() !== '') {
     o.thumbnailPrompt = String(item.thumbnailPrompt).trim();
   }
+
+  const emailEmpty = o.email == null || String(o.email).trim() === '';
+  if (emailEmpty && item.email != null && String(item.email).trim() !== '') {
+    o.email = String(item.email).trim();
+  }
   return o;
 }
 
@@ -467,6 +472,9 @@ async function main(props = {}) {
   const videoCropReup = props.videoCropPercent ?? process.env.MAVID_VIDEO_CROP_PERCENT;
 
   let mergedProps = { ...props };
+  if (email != null && String(email).trim() !== '' && (mergedProps.email == null || String(mergedProps.email).trim() === '')) {
+    mergedProps = { ...mergedProps, email: String(email).trim() };
+  }
   let inputFile = null;
   let effectiveChannelName = channelParam || null;
 
@@ -552,7 +560,7 @@ async function main(props = {}) {
         ? `Không có link video nào thỏa điều kiện độ dài (${minDurationMinutes > 0 ? `tối thiểu ${minDurationMinutes} phút` : ''}${
             minDurationMinutes > 0 && maxDurationMinutes > 0 ? ', ' : ''
           }${maxDurationMinutes > 0 ? `tối đa ${maxDurationMinutes} phút` : ''}) trong CSV/Excel.`
-        : 'Không có link video nào trong CSV/Excel.',
+        : 'Không có link video nào trong CSV/Excel.'
     );
   }
 
@@ -564,7 +572,7 @@ async function main(props = {}) {
 
   if (videoType !== MAKE_VIDEO_MODE.FROM_AUDIO && videoType !== MAKE_VIDEO_MODE.REUP_FULL) {
     throw new Error(
-      'Thiếu hoặc không hợp lệ videoType (from_audio | reup_full). Truyền props.videoType hoặc ghi videoType trong mavid-channel-config.json khi chạy với MAVID_CHANNEL.',
+      'Thiếu hoặc không hợp lệ videoType (from_audio | reup_full). Truyền props.videoType hoặc ghi videoType trong mavid-channel-config.json khi chạy với MAVID_CHANNEL.'
     );
   }
 
@@ -603,16 +611,18 @@ async function main(props = {}) {
     }
   }
 
-  console.log('result', result);
+  console.log('result', result, mergedProps);
+  console.log('effectiveChannelName', effectiveChannelName);
+  console.log('email', mergedProps.email);
 
   if (result && result.success && result.processedCount > 0 && mergedProps.email) {
     try {
       const gpmProfileId = await resolveGpmProfileIdByEmail(mergedProps.email);
       if (gpmProfileId) {
         console.log(
-          `\n[upload] Đã hoàn thành batch ${result.processedCount} video. Bắt đầu upload lên YouTube qua GPM profile: ${gpmProfileId}`,
+          `\n[upload] Đã hoàn thành batch ${result.processedCount} video. Bắt đầu upload lên YouTube qua GPM profile: ${gpmProfileId}`
         );
-        const { default: uploadYoutubeViaGpm } = await import('./youtubeUploadViaGpm.js');
+        const { default: uploadYoutubeViaGpm } = await import('../youtube/uploadViaGpm.js');
         await uploadYoutubeViaGpm({
           gpmProfileId,
           channelFolder: effectiveChannelName,

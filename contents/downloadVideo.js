@@ -10,57 +10,12 @@ import { fileURLToPath } from 'url';
 import { detectVideoLang, getLanguageOptions } from './utils/detectLanguage.util.js';
 
 import { MAKE_VIDEO_MODE, LANGUAGES_NEED_UPDATE_TRANSCRIPT } from './constants/index.js';
+import { optimizeFlowThumbnailJpegIfLarge } from './flow/thumbnailOptimize.util.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const DEFAULT_OUTPUT_DIR = path.join(__dirname, '..', 'downloads');
 const INPUT_FILE = path.join(__dirname, '..', 'input.txt');
 const OUTPUT_FILE = path.join(DEFAULT_OUTPUT_DIR, 'output.json');
-
-/** Ngưỡng tối ưu JPEG flow-thumbnail (bytes). */
-const FLOW_THUMB_OPTIMIZE_MIN_BYTES = 1024 * 1024;
-
-/**
- * Nếu `flow-thumbnail.jpg` ≥ 1MB — nén JPEG (giảm quality), vẫn lớn thì thu nhỏ chiều ngang.
- */
-async function optimizeFlowThumbnailJpegIfLarge(filePath) {
-  try {
-    if (!filePath || !fs.existsSync(filePath)) return;
-    const before = fs.statSync(filePath).size;
-    if (before < FLOW_THUMB_OPTIMIZE_MIN_BYTES) return;
-
-    const sharp = (await import('sharp')).default;
-    let buf;
-    let quality = 85;
-    while (quality >= 40) {
-      buf = await sharp(filePath).jpeg({ quality, mozjpeg: true, chromaSubsampling: '4:2:0' }).toBuffer();
-      if (buf.length < FLOW_THUMB_OPTIMIZE_MIN_BYTES) break;
-      quality -= quality > 55 ? 10 : 5;
-    }
-
-    if (buf.length >= FLOW_THUMB_OPTIMIZE_MIN_BYTES) {
-      for (const maxW of [1280, 1024, 800, 640]) {
-        buf = await sharp(buf)
-          .resize(maxW, null, { withoutEnlargement: true })
-          .jpeg({ quality: 72, mozjpeg: true, chromaSubsampling: '4:2:0' })
-          .toBuffer();
-        if (buf.length < FLOW_THUMB_OPTIMIZE_MIN_BYTES) break;
-      }
-    }
-
-    if (buf.length < before) {
-      fs.writeFileSync(filePath, buf);
-      console.log(
-        `[thumbnail-flow] Đã tối ưu flow-thumbnail: ${(before / FLOW_THUMB_OPTIMIZE_MIN_BYTES).toFixed(2)}MB → ${(
-          buf.length / FLOW_THUMB_OPTIMIZE_MIN_BYTES
-        ).toFixed(2)}MB (${before} → ${buf.length} bytes)`,
-      );
-    } else if (before >= FLOW_THUMB_OPTIMIZE_MIN_BYTES) {
-      console.warn('[thumbnail-flow] Không giảm được kích thước flow-thumbnail sau tối ưu; giữ file gốc.');
-    }
-  } catch (e) {
-    console.warn('[thumbnail-flow] Lỗi tối ưu kích thước thumbnail:', e.message);
-  }
-}
 
 /**
  * Lấy thông tin video đơn lẻ
@@ -201,7 +156,7 @@ async function processVttTranscriptsWithGemini(
   },
 ) {
   const { cleanSrt } = await import('./utils/srt.util.js');
-  const { updateVideoInfo } = await import('./updateContentWithGemini.js');
+  const { updateVideoInfo } = await import('./gemini/updateContent.js');
   const { PROMPTS_CREATE_THUMBNAIL, PROMPTS_NEED_IMAGE } = await import('./prompts/index.js');
 
   const vttFiles = fs.readdirSync(outputDir).filter(f => f.endsWith('.vtt'));
@@ -249,7 +204,7 @@ async function processVttTranscriptsWithGemini(
         if (titleG && summaryG) {
           console.log('[thumbnail-flow] Tạo thumbnail từ title/summary Gemini →', path.basename(thumbnailFlowOutputDir));
           try {
-            const { runCreateThumbnailFlow } = await import('./scripts/createThumbnailFlow.js');
+            const { runCreateThumbnailFlow } = await import('./flow/runCreateThumbnail.js');
 
             let promptFn = PROMPTS_CREATE_THUMBNAIL[thumbnailPrompt];
             if (!promptFn) {

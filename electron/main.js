@@ -7,6 +7,7 @@ import { resolveGpmChromiumExecutable } from '../contents/scripts/openGpmPlaywri
 import { getDefaultVideoStorageRoot, MAVID_MEDIA_FOLDER } from '../contents/constants/defaultVideoStorageRoot.js';
 import { mergeConstantsBaseWithUserOverlay } from '../contents/constants/mergeConstantsOverlay.js';
 import { CONSTANT_EXPORT_KEYS } from '../contents/constants/constantsExportKeys.js';
+import { buildConstantsModuleBase } from '../contents/constants/constantsModuleBase.js';
 import { getAppSettingsUserJsonPath } from '../contents/constants/userConstantsPaths.js';
 
 const VITE_DEV_SERVER_URL = process.env.VITE_DEV_SERVER_URL || 'http://localhost:5173';
@@ -34,6 +35,85 @@ const ALLOWED_NPM_SCRIPTS = new Set([
 ]);
 
 let jobRunning = false;
+
+/** Dòng giống lỗi trên stdout npm — đẩy lên tab Logs. */
+const NPM_STDOUT_ERR_LIKE =
+  /^(Error|RangeError|TypeError|ReferenceError|SyntaxError):|\bUnhandledPromiseRejection\b|\bnpm ERR!|\bELIFECYCLE\b|\bERR_MODULE_NOT_FOUND\b|\bCannot find module\b|\bFATAL\b|\bAssertionError\b/i;
+
+/**
+ * FFmpeg (và nhiều CLI) ghi tiến độ ra stderr; không phải lỗi.
+ * Chỉ gửi tab Logs khi dòng thực sự giống warning/error.
+ */
+function isReportableNpmStderrLine(t) {
+  const s = String(t).trim();
+  if (!s) return false;
+  if (NPM_STDOUT_ERR_LIKE.test(s)) return true;
+  if (/\[(error|fatal|warning)\]/i.test(s)) return true;
+  if (/^\(node:\d+\)\s*(Warning|ExperimentalWarning)/i.test(s)) return true;
+  if (/^\s*npm\s+WARN\b/i.test(s)) return true;
+  if (/^\s*npm\s+ERR!/i.test(s)) return true;
+  if (/^warning[\s:]/i.test(s)) return true;
+  return false;
+}
+
+/** Ghi ra terminal process Electron (dev), không gửi UI Logs. */
+function writeRunnerTerminalLine(line) {
+  process.stdout.write(`[log] ${line}\n`);
+}
+
+/** Log lỗi tab Logs — lưu file để đóng/mở app vẫn còn (chỉ xóa khi user bấm Xóa). */
+const MAX_PERSISTED_ERROR_LOG_LINES = 3000;
+
+function getErrorLogFilePath() {
+  return path.join(app.getPath('userData'), 'mavid-error-logs.json');
+}
+
+function readPersistedErrorLogs() {
+  const p = getErrorLogFilePath();
+  try {
+    if (!fs.existsSync(p)) return [];
+    const raw = fs.readFileSync(p, 'utf8');
+    const j = JSON.parse(raw);
+    return Array.isArray(j.lines) ? j.lines.filter(x => typeof x === 'string') : [];
+  } catch {
+    return [];
+  }
+}
+
+function writePersistedErrorLogs(lines) {
+  const p = getErrorLogFilePath();
+  const trimmed =
+    lines.length > MAX_PERSISTED_ERROR_LOG_LINES ? lines.slice(-MAX_PERSISTED_ERROR_LOG_LINES) : [...lines];
+  fs.mkdirSync(path.dirname(p), { recursive: true });
+  fs.writeFileSync(p, JSON.stringify({ lines: trimmed }, null, 0), 'utf8');
+}
+
+function appendPersistedErrorLogLine(line) {
+  const s = typeof line === 'string' ? line : String(line);
+  if (!String(s).trim()) return;
+  const cur = readPersistedErrorLogs();
+  cur.push(s);
+  writePersistedErrorLogs(cur);
+}
+
+function clearPersistedErrorLogsFile() {
+  writePersistedErrorLogs([]);
+}
+
+/** Chỉ lỗi / stderr / console.error — tab Logs trong app (đã ghi file trước khi push IPC). */
+function broadcastScriptError(line) {
+  const s = typeof line === 'string' ? line : String(line);
+  if (!String(s).trim()) return;
+  appendPersistedErrorLogLine(s);
+  try {
+    const wins = BrowserWindow.getAllWindows();
+    for (const w of wins) {
+      if (!w.isDestroyed()) w.webContents.send('script-error-log', s);
+    }
+  } catch {
+    /* ignore */
+  }
+}
 
 /** Tiến trình con của `run-npm-script` (để có thể kill khi user bấm Dừng). */
 let npmChildProcess = null;
@@ -74,6 +154,21 @@ ipcMain.handle('minimize-app', async () => {
   return { ok: true };
 });
 
+ipcMain.handle('get-persisted-error-logs', async () => ({
+  lines: readPersistedErrorLogs(),
+}));
+
+ipcMain.handle('append-persisted-error-log', async (_event, { line }) => {
+  if (typeof line !== 'string' || !line.trim()) return { ok: false };
+  appendPersistedErrorLogLine(line);
+  return { ok: true };
+});
+
+ipcMain.handle('clear-persisted-error-logs', async () => {
+  clearPersistedErrorLogsFile();
+  return { ok: true };
+});
+
 ipcMain.handle('run-npm-script', async (_event, { npmScript, extraEnv }) => {
   if (!npmScript || typeof npmScript !== 'string') throw new Error('npmScript không hợp lệ.');
   if (!ALLOWED_NPM_SCRIPTS.has(npmScript)) throw new Error(`Script không được phép: ${npmScript}`);
@@ -82,19 +177,7 @@ ipcMain.handle('run-npm-script', async (_event, { npmScript, extraEnv }) => {
   jobRunning = true;
   npmRunUserCancelled = false;
 
-  function sendLog(line) {
-    process.stdout.write(`[log] ${line}\n`);
-    try {
-      const wins = BrowserWindow.getAllWindows();
-      for (const w of wins) {
-        if (!w.isDestroyed()) w.webContents.send('script-log', line);
-      }
-    } catch {
-      /* window closed */
-    }
-  }
-
-  sendLog(`[MaVid] Bắt đầu: npm run ${npmScript}`);
+  writeRunnerTerminalLine(`[MaVid] Bắt đầu: npm run ${npmScript}`);
 
   try {
     const npmCmd = process.platform === 'win32' ? 'npm.cmd' : 'npm';
@@ -111,12 +194,24 @@ ipcMain.handle('run-npm-script', async (_event, { npmScript, extraEnv }) => {
 
       child.stdout.on('data', chunk => {
         const lines = chunk.toString().split('\n');
-        for (const l of lines) if (l.trim()) sendLog(l);
+        for (const l of lines) {
+          const t = l.trim();
+          if (!t) continue;
+          writeRunnerTerminalLine(t);
+          if (NPM_STDOUT_ERR_LIKE.test(t)) broadcastScriptError(`[npm stdout] ${t}`);
+        }
       });
 
       child.stderr.on('data', chunk => {
         const lines = chunk.toString().split('\n');
-        for (const l of lines) if (l.trim()) sendLog(`[stderr] ${l}`);
+        for (const l of lines) {
+          const t = l.trim();
+          if (!t) continue;
+          writeRunnerTerminalLine(`[stderr] ${t}`);
+          if (isReportableNpmStderrLine(t)) {
+            broadcastScriptError(`[stderr] ${t}`);
+          }
+        }
       });
 
       child.on('close', c => {
@@ -134,17 +229,25 @@ ipcMain.handle('run-npm-script', async (_event, { npmScript, extraEnv }) => {
     });
 
     if (cancelled) {
-      sendLog('[MaVid] Đã dừng theo yêu cầu (tiến trình npm đã kết thúc).');
+      writeRunnerTerminalLine('[MaVid] Đã dừng theo yêu cầu (tiến trình npm đã kết thúc).');
       return { code: code, cancelled: true };
     }
 
     if (code !== 0) {
-      sendLog(`[MaVid] Script kết thúc với code ${code}`);
+      const msg = `[MaVid] npm script thoát với code ${code}`;
+      writeRunnerTerminalLine(msg);
+      broadcastScriptError(msg);
       throw new Error(`npm script exited with code ${code}`);
     }
 
-    sendLog('[MaVid] Hoàn thành.');
+    writeRunnerTerminalLine('[MaVid] Hoàn thành.');
     return { code: 0, cancelled: false };
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    if (!msg.startsWith('npm script exited with code')) {
+      broadcastScriptError(`[MaVid] Lỗi npm: ${msg}`);
+    }
+    throw e;
   } finally {
     jobRunning = false;
     npmChildProcess = null;
@@ -160,9 +263,9 @@ const SCRIPT_MAP = {
   downloadVideo: '../contents/downloadVideo.js',
   createBatchVideo: '../contents/scripts/createBatchVideo.js',
   makeChromeProfile: '../contents/scripts/makeChromeProfile.js',
-  createThumbnailFlow: '../contents/scripts/createThumbnailFlow.js',
+  createThumbnailFlow: '../contents/flow/createThumbnailFlow.js',
   summaryMetaFromTranscript: '../contents/scripts/summaryMetaFromTranscript.js',
-  uploadYoutubeViaGpm: '../contents/scripts/youtubeUploadViaGpm.js',
+  uploadYoutubeViaGpm: '../contents/youtube/uploadViaGpm.js',
 };
 
 ipcMain.handle('run-script', async (_event, { script, params = {} }) => {
@@ -172,40 +275,26 @@ ipcMain.handle('run-script', async (_event, { script, params = {} }) => {
 
   jobRunning = true;
 
-  function sendLog(line) {
-    process.stdout.write(`[log] ${line}\n`);
-    try {
-      const wins = BrowserWindow.getAllWindows();
-      for (const w of wins) {
-        if (!w.isDestroyed()) w.webContents.send('script-log', line);
-      }
-    } catch {
-      /* window closed */
-    }
-  }
-
-  // Intercept console.log/warn/error
+  // Intercept console: chỉ đẩy warn/error lên tab Logs (contents thường dùng console.error trong catch).
   const originalLog = console.log;
   const originalWarn = console.warn;
   const originalError = console.error;
 
   console.log = (...args) => {
-    const line = args.map(a => (typeof a === 'object' ? JSON.stringify(a) : String(a))).join(' ');
-    sendLog(line);
     originalLog.apply(console, args);
   };
   console.warn = (...args) => {
     const line = args.map(a => (typeof a === 'object' ? JSON.stringify(a) : String(a))).join(' ');
-    sendLog(`[warn] ${line}`);
+    broadcastScriptError(`[warn] ${line}`);
     originalWarn.apply(console, args);
   };
   console.error = (...args) => {
     const line = args.map(a => (typeof a === 'object' ? JSON.stringify(a) : String(a))).join(' ');
-    sendLog(`[error] ${line}`);
+    broadcastScriptError(`[error] ${line}`);
     originalError.apply(console, args);
   };
 
-  sendLog(`[MaVid] Bắt đầu: ${script}`);
+  writeRunnerTerminalLine(`[MaVid] Bắt đầu: ${script}`);
 
   try {
     const modulePath = SCRIPT_MAP[script];
@@ -214,10 +303,11 @@ ipcMain.handle('run-script', async (_event, { script, params = {} }) => {
 
     const result = await module.default(params);
 
-    sendLog('[MaVid] Hoàn thành.');
+    writeRunnerTerminalLine('[MaVid] Hoàn thành.');
     return { success: true, data: result };
   } catch (err) {
-    sendLog(`[MaVid] Lỗi: ${err.message}`);
+    const em = err instanceof Error ? err.message : String(err);
+    broadcastScriptError(`[MaVid] Lỗi: ${em}`);
     throw err;
   } finally {
     // Restore console
@@ -634,54 +724,26 @@ function loadUserConstantsOverlay() {
   }
 }
 
-/**
- * Giá trị mặc định khi import `contents/constants/index.js` thất bại (vd. lỗi cú pháp).
- * Đồng bộ với `SettingsPage` DEFAULT_MODEL + `FLOW_CHROME_PROFILE` + các export chỉ có trong index.
- */
+/** Khi import `contents/constants/index.js` thất bại — cùng nguồn với `constantsModuleBase.js`. */
 function getDefaultConstantsModule() {
-  return {
-    flowSettings: {
-      FLOW_URL: 'https://labs.google/fx/vi/tools/flow/project/',
-      FLOW_PROJECT_ID: '3550d75f-a7ac-41ec-9ec7-0c23bc5efb95',
-      FLOW_CHROME_PROFILE: 1,
-    },
-    GEMINI_CONFIG: { URL: 'https://gemini.google.com/app', MAX_CONCURRENT: 3 },
-    GEMINI_CHUNK_SIZE: { UPDATE_TRANSCRIPT: 200, SUMMARY_CONTENT: 500 },
-    STOCK_VIDEO: {
-      CROSSFADE_SEC: 1,
-      RENDER_EXTRA_SEC: 15,
-      SLOWMO_FACTOR: 2,
-      CANVAS_W: 1280,
-      CANVAS_H: 720,
-      FPS: 30,
-      BITRATE: '4M',
-      MAX_BITRATE: '5M',
-      BUFSIZE: '8M',
-    },
-    SUBTITLE: {
-      BOX_HEIGHT: 200,
-      BOX_OPACITY: 0.5,
-      FONT_SIZE: 80,
-      PADDING_TOP: 15,
-      PADDING_HORIZONTAL: 40,
-      CHAR_SPACING: 2,
-    },
-    LOGO: { SIZE: 80, MARGIN_TOP: 20, MARGIN_RIGHT: 20 },
-    VIDEO_STORAGE_ROOT: '',
-    MAX_SCHEDULED_VIDEOS: 4,
-    MAX_VIDEOS_PREPARE_AHEAD: 5,
-    MAKE_VIDEO_MODE: { FROM_AUDIO: 'from_audio', REUP_FULL: 'reup_full' },
-    VIDEO_TYPE: { '2CH': '2ch', STORY: 'story' },
-    LANGUAGES_NEED_UPDATE_TRANSCRIPT: ['ja'],
-    META_DATA: {
-      NICHE: 'Niche',
-      TITLE: 'Title',
-      DESCRIPTION: 'Description',
-      TAGS: 'Tags',
-    },
-    DEFAULT_VIDEO: { BACKGROUND_VIDEO: 'cat' },
-    AUDIO_SPEED: 0.91,
-  };
+  return buildConstantsModuleBase();
+}
+
+function constantsModToUiModel(mod) {
+  const model = {};
+  for (const key of CONSTANT_EXPORT_KEYS) {
+    model[key] = mod[key];
+  }
+  return model;
+}
+
+function applyDefaultVideoStorageRootToUiModel(model) {
+  const m = { ...model };
+  const root = m.VIDEO_STORAGE_ROOT;
+  if (typeof root !== 'string' || !root.trim()) {
+    m.VIDEO_STORAGE_ROOT = getDefaultVideoStorageRoot();
+  }
+  return m;
 }
 
 /** Thư mục con trong `MaVidMedia`. */
@@ -764,13 +826,13 @@ async function writeConstantsFiles(nextValues) {
 
 ipcMain.handle('get-constants-ui-model', async () => {
   const mod = await importConstantsFresh();
-  const model = {};
-  for (const key of CONSTANT_EXPORT_KEYS) model[key] = mod[key];
-  const root = model.VIDEO_STORAGE_ROOT;
-  if (typeof root !== 'string' || !root.trim()) {
-    model.VIDEO_STORAGE_ROOT = getDefaultVideoStorageRoot();
-  }
-  return model;
+  return applyDefaultVideoStorageRootToUiModel(constantsModToUiModel(mod));
+});
+
+/** Giá trị factory (repo), không overlay user — dùng nút Reset Settings. */
+ipcMain.handle('get-constants-factory-ui-model', async () => {
+  const mod = buildConstantsModuleBase();
+  return applyDefaultVideoStorageRootToUiModel(constantsModToUiModel(mod));
 });
 
 ipcMain.handle('save-constants-ui-model', async (_event, { modelPatch }) => {

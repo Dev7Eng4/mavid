@@ -298,6 +298,8 @@ declare global {
       cancelRunningJob: () => Promise<{ ok: boolean; reason?: string }>;
       runScript: <T = unknown>(script: DirectScriptId, params?: Record<string, unknown>) => Promise<ScriptResult<T>>;
       getConstantsUiModel: () => Promise<ConstantsUiModel>;
+      /** Mặc định repo (không overlay) + gợi ý VIDEO_STORAGE_ROOT — cho Reset form. */
+      getConstantsFactoryUiModel: () => Promise<ConstantsUiModel>;
       saveConstantsUiModel: (modelPatch: Partial<ConstantsUiModel>) => Promise<{ ok: boolean }>;
       /** Chọn thư mục cha → tạo `MaVidMedia/{backgrounds,videos,channels}`, ghi `VIDEO_STORAGE_ROOT` = …/MaVidMedia. */
       selectVideoStorageFolder: (currentPath?: string | null) => Promise<{ ok: boolean; path: string | null }>;
@@ -334,8 +336,12 @@ declare global {
       gpmPlaywrightListOpen: () => Promise<GpmPlaywrightListOpenResult>;
       gpmPlaywrightStartFolder: (payload: GpmPlaywrightStartFolderPayload) => Promise<GpmPlaywrightStartFolderResult>;
       gpmPlaywrightStopFolder: (profileKey: string) => Promise<GpmPlaywrightStopFolderResult>;
-      onScriptLog: (cb: (line: string) => void) => void;
-      removeScriptLogListener: () => void;
+      /** Tab Logs: chỉ nhận lỗi (stderr, console.error, …), không phải full terminal. */
+      onScriptErrorLog: (cb: (line: string) => void) => void;
+      removeScriptErrorLogListener: () => void;
+      getPersistedErrorLogs: () => Promise<{ lines: string[] }>;
+      appendPersistedErrorLog: (line: string) => Promise<{ ok: boolean }>;
+      clearPersistedErrorLogs: () => Promise<{ ok: boolean }>;
       minimizeApp: () => Promise<{ ok: boolean }>;
     };
   }
