@@ -24,7 +24,7 @@
  *   node contents/scripts/openGpmPlaywright.js --folder <đường_dẫn_thư_mục_profile> [url]
  *
  * Import:
- *   import { connectPlaywrightToGpmProfile, connectPlaywrightToProfileFolder, stopGpmProfile } from './scripts/openGpmPlaywright.js';
+ *   import { connectPlaywrightToGpmProfile, connectPlaywrightToProfileFolder, closeProfile } from './scripts/openGpmPlaywright.js';
  */
 
 import fs from 'fs';
@@ -190,6 +190,18 @@ function normalizeApiBase(base) {
   return b;
 }
 
+/**
+ * Root API v3 cho `fetch` — khớp Electron `GPM_API_V3_ROOT` và `createGpmApiClient` (`…/api/v3`).
+ * @param {string} [explicitBase] — chỉ origin (`http://127.0.0.1:19995`) hoặc đã kết thúc bằng `/api/v3`
+ */
+function resolveGpmApiV3Root(explicitBase) {
+  const raw = String(explicitBase || process.env.GPM_API_BASE || 'http://127.0.0.1:19995')
+    .trim()
+    .replace(/\/+$/, '');
+  if (/\/api\/v3$/i.test(raw)) return raw;
+  return `${raw}/api/v3`;
+}
+
 /** @returns {Record<string, string>} */
 function gpmHeaders() {
   const h = { Accept: 'application/json' };
@@ -279,20 +291,29 @@ export async function startGpmProfile(profileId, options = {}) {
 }
 
 /**
- * Đóng profile trong GPM (GET /api/v3/profiles/close/{id}).
+ * Đóng Chrome/profile do GPM mở — **bắt buộc** gọi API này (giống `gpmApi.closeProfile` trong app).
+ * `GET {apiV3Root}/profiles/close/{profileId}`
  * @param {string} profileId
  * @param {object} [options]
- * @param {string} [options.apiBase]
+ * @param {string} [options.apiBase] — origin hoặc base đã có `/api/v3` (ưu tiên khớp `GPM_API_BASE` / `apiRootForPlaywright`)
  */
-export async function stopGpmProfile(profileId, options = {}) {
-  const base = normalizeApiBase(options.apiBase);
-  const url = new URL(`/api/v3/profiles/close/${encodeURIComponent(profileId)}`, base);
-  const res = await fetch(url.toString(), { method: 'GET', headers: gpmHeaders() });
+export async function closeProfile(profileId, options = {}) {
+  if (!profileId || typeof profileId !== 'string' || !profileId.trim()) {
+    throw new Error('closeProfile: cần profileId (string).');
+  }
+  const root = resolveGpmApiV3Root(options.apiBase);
+  const url = `${root}/profiles/close/${encodeURIComponent(profileId.trim())}`;
+  const res = await fetch(url, { method: 'GET', headers: gpmHeaders() });
   const json = await res.json().catch(() => ({}));
   if (!json.success) {
-    throw new Error(json.message || `GPM đóng profile lỗi (${res.status})`);
+    throw new Error(json.message || `GPM closeProfile lỗi (${res.status})`);
   }
   return json;
+}
+
+/** Alias tên cũ — cùng {@link closeProfile}. */
+export async function stopGpmProfile(profileId, options = {}) {
+  return closeProfile(profileId, options);
 }
 
 /**
@@ -480,8 +501,8 @@ async function mainApiMode() {
 
   await browser.close();
   try {
-    await stopGpmProfile(profileId);
-    console.log('Đã đóng profile trong GPM.');
+    await closeProfile(profileId);
+    console.log('Đã đóng profile trong GPM (API closeProfile).');
   } catch (e) {
     console.warn('Không đóng profile qua API (có thể đã tắt tay):', e.message);
   }
