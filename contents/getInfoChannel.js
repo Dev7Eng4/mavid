@@ -2,7 +2,7 @@
  * Script lấy thông tin kênh YouTube
  * Có thể chạy từ CLI (đọc input.txt) hoặc từ UI (nhận params)
  * Chỉ xử lý channel/playlist, không xử lý video
- * Xuất kết quả ra file Excel (.xlsx) với dropdown cột Trạng thái
+ * File Excel kênh: LINK VIDEO | VIEWS | DURATION | STATUS (không gắn dropdown trong code)
  */
 
 import youtubedl from 'youtube-dl-exec';
@@ -10,99 +10,71 @@ import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import ExcelJS from 'exceljs';
-import { resolveStockBackgroundsDir } from './utils/stockBackgroundsPath.js';
 import { resolveChannelsDir } from './utils/channelsStoragePath.js';
+import { MIN_DURATION_VIDEO } from './constants/channel.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const DEFAULT_OUTPUT_DIR = resolveChannelsDir();
 const INPUT_FILE = path.join(__dirname, '..', 'input.txt');
 const INDEX_FILE = path.join(DEFAULT_OUTPUT_DIR, 'index.xlsx');
 
-/** Options cho cột Trạng thái (dropdown) */
-const TRANG_THAI_OPTIONS = ['', 'Đã tạo video', 'Đã đăng video'];
-
-/** index.xlsx: loại video (dropdown) */
-const INDEX_VIDEO_TYPE_OPTIONS = ['from_audio', 'reup_full'];
-
-/** index.xlsx: thời lượng video phút (dropdown) */
-const INDEX_THOI_GIAN_OPTIONS = ['Tất cả', '0 - 30 phút', '0 - 60 phút', '30 - 60 phút', 'Từ 30 phút', 'Từ 60 phút'];
-
 /** Headers cho file index.xlsx — cột ID = tên thư mục kênh (MaVidMedia/channels/<ID>/) */
 const INDEX_HEADERS = ['CHANNEL', 'LINK', 'ID', 'EMAIL', 'LOẠI VIDEO', 'THỜI GIAN VIDEO', 'BACKGROUND', 'LAST UPLOAD'];
 
-/** Bản index từng có cột THƯ MỤC (cột 9): gộp về cột ID rồi bỏ cột 9. */
-const UC_INDEX_ID_RE = /^UC[A-Za-z0-9_-]{22}$/;
-function migrateDropThucMucColumnIfPresent(sheet) {
-  const r1 = sheet.getRow(1);
-  const h9 = String(r1.getCell(9).value || '')
-    .trim()
-    .toUpperCase();
-  if (h9 !== 'THƯ MỤC' && h9 !== 'FOLDER') return;
-
-  for (let i = 2; i <= sheet.rowCount; i++) {
-    const row = sheet.getRow(i);
-    const idVal = String(row.getCell(3).value || '').trim();
-    const folderVal = String(row.getCell(9).value || '').trim();
-    if (folderVal && (UC_INDEX_ID_RE.test(idVal) || !idVal)) {
-      row.getCell(3).value = folderVal;
-    }
-    row.getCell(9).value = null;
-  }
-  r1.getCell(9).value = null;
-}
-
-/** Thời gian video tối thiểu để lấy vào danh sách (giây) */
-const MIN_DURATION_SECONDS = 480;
-
 /**
- * File index cũ (5 cột): LAST UPLOAD ở cột E → chèn 3 cột sau EMAIL, đẩy LAST UPLOAD sang cột H.
+ * Gỡ dataValidation cũ trên index (file từng có dropdown); không đổi giá trị ô.
+ * @param {import('exceljs').Worksheet} sheet
  */
 function migrateIndexSheetIfNeeded(sheet) {
-  const h1 = String(sheet.getRow(1).getCell(5).value || '').trim();
-  const h8 = String(sheet.getRow(1).getCell(8).value || '').trim();
-  if (h1 !== 'LAST UPLOAD' || h8 === 'LAST UPLOAD') return;
-
-  for (let i = 2; i <= sheet.rowCount; i++) {
-    const row = sheet.getRow(i);
-    const lastUpload = row.getCell(5).value;
-    row.getCell(5).value = '';
-    row.getCell(6).value = '';
-    row.getCell(7).value = '';
-    row.getCell(8).value = lastUpload;
+  if (!sheet) return;
+  const maxR = Math.min(sheet.rowCount || 0, 2000);
+  const maxC = Math.min(sheet.columnCount || 12, 20);
+  for (let r = 1; r <= maxR; r++) {
+    const row = sheet.getRow(r);
+    for (let c = 1; c <= maxC; c++) {
+      const cell = row.getCell(c);
+      if (cell.dataValidation) cell.dataValidation = null;
+    }
   }
-  sheet.getRow(1).values = [undefined, ...INDEX_HEADERS];
 }
 
-/** Gắn dropdown cho index sheet (cột E–G: loại video, thời gian, background) */
-function applyIndexDataValidation(sheet) {
-  const backgroundsDir = resolveStockBackgroundsDir();
-  let bgOptions = [];
-  if (fs.existsSync(backgroundsDir)) {
-    bgOptions = fs.readdirSync(backgroundsDir).filter(f => fs.statSync(path.join(backgroundsDir, f)).isDirectory());
+/**
+ * Ánh xạ cột file Excel trong thư mục kênh (hỗ trợ layout 4 cột chuẩn hoặc file cũ nhiều cột).
+ * @param {import('exceljs').Row} headerRow
+ */
+function getChannelExcelColumnMap(headerRow) {
+  const vals = headerRow.values || [];
+  const label = i => String(vals[i] ?? '').trim().toLowerCase();
+  let maxUsed = 0;
+  for (let i = 1; i < vals.length; i++) {
+    if (vals[i] != null && String(vals[i]).trim() !== '') maxUsed = i;
   }
-
-  const typeFormula = `"${INDEX_VIDEO_TYPE_OPTIONS.join(',')}"`;
-  const thoiGianFormula = `"${INDEX_THOI_GIAN_OPTIONS.join(',')}"`;
-
-  for (let i = 2; i <= sheet.rowCount; i++) {
-    sheet.getCell(`E${i}`).dataValidation = {
-      type: 'list',
-      allowBlank: true,
-      formulae: [typeFormula],
-    };
-    sheet.getCell(`F${i}`).dataValidation = {
-      type: 'list',
-      allowBlank: true,
-      formulae: [thoiGianFormula],
-    };
-    if (bgOptions.length > 0) {
-      const bgFormula = `"${bgOptions.join(',')}"`;
-      sheet.getCell(`G${i}`).dataValidation = {
-        type: 'list',
-        allowBlank: true,
-        formulae: [bgFormula],
-      };
+  const find = match => {
+    for (let i = 1; i < vals.length; i++) {
+      if (match(label(i))) return i;
     }
+    return -1;
+  };
+  const link = find(l => l === 'link video');
+  const views = find(l => l === 'views');
+  const duration = find(l => l === 'duration');
+  const status = find(l => l.includes('status'));
+  const maxCol = Math.max(maxUsed, link, views, duration, status, 4);
+  return { link, views, duration, status, maxCol };
+}
+
+/** @param {ReturnType<typeof getChannelExcelColumnMap>} map */
+function appendChannelVideoRows(sheet, map, videos) {
+  for (const video of videos) {
+    const row = Array.from({ length: map.maxCol }, () => '');
+    const set = (col1Based, val) => {
+      if (col1Based >= 1) row[col1Based - 1] = val;
+    };
+    set(map.link, video?.url || '');
+    set(map.views, video?.viewCount ?? 0);
+    set(map.duration, video?.duration || '');
+    set(map.status, '');
+    sheet.addRow(row);
   }
 }
 
@@ -144,7 +116,6 @@ async function updateIndexFile(channelData) {
     await workbook.xlsx.readFile(INDEX_FILE);
     sheet = workbook.worksheets[0];
     migrateIndexSheetIfNeeded(sheet);
-    migrateDropThucMucColumnIfPresent(sheet);
 
     // Đồng bộ dòng tiêu đề nếu lệch INDEX_HEADERS (sau migrate hoặc file chỉnh tay)
     const r1 = sheet.getRow(1);
@@ -199,8 +170,6 @@ async function updateIndexFile(channelData) {
       sheet.addRow([name, link, id, meta.c4, meta.c5, meta.c6, meta.c7, lastUpload]);
       console.log(`Đã thêm channel "${name}" vào index.xlsx`);
     }
-
-    applyIndexDataValidation(sheet);
   } else {
     // Tạo file mới
     workbook = new ExcelJS.Workbook();
@@ -218,8 +187,6 @@ async function updateIndexFile(channelData) {
       { width: 22 }, // BACKGROUND
       { width: 30 }, // LAST UPLOAD
     ];
-
-    applyIndexDataValidation(sheet);
 
     console.log(`Đã tạo file index.xlsx và thêm channel "${name}"`);
   }
@@ -295,7 +262,7 @@ export async function getChannelInfo(url) {
         });
         entries = rawPlaylist.entries || [];
         videoLinks = entries
-          .filter(e => e.id && e.id.length === 11 && e.duration && e.duration > MIN_DURATION_SECONDS)
+          .filter(e => e.id && e.id.length === 11 && e.duration && e.duration > MIN_DURATION_VIDEO)
           .map(e => ({
             url: e.url || `https://www.youtube.com/watch?v=${e.id}`,
             title: e.title || '',
@@ -313,7 +280,7 @@ export async function getChannelInfo(url) {
   if (entries.length === 0 && rawMeta.entries) {
     entries = rawMeta.entries;
     videoLinks = entries
-      .filter(e => e.id && e.id.length === 11 && e.duration && e.duration > MIN_DURATION_SECONDS)
+      .filter(e => e.id && e.id.length === 11 && e.duration && e.duration > MIN_DURATION_VIDEO)
       .map(e => ({
         url: e.url || `https://www.youtube.com/watch?v=${e.id}`,
         title: e.title || '',
@@ -466,7 +433,7 @@ export async function addChannelFromForm(options = {}) {
   const channelDir = path.join(DEFAULT_OUTPUT_DIR, folderName);
   const outputExcelPath = path.join(channelDir, `${folderName}.xlsx`);
 
-  const headers = ['CHANNEL NAME', 'CHANNEL TAGS', 'LINK VIDEO', 'VIEWS', 'DURATION', 'STATUS'];
+  const headers = ['LINK VIDEO', 'VIEWS', 'DURATION', 'STATUS'];
   const videoLinks = [...(result.video_links || [])].reverse();
   const channelName = result.name || '';
   const channelTagsStr = (result.tags || []).join(', ');
@@ -719,7 +686,7 @@ async function main(options = {}) {
     });
 
     // Tạo dữ liệu: mỗi video một dòng (đảo ngược: cũ ở đầu, mới ở cuối)
-    const headers = ['EMAIL', 'CHANNEL NAME', 'CHANNEL TAGS', 'LINK VIDEO', 'VIEWS', 'DURATION', 'STATUS', 'START FROM'];
+    const headers = ['LINK VIDEO', 'VIEWS', 'DURATION', 'STATUS'];
     const videoLinks = [...(result.video_links || [])].reverse();
 
     const channelName = result.name || '';
@@ -808,16 +775,12 @@ async function main(options = {}) {
       sheet.addRow(headers);
       rows.forEach(row => sheet.addRow(row));
 
-      // Độ rộng cột: EMAIL | CHANNEL NAME | CHANNEL TAGS | LINK VIDEO | VIEWS | DURATION | STATUS | START FROM
+      // Độ rộng cột: LINK VIDEO | VIEWS | DURATION | STATUS
       sheet.columns = [
-        { width: 20 }, // EMAIL
-        { width: 25 }, // CHANNEL NAME
-        { width: 20 }, // CHANNEL TAGS
         { width: 45 }, // LINK VIDEO
         { width: 12 }, // VIEWS
         { width: 12 }, // DURATION
         { width: 20 }, // STATUS
-        { width: 12 }, // START FROM
       ];
     }
 

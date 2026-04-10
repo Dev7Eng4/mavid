@@ -1,12 +1,13 @@
 const { contextBridge, ipcRenderer } = require('electron');
 
-let _scriptLogHandler = null;
+let _scriptErrorLogHandler = null;
 
 contextBridge.exposeInMainWorld('runner', {
   runNpmScript: (npmScript, extraEnv) => ipcRenderer.invoke('run-npm-script', { npmScript, extraEnv }),
   cancelRunningJob: () => ipcRenderer.invoke('cancel-running-job'),
   runScript: (script, params) => ipcRenderer.invoke('run-script', { script, params }),
   getConstantsUiModel: () => ipcRenderer.invoke('get-constants-ui-model'),
+  getConstantsFactoryUiModel: () => ipcRenderer.invoke('get-constants-factory-ui-model'),
   saveConstantsUiModel: modelPatch => ipcRenderer.invoke('save-constants-ui-model', { modelPatch }),
   selectVideoStorageFolder: currentPath => ipcRenderer.invoke('select-video-storage-folder', { currentPath }),
   listChannels: () => ipcRenderer.invoke('list-channels'),
@@ -33,18 +34,22 @@ contextBridge.exposeInMainWorld('runner', {
   gpmPlaywrightListOpen: () => ipcRenderer.invoke('gpm-playwright-list-open'),
   gpmPlaywrightStartFolder: payload => ipcRenderer.invoke('gpm-playwright-start-folder', payload),
   gpmPlaywrightStopFolder: profileKey => ipcRenderer.invoke('gpm-playwright-stop-folder', { profileKey }),
-  onScriptLog: cb => {
-    if (_scriptLogHandler) {
-      ipcRenderer.removeListener('script-log', _scriptLogHandler);
+  /** Chỉ stderr / console.error / warn / lỗi thoát mã — không phải toàn bộ stdout npm. */
+  onScriptErrorLog: cb => {
+    if (_scriptErrorLogHandler) {
+      ipcRenderer.removeListener('script-error-log', _scriptErrorLogHandler);
     }
-    _scriptLogHandler = (_event, line) => cb(line);
-    ipcRenderer.on('script-log', _scriptLogHandler);
+    _scriptErrorLogHandler = (_event, line) => cb(line);
+    ipcRenderer.on('script-error-log', _scriptErrorLogHandler);
   },
-  removeScriptLogListener: () => {
-    if (_scriptLogHandler) {
-      ipcRenderer.removeListener('script-log', _scriptLogHandler);
-      _scriptLogHandler = null;
+  removeScriptErrorLogListener: () => {
+    if (_scriptErrorLogHandler) {
+      ipcRenderer.removeListener('script-error-log', _scriptErrorLogHandler);
+      _scriptErrorLogHandler = null;
     }
   },
+  getPersistedErrorLogs: () => ipcRenderer.invoke('get-persisted-error-logs'),
+  appendPersistedErrorLog: line => ipcRenderer.invoke('append-persisted-error-log', { line }),
+  clearPersistedErrorLogs: () => ipcRenderer.invoke('clear-persisted-error-logs'),
   minimizeApp: () => ipcRenderer.invoke('minimize-app'),
 });

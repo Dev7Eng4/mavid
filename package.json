@@ -15,7 +15,7 @@
     "lay-thong-tin-youtube (video, channel)": "node -e \"import('./contents/getInfoChannel.js').then(m=>m.default())\"",
     "tao-batch-video-tu-audio": "node -e \"import('./contents/scripts/createBatchVideo.js').then(m => m.default({ videoType: 'from_audio' }))\"",
     "tao-batch-video-reup-full": "node -e \"import('./contents/scripts/createBatchVideo.js').then(m => m.default({ videoType: 'reup_full' }))\"",
-    "tao-thumbnail-flow": "node contents/scripts/createThumbnailFlow.js",
+    "tao-thumbnail-flow": "node contents/flow/createThumbnail.cli.js",
     "tom-tat-meta-tu-transcript": "node contents/scripts/summaryMetaFromTranscript.js",
     "syncProgressToSpreadsheet": "node contents/scripts/syncProgressToSpreadsheet.js"
   },

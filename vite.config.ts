@@ -12,6 +12,7 @@ export default defineConfig({
   resolve: {
     alias: {
       '@contents': path.resolve(root, 'contents'),
+      '@': path.resolve(root, 'src'),
     },
   },
   plugins: [react(), babel({ presets: [reactCompilerPreset()] }), tailwindcss()],

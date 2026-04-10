@@ -1,43 +1,65 @@
 import { useState, useCallback, useEffect } from 'react';
 import type { Page, ScriptId } from './types';
 import { Sidebar } from './components/layout/Sidebar';
-import { PipelinePage } from './components/pages/PipelinePage';
-import { CreateVideoPage } from './components/pages/CreateVideoPage';
-import { SettingsPage } from './components/pages/SettingsPage';
-import { ChannelsPage } from './components/pages/ChannelsPage';
-import { GpmPage } from './components/pages/GpmPage';
-import { LogsPage } from './components/pages/LogsPage';
+import { PipelinePage } from '@/pages/PipelinePage';
+import CreateVideoPage from '@/pages/create-video';
+import { SettingsPage } from '@/pages/SettingsPage';
+import ChannelsPage from '@/pages/channels';
+import { GpmPage } from '@/pages/GpmPage';
+import { LogsPage } from '@/pages/LogsPage';
 
 export default function App() {
   const [activePage, setActivePage] = useState<Page>('pipeline');
   const [runningScript, setRunningScript] = useState<ScriptId | null>(null);
-  const [logs, setLogs] = useState<string[]>([]);
+  const [errorLogs, setErrorLogs] = useState<string[]>([]);
 
-  const appendLog = useCallback((line: string) => {
-    setLogs(prev => [...prev, line]);
+  const appendErrorLog = useCallback(async (line: string) => {
+    try {
+      await window.runner?.appendPersistedErrorLog?.(line);
+    } catch {
+      /* ignore */
+    }
+    setErrorLogs(prev => [...prev, line]);
   }, []);
 
-  const clearLogs = useCallback(() => {
-    setLogs([]);
+  const clearErrorLogs = useCallback(async () => {
+    try {
+      await window.runner?.clearPersistedErrorLogs?.();
+    } catch {
+      /* ignore */
+    }
+    setErrorLogs([]);
   }, []);
 
   useEffect(() => {
-    window.runner?.onScriptLog?.(appendLog);
+    let cancelled = false;
+    void (async () => {
+      try {
+        const r = await window.runner?.getPersistedErrorLogs?.();
+        if (!cancelled) setErrorLogs(Array.isArray(r?.lines) ? r.lines : []);
+      } catch {
+        /* ignore */
+      }
+      if (!cancelled) {
+        window.runner?.onScriptErrorLog?.(line => {
+          setErrorLogs(prev => [...prev, line]);
+        });
+      }
+    })();
     return () => {
-      window.runner?.removeScriptLogListener?.();
+      cancelled = true;
+      window.runner?.removeScriptErrorLogListener?.();
     };
-  }, [appendLog]);
+  }, []);
 
   const stopRunningNpmJob = useCallback(async () => {
     try {
-      const r = await window.runner?.cancelRunningJob?.();
-      if (r?.ok) appendLog('[MaVid] Đã gửi lệnh dừng tiến trình (npm).');
-      else appendLog('[MaVid] Không có tiến trình npm đang chạy để dừng.');
+      await window.runner?.cancelRunningJob?.();
     } catch (e) {
-      appendLog(`[MaVid] Lỗi khi dừng: ${e instanceof Error ? e.message : 'Không xác định'}`);
+      appendErrorLog(`[MaVid] Lỗi khi dừng: ${e instanceof Error ? e.message : 'Không xác định'}`);
     }
     setRunningScript(null);
-  }, [appendLog]);
+  }, [appendErrorLog]);
 
   return (
     <div className='flex min-h-screen'>
@@ -52,7 +74,7 @@ export default function App() {
           <PipelinePage
             runningScript={runningScript}
             setRunningScript={setRunningScript}
-            appendLog={appendLog}
+            appendErrorLog={appendErrorLog}
             onNavigate={setActivePage}
           />
         )}
@@ -62,14 +84,14 @@ export default function App() {
             disabled={runningScript !== null}
             runningScript={runningScript}
             setRunningScript={setRunningScript}
-            appendLog={appendLog}
+            appendErrorLog={appendErrorLog}
             onNavigate={setActivePage}
           />
         )}
         {activePage === 'settings' && <SettingsPage key='settings' disabled={runningScript !== null} />}
         {activePage === 'channels' && <ChannelsPage key='channels' />}
         {activePage === 'gpm' && <GpmPage key='gpm' />}
-        {activePage === 'logs' && <LogsPage logs={logs} clearLogs={clearLogs} />}
+        {activePage === 'logs' && <LogsPage errorLogs={errorLogs} clearErrorLogs={clearErrorLogs} />}
       </main>
     </div>
   );
