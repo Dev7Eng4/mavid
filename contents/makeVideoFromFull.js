@@ -106,7 +106,7 @@ function getPreprocessedImageOverlay(imagePath, width, height, opacity, overlayC
   try {
     execSync(
       `ffmpeg -hide_banner -loglevel error -y -i "${imagePath}" -vf "scale=${width}:${height},format=rgba,colorchannelmixer=aa=${opacity}" -frames:v 1 "${cachePath}"`,
-      { encoding: 'utf-8', stdio: 'pipe' }
+      { encoding: 'utf-8', stdio: 'pipe' },
     );
     console.log(`Đã tạo cache: ${path.basename(cachePath)}`);
   } catch (err) {
@@ -182,7 +182,7 @@ async function remakeVideo(videoPath, imagePath, overlayVideoPath, outputPath, o
       '[outv]',
       '-map',
       '0:a?',
-      '-shortest'
+      '-shortest',
     );
 
     args.push(...GPU_INFO.videoEncodeArgs);

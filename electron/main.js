@@ -629,10 +629,7 @@ function loadUserConstantsOverlay() {
     const raw = fs.readFileSync(p, 'utf-8');
     return JSON.parse(raw);
   } catch (e) {
-    console.warn(
-      '[MaVid] Không đọc/parse được mavid-user-constants.json:',
-      e instanceof Error ? e.message : e,
-    );
+    console.warn('[MaVid] Không đọc/parse được mavid-user-constants.json:', e instanceof Error ? e.message : e);
     return null;
   }
 }
@@ -671,6 +668,8 @@ function getDefaultConstantsModule() {
     },
     LOGO: { SIZE: 80, MARGIN_TOP: 20, MARGIN_RIGHT: 20 },
     VIDEO_STORAGE_ROOT: '',
+    MAX_SCHEDULED_VIDEOS: 4,
+    MAX_VIDEOS_PREPARE_AHEAD: 5,
     MAKE_VIDEO_MODE: { FROM_AUDIO: 'from_audio', REUP_FULL: 'reup_full' },
     VIDEO_TYPE: { '2CH': '2ch', STORY: 'story' },
     LANGUAGES_NEED_UPDATE_TRANSCRIPT: ['ja'],

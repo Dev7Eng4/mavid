@@ -13,6 +13,8 @@ export const STOCK_VIDEO = m.STOCK_VIDEO;
 export const SUBTITLE = m.SUBTITLE;
 export const LOGO = m.LOGO;
 export const VIDEO_STORAGE_ROOT = m.VIDEO_STORAGE_ROOT;
+export const MAX_SCHEDULED_VIDEOS = m.MAX_SCHEDULED_VIDEOS;
+export const MAX_VIDEOS_PREPARE_AHEAD = m.MAX_VIDEOS_PREPARE_AHEAD;
 export const MAKE_VIDEO_MODE = m.MAKE_VIDEO_MODE;
 export const VIDEO_TYPE = m.VIDEO_TYPE;
 export const LANGUAGES_NEED_UPDATE_TRANSCRIPT = m.LANGUAGES_NEED_UPDATE_TRANSCRIPT;
@@ -20,4 +22,4 @@ export const META_DATA = m.META_DATA;
 export const DEFAULT_VIDEO = m.DEFAULT_VIDEO;
 export const AUDIO_SPEED = m.AUDIO_SPEED;
 
-export const DEFAULT_PROMPT_LANG = 'ja';
+export { DEFAULT_PROMPT_LANG } from './defaultPromptLang.js';

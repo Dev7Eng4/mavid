@@ -132,7 +132,7 @@ async function downloadVideo(url, options = {}) {
     output: outputTemplate,
     format: actualFormat,
     mergeOutputFormat: 'mp4', // Yêu cầu ffmpeg gộp vào container mp4
-    writeThumbnail: true,
+    // Không writeThumbnail ở đây: downloadThumbnail() đã tải thumbnail → thumbnail.%(ext)s (tránh trùng file title-id.*)
     noCheckCertificates: true,
     noWarnings: true,
     addHeader: ['referer:youtube.com', 'user-agent:googlebot'],
