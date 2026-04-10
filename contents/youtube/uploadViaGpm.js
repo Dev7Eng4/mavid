@@ -12,7 +12,7 @@
  */
 import path from 'path';
 import { delay } from '../utils/dom.util.js';
-import { connectPlaywrightToGpmProfile, stopGpmProfile } from '../scripts/openGpmPlaywright.js';
+import { connectPlaywrightToGpmProfile, closeProfile } from '../scripts/openGpmPlaywright.js';
 import { syncChannelAfterYoutubeUpload } from './uploadAfterSync.js';
 import { moveSuccessfulUploadFoldersToVideosArchive } from './moveUploadedFoldersToVideosArchive.js';
 import { getYoutubePublishPlan } from './publishSchedule.util.js';
@@ -147,6 +147,15 @@ export default async function main(raw = {}) {
       videosArchive,
     };
   } finally {
+    /* Chrome do GPM mở: bắt buộc GPM Local API `profiles/close/{id}` (cùng `gpmApi.closeProfile`), sau đó mới ngắt CDP. */
+    if (profileIdToStop) {
+      try {
+        await closeProfile(profileIdToStop, { apiBase: gpmOpts.apiBase });
+        console.log(`[upload] GPM API closeProfile — ${profileIdToStop}`);
+      } catch (e) {
+        console.warn('[upload] closeProfile:', e instanceof Error ? e.message : e);
+      }
+    }
     if (context) {
       try {
         await context.close();
@@ -159,15 +168,6 @@ export default async function main(raw = {}) {
         await browser.close();
       } catch {
         /* ignore */
-      }
-    }
-    /* `browser.close()` qua CDP chỉ ngắt kết nối — Chrome vẫn mở nếu không gọi API GPM. */
-    if (profileIdToStop) {
-      try {
-        await stopGpmProfile(profileIdToStop, { apiBase: gpmOpts.apiBase });
-        console.log(`[upload] Đã đóng profile GPM (Chrome) — ${profileIdToStop}`);
-      } catch (e) {
-        console.warn('[upload] stopGpmProfile:', e instanceof Error ? e.message : e);
       }
     }
   }
