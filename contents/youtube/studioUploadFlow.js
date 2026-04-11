@@ -3,9 +3,65 @@
  */
 import fs from 'fs';
 import path from 'path';
-import { execFile } from 'child_process';
+import { execFileSync } from 'child_process';
 import { clearContent, clickElement, delay, getRandomNumber, scrollUntilVisible } from '../utils/dom.util.js';
 import { YOUTUBE_SELECTOR } from './studioSelectors.js';
+
+/** Giây trừ khỏi thời lượng video để lấy mốc Start time end screen. */
+const RELATED_VIDEO_START_OFFSET_SEC = 17;
+
+/**
+ * Thời lượng file video (giây) — ffprobe format.duration.
+ * @param {string} mp4Path
+ * @returns {number | null}
+ */
+function getVideoDurationSeconds(mp4Path) {
+  if (!mp4Path || !fs.existsSync(mp4Path)) return null;
+  try {
+    const out = execFileSync(
+      'ffprobe',
+      ['-v', 'error', '-show_entries', 'format=duration', '-of', 'default=noprint_wrappers=1:nokey=1', mp4Path],
+      { encoding: 'utf-8' },
+    ).trim();
+    const n = parseFloat(out);
+    return Number.isFinite(n) && n > 0 ? n : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Đổi thời lượng video (giây) → số giây start (floor(duration) − offset, tối thiểu 0).
+ * @param {number} durationSeconds
+ * @param {number} [offsetSec=RELATED_VIDEO_START_OFFSET_SEC]
+ */
+export function relatedVideoStartSecondsFromDuration(durationSeconds, offsetSec = RELATED_VIDEO_START_OFFSET_SEC) {
+  return Math.max(0, Math.floor(Number(durationSeconds)) - offsetSec);
+}
+
+/**
+ * Chuỗi thời gian cho ô Start (YouTube): dưới 1h là m:ss / mm:ss; từ 1h là h:mm:ss (không zero-leading giờ/phút khi < 10).
+ * @param {number} totalSeconds — tổng giây đã là mốc start (đã trừ offset nếu cần ở bước trước)
+ */
+export function formatYoutubeRelatedStartStamp(totalSeconds) {
+  const s = Math.max(0, Math.floor(Number(totalSeconds)));
+  const h = Math.floor(s / 3600);
+  const m = Math.floor((s % 3600) / 60);
+  const sec = s % 60;
+  const ss = String(sec).padStart(2, '0');
+  if (h > 0) {
+    return `${h}:${String(m).padStart(2, '0')}:${ss}:00`;
+  }
+  return `${m}:${ss}:00`;
+}
+
+/**
+ * Từ thời lượng video (giây): trừ 17s rồi format stamp (vd 9:24, 25:32, 1:07:32).
+ * @param {number} durationSeconds
+ */
+export function formatRelatedVideoStartFromDuration(durationSeconds) {
+  return formatYoutubeRelatedStartStamp(relatedVideoStartSecondsFromDuration(durationSeconds));
+}
 
 async function getMetaInfo(videoFolderPath) {
   const metaPath = path.join(videoFolderPath, 'video-meta.json');
@@ -211,30 +267,44 @@ export async function fillVideoDetails(page, videoFolderPath) {
   await clickElement(page, YOUTUBE_SELECTOR.btnNextToRelatedStep);
 }
 
-export async function addRelatedVideo(page, _isNeedAddRelatedVideo = false) {
+/**
+ * @param {import('playwright').Page} page
+ * @param {boolean} [_isNeedAddRelatedVideo=false]
+ * @param {string} [mp4Path] — đường dẫn .mp4 để ffprobe lấy duration và điền Start time (duration − 17s)
+ */
+export async function addRelatedVideo(page, _isNeedAddRelatedVideo = false, mp4Path) {
   await clickElement(page, YOUTUBE_SELECTOR.btnAddVideoRelated);
-
-  await delay(3000);
-
+  await delay(4000);
   await clickElement(page, YOUTUBE_SELECTOR.btnChooseTemplate);
 
   if (_isNeedAddRelatedVideo) {
     await clickElement(page, YOUTUBE_SELECTOR.btnSelectElement);
-
-    await delay(500);
+    // await delay(500);
     await clickElement(page, YOUTUBE_SELECTOR.btnSelectVideo);
   }
 
+  await clickElement(page, YOUTUBE_SELECTOR.startTime);
+  await delay(400);
+
+  if (mp4Path) {
+    const dur = getVideoDurationSeconds(mp4Path);
+    if (dur != null) {
+      const stamp = formatRelatedVideoStartFromDuration(dur);
+      await clearContent(page);
+      await delay(300);
+      await page.keyboard.insertText(stamp);
+      console.log(`[edit] ✓ Start time end screen: ${stamp} (từ duration ${dur.toFixed(2)}s − ${RELATED_VIDEO_START_OFFSET_SEC}s)`);
+    } else {
+      console.warn(`[edit] ⚠ Không đọc được duration từ file — bỏ qua nhập Start time: ${mp4Path}`);
+    }
+  }
+
   await delay(500);
-
   await clickElement(page, YOUTUBE_SELECTOR.btnSaveRelatedVideo);
-
-  await delay(5000);
-
-  await clickElement(page, YOUTUBE_SELECTOR.btnNextToCheckStep);
-
   await delay(2000);
 
+  await clickElement(page, YOUTUBE_SELECTOR.btnNextToCheckStep);
+  await delay(500);
   await clickElement(page, YOUTUBE_SELECTOR.btnNextToVisibilityStep);
 }
 
