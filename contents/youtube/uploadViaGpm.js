@@ -20,6 +20,7 @@ import { apiRootForPlaywright, listUploadJobs } from './uploadJobs.util.js';
 import { assertSafeChannelFolder } from './channelFolder.util.js';
 import { resolveChannelsDir } from '../utils/channelsStoragePath.js';
 import { openYoutubeUpload, selectFile, fillVideoDetails, addRelatedVideo, chooseVisibility } from './studioUploadFlow.js';
+import { logToLogsPage } from '../utils/logToLogsPage.util.js';
 
 /**
  * @param {Record<string, unknown>} raw
@@ -53,6 +54,10 @@ export default async function main(raw = {}) {
       `Không có thư mục con nào chứa file .mp4 trong ${channelAbs} (đã giới hạn ${maxUploads == null ? 'tất cả' : maxUploads} video).`,
     );
   }
+
+  const showErrorLogs = message => {
+    logToLogsPage(`[upload] Channel ${channelFolder} - Email ${scheduleEmail} - ${message}`, 'error');
+  };
 
   console.log(`[upload] Kênh «${channelFolder}»: ${jobs.length} video — GPM profile ${gpmProfileId}`);
 
@@ -109,7 +114,7 @@ export default async function main(raw = {}) {
           await selectFile(page, mp4Path);
         }
 
-        await fillVideoDetails(page, folderPath);
+        await fillVideoDetails(page, folderPath, showErrorLogs);
         await addRelatedVideo(page, baselineUploadedVideosFromConfig === 2, mp4Path);
         await chooseVisibility(page, {
           slot: publishSchedule?.[i] ?? null,
