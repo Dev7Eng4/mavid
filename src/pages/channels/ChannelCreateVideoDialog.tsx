@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { MAX_SCHEDULED_VIDEOS, MAX_VIDEOS_PREPARE_AHEAD } from '@contents/constants/appSettings.js';
+import { MAX_SCHEDULED_DAYS, MAX_VIDEOS_PREPARE_AHEAD } from '@contents/constants/appSettings.js';
 import { AppButton } from '@/components/ui/AppButton';
 import { CustomSelect, type SelectOption } from '@/components/ui/CustomSelect';
 
@@ -107,7 +107,7 @@ export function ChannelCreateVideoDialog({ channels, onClose, onConfirm }: Chann
     }
 
     const maxVideosPerBatch =
-      maxVideosInput == null ? MAX_SCHEDULED_VIDEOS : clampInt(maxVideosInput, 1, MAX_VIDEOS_CAP);
+      maxVideosInput == null ? MAX_SCHEDULED_DAYS : clampInt(maxVideosInput, 1, MAX_VIDEOS_CAP);
 
     setFormError(null);
     setBusy(true);
@@ -201,7 +201,7 @@ export function ChannelCreateVideoDialog({ channels, onClose, onConfirm }: Chann
                 if (v === '') setMaxVideosInput(null);
                 else setMaxVideosInput(clampInt(parseInt(v, 10), 1, MAX_VIDEOS_CAP));
               }}
-              placeholder={`Mặc định ${MAX_SCHEDULED_VIDEOS} (để trống)`}
+              placeholder={`Mặc định ${MAX_SCHEDULED_DAYS} (để trống)`}
               className='w-full rounded-xl px-3 py-2.5 text-base outline-none border transition-colors duration-150'
               style={{
                 background: 'var(--code-bg)',

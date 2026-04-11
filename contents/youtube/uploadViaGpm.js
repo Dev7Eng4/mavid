@@ -41,7 +41,12 @@ export default async function main(raw = {}) {
     : null;
 
   const channelAbs = path.join(resolveChannelsDir(), channelFolder);
-  const jobs = listUploadJobs(channelAbs, maxUploads, uploadFolderNames && uploadFolderNames.length > 0 ? uploadFolderNames : null);
+  const jobs = await listUploadJobs(
+    channelAbs,
+    scheduleEmail,
+    maxUploads,
+    uploadFolderNames && uploadFolderNames.length > 0 ? uploadFolderNames : null,
+  );
 
   if (jobs.length === 0) {
     throw new Error(

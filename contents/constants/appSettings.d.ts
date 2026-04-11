@@ -42,5 +42,5 @@ export declare const LOGO: {
 };
 
 export declare const VIDEO_STORAGE_ROOT: string;
-export declare const MAX_SCHEDULED_VIDEOS: number;
+export declare const MAX_SCHEDULED_DAYS: number;
 export declare const MAX_VIDEOS_PREPARE_AHEAD: number;
