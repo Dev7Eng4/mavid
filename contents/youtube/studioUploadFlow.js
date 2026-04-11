@@ -6,6 +6,7 @@ import path from 'path';
 import { execFileSync } from 'child_process';
 import { clearContent, clickElement, delay, getRandomNumber, scrollUntilVisible } from '../utils/dom.util.js';
 import { YOUTUBE_SELECTOR } from './studioSelectors.js';
+import { logToLogsPage } from '../utils/logToLogsPage.util.js';
 
 /** Giây trừ khỏi thời lượng video để lấy mốc Start time end screen. */
 const RELATED_VIDEO_START_OFFSET_SEC = 17;
@@ -119,7 +120,7 @@ export async function selectFile(page, mp4Path) {
   await page.mouse.move(getRandomNumber(100), getRandomNumber(300), { steps: 20 });
 
   // Giả vờ chờ khoảng 2-3 giây như người dùng đang duyệt file trong máy tính
-  await delay(2500);
+  await delay(2000);
 
   // 3. Lấy Root DOM qua CDP
   const { root } = await session.send('DOM.getDocument', { depth: 0 });
@@ -159,8 +160,8 @@ export async function selectFile(page, mp4Path) {
 
   try {
     await page.waitForSelector(YOUTUBE_SELECTOR.formDetails, {
-      state: 'attached',
-      timeout: 60000,
+      state: 'visible',
+      timeout: 10000,
     });
   } catch {}
   console.log('[upload] ✓ Form chi tiết đã xuất hiện — sẵn sàng edit title/description');
@@ -170,14 +171,12 @@ export async function selectFile(page, mp4Path) {
  * @param {import('playwright').Page} page
  * @param {string} videoFolderPath — đường dẫn tuyệt đối đến folder chứa video-meta.json
  */
-export async function fillVideoDetails(page, videoFolderPath) {
+export async function fillVideoDetails(page, videoFolderPath, showErrorLogs) {
   const meta = await getMetaInfo(videoFolderPath);
-  console.log('🚀 ~ fillVideoDetails ~ meta:', meta);
 
-  const title = meta.titleGemini || meta.title || '';
-  const description = meta.descriptionGemini || meta.description || '';
-  const tagsGemini = meta.tagsGemini || '';
-  const tags = meta.tags || '';
+  const title = meta.titleGemini || '';
+  const description = meta.descriptionGemini || '';
+  const tags = [meta.tagsGemini || '', meta.tags || ''].join(', ');
 
   if (title) {
     console.log('[edit] Step 1: Nhập Title...');
@@ -187,10 +186,12 @@ export async function fillVideoDetails(page, videoFolderPath) {
     await clearContent(page);
     await page.keyboard.insertText(title);
     console.log('[edit] ✓ Đã nhập Title');
-    await delay(500);
+    // await delay(500);
+  } else {
+    showErrorLogs(`Không tìm thấy title trong video-meta.json: ${videoFolderPath}`);
   }
 
-  await delay(2000);
+  await delay(500);
 
   if (description) {
     console.log('[edit] Step 2: Nhập Description...');
@@ -201,18 +202,43 @@ export async function fillVideoDetails(page, videoFolderPath) {
     await page.keyboard.insertText(description);
     console.log('[edit] ✓ Đã nhập Description');
     await delay(500);
+  } else {
+    showErrorLogs(`Không tìm thấy description trong video-meta.json: ${videoFolderPath}`);
   }
 
   try {
     await page.keyboard.press('Escape');
-    await delay(400);
+    await delay(200);
   } catch {
     /* ignore */
   }
 
+  const box = await page.locator(`${YOUTUBE_SELECTOR.boxUpload}`).boundingBox();
+
+  if (box) {
+    // await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+    const targetX = box.x + box.width / 2;
+    const targetY = box.y + box.height / 2;
+
+    // 🖱️ Lấy vị trí hiện tại (giả lập)
+    let currentX = targetX - 200 + Math.random() * 100;
+    let currentY = targetY - 200 + Math.random() * 100;
+
+    // 🖱️ Di chuyển chuột theo từng bước nhỏ (giống người)
+    const steps = 10 + Math.floor(Math.random() * 10);
+
+    for (let i = 0; i < steps; i++) {
+      currentX += (targetX - currentX) / (steps - i) + (Math.random() - 0.5) * 5;
+      currentY += (targetY - currentY) / (steps - i) + (Math.random() - 0.5) * 5;
+
+      await page.mouse.move(currentX, currentY);
+      await page.waitForTimeout(10 + Math.random() * 30);
+    }
+  }
+
   await scrollUntilVisible(page, YOUTUBE_SELECTOR.thumbnailBox, false, 50);
 
-  await delay(2000);
+  await delay(200);
 
   const imageExts = ['.jpg', '.jpeg', '.png'];
   const folderFiles = fs.readdirSync(videoFolderPath);
@@ -225,43 +251,85 @@ export async function fillVideoDetails(page, videoFolderPath) {
 
     await fileChooser.setFiles(path.join(videoFolderPath, imageFile));
   } else {
-    console.log(`[edit] ⚠ Không tìm thấy file thumbnail (.jpg, .png...) trong ${videoFolderPath}`);
+    showErrorLogs(`Không tìm thấy file thumbnail trong ${videoFolderPath}`);
   }
 
-  await delay(4000);
+  await delay(500);
 
   console.log('[edit] Step 3: Click "Hiển thị thêm" (Show more)...');
 
-  const box = await page.locator(`${YOUTUBE_SELECTOR.boxUpload}`).boundingBox();
+  // if (box) {
+  //   await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+
+  //   for (let i = 0; i < 10; i++) {
+  //     await page.mouse.wheel(0, 300);
+  //     await page.waitForTimeout(100 + Math.random() * 200);
+  //   }
+  // }
 
   if (box) {
-    await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+    const targetX = box.x + box.width / 2;
+    const targetY = box.y + box.height / 2;
 
-    for (let i = 0; i < 10; i++) {
-      await page.mouse.wheel(0, 300);
-      await page.waitForTimeout(100 + Math.random() * 200);
+    // 🖱️ Lấy vị trí hiện tại (giả lập)
+    let currentX = targetX - 200 + Math.random() * 100;
+    let currentY = targetY - 200 + Math.random() * 100;
+
+    // 🖱️ Di chuyển chuột theo từng bước nhỏ (giống người)
+    const steps = 10 + Math.floor(Math.random() * 10);
+
+    for (let i = 0; i < steps; i++) {
+      currentX += (targetX - currentX) / (steps - i) + (Math.random() - 0.5) * 5;
+      currentY += (targetY - currentY) / (steps - i) + (Math.random() - 0.5) * 5;
+
+      await page.mouse.move(currentX, currentY);
+      await page.waitForTimeout(10 + Math.random() * 30);
+    }
+
+    // 😶 pause nhẹ như người đang đọc
+    await page.waitForTimeout(300 + Math.random() * 700);
+
+    // 🌀 Scroll kiểu người thật (không đều)
+    const scrollTimes = 6 + Math.floor(Math.random() * 6);
+
+    for (let i = 0; i < scrollTimes; i++) {
+      const deltaY = 100 + Math.random() * 400;
+
+      await page.mouse.wheel(0, deltaY);
+
+      // ⏱️ delay không đều
+      await page.waitForTimeout(200 + Math.random() * 800);
+
+      // 🤔 đôi khi dừng lâu hơn (giả lập đọc nội dung)
+      if (Math.random() < 0.3) {
+        await page.waitForTimeout(800 + Math.random() * 1200);
+      }
     }
   }
-  await delay(1000);
+
+  // await delay(1000);
   await clickElement(page, YOUTUBE_SELECTOR.btnShowMore);
   console.log('[edit] ✓ Đã click "Hiển thị thêm"');
-  await delay(1500);
+  await delay(500);
 
-  if (tags || tagsGemini) {
+  if (tags) {
     console.log('[edit] Step 4: Nhập Tags...');
 
-    if (box) {
-      await page.mouse.move(box.x + box.width / 2 + (Math.random() * 20 - 10), box.y + box.height / 2 + (Math.random() * 20 - 10));
+    // if (box) {
+    //   await page.mouse.move(box.x + box.width / 2 + (Math.random() * 20 - 10), box.y + box.height / 2 + (Math.random() * 20 - 10));
 
-      await scrollUntilVisible(page, YOUTUBE_SELECTOR.tagsBox);
-    }
+    await scrollUntilVisible(page, YOUTUBE_SELECTOR.tagsBox);
+    // }
 
     await clickElement(page, YOUTUBE_SELECTOR.tagsInput);
     await delay(500);
 
-    await page.keyboard.insertText(tagsGemini);
-    await delay(1500);
+    await page.keyboard.insertText(tags);
+  } else {
+    showErrorLogs(`Không tìm thấy tags trong video-meta.json: ${videoFolderPath}`);
   }
+
+  await delay(1000);
 
   console.log('[edit] ✓ Hoàn thành điền thông tin video! Sang bước tiếp theo');
   await clickElement(page, YOUTUBE_SELECTOR.btnNextToRelatedStep);
@@ -274,14 +342,36 @@ export async function fillVideoDetails(page, videoFolderPath) {
  */
 export async function addRelatedVideo(page, _isNeedAddRelatedVideo = false, mp4Path) {
   await clickElement(page, YOUTUBE_SELECTOR.btnAddVideoRelated);
-  await delay(4000);
-  await clickElement(page, YOUTUBE_SELECTOR.btnChooseTemplate);
+  await delay(2000);
+  try {
+    await page.waitForSelector(YOUTUBE_SELECTOR.boxChooseTemplate, {
+      state: 'visible',
+      timeout: 3000,
+    });
+    await clickElement(page, YOUTUBE_SELECTOR.btnChooseTemplate);
+  } catch {
+    showErrorLogs(`Không tìm thấy box choose template`);
+  }
+
+  await delay(200);
 
   if (_isNeedAddRelatedVideo) {
     await clickElement(page, YOUTUBE_SELECTOR.btnSelectElement);
     // await delay(500);
     await clickElement(page, YOUTUBE_SELECTOR.btnSelectVideo);
+
+    try {
+      await page.waitForSelector(YOUTUBE_SELECTOR.boxChooseSpecificVideo, {
+        state: 'visible',
+        timeout: 3000,
+      });
+      await clickElement(page, YOUTUBE_SELECTOR.btnCloseChooseSpecificVideo);
+    } catch {
+      showErrorLogs(`Không tìm thấy box choose specific video`);
+    }
   }
+
+  await delay(200);
 
   await clickElement(page, YOUTUBE_SELECTOR.startTime);
   await delay(400);
@@ -304,7 +394,15 @@ export async function addRelatedVideo(page, _isNeedAddRelatedVideo = false, mp4P
 
   await delay(500);
   await clickElement(page, YOUTUBE_SELECTOR.btnSaveRelatedVideo);
-  await delay(2000);
+  try {
+    await page.waitForSelector(YOUTUBE_SELECTOR.boxEditDetailEndScreen, {
+      state: 'detached',
+      timeout: 3000,
+    });
+  } catch {
+    showErrorLogs(`Không tìm thấy box edit detail end screen`);
+  }
+  await delay(500);
 
   await clickElement(page, YOUTUBE_SELECTOR.btnNextToCheckStep);
   await delay(500);

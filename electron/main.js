@@ -47,6 +47,7 @@ const NPM_STDOUT_ERR_LIKE =
 function isReportableNpmStderrLine(t) {
   const s = String(t).trim();
   if (!s) return false;
+  if (/^\[mavid-(log|warn|err)\]\s?/i.test(s)) return true;
   if (NPM_STDOUT_ERR_LIKE.test(s)) return true;
   if (/\[(error|fatal|warning)\]/i.test(s)) return true;
   if (/^\(node:\d+\)\s*(Warning|ExperimentalWarning)/i.test(s)) return true;
@@ -54,6 +55,18 @@ function isReportableNpmStderrLine(t) {
   if (/^\s*npm\s+ERR!/i.test(s)) return true;
   if (/^warning[\s:]/i.test(s)) return true;
   return false;
+}
+
+/** Dòng từ `contents/utils/logToLogsPage.util.js` → tab Logs (không tiền tố [stderr]). */
+function formatMavidUiLogLine(t) {
+  const s = String(t).trim();
+  const logMark = '[mavid-log]';
+  const warnMark = '[mavid-warn]';
+  const errMark = '[mavid-err]';
+  if (s.startsWith(logMark)) return `[MaVid] ${s.slice(logMark.length).trim()}`;
+  if (s.startsWith(warnMark)) return `[warn] ${s.slice(warnMark.length).trim()}`;
+  if (s.startsWith(errMark)) return `[error] ${s.slice(errMark.length).trim()}`;
+  return null;
 }
 
 /** Ghi ra terminal process Electron (dev), không gửi UI Logs. */
@@ -209,7 +222,8 @@ ipcMain.handle('run-npm-script', async (_event, { npmScript, extraEnv }) => {
           if (!t) continue;
           writeRunnerTerminalLine(`[stderr] ${t}`);
           if (isReportableNpmStderrLine(t)) {
-            broadcastScriptError(`[stderr] ${t}`);
+            const mavidUi = formatMavidUiLogLine(t);
+            broadcastScriptError(mavidUi ?? `[stderr] ${t}`);
           }
         }
       });
