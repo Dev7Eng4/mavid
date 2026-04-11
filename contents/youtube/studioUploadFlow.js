@@ -290,7 +290,10 @@ export async function addRelatedVideo(page, _isNeedAddRelatedVideo = false, mp4P
     const dur = getVideoDurationSeconds(mp4Path);
     if (dur != null) {
       const stamp = formatRelatedVideoStartFromDuration(dur);
-      await clearContent(page);
+      await page.keyboard.down('Control');
+      await page.keyboard.press('A');
+      await page.keyboard.up('Control');
+      await page.waitForTimeout(300);
       await delay(300);
       await page.keyboard.insertText(stamp);
       console.log(`[edit] ✓ Start time end screen: ${stamp} (từ duration ${dur.toFixed(2)}s − ${RELATED_VIDEO_START_OFFSET_SEC}s)`);

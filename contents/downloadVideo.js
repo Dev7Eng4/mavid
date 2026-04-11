@@ -422,26 +422,40 @@ async function downloadSingleVideo(url, options = {}) {
     }
 
     await downloadThumbnail(url, { outputDir: DEFAULT_OUTPUT_DIR });
-    if (mode === MAKE_VIDEO_MODE.FROM_AUDIO) {
-      await downloadAudio(url, { outputDir: DEFAULT_OUTPUT_DIR });
-    } else {
-      await downloadVideo(url, { outputDir: DEFAULT_OUTPUT_DIR });
-    }
 
-    try {
-      await downloadTranscript(url, {
-        updateTranscript: mode === MAKE_VIDEO_MODE.FROM_AUDIO,
-        outputDir: DEFAULT_OUTPUT_DIR,
-        videoTitle: result.title,
-        description: result.description,
-        tags: result.tags,
-        callback,
-        thumbnailFlowOutputDir,
-        generateThumbnailWithFlow,
-        thumbnailPrompt,
-      });
-    } catch (err) {
-      console.warn('Không tải được transcript:', err.message);
+    // [OPT-2] Song song hóa download video + transcript (transcript tải subtitle riêng, không cần file video local)
+    const transcriptOptions = {
+      updateTranscript: mode === MAKE_VIDEO_MODE.FROM_AUDIO,
+      outputDir: DEFAULT_OUTPUT_DIR,
+      videoTitle: result.title,
+      description: result.description,
+      tags: result.tags,
+      callback,
+      thumbnailFlowOutputDir,
+      generateThumbnailWithFlow,
+      thumbnailPrompt,
+    };
+
+    if (mode === MAKE_VIDEO_MODE.FROM_AUDIO) {
+      // FROM_AUDIO: tuần tự (transcript cần updateTranscript = true, phụ thuộc tiến trình)
+      await downloadAudio(url, { outputDir: DEFAULT_OUTPUT_DIR });
+      try {
+        await downloadTranscript(url, transcriptOptions);
+      } catch (err) {
+        console.warn('Không tải được transcript:', err.message);
+      }
+    } else {
+      // REUP_FULL: song song hóa → tiết kiệm ~5-10 phút
+      console.log('[OPT-2] Song song: download video + transcript/Gemini/thumbnail...');
+      const [videoResult, transcriptResult] = await Promise.allSettled([
+        downloadVideo(url, { outputDir: DEFAULT_OUTPUT_DIR }),
+        downloadTranscript(url, transcriptOptions).catch(err => {
+          console.warn('Không tải được transcript:', err.message);
+        }),
+      ]);
+      if (videoResult.status === 'rejected') {
+        throw videoResult.reason;
+      }
     }
 
     const videoExt = /\.(mp4|mkv|mov|webm|avi)$/i;

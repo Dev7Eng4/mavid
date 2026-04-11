@@ -73,27 +73,34 @@ function detectHardware() {
   const { BITRATE, MAX_BITRATE, BUFSIZE } = STOCK_VIDEO;
   const bitrateArgs = ['-b:v', BITRATE, '-maxrate', MAX_BITRATE, '-bufsize', BUFSIZE];
 
-  let encoder, videoEncodeArgs, encoderLabel;
+  // [OPT-4] Bitrate thấp hơn cho reup_full (video đã overlay, không cần bitrate cao)
+  const reupBitrateArgs = ['-b:v', '3M', '-maxrate', '4M', '-bufsize', '6M'];
+
+  let encoder, videoEncodeArgs, reupVideoEncodeArgs, encoderLabel;
 
   if (hasNvenc) {
     encoder = 'h264_nvenc';
     videoEncodeArgs = ['-c:v', 'h264_nvenc', '-preset', 'p1', '-rc', 'vbr', '-cq', '28', ...bitrateArgs, '-pix_fmt', 'yuv420p', '-tag:v', 'avc1'];
+    reupVideoEncodeArgs = ['-c:v', 'h264_nvenc', '-preset', 'p1', '-rc', 'vbr', '-cq', '30', ...reupBitrateArgs, '-pix_fmt', 'yuv420p', '-tag:v', 'avc1'];
     encoderLabel = 'GPU NVIDIA (h264_nvenc p1)';
   } else if (hasAmf) {
     encoder = 'h264_amf';
     videoEncodeArgs = ['-c:v', 'h264_amf', '-quality', 'speed', ...bitrateArgs, '-pix_fmt', 'yuv420p', '-tag:v', 'avc1'];
+    reupVideoEncodeArgs = ['-c:v', 'h264_amf', '-quality', 'speed', ...reupBitrateArgs, '-pix_fmt', 'yuv420p', '-tag:v', 'avc1'];
     encoderLabel = 'GPU AMD (h264_amf)';
   } else if (hasQsv) {
     encoder = 'h264_qsv';
     videoEncodeArgs = ['-c:v', 'h264_qsv', '-preset', 'veryfast', ...bitrateArgs, '-pix_fmt', 'yuv420p', '-tag:v', 'avc1'];
+    reupVideoEncodeArgs = ['-c:v', 'h264_qsv', '-preset', 'veryfast', ...reupBitrateArgs, '-pix_fmt', 'yuv420p', '-tag:v', 'avc1'];
     encoderLabel = 'GPU Intel QSV (h264_qsv)';
   } else {
     encoder = 'libx264';
     videoEncodeArgs = ['-c:v', 'libx264', '-crf', '28', '-preset', 'ultrafast', ...bitrateArgs, '-pix_fmt', 'yuv420p', '-tag:v', 'avc1'];
+    reupVideoEncodeArgs = ['-c:v', 'libx264', '-crf', '30', '-preset', 'ultrafast', ...reupBitrateArgs, '-pix_fmt', 'yuv420p', '-tag:v', 'avc1'];
     encoderLabel = 'CPU (libx264 ultrafast)';
   }
 
-  return { gpus, encoder, videoEncodeArgs, encoderLabel, hasNvenc, hasAmf, hasQsv, isHwAccelerated: hasNvenc || hasAmf || hasQsv };
+  return { gpus, encoder, videoEncodeArgs, reupVideoEncodeArgs, encoderLabel, hasNvenc, hasAmf, hasQsv, isHwAccelerated: hasNvenc || hasAmf || hasQsv };
 }
 
 const GPU_INFO = detectHardware();

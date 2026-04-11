@@ -45,7 +45,7 @@ export default async function main(raw = {}) {
 
   if (jobs.length === 0) {
     throw new Error(
-      `Không có thư mục con nào chứa file .mp4 trong ${channelAbs} (đã giới hạn ${maxUploads == null ? 'tất cả' : maxUploads} video).`
+      `Không có thư mục con nào chứa file .mp4 trong ${channelAbs} (đã giới hạn ${maxUploads == null ? 'tất cả' : maxUploads} video).`,
     );
   }
 
@@ -114,8 +114,7 @@ export default async function main(raw = {}) {
         baselineUploadedVideosFromConfig++;
         successfulFolderNames.push(folderName);
         const slot = publishSchedule?.[i];
-        latestSuccessfulScheduleSlot =
-          slot && String(slot.date || '').trim() && String(slot.time || '').trim() ? slot : null;
+        latestSuccessfulScheduleSlot = slot && String(slot.date || '').trim() && String(slot.time || '').trim() ? slot : null;
       } catch (e) {
         console.warn('[upload]', e instanceof Error ? e.message : e);
       }
