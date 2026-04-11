@@ -617,23 +617,97 @@ async function main(props = {}) {
 
   if (result && result.success && result.processedCount > 0 && mergedProps.email) {
     try {
-      const gpmProfileId = await resolveGpmProfileIdByEmail(mergedProps.email);
-      if (gpmProfileId) {
-        console.log(
-          `\n[upload] Đã hoàn thành batch ${result.processedCount} video. Bắt đầu upload lên YouTube qua GPM profile: ${gpmProfileId}`
-        );
-        const { default: uploadYoutubeViaGpm } = await import('../youtube/uploadViaGpm.js');
-        await uploadYoutubeViaGpm({
-          gpmProfileId,
-          channelFolder: effectiveChannelName,
-          email: mergedProps.email,
-          maxUploads: result.processedCount,
-          ...(Array.isArray(result.processedFolderNames) && result.processedFolderNames.length > 0
-            ? { uploadFolderNames: result.processedFolderNames }
-            : {}),
-        });
+      // ──────── Tính số ngày đã schedule trước ────────
+      let maxUploadsFromSchedule = result.processedCount; // mặc định = tất cả video vừa tạo
+      let skipUploadReason = '';
+
+      if (effectiveChannelName) {
+        const folderPath = path.join(CHANNELS_DIR, effectiveChannelName);
+        const cfg = readMavidChannelConfigFromFolder(folderPath);
+        const item = cfg ? pickChannelConfigItem(cfg, mergedProps.email) : null;
+
+        if (item) {
+          const { MAX_SCHEDULED_DAYS } = await import('../constants/index.js');
+          const latestUploadDateStr = String(item.latestUploadDate || '').trim();
+          const videosPerDayPresetRaw = String(item.videosPerDayPreset || '1').trim();
+
+          // Parse videosPerDayPreset → lấy số tối đa video/ngày
+          // '1' → 1, '2' → 2, '3' → 3, '1-2' → 2 (max)
+          let maxVideosPerDay = 1;
+          if (videosPerDayPresetRaw === '1-2') {
+            maxVideosPerDay = 2;
+          } else {
+            const parsed = parseInt(videosPerDayPresetRaw, 10);
+            if (Number.isFinite(parsed) && parsed > 0) maxVideosPerDay = parsed;
+          }
+
+          // Parse latestUploadDate (DD/MM/YYYY) → Date
+          let latestUploadDate = null;
+          if (latestUploadDateStr) {
+            const parts = latestUploadDateStr.split('/');
+            if (parts.length === 3) {
+              const [dd, mm, yyyy] = parts.map(Number);
+              if (dd > 0 && mm > 0 && yyyy > 0) {
+                latestUploadDate = new Date(yyyy, mm - 1, dd);
+              }
+            }
+          }
+
+          if (latestUploadDate && !isNaN(latestUploadDate.getTime())) {
+            const now = new Date();
+            // Chỉ tính theo ngày (bỏ giờ)
+            const nowDay = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+            const uploadDay = new Date(latestUploadDate.getFullYear(), latestUploadDate.getMonth(), latestUploadDate.getDate());
+
+            const diffMs = uploadDay.getTime() - nowDay.getTime();
+            const diffDays = Math.max(0, Math.floor(diffMs / (24 * 60 * 60 * 1000)));
+
+            // Số ngày đã schedule = diffDays / maxVideosPerDay (phần nguyên)
+            const scheduledDays = Math.floor(diffDays / maxVideosPerDay);
+            const remainingDays = MAX_SCHEDULED_DAYS - scheduledDays;
+
+            console.log(`[schedule] latestUploadDate: ${latestUploadDateStr} | videosPerDayPreset: ${videosPerDayPresetRaw} (max ${maxVideosPerDay}/ngày)`);
+            console.log(`[schedule] Ngày đã schedule trước: ${scheduledDays} | MAX_SCHEDULED_DAYS: ${MAX_SCHEDULED_DAYS} | Còn lại: ${remainingDays}`);
+
+            if (remainingDays <= 0) {
+              skipUploadReason = `Đã schedule đủ ${MAX_SCHEDULED_DAYS} ngày (latestUploadDate: ${latestUploadDateStr}). Bỏ qua upload.`;
+            } else {
+              // Số video upload = remainingDays × maxVideosPerDay, không vượt quá số video đã tạo
+              maxUploadsFromSchedule = Math.min(remainingDays * maxVideosPerDay, result.processedCount);
+              console.log(`[schedule] Sẽ upload tối đa ${maxUploadsFromSchedule} video (${remainingDays} ngày × ${maxVideosPerDay} video/ngày).`);
+            }
+          } else {
+            console.log('[schedule] Không có latestUploadDate hợp lệ → upload tất cả video đã tạo.');
+          }
+        }
+      }
+
+      if (skipUploadReason) {
+        console.log(`\n[upload] ${skipUploadReason}`);
       } else {
-        console.warn(`[upload] Không tìm thấy Profile GPM có tên khớp với email «${mergedProps.email}». Bỏ qua tự động upload.`);
+        const gpmProfileId = await resolveGpmProfileIdByEmail(mergedProps.email);
+        if (gpmProfileId) {
+          console.log(
+            `\n[upload] Đã hoàn thành batch ${result.processedCount} video. Upload ${maxUploadsFromSchedule} video lên YouTube qua GPM profile: ${gpmProfileId}`
+          );
+          const { default: uploadYoutubeViaGpm } = await import('../youtube/uploadViaGpm.js');
+
+          // Giới hạn uploadFolderNames theo maxUploadsFromSchedule
+          let uploadFolderNames = Array.isArray(result.processedFolderNames) ? result.processedFolderNames : [];
+          if (uploadFolderNames.length > maxUploadsFromSchedule) {
+            uploadFolderNames = uploadFolderNames.slice(0, maxUploadsFromSchedule);
+          }
+
+          await uploadYoutubeViaGpm({
+            gpmProfileId,
+            channelFolder: effectiveChannelName,
+            email: mergedProps.email,
+            maxUploads: maxUploadsFromSchedule,
+            ...(uploadFolderNames.length > 0 ? { uploadFolderNames } : {}),
+          });
+        } else {
+          console.warn(`[upload] Không tìm thấy Profile GPM có tên khớp với email «${mergedProps.email}». Bỏ qua tự động upload.`);
+        }
       }
     } catch (e) {
       console.error('[upload] Lỗi trong quá trình tự động upload:', e.message);

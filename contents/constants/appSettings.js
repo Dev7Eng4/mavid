@@ -51,8 +51,8 @@ export const LOGO = {
 
 export const VIDEO_STORAGE_ROOT = '';
 
-/** Giới hạn số video được lên lịch đăng cùng lúc (YouTube / pipeline). */
-export const MAX_SCHEDULED_VIDEOS = 4;
+/** Giới hạn số ngày lên lịch trước tối đa (YouTube / pipeline). */
+export const MAX_SCHEDULED_DAYS = 4;
 
 /** Giới hạn số video được tạo / chuẩn bị trước tối đa (buffer trước khi đăng). */
 export const MAX_VIDEOS_PREPARE_AHEAD = 5;
