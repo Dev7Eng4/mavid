@@ -83,8 +83,8 @@ export async function moveToTopLeft(
   }
 }
 
-export const clickElement = async (page, selector, isXpath = false) => {
-  const element = isXpath ? page.locator(`xpath=${selector}`) : selectElement(page, selector);
+export const clickElement = async (page, selector, isXpath = false, isElement = false) => {
+  const element = isElement ? selector : isXpath ? page.locator(`xpath=${selector}`) : selectElement(page, selector);
   console.log('🚀 ~ clickElement ~ element:', element);
 
   const box = await element.boundingBox();
@@ -167,6 +167,7 @@ export async function scrollUntilVisible(page, selector, isFullXpath = false, ju
   const maxAttempts = 25;
 
   for (let i = 0; i < maxAttempts; i++) {
+    console.log('🚀 ~ scrollUntilVisible ~ i:', i);
     if (await isElementInViewport(page, selector, isFullXpath)) return;
 
     // Cuộn từng đoạn ngắn, không nhảy một cú 500px

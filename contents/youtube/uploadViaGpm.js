@@ -115,7 +115,7 @@ export default async function main(raw = {}) {
         }
 
         await fillVideoDetails(page, folderPath, showErrorLogs);
-        await addRelatedVideo(page, baselineUploadedVideosFromConfig === 2, mp4Path);
+        await addRelatedVideo(page, baselineUploadedVideosFromConfig === 2, mp4Path, showErrorLogs);
         await chooseVisibility(page, {
           slot: publishSchedule?.[i] ?? null,
           jobIndex: i,
