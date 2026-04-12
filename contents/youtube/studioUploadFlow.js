@@ -160,8 +160,8 @@ export async function selectFile(page, mp4Path) {
 
   try {
     await page.waitForSelector(YOUTUBE_SELECTOR.formDetails, {
-      state: 'visible',
-      timeout: 10000,
+      state: 'attached',
+      timeout: 15000,
     });
   } catch {}
   console.log('[upload] ✓ Form chi tiết đã xuất hiện — sẵn sàng edit title/description');
@@ -208,44 +208,44 @@ export async function fillVideoDetails(page, videoFolderPath, showErrorLogs) {
 
   try {
     await page.keyboard.press('Escape');
-    await delay(200);
+    await delay(400);
   } catch {
     /* ignore */
   }
 
-  const box = await page.locator(`${YOUTUBE_SELECTOR.boxUpload}`).boundingBox();
+  // if (box) {
+  //   // await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+  //   const targetX = box.x + box.width / 2;
+  //   const targetY = box.y + box.height / 2;
 
-  if (box) {
-    // await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
-    const targetX = box.x + box.width / 2;
-    const targetY = box.y + box.height / 2;
+  //   // 🖱️ Lấy vị trí hiện tại (giả lập)
+  //   let currentX = targetX - 200 + Math.random() * 100;
+  //   let currentY = targetY - 200 + Math.random() * 100;
 
-    // 🖱️ Lấy vị trí hiện tại (giả lập)
-    let currentX = targetX - 200 + Math.random() * 100;
-    let currentY = targetY - 200 + Math.random() * 100;
+  //   // 🖱️ Di chuyển chuột theo từng bước nhỏ (giống người)
+  //   const steps = 10 + Math.floor(Math.random() * 10);
 
-    // 🖱️ Di chuyển chuột theo từng bước nhỏ (giống người)
-    const steps = 10 + Math.floor(Math.random() * 10);
+  //   for (let i = 0; i < steps; i++) {
+  //     currentX += (targetX - currentX) / (steps - i) + (Math.random() - 0.5) * 5;
+  //     currentY += (targetY - currentY) / (steps - i) + (Math.random() - 0.5) * 5;
 
-    for (let i = 0; i < steps; i++) {
-      currentX += (targetX - currentX) / (steps - i) + (Math.random() - 0.5) * 5;
-      currentY += (targetY - currentY) / (steps - i) + (Math.random() - 0.5) * 5;
+  //     await page.mouse.move(currentX, currentY);
+  //     await page.waitForTimeout(10 + Math.random() * 30);
+  //   }
+  // }
 
-      await page.mouse.move(currentX, currentY);
-      await page.waitForTimeout(10 + Math.random() * 30);
-    }
-  }
+  await scrollUntilVisible(page, YOUTUBE_SELECTOR.boxAudience, false, 100);
 
-  await scrollUntilVisible(page, YOUTUBE_SELECTOR.thumbnailBox, false, 50);
-
-  await delay(200);
+  console.log('🚀 ~ fillVideoDetails ~ scrollUntilVisible done');
+  await delay(2000);
 
   const imageExts = ['.jpg', '.jpeg', '.png'];
   const folderFiles = fs.readdirSync(videoFolderPath);
   const imageFile = folderFiles.find(f => imageExts.includes(path.extname(f).toLowerCase()));
 
   if (imageFile) {
-    const [fileChooser] = await Promise.all([page.waitForEvent('filechooser'), clickElement(page, YOUTUBE_SELECTOR.thumbnailBox)]);
+    console.log('🚀 ~ fillVideoDetails ~ imageFile:', imageFile);
+    const [fileChooser] = await Promise.all([page.waitForEvent('filechooser'), clickElement(page, YOUTUBE_SELECTOR.btnSelectThumbnail)]);
 
     await delay(1000);
 
@@ -258,56 +258,58 @@ export async function fillVideoDetails(page, videoFolderPath, showErrorLogs) {
 
   console.log('[edit] Step 3: Click "Hiển thị thêm" (Show more)...');
 
-  // if (box) {
-  //   await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
-
-  //   for (let i = 0; i < 10; i++) {
-  //     await page.mouse.wheel(0, 300);
-  //     await page.waitForTimeout(100 + Math.random() * 200);
-  //   }
-  // }
+  const box = await page.locator(`${YOUTUBE_SELECTOR.boxUpload}`).boundingBox();
 
   if (box) {
-    const targetX = box.x + box.width / 2;
-    const targetY = box.y + box.height / 2;
+    await page.mouse.move(box.x + box.width / 2 + (Math.random() * 20 - 10), box.y + box.height / 2 + (Math.random() * 20 - 10));
 
-    // 🖱️ Lấy vị trí hiện tại (giả lập)
-    let currentX = targetX - 200 + Math.random() * 100;
-    let currentY = targetY - 200 + Math.random() * 100;
-
-    // 🖱️ Di chuyển chuột theo từng bước nhỏ (giống người)
-    const steps = 10 + Math.floor(Math.random() * 10);
-
-    for (let i = 0; i < steps; i++) {
-      currentX += (targetX - currentX) / (steps - i) + (Math.random() - 0.5) * 5;
-      currentY += (targetY - currentY) / (steps - i) + (Math.random() - 0.5) * 5;
-
-      await page.mouse.move(currentX, currentY);
-      await page.waitForTimeout(10 + Math.random() * 30);
-    }
-
-    // 😶 pause nhẹ như người đang đọc
-    await page.waitForTimeout(300 + Math.random() * 700);
-
-    // 🌀 Scroll kiểu người thật (không đều)
-    const scrollTimes = 6 + Math.floor(Math.random() * 6);
-
-    for (let i = 0; i < scrollTimes; i++) {
-      const deltaY = 100 + Math.random() * 400;
-
-      await page.mouse.wheel(0, deltaY);
-
-      // ⏱️ delay không đều
-      await page.waitForTimeout(200 + Math.random() * 800);
-
-      // 🤔 đôi khi dừng lâu hơn (giả lập đọc nội dung)
-      if (Math.random() < 0.3) {
-        await page.waitForTimeout(800 + Math.random() * 1200);
-      }
+    for (let i = 0; i < 10; i++) {
+      await page.mouse.wheel(0, 300);
+      await page.waitForTimeout(100 + Math.random() * 200);
     }
   }
 
-  // await delay(1000);
+  // if (box) {
+  //   const targetX = box.x + box.width / 2;
+  //   const targetY = box.y + box.height / 2;
+
+  //   // 🖱️ Lấy vị trí hiện tại (giả lập)
+  //   let currentX = targetX - 200 + Math.random() * 100;
+  //   let currentY = targetY - 200 + Math.random() * 100;
+
+  //   // 🖱️ Di chuyển chuột theo từng bước nhỏ (giống người)
+  //   const steps = 10 + Math.floor(Math.random() * 10);
+
+  //   for (let i = 0; i < steps; i++) {
+  //     currentX += (targetX - currentX) / (steps - i) + (Math.random() - 0.5) * 5;
+  //     currentY += (targetY - currentY) / (steps - i) + (Math.random() - 0.5) * 5;
+
+  //     await page.mouse.move(currentX, currentY);
+  //     await page.waitForTimeout(10 + Math.random() * 30);
+  //   }
+
+  //   // 😶 pause nhẹ như người đang đọc
+  //   await page.waitForTimeout(300 + Math.random() * 700);
+
+  //   // 🌀 Scroll kiểu người thật (không đều)
+  //   const scrollTimes = 6 + Math.floor(Math.random() * 6);
+
+  //   for (let i = 0; i < scrollTimes; i++) {
+  //     const deltaY = 100 + Math.random() * 400;
+
+  //     await page.mouse.wheel(0, deltaY);
+
+  //     // ⏱️ delay không đều
+  //     await page.waitForTimeout(200 + Math.random() * 800);
+
+  //     // 🤔 đôi khi dừng lâu hơn (giả lập đọc nội dung)
+  //     if (Math.random() < 0.3) {
+  //       await page.waitForTimeout(800 + Math.random() * 1200);
+  //     }
+  //   }
+  // }
+
+  await delay(200);
   await clickElement(page, YOUTUBE_SELECTOR.btnShowMore);
   console.log('[edit] ✓ Đã click "Hiển thị thêm"');
   await delay(500);
@@ -315,11 +317,11 @@ export async function fillVideoDetails(page, videoFolderPath, showErrorLogs) {
   if (tags) {
     console.log('[edit] Step 4: Nhập Tags...');
 
-    // if (box) {
-    //   await page.mouse.move(box.x + box.width / 2 + (Math.random() * 20 - 10), box.y + box.height / 2 + (Math.random() * 20 - 10));
+    if (box) {
+      await page.mouse.move(box.x + box.width / 2 + (Math.random() * 20 - 10), box.y + box.height / 2 + (Math.random() * 20 - 10));
 
-    await scrollUntilVisible(page, YOUTUBE_SELECTOR.tagsBox);
-    // }
+      await scrollUntilVisible(page, YOUTUBE_SELECTOR.tagsBox);
+    }
 
     await clickElement(page, YOUTUBE_SELECTOR.tagsInput);
     await delay(500);
@@ -340,7 +342,7 @@ export async function fillVideoDetails(page, videoFolderPath, showErrorLogs) {
  * @param {boolean} [_isNeedAddRelatedVideo=false]
  * @param {string} [mp4Path] — đường dẫn .mp4 để ffprobe lấy duration và điền Start time (duration − 17s)
  */
-export async function addRelatedVideo(page, _isNeedAddRelatedVideo = false, mp4Path) {
+export async function addRelatedVideo(page, _isNeedAddRelatedVideo = false, mp4Path, showErrorLogs) {
   await clickElement(page, YOUTUBE_SELECTOR.btnAddVideoRelated);
   await delay(2000);
   try {
@@ -348,6 +350,7 @@ export async function addRelatedVideo(page, _isNeedAddRelatedVideo = false, mp4P
       state: 'visible',
       timeout: 3000,
     });
+    await delay(3000);
     await clickElement(page, YOUTUBE_SELECTOR.btnChooseTemplate);
   } catch {
     showErrorLogs(`Không tìm thấy box choose template`);
@@ -362,7 +365,7 @@ export async function addRelatedVideo(page, _isNeedAddRelatedVideo = false, mp4P
 
     try {
       await page.waitForSelector(YOUTUBE_SELECTOR.boxChooseSpecificVideo, {
-        state: 'visible',
+        state: 'attached',
         timeout: 3000,
       });
       await clickElement(page, YOUTUBE_SELECTOR.btnCloseChooseSpecificVideo);
@@ -371,21 +374,38 @@ export async function addRelatedVideo(page, _isNeedAddRelatedVideo = false, mp4P
     }
   }
 
-  await delay(200);
-
-  await clickElement(page, YOUTUBE_SELECTOR.startTime);
-  await delay(400);
+  await delay(300);
 
   if (mp4Path) {
     const dur = getVideoDurationSeconds(mp4Path);
     if (dur != null) {
       const stamp = formatRelatedVideoStartFromDuration(dur);
-      await page.keyboard.down('Control');
-      await page.keyboard.press('A');
-      await page.keyboard.up('Control');
-      await page.waitForTimeout(300);
-      await delay(300);
-      await page.keyboard.insertText(stamp);
+
+      const elementsTimeline = page.locator(YOUTUBE_SELECTOR.elementTimeline);
+      const countElementsTimeline = await elementsTimeline.count();
+
+      if (countElementsTimeline > 0) {
+        for (let i = 0; i < countElementsTimeline; i++) {
+          const element = elementsTimeline.nth(i);
+
+          console.log('🚀 ~ addRelatedVideo ~ element:', element);
+          await clickElement(page, element, false, true);
+          await delay(300);
+
+          console.log('🚀 ~ addRelatedVideo ~ click startTime');
+          await clickElement(page, YOUTUBE_SELECTOR.startTime);
+          await delay(400);
+
+          await page.keyboard.down('Control');
+          await page.keyboard.press('A');
+          await page.keyboard.up('Control');
+
+          await page.waitForTimeout(300);
+
+          await page.keyboard.insertText(stamp);
+          await delay(300);
+        }
+      }
       console.log(`[edit] ✓ Start time end screen: ${stamp} (từ duration ${dur.toFixed(2)}s − ${RELATED_VIDEO_START_OFFSET_SEC}s)`);
     } else {
       console.warn(`[edit] ⚠ Không đọc được duration từ file — bỏ qua nhập Start time: ${mp4Path}`);
