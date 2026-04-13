@@ -1,17 +1,21 @@
 import { DEFAULT_PROMPT_LANG } from '../constants/defaultPromptLang.js';
-import { createPromptToCreateThumbnailFromImage, createPromptToCreateThumbnailOnlyTextFromImage } from './ja/createImage.js';
+import {
+  createPromptToCreateThumbnailFromImage,
+  createPromptToCreateThumbnailOnlyTextFromImage,
+  promptToCreateThumbnail,
+} from './ja/createImage.js';
 
 export const PROMPTS_CREATE_THUMBNAIL = {
   ja2CHOnlyText: createPromptToCreateThumbnailOnlyTextFromImage,
-  ja2CHFromOldThumbnail: createPromptToCreateThumbnailFromImage,
+  ja2CHFromOldThumbnail: promptToCreateThumbnail,
   // ja2CHNewImage: createPromptToCreateThumbnailNewImage,
 };
 
 export const PROMPTS_NEED_IMAGE = ['ja2CHFromOldThumbnail'];
 
 export const PROMPTS_CREATE_THUMBNAIL_OPTIONS = [
-  { label: 'Japan 2CH Chỉ text', value: 'ja2CHOnlyText' },
   { label: 'Japan 2CH Từ thumbnail cũ', value: 'ja2CHFromOldThumbnail' },
+  { label: 'Japan 2CH Chỉ text', value: 'ja2CHOnlyText' },
   // { label: '2CH New Image', value: 'ja2CHNewImage' },
 ];
 

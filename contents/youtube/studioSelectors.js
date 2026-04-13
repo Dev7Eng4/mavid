@@ -6,6 +6,7 @@ export const YOUTUBE_SELECTOR = {
   btnUploadVideo: '#items ytd-compact-link-renderer:nth-of-type(1) a',
   btnSelectFile: '#select-files-button button',
   formDetails: 'ytcp-uploads-dialog[workflow-step="DETAILS"]',
+  progressUpload: 'ytcp-video-upload-progress #processing-badge',
   titleBox: '#title-wrapper #textbox',
   descriptionBox: '#description-wrapper #textbox',
   thumbnailBox: 'ytcp-video-thumbnail-editor',

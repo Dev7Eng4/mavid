@@ -2,7 +2,7 @@
  * Script lấy thông tin kênh YouTube
  * Có thể chạy từ CLI (đọc input.txt) hoặc từ UI (nhận params)
  * Chỉ xử lý channel/playlist, không xử lý video
- * File Excel kênh: LINK VIDEO | VIEWS | DURATION | STATUS (không gắn dropdown trong code)
+ * File Excel kênh: bốn cột LINK VIDEO | VIEWS | DURATION | STATUS; dropdown STATUS từ VIDEO_STATUS_OPTIONS.
  */
 
 import youtubedl from 'youtube-dl-exec';
@@ -11,7 +11,7 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import ExcelJS from 'exceljs';
 import { resolveChannelsDir } from './utils/channelsStoragePath.js';
-import { MIN_DURATION_VIDEO } from './constants/channel.js';
+import { MIN_DURATION_VIDEO, VIDEO_STATUS_OPTIONS } from './constants/channel.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const DEFAULT_OUTPUT_DIR = resolveChannelsDir();
@@ -44,7 +44,10 @@ function migrateIndexSheetIfNeeded(sheet) {
  */
 function getChannelExcelColumnMap(headerRow) {
   const vals = headerRow.values || [];
-  const label = i => String(vals[i] ?? '').trim().toLowerCase();
+  const label = i =>
+    String(vals[i] ?? '')
+      .trim()
+      .toLowerCase();
   let maxUsed = 0;
   for (let i = 1; i < vals.length; i++) {
     if (vals[i] != null && String(vals[i]).trim() !== '') maxUsed = i;
@@ -76,6 +79,35 @@ function appendChannelVideoRows(sheet, map, videos) {
     set(map.status, '');
     sheet.addRow(row);
   }
+}
+
+/**
+ * Header có thể là 4 cột chuẩn (A–D) trong khi file cũ ghi URL ở cột D (sau 3 ô tên/tag trống).
+ * Dùng khi đọc URL hiện có và khi nối thêm dòng cho khớp layout thực tế.
+ * @param {import('exceljs').Worksheet} sheet
+ * @param {ReturnType<typeof getChannelExcelColumnMap>} headerMap
+ */
+function effectiveChannelColumnMap(sheet, headerMap) {
+  if (sheet.rowCount < 2 || headerMap.link < 1) return headerMap;
+  const r2 = sheet.getRow(2);
+  const cellText = col => {
+    const raw = r2.getCell(col).value;
+    return raw && typeof raw === 'object' ? String(raw.text || raw.hyperlink || '').trim() : String(raw || '').trim();
+  };
+  const looksLikeYt = s => /youtube\.com|youtu\.be/i.test(String(s || ''));
+  const atHeaderLink = cellText(headerMap.link);
+  const atCol4 = cellText(4);
+  if (!looksLikeYt(atHeaderLink) && looksLikeYt(atCol4) && headerMap.link === 1) {
+    const off = 3;
+    const bump = idx => (idx >= 1 ? idx + off : -1);
+    const link = 4;
+    const views = bump(headerMap.views);
+    const duration = bump(headerMap.duration);
+    const status = bump(headerMap.status);
+    const maxCol = Math.max(headerMap.maxCol, link, views, duration, status, 8);
+    return { link, views, duration, status, maxCol };
+  }
+  return headerMap;
 }
 
 /**
@@ -436,7 +468,6 @@ export async function addChannelFromForm(options = {}) {
   const headers = ['LINK VIDEO', 'VIEWS', 'DURATION', 'STATUS'];
   const videoLinks = [...(result.video_links || [])].reverse();
   const channelName = result.name || '';
-  const channelTagsStr = (result.tags || []).join(', ');
 
   let workbook;
   let sheet;
@@ -447,20 +478,20 @@ export async function addChannelFromForm(options = {}) {
     await workbook.xlsx.readFile(outputExcelPath);
     sheet = workbook.worksheets[0];
 
-    // Tìm cột "LINK VIDEO" logic (thường là cột 4)
+    const colMap = effectiveChannelColumnMap(sheet, getChannelExcelColumnMap(sheet.getRow(1)));
+    if (colMap.link < 1) throw new Error('[addChannelFromForm] Không tìm thấy cột LINK VIDEO trong file hiện tại.');
+
     const existingUrls = new Set();
     for (let i = 2; i <= sheet.rowCount; i++) {
       const row = sheet.getRow(i);
-      const val = String(row.getCell(4).value || '').trim();
+      const val = String(row.getCell(colMap.link).value || '').trim();
       if (val) existingUrls.add(val);
     }
 
     const newVideos = videoLinks.filter(v => !existingUrls.has(v.url));
     if (newVideos.length > 0) {
       console.log(`[addChannelFromForm] Tìm thấy ${newVideos.length} video mới.`);
-      newVideos.forEach(video => {
-        sheet.addRow(['', '', '', video.url, video.viewCount || 0, video.duration || '', '', '']);
-      });
+      appendChannelVideoRows(sheet, colMap, newVideos);
     } else {
       console.log(`[addChannelFromForm] Không có video mới.`);
     }
@@ -471,21 +502,23 @@ export async function addChannelFromForm(options = {}) {
     sheet.addRow(headers);
     const rows =
       videoLinks.length > 0
-        ? videoLinks.map((video, i) => {
+        ? videoLinks.map(video => {
             const vu = video?.url || '';
             const views = video?.viewCount || 0;
             const duration = video?.duration || '';
-            return [i === 0 ? channelName : '', i === 0 ? channelTagsStr : '', vu, views, duration, ''];
+            return [vu, views, duration, ''];
           })
-        : [[channelName, channelTagsStr, '(Không có video)', 0, '00:00:00', '']];
+        : [['(Không có video)', 0, '00:00:00', '']];
     rows.forEach(row => sheet.addRow(row));
   }
 
-  sheet.columns = [{ width: 25 }, { width: 20 }, { width: 45 }, { width: 20 }, { width: 20 }, { width: 25 }];
+  sheet.columns = [{ width: 45 }, { width: 12 }, { width: 12 }, { width: 20 }];
 
-  const listFormula = `"${TRANG_THAI_OPTIONS.filter(Boolean).join(',')}"`;
+  const colMapVal = effectiveChannelColumnMap(sheet, getChannelExcelColumnMap(sheet.getRow(1)));
+  const statusCol = colMapVal.status >= 1 ? colMapVal.status : 4;
+  const listFormula = `"${VIDEO_STATUS_OPTIONS.filter(Boolean).join(',')}"`;
   for (let i = 2; i <= sheet.rowCount; i++) {
-    sheet.getCell(`F${i}`).dataValidation = {
+    sheet.getRow(i).getCell(statusCol).dataValidation = {
       type: 'list',
       allowBlank: true,
       formulae: [listFormula],
@@ -689,16 +722,12 @@ async function main(options = {}) {
     const headers = ['LINK VIDEO', 'VIEWS', 'DURATION', 'STATUS'];
     const videoLinks = [...(result.video_links || [])].reverse();
 
-    const channelName = result.name || '';
-    const channelTagsStr = (result.tags || []).join(', ');
-
     // Thư mục lưu kết quả: MaVidMedia/channels/<Tên người dùng>/
     const channelDir = path.join(DEFAULT_OUTPUT_DIR, excelFilename);
     const outputExcelPath = path.join(channelDir, `${excelFilename}.xlsx`);
 
     let workbook;
     let sheet;
-    let startRowIndex = 2;
 
     if (fs.existsSync(outputExcelPath)) {
       console.log(`\nFILE EXCEL CHO KÊNH NÀY ĐÃ TỒN TẠI! (${excelFilename}/${excelFilename}.xlsx) Đang kiểm tra video mới...`);
@@ -707,25 +736,21 @@ async function main(options = {}) {
       sheet = workbook.worksheets[0];
 
       const headerRow = sheet.getRow(1);
-      const videoIdx = headerRow.values.findIndex(v => String(v || '').toLowerCase() === 'link video');
-      if (videoIdx < 0) throw new Error('Không tìm thấy cột LINK VIDEO trong file hiện tại.');
-      const col8Header = String(headerRow.getCell(8).value || '')
-        .trim()
-        .toUpperCase();
-      const legacyBackgroundColumn = col8Header === 'BACKGROUND VIDEO';
+      const colMap = effectiveChannelColumnMap(sheet, getChannelExcelColumnMap(headerRow));
+      if (colMap.link < 1) throw new Error('Không tìm thấy cột LINK VIDEO trong file hiện tại.');
 
       const existingUrls = new Set();
       for (let i = 2; i <= sheet.rowCount; i++) {
         const row = sheet.getRow(i);
-        const rawVal = row.getCell(videoIdx).value;
+        const rawVal = row.getCell(colMap.link).value;
         const val =
           rawVal && typeof rawVal === 'object' ? String(rawVal.text || rawVal.hyperlink || '').trim() : String(rawVal || '').trim();
         if (val) existingUrls.add(val);
       }
 
       const newVideos = videoLinks.filter(v => {
-        const url = typeof v === 'string' ? v : v?.url || '';
-        return url && !existingUrls.has(url);
+        const u = typeof v === 'string' ? v : v?.url || '';
+        return u && !existingUrls.has(u);
       });
 
       if (newVideos.length === 0) {
@@ -744,27 +769,17 @@ async function main(options = {}) {
       }
 
       console.log(`Tìm thấy ${newVideos.length} video mới. Đang thêm vào cuối file...`);
-      startRowIndex = sheet.rowCount + 1;
-      newVideos.forEach(video => {
-        const url = video?.url || '';
-        const views = video?.viewCount || 0;
-        const duration = video?.duration || '';
-        if (legacyBackgroundColumn) {
-          sheet.addRow(['', '', '', url, views, duration, '', '', '']);
-        } else {
-          sheet.addRow(['', '', '', url, views, duration, '', '']);
-        }
-      });
+      appendChannelVideoRows(sheet, colMap, newVideos);
     } else {
       const rows =
         videoLinks.length > 0
-          ? videoLinks.map((video, i) => {
-              const url = video?.url || '';
+          ? videoLinks.map(video => {
+              const u = video?.url || '';
               const views = video?.viewCount || 0;
               const duration = video?.duration || '';
-              return ['', i === 0 ? channelName : '', i === 0 ? channelTagsStr : '', url, views, duration, '', ''];
+              return [u, views, duration, ''];
             })
-          : [['', channelName, channelTagsStr, '(Không có video)', 0, '00:00:00', '', '']];
+          : [['(Không có video)', 0, '00:00:00', '']];
 
       if (!fs.existsSync(channelDir)) {
         fs.mkdirSync(channelDir, { recursive: true });
@@ -791,7 +806,9 @@ async function main(options = {}) {
       bgOptions = fs.readdirSync(backgroundsDirForSheet).filter(f => fs.statSync(path.join(backgroundsDirForSheet, f)).isDirectory());
     }
 
-    const listFormula = `"${TRANG_THAI_OPTIONS.filter(Boolean).join(',')}"`;
+    const colMapVal = effectiveChannelColumnMap(sheet, getChannelExcelColumnMap(sheet.getRow(1)));
+    const statusCol = colMapVal.status >= 1 ? colMapVal.status : 4;
+    const listFormula = `"${VIDEO_STATUS_OPTIONS.filter(Boolean).join(',')}"`;
     const row1ForValidation = sheet.getRow(1);
     const legacyBgForValidation =
       String(row1ForValidation.getCell(8).value || '')
@@ -799,7 +816,7 @@ async function main(options = {}) {
         .toUpperCase() === 'BACKGROUND VIDEO';
 
     for (let i = 2; i <= sheet.rowCount; i++) {
-      sheet.getCell(`G${i}`).dataValidation = {
+      sheet.getRow(i).getCell(statusCol).dataValidation = {
         type: 'list',
         allowBlank: true,
         formulae: [listFormula],

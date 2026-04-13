@@ -53,7 +53,7 @@ function readPublishTimesFromTimeInputs(slotCount: number, fallback: string[]): 
 const ADD_FORM_DEFAULT: ChannelAddDialogInitialFields = {
   channelUrl: '',
   email: '',
-  videoType: 'from_audio',
+  videoType: 'reup_full',
   durationOption: '0_null',
   selectedBackground: '',
   reupOverlayOption: defaultReupOverlayName(),
@@ -66,6 +66,7 @@ const ADD_FORM_DEFAULT: ChannelAddDialogInitialFields = {
 const VIDEO_PER_DAY_OPTIONS: { value: VideoPerDayPreset; label: string }[] = [
   { value: '1', label: '1' },
   { value: '2', label: '2' },
+  { value: '3', label: '3' },
   { value: '1-2', label: '1–2 (2 suất cuối tuần)' },
 ];
 
@@ -116,7 +117,7 @@ export function ChannelAddDialog({
   const [configHydrated, setConfigHydrated] = useState(!isEditMode);
 
   const [form, setForm] = useState<ChannelAddDialogInitialFields>(() =>
-    initialRow != null ? channelAddDialogInitialFromIndexRow(initialRow, indexHeaders) : ADD_FORM_DEFAULT
+    initialRow != null ? channelAddDialogInitialFromIndexRow(initialRow, indexHeaders) : ADD_FORM_DEFAULT,
   );
 
   const {
@@ -148,7 +149,7 @@ export function ChannelAddDialog({
         value: String(o.value),
         label: String(o.label),
       })),
-    []
+    [],
   );
 
   const resolvedReupOverlay = useMemo(() => {
@@ -249,8 +250,8 @@ export function ChannelAddDialog({
   }, []);
 
   const videoTypeOptions = [
-    { value: 'from_audio', label: 'Tạo video từ audio' },
     { value: 'reup_full', label: 'Tạo video reup toàn bộ' },
+    { value: 'from_audio', label: 'Tạo video từ audio' },
   ];
 
   /** Email trùng lặp (reactive, hiển thị inline). */
@@ -296,26 +297,15 @@ export function ChannelAddDialog({
     return used;
   }, [channelUrl, indexRows, indexHeaders, isEditMode, initialRow]);
 
-  /** Lọc các option thời gian không bị overlap với đã dùng. */
-  const durationMinuteOptions = useMemo(() => {
-    if (usedDurationOptions.size === 0) return CHANNEL_ADD_DURATION_SELECT_OPTIONS;
-    return CHANNEL_ADD_DURATION_SELECT_OPTIONS.filter(opt => {
-      // Giữ lại option hiện tại đang chọn (edit mode)
-      if (opt.value === durationOption) return true;
-      // Loại nếu overlap bất kỳ option đã dùng
-      for (const used of usedDurationOptions) {
-        if (isDurationOverlap(opt.value, used)) return false;
-      }
-      return true;
-    });
-  }, [usedDurationOptions, durationOption]);
+  /** Luôn hiển thị đủ preset — cho phép chọn khoảng trùng; chỉ cảnh báo, không chặn lưu. */
+  const durationMinuteOptions = CHANNEL_ADD_DURATION_SELECT_OPTIONS;
 
-  /** Thông báo lỗi inline cho duration nếu option hiện tại overlap. */
-  const durationOverlapError = useMemo(() => {
+  /** Cảnh báo (không chặn submit): cùng URL đã có dòng với khoảng thời gian trùng. */
+  const durationOverlapWarning = useMemo(() => {
     if (usedDurationOptions.size === 0) return '';
     for (const used of usedDurationOptions) {
       if (isDurationOverlap(durationOption, used)) {
-        return 'Khoảng thời gian đã tồn tại cho URL kênh này.';
+        return 'Đã tồn tại — cùng URL và khoảng thời gian video đã có trong index (vẫn có thể lưu).';
       }
     }
     return '';
@@ -359,22 +349,15 @@ export function ChannelAddDialog({
         setFormError(
           videosPerDayPreset === '1-2'
             ? 'Chọn đủ 3 giờ (HH:mm): 1 suất ngày thường + 2 suất cuối tuần.'
-            : 'Chọn đủ giờ upload (HH:mm) cho từng video trong ngày.'
+            : 'Chọn đủ giờ upload (HH:mm) cho từng video trong ngày.',
         );
         return;
       }
 
       if (indexRows && indexRows.length > 0) {
         let hasDuplicateEmail = false;
-        let hasDurationOverlap = false;
-
-        const normUrlRaw = channelUrl.trim();
-        const normUrl = /^https?:\/\//i.test(normUrlRaw) ? normUrlRaw : normUrlRaw ? `https://${normUrlRaw}` : '';
         const inputEmail = email.trim().toLowerCase();
-
         const emailKey = findIndexHeaderKey(indexHeaders, 'EMAIL');
-        const linkKey = findIndexHeaderKey(indexHeaders, 'LINK');
-        const durationColumnKey = findIndexHeaderKey(indexHeaders, 'THỜI GIAN VIDEO');
 
         for (const r of indexRows) {
           if (isEditMode && initialRow === r) continue;
@@ -389,29 +372,10 @@ export function ChannelAddDialog({
               hasDuplicateEmail = true;
             }
           }
-
-          if (linkKey && durationColumnKey) {
-            const rowUrlRaw = String(r[linkKey] ?? '').trim();
-            const rowNormUrl = /^https?:\/\//i.test(rowUrlRaw) ? rowUrlRaw : rowUrlRaw ? `https://${rowUrlRaw}` : '';
-            if (normUrl && rowNormUrl === normUrl) {
-              const rowDurationLabel = String(r[durationColumnKey] ?? '').trim();
-              if (rowDurationLabel) {
-                const rowOpt = durationLabelToOption(rowDurationLabel);
-                if (isDurationOverlap(durationOption, rowOpt)) {
-                  hasDurationOverlap = true;
-                }
-              }
-            }
-          }
         }
 
         if (hasDuplicateEmail) {
           setFormError('Email đã được sử dụng trong index.xlsx. Vui lòng chọn email khác hoặc để trống.');
-          return;
-        }
-
-        if (hasDurationOverlap) {
-          setFormError('URL này đã tồn tại với khoảng thời gian bị trùng lặp trong index.xlsx. Hãy chọn thời gian khác.');
           return;
         }
       }
@@ -439,7 +403,7 @@ export function ChannelAddDialog({
             publishTimes: times,
             folderIdOverride,
           },
-          { preserveChannelFromRow: initialRow }
+          { preserveChannelFromRow: initialRow },
         );
         if (error) {
           setFormError(error);
@@ -658,9 +622,9 @@ export function ChannelAddDialog({
               placeholder='Phút'
               menuZIndex={100}
             />
-            {durationOverlapError ? (
-              <p className='text-xs mt-1' style={{ color: '#fecaca' }}>
-                {durationOverlapError}
+            {durationOverlapWarning ? (
+              <p className='text-xs mt-1' style={{ color: '#f87171' }}>
+                {durationOverlapWarning}
               </p>
             ) : null}
           </div>
