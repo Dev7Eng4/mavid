@@ -50,9 +50,11 @@ async function updateChannelsIndexLastUpload(channelFolder, lastUploadText) {
     const colIndex = norm => {
       const n = norm.toUpperCase();
       for (let i = 1; i < vals.length; i++) {
-        if (String(vals[i] ?? '')
-          .trim()
-          .toUpperCase() === n) {
+        if (
+          String(vals[i] ?? '')
+            .trim()
+            .toUpperCase() === n
+        ) {
           return i;
         }
       }
@@ -60,7 +62,11 @@ async function updateChannelsIndexLastUpload(channelFolder, lastUploadText) {
     };
 
     const lastUploadCol = vals.findIndex(
-      (v, i) => i >= 1 && String(v || '').toUpperCase().includes('LAST UPLOAD'),
+      (v, i) =>
+        i >= 1 &&
+        String(v || '')
+          .toUpperCase()
+          .includes('LAST UPLOAD')
     );
     if (lastUploadCol < 1) {
       console.warn(`${LOG} index.xlsx: không tìm thấy cột LAST UPLOAD.`);
@@ -157,9 +163,16 @@ function applyLatestUploadFromScheduleSlot(ch, slot) {
  */
 function resolveChannelRowIndexForAfterUpload(cfg, email) {
   if (!Array.isArray(cfg.channels)) return { idx: -1, label: '' };
-  const em = String(email || '').trim().toLowerCase();
+  const em = String(email || '')
+    .trim()
+    .toLowerCase();
   if (em) {
-    const idx = cfg.channels.findIndex(ch => String(ch?.email || '').trim().toLowerCase() === em);
+    const idx = cfg.channels.findIndex(
+      ch =>
+        String(ch?.email || '')
+          .trim()
+          .toLowerCase() === em
+    );
     return idx >= 0 ? { idx, label: String(cfg.channels[idx]?.email || email).trim() || email } : { idx: -1, label: '' };
   }
   if (cfg.channels.length === 1) {
@@ -239,7 +252,7 @@ export async function syncChannelAfterYoutubeUpload(p) {
       throw new Error(
         email
           ? `Không tìm thấy email «${email}» trong mavid-channel-config.`
-          : 'Thiếu email và channels[] có ≠ 1 phần tử — không chọn được dòng để cập nhật uploadedVideos / latestUpload*.',
+          : 'Thiếu email và channels[] có ≠ 1 phần tử — không chọn được dòng để cập nhật uploadedVideos / latestUpload*.'
       );
     }
     const ch = { ...cfg.channels[idx] };
@@ -251,13 +264,17 @@ export async function syncChannelAfterYoutubeUpload(p) {
     const configPath = path.join(channelAbs, MAVID_CHANNEL_CONFIG_FILENAME);
     fs.writeFileSync(configPath, `${JSON.stringify(cfg, null, 2)}\n`, 'utf8');
     console.log(
-      `${LOG} mavid-channel-config «${label}»: uploadedVideos=${ch.uploadedVideos}, latestUploadDate=${ch.latestUploadDate ?? '—'}, latestUploadTime=${ch.latestUploadTime ?? '—'}`,
+      `${LOG} mavid-channel-config «${label}»: uploadedVideos=${ch.uploadedVideos}, latestUploadDate=${
+        ch.latestUploadDate ?? '—'
+      }, latestUploadTime=${ch.latestUploadTime ?? '—'}`
     );
 
     /** Giống `latestUploadDate` / `latestUploadTime` vừa ghi vào JSON — chỉ khi có mốc schedule (không dùng giá trị cũ trong config). */
     const indexLastUploadText =
       slotForLatest && ch.latestUploadDate != null && String(ch.latestUploadDate).trim()
-        ? `${String(ch.latestUploadDate).trim()}${ch.latestUploadTime != null && String(ch.latestUploadTime).trim() ? ` ${String(ch.latestUploadTime).trim()}` : ''}`.trim()
+        ? `${String(ch.latestUploadDate).trim()}${
+            ch.latestUploadTime != null && String(ch.latestUploadTime).trim() ? ` ${String(ch.latestUploadTime).trim()}` : ''
+          }`.trim()
         : '';
     await updateChannelsIndexLastUpload(p.channelFolder, indexLastUploadText);
   } catch (e) {
@@ -282,7 +299,11 @@ export async function syncChannelAfterYoutubeUpload(p) {
       if (!sheet || sheet.rowCount < 2) return;
       const headerRow = sheet.getRow(1);
       const videoIdx = headerRow.values.findIndex(v => String(v || '').toLowerCase() === 'link video');
-      const statusIdx = headerRow.values.findIndex(v => String(v || '').toLowerCase().includes('status'));
+      const statusIdx = headerRow.values.findIndex(v =>
+        String(v || '')
+          .toLowerCase()
+          .includes('status')
+      );
       if (videoIdx < 1 || statusIdx < 1) {
         console.warn(`${LOG} Excel: không tìm thấy cột LINK VIDEO hoặc STATUS.`);
         return;
@@ -311,7 +332,10 @@ export async function syncChannelAfterYoutubeUpload(p) {
 
     if (lower.endsWith('.csv')) {
       const content = fs.readFileSync(sheetPath, 'utf-8').replace(/^\uFEFF/, '');
-      const lines = content.split('\n').map(l => l.trimEnd()).filter(l => l.trim());
+      const lines = content
+        .split('\n')
+        .map(l => l.trimEnd())
+        .filter(l => l.trim());
       if (lines.length < 2) return;
       const parseLine = line => line.split(',').map(c => c.trim().replace(/^"|"$/g, ''));
       const headers = parseLine(lines[0]);
@@ -341,10 +365,12 @@ export async function syncChannelAfterYoutubeUpload(p) {
           updated++;
         }
         out.push(
-          cells.map(c => {
-            const s = String(c ?? '');
-            return s.includes(',') || s.includes('"') ? `"${s.replace(/"/g, '""')}"` : s;
-          }).join(','),
+          cells
+            .map(c => {
+              const s = String(c ?? '');
+              return s.includes(',') || s.includes('"') ? `"${s.replace(/"/g, '""')}"` : s;
+            })
+            .join(',')
         );
       }
       fs.writeFileSync(sheetPath, out.join('\n'), 'utf-8');

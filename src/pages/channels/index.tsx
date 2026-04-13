@@ -492,9 +492,7 @@ function ChannelsPage() {
                     setGoogleDriveSyncInfo('Đồng bộ Google Drive đã bị dừng.');
                     return;
                   }
-                  setGoogleDriveSyncInfo(
-                    'Đồng bộ Google Drive đã xong. Kiểm tra thư mục trên Drive và tab Logs nếu có cảnh báo.'
-                  );
+                  setGoogleDriveSyncInfo('Đồng bộ Google Drive đã xong. Kiểm tra thư mục trên Drive và tab Logs nếu có cảnh báo.');
                 } catch (e) {
                   setGoogleDriveSyncInfo(e instanceof Error ? e.message : String(e));
                 }

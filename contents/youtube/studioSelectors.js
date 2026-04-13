@@ -3,8 +3,11 @@
  */
 export const YOUTUBE_SELECTOR = {
   btnCreate: '#buttons ytd-button-renderer button',
+<<<<<<< HEAD
   btnCreateInStudio: 'header button[aria-label="Create"]',
   btnUploadVideoInStudio: 'tp-yt-paper-listbox tp-yt-paper-item:nth-of-type(1)',
+=======
+>>>>>>> 875a88f2381418d4b1835dcfc2e8be32166c667b
   btnUploadVideo: '#items ytd-compact-link-renderer:nth-of-type(1) a',
   btnSelectFile: '#select-files-button button',
   formDetails: 'ytcp-uploads-dialog[workflow-step="DETAILS"]',
