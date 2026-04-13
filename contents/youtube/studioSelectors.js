@@ -3,6 +3,8 @@
  */
 export const YOUTUBE_SELECTOR = {
   btnCreate: '#buttons ytd-button-renderer button',
+  btnCreateInStudio: 'header button[aria-label="Create"]',
+  btnUploadVideoInStudio: 'tp-yt-paper-listbox tp-yt-paper-item:nth-of-type(1)',
   btnUploadVideo: '#items ytd-compact-link-renderer:nth-of-type(1) a',
   btnSelectFile: '#select-files-button button',
   formDetails: 'ytcp-uploads-dialog[workflow-step="DETAILS"]',
@@ -32,14 +34,20 @@ export const YOUTUBE_SELECTOR = {
   btnNextToCheckStep: '#next-button button',
   btnNextToVisibilityStep: '#next-button button',
   btnChooseSchedule: '#visibility-container #second-container',
-  btnSelectDate: '#datepicker-trigger div',
+  btnSelectDate: '#datepicker-trigger ytcp-dropdown-trigger',
   inputDate: 'ytcp-date-picker #labelAndInputContainer input',
   inputTime: '.ytcp-datetime-picker input',
   startTime: 'ytve-framestamp-input#start-input',
   endTime: 'ytve-framestamp-input#end-input',
   btnSaveSchedule: '#done-button button',
   popupScheduleSuccess: '#dialog ytcp-video-thumbnail-with-info',
-  popupProcessing: 'ytcp-uploads-still-processing-dialog #dialog',
+  progressUploadLabel: '#dialog ytcp-video-upload-progress .progress-label',
+
+  // check upload with dialog — dùng #dialog: host ytcp-* thường không pass Playwright visible; người dùng thấy là #dialog
   popupWarning: 'ytcp-prechecks-warning-dialog #dialog',
-  btnGotItWarning: 'ytcp-prechecks-warning-dialog #primary-action-button button',
+  btnGotItWarning: 'ytcp-prechecks-warning-dialog .footer button',
+  popupProcessing: 'ytcp-uploads-still-processing-dialog #dialog',
+  btnCloseProcessing: 'ytcp-uploads-still-processing-dialog .footer button',
+  popupShare: 'ytcp-video-share-dialog #dialog',
+  btnCloseShare: 'ytcp-video-share-dialog .footer button',
 };

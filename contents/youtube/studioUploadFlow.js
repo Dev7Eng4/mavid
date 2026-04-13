@@ -4,7 +4,15 @@
 import fs from 'fs';
 import path from 'path';
 import { execFileSync } from 'child_process';
-import { clearContent, clickElement, delay, getRandomNumber, scrollUntilVisible } from '../utils/dom.util.js';
+import {
+  clearContent,
+  clickElement,
+  delay,
+  getRandomNumber,
+  isVisible,
+  pollUntilAnyLocatorVisible,
+  scrollUntilVisible,
+} from '../utils/dom.util.js';
 import { YOUTUBE_SELECTOR } from './studioSelectors.js';
 import { logToLogsPage } from '../utils/logToLogsPage.util.js';
 
@@ -22,7 +30,7 @@ function getVideoDurationSeconds(mp4Path) {
     const out = execFileSync(
       'ffprobe',
       ['-v', 'error', '-show_entries', 'format=duration', '-of', 'default=noprint_wrappers=1:nokey=1', mp4Path],
-      { encoding: 'utf-8' },
+      { encoding: 'utf-8' }
     ).trim();
     const n = parseFloat(out);
     return Number.isFinite(n) && n > 0 ? n : null;
@@ -86,7 +94,8 @@ async function getMetaInfo(videoFolderPath) {
  * @param {import('playwright').Page} page
  * @param {string} mp4Path — đường dẫn tuyệt đối đến file .mp4 cần upload
  */
-export async function openYoutubeUpload(page, mp4Path) {
+export async function openYoutubeUpload(page, mp4Path, index) {
+  // if (index === 0) {
   console.log('[upload] Step 1: Mở trang YouTube...');
   await page.goto('https://www.youtube.com/', { waitUntil: 'domcontentloaded', timeout: 60000 });
 
@@ -105,12 +114,17 @@ export async function openYoutubeUpload(page, mp4Path) {
 
   console.log('[upload] Step 3: Chọn mục Tải video lên...');
   await clickElement(page, YOUTUBE_SELECTOR.btnUploadVideo);
-  await delay(3000);
+  // await delay(3000);
+  // } else {
+  //   await clickElement(page, YOUTUBE_SELECTOR.btnCreateInStudio);
+  //   await clickElement(page, YOUTUBE_SELECTOR.btnUploadVideoInStudio);
+  // }
 
   await selectFile(page, mp4Path);
 }
 
 export async function selectFile(page, mp4Path) {
+  await delay(5000);
   // 1. Tạo CDP Session kết nối với trang hiện tại
   const session = await page.context().newCDPSession(page);
 
@@ -178,13 +192,13 @@ export async function fillVideoDetails(page, videoFolderPath, showErrorLogs) {
   const description = meta.descriptionGemini || '';
   const tags = [meta.tagsGemini, meta.tags].filter(Boolean).join(', ');
 
-  await page.waitForTimeout(getRandomNumber(2000));
+  await page.waitForTimeout(getRandomNumber(200));
 
   if (title) {
     console.log('[edit] Step 1: Nhập Title...');
 
     await clickElement(page, YOUTUBE_SELECTOR.titleBox);
-    await delay(500);
+    // await delay(500);
     await clearContent(page);
     await page.keyboard.insertText(title);
     console.log('[edit] ✓ Đã nhập Title');
@@ -193,24 +207,24 @@ export async function fillVideoDetails(page, videoFolderPath, showErrorLogs) {
     showErrorLogs(`Không tìm thấy title trong video-meta.json: ${videoFolderPath}`);
   }
 
-  await delay(500);
+  await delay(200);
 
   if (description) {
     console.log('[edit] Step 2: Nhập Description...');
 
     await clickElement(page, YOUTUBE_SELECTOR.descriptionBox);
-    await delay(500);
+    // await delay(500);
     await clearContent(page);
     await page.keyboard.insertText(description);
     console.log('[edit] ✓ Đã nhập Description');
-    await delay(500);
+    // await delay(200);
   } else {
     showErrorLogs(`Không tìm thấy description trong video-meta.json: ${videoFolderPath}`);
   }
 
   try {
     await page.keyboard.press('Escape');
-    await delay(400);
+    await delay(200);
   } catch {
     /* ignore */
   }
@@ -220,14 +234,14 @@ export async function fillVideoDetails(page, videoFolderPath, showErrorLogs) {
   if (boxUpload) {
     await page.mouse.move(
       boxUpload.x + boxUpload.width / 2 + (Math.random() * 20 - 10),
-      boxUpload.y + boxUpload.height / 2 + (Math.random() * 20 - 10),
+      boxUpload.y + boxUpload.height / 2 + (Math.random() * 20 - 10)
     );
   }
 
   await scrollUntilVisible(page, YOUTUBE_SELECTOR.thumbnailBox, false, 50);
 
   console.log('🚀 ~ fillVideoDetails ~ scrollUntilVisible done');
-  await delay(2000);
+  await delay(200);
 
   const imageExts = ['.jpg', '.jpeg', '.png'];
   const folderFiles = fs.readdirSync(videoFolderPath);
@@ -244,7 +258,7 @@ export async function fillVideoDetails(page, videoFolderPath, showErrorLogs) {
     showErrorLogs(`Không tìm thấy file thumbnail trong ${videoFolderPath}`);
   }
 
-  await delay(500);
+  await delay(200);
 
   console.log('[edit] Step 3: Click "Hiển thị thêm" (Show more)...');
 
@@ -264,7 +278,7 @@ export async function fillVideoDetails(page, videoFolderPath, showErrorLogs) {
   await delay(200);
   await clickElement(page, YOUTUBE_SELECTOR.btnShowMore);
   console.log('[edit] ✓ Đã click "Hiển thị thêm"');
-  await delay(500);
+  await delay(200);
 
   if (tags) {
     console.log('[edit] Step 4: Nhập Tags...');
@@ -276,14 +290,14 @@ export async function fillVideoDetails(page, videoFolderPath, showErrorLogs) {
     // }
 
     await clickElement(page, YOUTUBE_SELECTOR.tagsInput);
-    await delay(500);
+    await delay(200);
 
     await page.keyboard.insertText(tags);
   } else {
     showErrorLogs(`Không tìm thấy tags trong video-meta.json: ${videoFolderPath}`);
   }
 
-  await delay(1000);
+  await delay(100);
 
   console.log('[edit] ✓ Hoàn thành điền thông tin video! Sang bước tiếp theo');
   await clickElement(page, YOUTUBE_SELECTOR.btnNextToRelatedStep);
@@ -296,13 +310,13 @@ export async function fillVideoDetails(page, videoFolderPath, showErrorLogs) {
  */
 export async function addRelatedVideo(page, _isNeedAddRelatedVideo = false, mp4Path, showErrorLogs) {
   await clickElement(page, YOUTUBE_SELECTOR.btnAddVideoRelated);
-  await delay(2000);
+  await delay(500);
   try {
     await page.waitForSelector(YOUTUBE_SELECTOR.boxChooseTemplate, {
       state: 'visible',
       timeout: 3000,
     });
-    await delay(3000);
+    await delay(500);
     await clickElement(page, YOUTUBE_SELECTOR.btnChooseTemplate);
   } catch {
     showErrorLogs(`Không tìm thấy box choose template`);
@@ -335,7 +349,7 @@ export async function addRelatedVideo(page, _isNeedAddRelatedVideo = false, mp4P
       console.log('🚀 ~ addRelatedVideo ~ stamp:', stamp);
 
       const elementsTimeline = page.locator(YOUTUBE_SELECTOR.elementTimeline);
-      const countElementsTimeline = await elementsTimeline.count();
+      // const countElementsTimeline = await elementsTimeline.count();
 
       for (let i = 0; i < 3; i++) {
         const ele = elementsTimeline.nth(i);
@@ -388,7 +402,7 @@ export async function addRelatedVideo(page, _isNeedAddRelatedVideo = false, mp4P
     }
   }
 
-  await delay(500);
+  await delay(300);
   await clickElement(page, YOUTUBE_SELECTOR.btnSaveRelatedVideo);
   try {
     await page.waitForSelector(YOUTUBE_SELECTOR.boxEditDetailEndScreen, {
@@ -401,7 +415,7 @@ export async function addRelatedVideo(page, _isNeedAddRelatedVideo = false, mp4P
   await delay(500);
 
   await clickElement(page, YOUTUBE_SELECTOR.btnNextToCheckStep);
-  await delay(500);
+  await delay(200);
   await clickElement(page, YOUTUBE_SELECTOR.btnNextToVisibilityStep);
 }
 
@@ -415,14 +429,14 @@ export async function chooseVisibility(page, ctx) {
 
   if (slot?.date && slot?.time) {
     await clickElement(page, YOUTUBE_SELECTOR.btnChooseSchedule);
-    await delay(1500);
-    await clickElement(page, YOUTUBE_SELECTOR.btnSelectDate);
     await delay(500);
+    await clickElement(page, YOUTUBE_SELECTOR.btnSelectDate);
+    await delay(200);
     await clickElement(page, YOUTUBE_SELECTOR.inputDate);
     await clearContent(page);
     await delay(500);
     await page.keyboard.insertText(slot.date);
-    await delay(500);
+    await delay(200);
     await page.keyboard.press('Enter');
     await page.keyboard.press('Escape');
 
@@ -430,41 +444,52 @@ export async function chooseVisibility(page, ctx) {
     await clearContent(page);
     await delay(500);
     await page.keyboard.insertText(slot.time);
-    await delay(500);
+    await delay(200);
     await page.keyboard.press('Enter');
   }
+
+  // try {
+  //   await page.waitForFunction(
+  //     () => {
+  //       const el1 = document.querySelector(YOUTUBE_SELECTOR.progressUpload);
+
+  //       // Điều kiện 1: element không còn trong DOM
+  //       if (!el1) return true;
+
+  //       // Điều kiện 2: có attribute aria-describedby
+  //       return el1.hasAttribute('aria-describedby');
+  //     },
+  //     { timeout: 60000 }
+  //   );
+  // } catch {
+  //   // showErrorLogs(`Không tìm thấy popup warning`);
+  // }
 
   try {
     await page.waitForFunction(
       () => {
-        const el = document.querySelector(YOUTUBE_SELECTOR.progressUpload);
-
-        // Điều kiện 1: element không còn trong DOM
-        if (!el) return true;
-
-        // Điều kiện 2: có attribute aria-describedby
-        return el.hasAttribute('aria-describedby');
+        const el = document.querySelector('#dialog ytcp-video-upload-progress .progress-label');
+        if (!el) return false;
+        return !el.textContent.toLowerCase().includes('uploading');
       },
-      { timeout: 60000 },
-    );
+      { timeout: 0 }
+    ); // timeout: 0 = chờ vô hạn (tuỳ bạn chỉnh)
   } catch {
-    // showErrorLogs(`Không tìm thấy popup warning`);
+    // showErrorLogs(`Không tìm thấy popup upload progress`);
   }
 
   await clickElement(page, YOUTUBE_SELECTOR.btnSaveSchedule);
+  await delay(400);
 
   try {
     // Cố gắng chờ popup xuất hiện trong 3 giây
     await page.waitForSelector(YOUTUBE_SELECTOR.popupWarning, {
       state: 'visible',
-      timeout: 3000,
+      timeout: 4000,
     });
 
-    // 👇 Nếu code lọt được xuống dòng này, nghĩa là popup ĐÃ XUẤT HIỆN
-    console.log('[Info] Popup cảnh báo xuất hiện, đang tiến hành đóng...');
-    await delay(1000);
     await clickElement(page, YOUTUBE_SELECTOR.btnGotItWarning);
-    await delay(2000);
+    await delay(500);
   } catch (error) {
     // 👇 Nếu sau 3 giây không có popup, Playwright sẽ nhảy vào đây.
     // Chúng ta không làm gì cả để tool bỏ qua và chạy tiếp các bước bên dưới.
@@ -472,4 +497,57 @@ export async function chooseVisibility(page, ctx) {
   }
 
   await page.reload({ timeout: 30000 });
+
+  // try {
+  //   const locWarning = page.locator(YOUTUBE_SELECTOR.popupWarning).first();
+  //   console.log('[chooseVisibility] Chờ popup (precheck / share / processing)...');
+  //   if (await isVisible(locWarning, 5000)) {
+  //     console.log('[chooseVisibility] Đã thấy popup precheck warning');
+  //     await clickElement(page, YOUTUBE_SELECTOR.btnGotItWarning);
+
+  //     await delay(500);
+
+  //     const processingLoc = page.locator(YOUTUBE_SELECTOR.popupProcessing).first();
+  //     const shareLoc = page.locator(YOUTUBE_SELECTOR.popupShare).first();
+  //     const [hasProcessing, hasShare] = await pollUntilAnyLocatorVisible(page, [processingLoc, shareLoc], {
+  //       timeoutMs: 15000,
+  //       intervalMs: 350,
+  //       settleMs: 500,
+  //     });
+
+  //     console.log('[chooseVisibility] Sau Got it — hasProcessing:', hasProcessing, 'hasShare:', hasShare);
+
+  //     if (hasProcessing) {
+  //       await clickElement(page, YOUTUBE_SELECTOR.btnCloseProcessing);
+  //       await delay(400);
+  //     }
+
+  //     let closeShare = hasShare;
+  //     if (!closeShare && hasProcessing) {
+  //       closeShare = await isVisible(shareLoc, 10000);
+  //     }
+  //     if (closeShare) {
+  //       await clickElement(page, YOUTUBE_SELECTOR.btnCloseShare);
+  //     }
+  //   } else {
+  //     const locShare = page.locator(YOUTUBE_SELECTOR.popupShare).first();
+  //     const locProcessing = page.locator(YOUTUBE_SELECTOR.popupProcessing).first();
+  //     if (await isVisible(locShare, 3000)) {
+  //       await clickElement(page, YOUTUBE_SELECTOR.btnCloseShare);
+  //     } else if (await isVisible(locProcessing, 3000)) {
+  //       await clickElement(page, YOUTUBE_SELECTOR.btnCloseProcessing);
+  //     }
+  //   }
+
+  //   // 👇 Nếu code lọt được xuống dòng này, nghĩa là popup ĐÃ XUẤT HIỆN
+  //   // console.log('[Info] Popup cảnh báo xuất hiện, đang tiến hành đóng...');
+  //   // await delay(1000);
+  //   // await clickElement(page, YOUTUBE_SELECTOR.btnGotItWarning);
+  //   // await delay(2000);
+  // } catch (error) {
+  //   const msg = error instanceof Error ? error.message : String(error);
+  //   console.log(`[chooseVisibility] Lỗi khi xử lý popup (tiếp tục luồng): ${msg}`);
+  // }
+
+  // await page.reload({ timeout: 30000 });
 }

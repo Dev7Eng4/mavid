@@ -26,7 +26,7 @@ export async function moveToTopLeft(
     minDelay: 8,
     maxDelay: 20,
     overshoot: true,
-  },
+  }
 ) {
   const { steps = 60, minDelay = 8, maxDelay = 20, overshoot = true } = options;
 
@@ -44,7 +44,7 @@ export async function moveToTopLeft(
         window.__mouseX = e.clientX;
         window.__mouseY = e.clientY;
       },
-      { once: false },
+      { once: false }
     );
   });
 
@@ -241,4 +241,42 @@ export async function clearContent(page) {
   await page.waitForTimeout(300);
   await page.keyboard.press('Backspace');
   await page.waitForTimeout(200);
+}
+
+export const isVisible = async (locator, timeout = 8000) => {
+  try {
+    await locator.waitFor({ state: 'visible', timeout });
+    return true;
+  } catch {
+    return false;
+  }
+};
+
+/**
+ * Poll `locator.isVisible()` theo chu kỳ — dùng sau khi đóng dialog khác: popup kế thường mount trễ,
+ * hoặc `waitFor(visible)` kết thúc sớm khi DOM đang chuyển.
+ * @param {import('playwright').Page} page
+ * @param {import('playwright').Locator[]} locators
+ * @param {{ timeoutMs?: number, intervalMs?: number, settleMs?: number }} [options]
+ * @returns {Promise<boolean[]>} — cờ visible tương ứng từng locator (sau bước settle)
+ */
+export async function pollUntilAnyLocatorVisible(page, locators, options = {}) {
+  const { timeoutMs = 15000, intervalMs = 350, settleMs = 500 } = options;
+  const deadline = Date.now() + timeoutMs;
+
+  /** @type {boolean[]} */
+  let flags = locators.map(() => false);
+
+  while (Date.now() < deadline) {
+    flags = await Promise.all(locators.map(l => l.isVisible().catch(() => false)));
+    if (flags.some(Boolean)) break;
+    await page.waitForTimeout(intervalMs);
+  }
+
+  if (settleMs > 0) {
+    await page.waitForTimeout(settleMs);
+    flags = await Promise.all(locators.map(l => l.isVisible().catch(() => false)));
+  }
+
+  return flags;
 }

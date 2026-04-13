@@ -52,10 +52,18 @@ function getDurationBoundsFromConfig(channelAbs, email) {
   try {
     const cfg = JSON.parse(fs.readFileSync(cfgPath, 'utf-8'));
     const list = Array.isArray(cfg.channels) ? cfg.channels : [];
-    const norm = String(email || '').trim().toLowerCase();
+    const norm = String(email || '')
+      .trim()
+      .toLowerCase();
     let item = null;
     if (norm && list.length > 0) {
-      item = list.find(c => c && String(c.email || '').trim().toLowerCase() === norm);
+      item = list.find(
+        c =>
+          c &&
+          String(c.email || '')
+            .trim()
+            .toLowerCase() === norm
+      );
     }
     if (!item && list.length > 0) item = list[0];
     if (!item) return null;
@@ -107,7 +115,9 @@ function extractVideoIdFromUrl(url) {
     const u = new URL(url);
     const v = u.searchParams.get('v');
     if (v && v.trim()) return v.trim();
-  } catch { /* ignore */ }
+  } catch {
+    /* ignore */
+  }
   // Fallback: regex
   const m = url.match(/[?&]v=([^&]+)/);
   return m ? m[1].trim() : null;
@@ -139,8 +149,17 @@ async function readVideoIdsWithStatusDone(channelAbs, durBounds) {
     const headerRow = sheet.getRow(1);
     const videoIdx = headerRow.values.findIndex(v => String(v || '').toLowerCase() === 'link video');
     if (videoIdx < 0) return [];
-    const statusIdx = headerRow.values.findIndex(v => String(v || '').toLowerCase().includes('status'));
-    const durationIdx = headerRow.values.findIndex(v => String(v || '').trim().toLowerCase() === 'duration');
+    const statusIdx = headerRow.values.findIndex(v =>
+      String(v || '')
+        .toLowerCase()
+        .includes('status')
+    );
+    const durationIdx = headerRow.values.findIndex(
+      v =>
+        String(v || '')
+          .trim()
+          .toLowerCase() === 'duration'
+    );
 
     const ids = [];
     for (let i = 2; i <= sheet.rowCount; i++) {
@@ -163,9 +182,7 @@ async function readVideoIdsWithStatusDone(channelAbs, durBounds) {
       }
 
       const rawVal = row.getCell(videoIdx).value;
-      const val = rawVal && typeof rawVal === 'object'
-        ? String(rawVal.text || rawVal.hyperlink || '').trim()
-        : String(rawVal || '').trim();
+      const val = rawVal && typeof rawVal === 'object' ? String(rawVal.text || rawVal.hyperlink || '').trim() : String(rawVal || '').trim();
 
       if (!val || (!val.startsWith('http://') && !val.startsWith('https://'))) continue;
 
@@ -244,7 +261,9 @@ export async function listUploadJobs(channelAbs, email, maxUploads, folderNamesO
   // ──── Logic mới: đọc Excel → status "Đã tạo video" + duration filter → video ID → folder + .mp4 ────
   const durBounds = getDurationBoundsFromConfig(channelAbs, email);
   if (durBounds) {
-    console.log(`[upload-jobs] Duration filter: from ${durBounds.durationMinuteFrom} phút, to ${durBounds.durationMinuteTo ?? 'không giới hạn'} phút`);
+    console.log(
+      `[upload-jobs] Duration filter: from ${durBounds.durationMinuteFrom} phút, to ${durBounds.durationMinuteTo ?? 'không giới hạn'} phút`
+    );
   }
 
   const videoIds = await readVideoIdsWithStatusDone(channelAbs, durBounds);
@@ -262,4 +281,3 @@ export async function listUploadJobs(channelAbs, email, maxUploads, folderNamesO
   }
   return jobs;
 }
-

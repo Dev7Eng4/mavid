@@ -51,10 +51,17 @@ function ChannelsPage() {
 
   const [indexEditRowIndex, setIndexEditRowIndex] = useState<number | null>(null);
   const [uploadVideoOpen, setUploadVideoOpen] = useState(false);
+  /** Upload YouTube chạy nền sau khi đóng popup — hiển thị trên nút header. */
+  const [youtubeUploadProgress, setYoutubeUploadProgress] = useState<{
+    current: number;
+    total: number;
+    channelLabel: string;
+  } | null>(null);
   const [createVideoOpen, setCreateVideoOpen] = useState(false);
   const [uploadScheduleInfo, setUploadScheduleInfo] = useState<string | null>(null);
   const [addChannelOpen, setAddChannelOpen] = useState(false);
   const [addChannelInfo, setAddChannelInfo] = useState<string | null>(null);
+  const [googleDriveSyncInfo, setGoogleDriveSyncInfo] = useState<string | null>(null);
 
   const loadIndex = useCallback(async () => {
     setIndexLoading(true);
@@ -165,7 +172,7 @@ function ChannelsPage() {
         setIndexSaving(false);
       }
     },
-    [canWriteIndex, indexHeaders, loadIndex],
+    [canWriteIndex, indexHeaders, loadIndex]
   );
 
   type IndexCreateVideoQueueEntry = { row: ChannelRow; folder: string; videoType: 'from_audio' | 'reup_full' };
@@ -258,14 +265,14 @@ function ChannelsPage() {
           setIndexListError(
             failures.length === queue.length
               ? `Tất cả ${failures.length} kênh lỗi: ${failures.slice(0, 3).join(' ')}${failures.length > 3 ? '…' : ''}`
-              : `Một số kênh lỗi (${failures.length}/${queue.length}): ${failures.slice(0, 4).join(' ')}${failures.length > 4 ? '…' : ''}`,
+              : `Một số kênh lỗi (${failures.length}/${queue.length}): ${failures.slice(0, 4).join(' ')}${failures.length > 4 ? '…' : ''}`
           );
         }
       } finally {
         setIndexBatchVideo(null);
       }
     },
-    [indexHeaders, indexBackgrounds],
+    [indexHeaders, indexBackgrounds]
   );
 
   const detailLayout = useMemo(() => {
@@ -357,7 +364,7 @@ function ChannelsPage() {
   const indexPag = useClientPagination(indexDraftRows.length);
   const pageIndexRows = useMemo(
     () => indexDraftRows.slice(indexPag.startIndex, indexPag.startIndex + indexPag.pageSize),
-    [indexDraftRows, indexPag.startIndex, indexPag.pageSize],
+    [indexDraftRows, indexPag.startIndex, indexPag.pageSize]
   );
 
   const {
@@ -374,7 +381,7 @@ function ChannelsPage() {
 
   const pageDetailRows = useMemo(
     () => filteredRowsWithIndex.slice(detailStartIndex, detailStartIndex + detailPageSize),
-    [filteredRowsWithIndex, detailStartIndex, detailPageSize],
+    [filteredRowsWithIndex, detailStartIndex, detailPageSize]
   );
 
   const canSetStartFrom = Boolean(detail?.fileName?.toLowerCase().endsWith('.xlsx') && detailLayout.startFromKey);
@@ -400,8 +407,8 @@ function ChannelsPage() {
   const detailTheadHeaders = detailLoading
     ? DETAIL_TABLE_LOADING_HEADERS
     : detailLayout.tableHeaders.length > 0
-      ? detailLayout.tableHeaders
-      : ['—'];
+    ? detailLayout.tableHeaders
+    : ['—'];
 
   const detailColCount = Math.max(detailTheadHeaders.length, 1);
 
@@ -463,6 +470,7 @@ function ChannelsPage() {
             indexCreateVideoQueueLength={indexCreateVideoQueue.length}
             canRunIndexBatchVideo={canRunIndexBatchVideo}
             uploadChannelsLength={uploadChannels.length}
+            youtubeUploadProgress={youtubeUploadProgress}
             refreshBusy={refreshBusy}
             onOpenCreateVideo={() => setCreateVideoOpen(true)}
             onOpenAddChannel={() => {
@@ -470,6 +478,28 @@ function ChannelsPage() {
               setAddChannelOpen(true);
             }}
             onOpenUploadVideo={() => setUploadVideoOpen(true)}
+            onUploadToGoogleDrive={() => {
+              setGoogleDriveSyncInfo(null);
+              void (async () => {
+                if (!window.runner?.runNpmScript) {
+                  setGoogleDriveSyncInfo('Chỉ chạy đồng bộ Drive trong app Electron.');
+                  return;
+                }
+                setGoogleDriveSyncInfo('Đang chạy đồng bộ Google Drive (MaVidMedia/videos → Drive) trong nền…');
+                try {
+                  const r = await window.runner.runNpmScript('syncVideosToDrive');
+                  if (r.cancelled) {
+                    setGoogleDriveSyncInfo('Đồng bộ Google Drive đã bị dừng.');
+                    return;
+                  }
+                  setGoogleDriveSyncInfo(
+                    'Đồng bộ Google Drive đã xong. Kiểm tra thư mục trên Drive và tab Logs nếu có cảnh báo.'
+                  );
+                } catch (e) {
+                  setGoogleDriveSyncInfo(e instanceof Error ? e.message : String(e));
+                }
+              })();
+            }}
             onBackToIndex={() => setSelectedChannel(null)}
             onRefresh={handleRefresh}
           />
@@ -499,6 +529,19 @@ function ChannelsPage() {
           }}
         >
           {addChannelInfo}
+        </div>
+      ) : null}
+
+      {googleDriveSyncInfo ? (
+        <div
+          className='rounded-2xl px-4 py-3 text-base wrap-break-word'
+          style={{
+            color: 'var(--text-h)',
+            background: 'var(--accent-bg)',
+            border: '1px solid var(--accent-border)',
+          }}
+        >
+          {googleDriveSyncInfo}
         </div>
       ) : null}
 
@@ -592,28 +635,47 @@ function ChannelsPage() {
         <ChannelUploadVideoDialog
           channels={uploadChannels}
           onClose={() => setUploadVideoOpen(false)}
-          onConfirm={async (payloads: ChannelUploadVideoPayload[]) => {
-            if (!window.runner?.runScript) throw new Error('Chỉ chạy upload trong app Electron.');
-            for (const p of payloads) {
-              await window.runner.runScript('uploadYoutubeViaGpm', {
-                gpmProfileId: p.gpmProfileId,
-                channelFolder: p.channelFolder,
-                email: p.email,
-                maxUploads: p.totalVideos,
-                gpmApiBase: gpmApi.getBaseUrl(),
-              });
-            }
-            if (payloads.length === 1) {
-              const p = payloads[0];
-              const n = p.totalVideos == null ? 'tất cả thư mục con có .mp4' : String(p.totalVideos);
-              setUploadScheduleInfo(
-                `Upload YouTube đã chạy xong — kênh «${p.channelFolder}», profile GPM ${p.gpmProfileId} (theo email ↔ name), tối đa ${n}. Kiểm tra GPM / YouTube Studio và tab Logs.`,
-              );
-            } else if (payloads.length > 1) {
-              setUploadScheduleInfo(
-                `Upload YouTube đồng loạt đã chạy xong cho ${payloads.length} kênh. Kiểm tra GPM / YouTube Studio và tab Logs.`,
-              );
-            }
+          onConfirm={(payloads: ChannelUploadVideoPayload[]) => {
+            void (async () => {
+              if (!window.runner?.runScript) {
+                setUploadScheduleInfo('Chỉ chạy upload trong app Electron.');
+                return;
+              }
+              setUploadScheduleInfo(null);
+              try {
+                for (let i = 0; i < payloads.length; i++) {
+                  const p = payloads[i];
+                  setYoutubeUploadProgress({
+                    current: i + 1,
+                    total: payloads.length,
+                    channelLabel: p.channelFolder,
+                  });
+                  await window.runner.runScript('uploadYoutubeViaGpm', {
+                    gpmProfileId: p.gpmProfileId,
+                    channelFolder: p.channelFolder,
+                    email: p.email,
+                    maxUploads: p.totalVideos,
+                    gpmApiBase: gpmApi.getBaseUrl(),
+                  });
+                }
+                if (payloads.length === 1) {
+                  const p = payloads[0];
+                  const n = p.totalVideos == null ? 'tất cả thư mục con có .mp4' : String(p.totalVideos);
+                  setUploadScheduleInfo(
+                    `Upload YouTube đã chạy xong — kênh «${p.channelFolder}», profile GPM ${p.gpmProfileId} (theo email ↔ name), tối đa ${n}. Kiểm tra GPM / YouTube Studio và tab Logs.`
+                  );
+                } else if (payloads.length > 1) {
+                  setUploadScheduleInfo(
+                    `Upload YouTube đồng loạt đã chạy xong cho ${payloads.length} kênh. Kiểm tra GPM / YouTube Studio và tab Logs.`
+                  );
+                }
+              } catch (e) {
+                const msg = e instanceof Error ? e.message : String(e);
+                setUploadScheduleInfo(`Upload YouTube lỗi: ${msg}`);
+              } finally {
+                setYoutubeUploadProgress(null);
+              }
+            })();
           }}
         />
       ) : null}

@@ -16,6 +16,89 @@ export const STATUS_DA_DANG_VIDEO = 'Đã đăng video';
 
 const LOG = '[afterUpload]';
 
+/**
+ * Ghi cột LAST UPLOAD trên `channels/index.xlsx` cho đúng dòng kênh (cột ID hoặc CHANNEL).
+ * @param {string} channelFolder
+ * @param {string} lastUploadText — cùng nguồn với mavid-channel-config (DD/MM/YYYY [HH:mm])
+ */
+async function updateChannelsIndexLastUpload(channelFolder, lastUploadText) {
+  const text = String(lastUploadText || '').trim();
+  if (!text) return;
+
+  const folderNorm = String(channelFolder || '')
+    .trim()
+    .toLowerCase();
+  if (!folderNorm) return;
+
+  const indexPath = path.join(resolveChannelsDir(), 'index.xlsx');
+  if (!fs.existsSync(indexPath)) {
+    console.warn(`${LOG} Không có channels/index.xlsx — bỏ qua LAST UPLOAD.`);
+    return;
+  }
+
+  try {
+    const ExcelJS = (await import('exceljs')).default;
+    const workbook = new ExcelJS.Workbook();
+    await workbook.xlsx.readFile(indexPath);
+    const sheet = workbook.worksheets[0];
+    if (!sheet || sheet.rowCount < 2) return;
+
+    const headerRow = sheet.getRow(1);
+    const vals = headerRow.values || [];
+
+    /** @param {string} norm */
+    const colIndex = norm => {
+      const n = norm.toUpperCase();
+      for (let i = 1; i < vals.length; i++) {
+        if (String(vals[i] ?? '')
+          .trim()
+          .toUpperCase() === n) {
+          return i;
+        }
+      }
+      return -1;
+    };
+
+    const lastUploadCol = vals.findIndex(
+      (v, i) => i >= 1 && String(v || '').toUpperCase().includes('LAST UPLOAD'),
+    );
+    if (lastUploadCol < 1) {
+      console.warn(`${LOG} index.xlsx: không tìm thấy cột LAST UPLOAD.`);
+      return;
+    }
+
+    const idCol = colIndex('ID');
+    const channelCol = colIndex('CHANNEL');
+
+    let updated = 0;
+    for (let r = 2; r <= sheet.rowCount; r++) {
+      const row = sheet.getRow(r);
+      let cellVal = '';
+      if (idCol >= 1) {
+        const v = row.getCell(idCol).value;
+        cellVal = String(v ?? '').trim();
+      }
+      if (!cellVal && channelCol >= 1) {
+        const v = row.getCell(channelCol).value;
+        cellVal = String(v ?? '').trim();
+      }
+      if (cellVal.toLowerCase() !== folderNorm) continue;
+      row.getCell(lastUploadCol).value = text;
+      updated++;
+    }
+
+    if (updated === 0) {
+      console.warn(`${LOG} index.xlsx: không có dòng ID/CHANNEL trùng «${channelFolder}» — không ghi LAST UPLOAD.`);
+      return;
+    }
+
+    await workbook.xlsx.writeFile(indexPath);
+    console.log(`${LOG} index.xlsx: LAST UPLOAD = «${text}» (${updated} dòng).`);
+  } catch (e) {
+    console.warn(`${LOG} index.xlsx LAST UPLOAD:`, e instanceof Error ? e.message : e);
+  }
+}
+
 /** @param {unknown} rawVal */
 function extractUrlFromCell(rawVal) {
   if (rawVal == null) return '';
@@ -170,6 +253,13 @@ export async function syncChannelAfterYoutubeUpload(p) {
     console.log(
       `${LOG} mavid-channel-config «${label}»: uploadedVideos=${ch.uploadedVideos}, latestUploadDate=${ch.latestUploadDate ?? '—'}, latestUploadTime=${ch.latestUploadTime ?? '—'}`,
     );
+
+    /** Giống `latestUploadDate` / `latestUploadTime` vừa ghi vào JSON — chỉ khi có mốc schedule (không dùng giá trị cũ trong config). */
+    const indexLastUploadText =
+      slotForLatest && ch.latestUploadDate != null && String(ch.latestUploadDate).trim()
+        ? `${String(ch.latestUploadDate).trim()}${ch.latestUploadTime != null && String(ch.latestUploadTime).trim() ? ` ${String(ch.latestUploadTime).trim()}` : ''}`.trim()
+        : '';
+    await updateChannelsIndexLastUpload(p.channelFolder, indexLastUploadText);
   } catch (e) {
     console.warn(`${LOG} JSON:`, e instanceof Error ? e.message : e);
   }

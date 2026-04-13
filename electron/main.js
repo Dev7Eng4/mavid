@@ -32,6 +32,7 @@ const ALLOWED_NPM_SCRIPTS = new Set([
   'tao-batch-video-reup-full',
   'tao-thumbnail-flow',
   'tom-tat-meta-tu-transcript',
+  'syncVideosToDrive',
 ]);
 
 let jobRunning = false;

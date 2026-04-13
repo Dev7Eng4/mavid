@@ -75,7 +75,8 @@ export interface ChannelUploadVideoDialogProps {
   /** Danh sách kênh đủ điều kiện (có email trong index). */
   channels: ChannelItem[];
   onClose: () => void;
-  onConfirm: (payloads: ChannelUploadVideoPayload[]) => void | Promise<void>;
+  /** Gọi khi đã có payloads hợp lệ; parent tự chạy upload nền (không cần await). */
+  onConfirm: (payloads: ChannelUploadVideoPayload[]) => void;
 }
 
 function clampInt(n: number, min: number, max: number): number {
@@ -180,8 +181,7 @@ export function ChannelUploadVideoDialog({ channels, onClose, onConfirm }: Chann
       if (typeof window.runner?.minimizeApp === 'function') {
         window.runner.minimizeApp();
       }
-      await onConfirm(payloads);
-
+      onConfirm(payloads);
       onClose();
     } catch (e) {
       setFormError(e instanceof Error ? e.message : 'Không chạy được upload.');
