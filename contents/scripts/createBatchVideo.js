@@ -9,17 +9,6 @@ const CHANNELS_DIR = resolveChannelsDir();
 const MAVID_CHANNEL_CONFIG_FILENAME = 'mavid-channel-config.json';
 
 /**
- * @param {Record<string, unknown>} props
- * @returns {number} 1..100, mặc định 5
- */
-function resolveBatchLimit(props = {}) {
-  const raw = props.maxVideosPerBatch ?? process.env.MAVID_MAX_VIDEOS_PER_BATCH;
-  const n = Number(raw);
-  if (!Number.isFinite(n) || n < 1) return 5;
-  return Math.min(100, Math.floor(n));
-}
-
-/**
  * Phút tối thiểu (độ dài video trong Excel) — 0 = không lọc.
  * Env: MAVID_MIN_DURATION_MINUTES
  */
@@ -594,7 +583,6 @@ function buildMakeVideoFromAudioOptions(props, channelFolderName) {
  * @param {number} [props.audioSpeed] — (from_audio) atempo, vd 0.91
  * @param {string} [props.stockFolder] — (from_audio) tên folder con trong MaVidMedia/backgrounds
  * @param {boolean} [props.showLogo] — (from_audio) true: ảnh đầu tiên trong MaVidMedia/channels/{channel}
- * @param {number} [props.maxVideosPerBatch] — tối đa số video mỗi lần chạy; env MAVID_MAX_VIDEOS_PER_BATCH; mặc định 5
  * @param {string} [props.overlay] — (reup_full) tên preset OVERLAY_OPTIONS
  * @param {string|number} [props.videoCropPercent] — (reup_full) VIDEO_CROP_PERCENT
  * @param {number} [props.minDurationMinutes] — chỉ xử lý video có độ dài (cột DURATION) ≥ N phút; 0 = không lọc; env MAVID_MIN_DURATION_MINUTES
@@ -692,14 +680,12 @@ async function main(props = {}) {
   }
 
   const { videoType } = mergedProps;
-  const batchLimit = resolveBatchLimit(mergedProps);
   const minDurationMinutes = resolveMinDurationMinutes(mergedProps);
   const maxDurationMinutes = resolveMaxDurationMinutes(mergedProps);
 
   let items = await readVideoUrlsFromFile(inputFile, {
     minDurationMinutes,
     maxDurationMinutes,
-    batchLimit,
     channelFolder: effectiveChannelName ?? undefined,
     email: mergedProps.email != null ? String(mergedProps.email) : undefined,
   });
@@ -720,10 +706,6 @@ async function main(props = {}) {
     );
   }
 
-  if (items.length > batchLimit) {
-    console.log(`\t> Giới hạn tối đa ${batchLimit} video per batch, bỏ qua ${items.length - batchLimit} link còn lại.`);
-    items = items.slice(0, batchLimit);
-  }
   console.log(`Đọc được ${items.length} link từ file. Bắt đầu xử lý tuần tự...\n`);
 
   if (videoType !== MAKE_VIDEO_MODE.FROM_AUDIO && videoType !== MAKE_VIDEO_MODE.REUP_FULL) {
@@ -739,7 +721,6 @@ async function main(props = {}) {
       result = await makeVideoFromAudio({
         inputFile,
         items,
-        batchLimit,
         thumbnailPrompt: mergedProps.thumbnailPrompt,
         ...buildMakeVideoFromAudioOptions(mergedProps, effectiveChannelName),
       });
@@ -748,7 +729,6 @@ async function main(props = {}) {
       result = await makeVideoFromFull({
         inputFile,
         items,
-        batchLimit,
         thumbnailPrompt: mergedProps.thumbnailPrompt,
         ...(mergedProps.overlay != null && String(mergedProps.overlay).trim() !== ''
           ? { overlay: String(mergedProps.overlay).trim() }
