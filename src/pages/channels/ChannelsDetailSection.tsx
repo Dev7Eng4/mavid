@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { CustomSelect } from '@/components/ui/CustomSelect';
 import { SpinnerIcon } from '@/components/ui/Icons';
 import { TablePaginationBar } from '@/components/ui/TablePaginationBar';
@@ -29,6 +30,20 @@ export function ChannelsDetailSection({
   startMarkingIndex,
   onSetStartFromRow,
 }: ChannelsDetailSectionProps) {
+  const [selectedRowIndices, setSelectedRowIndices] = useState<Set<number>>(new Set());
+
+  const toggleRowSelection = (index: number) => {
+    setSelectedRowIndices(prev => {
+      const next = new Set(prev);
+      if (next.has(index)) {
+        next.delete(index);
+      } else {
+        next.add(index);
+      }
+      return next;
+    });
+  };
+
   const lk = detailLayout.linkVideoKey;
   const dk = detailLayout.durationKey;
   const sk = detailLayout.statusKey;
@@ -157,47 +172,67 @@ export function ChannelsDetailSection({
                   pageDetailRows.map(({ row, originalIndex }) => (
                     <tr
                       key={originalIndex}
-                      className='transition-colors duration-150'
-                      style={{ borderBottom: '1px solid var(--border)' }}
+                      className='transition-colors duration-150 cursor-pointer'
+                      style={{
+                        borderBottom: '1px solid var(--border)',
+                        background: selectedRowIndices.has(originalIndex) ? 'var(--hover-bg)' : 'transparent',
+                      }}
                       onMouseEnter={e => {
                         e.currentTarget.style.background = 'var(--hover-bg)';
                       }}
                       onMouseLeave={e => {
-                        e.currentTarget.style.background = 'transparent';
+                        e.currentTarget.style.background = selectedRowIndices.has(originalIndex)
+                          ? 'var(--hover-bg)'
+                          : 'transparent';
+                      }}
+                      onClick={e => {
+                        if (window.getSelection()?.toString()) return;
+                        if ((e.target as HTMLElement).closest('button, a')) return;
+                        toggleRowSelection(originalIndex);
                       }}
                     >
-                      {detailLayout.tableHeaders.map(h => {
+                      {detailLayout.tableHeaders.map((h, colIndex) => {
                         const isStartCol = canSetStartFrom && detailLayout.startFromKey === h;
                         if (isStartCol) {
                           const marked = String(row[h] ?? '').trim();
                           return (
                             <td key={h} className='px-4 py-3 align-top min-w-28'>
-                              <div className='flex flex-col gap-2 items-start'>
-                                {marked ? (
-                                  <span className='text-sm font-medium uppercase tracking-wider' style={{ color: 'var(--accent)' }}>
-                                    Điểm bắt đầu
-                                  </span>
-                                ) : null}
-                                <button
-                                  type='button'
-                                  disabled={startMarkingIndex !== null}
-                                  onClick={() => void onSetStartFromRow(originalIndex)}
-                                  className='rounded-lg px-3 py-1.5 text-base font-medium cursor-pointer transition-opacity duration-150 disabled:opacity-40 disabled:cursor-not-allowed'
-                                  style={{
-                                    color: '#fff',
-                                    background: 'var(--accent)',
-                                    border: '1px solid var(--accent)',
-                                  }}
-                                >
-                                  {startMarkingIndex === originalIndex ? (
-                                    <span className='inline-flex items-center gap-2'>
-                                      <SpinnerIcon className='w-3.5 h-3.5' />
-                                      Đang lưu…
+                              <div className='flex items-start gap-2'>
+                                {colIndex === 0 && (
+                                  <input
+                                    type='checkbox'
+                                    className='mt-1 cursor-pointer w-4 h-4 shrink-0'
+                                    checked={selectedRowIndices.has(originalIndex)}
+                                    readOnly
+                                  />
+                                )}
+                                <div className='flex flex-col gap-2 items-start'>
+                                  {marked ? (
+                                    <span className='text-sm font-medium uppercase tracking-wider' style={{ color: 'var(--accent)' }}>
+                                      Điểm bắt đầu
                                     </span>
-                                  ) : (
-                                    'Start'
-                                  )}
-                                </button>
+                                  ) : null}
+                                  <button
+                                    type='button'
+                                    disabled={startMarkingIndex !== null}
+                                    onClick={() => void onSetStartFromRow(originalIndex)}
+                                    className='rounded-lg px-3 py-1.5 text-base font-medium cursor-pointer transition-opacity duration-150 disabled:opacity-40 disabled:cursor-not-allowed'
+                                    style={{
+                                      color: '#fff',
+                                      background: 'var(--accent)',
+                                      border: '1px solid var(--accent)',
+                                    }}
+                                  >
+                                    {startMarkingIndex === originalIndex ? (
+                                      <span className='inline-flex items-center gap-2'>
+                                        <SpinnerIcon className='w-3.5 h-3.5' />
+                                        Đang lưu…
+                                      </span>
+                                    ) : (
+                                      'Start'
+                                    )}
+                                  </button>
+                                </div>
                               </div>
                             </td>
                           );
@@ -209,7 +244,17 @@ export function ChannelsDetailSection({
                             style={{ color: 'var(--text-h)' }}
                             title={String(row[h] ?? '')}
                           >
-                            {String(row[h] ?? '')}
+                            <div className='flex items-start gap-2'>
+                              {colIndex === 0 && (
+                                <input
+                                  type='checkbox'
+                                  className='mt-1 cursor-pointer w-4 h-4 shrink-0'
+                                  checked={selectedRowIndices.has(originalIndex)}
+                                  readOnly
+                                />
+                              )}
+                              <span className='flex-1 break-all'>{String(row[h] ?? '')}</span>
+                            </div>
                           </td>
                         );
                       })}
