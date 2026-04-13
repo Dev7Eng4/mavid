@@ -165,7 +165,7 @@ function ChannelsPage() {
         setIndexSaving(false);
       }
     },
-    [canWriteIndex, indexHeaders, loadIndex]
+    [canWriteIndex, indexHeaders, loadIndex],
   );
 
   type IndexCreateVideoQueueEntry = { row: ChannelRow; folder: string; videoType: 'from_audio' | 'reup_full' };
@@ -258,14 +258,14 @@ function ChannelsPage() {
           setIndexListError(
             failures.length === queue.length
               ? `Tất cả ${failures.length} kênh lỗi: ${failures.slice(0, 3).join(' ')}${failures.length > 3 ? '…' : ''}`
-              : `Một số kênh lỗi (${failures.length}/${queue.length}): ${failures.slice(0, 4).join(' ')}${failures.length > 4 ? '…' : ''}`
+              : `Một số kênh lỗi (${failures.length}/${queue.length}): ${failures.slice(0, 4).join(' ')}${failures.length > 4 ? '…' : ''}`,
           );
         }
       } finally {
         setIndexBatchVideo(null);
       }
     },
-    [indexHeaders, indexBackgrounds]
+    [indexHeaders, indexBackgrounds],
   );
 
   const detailLayout = useMemo(() => {
@@ -357,7 +357,7 @@ function ChannelsPage() {
   const indexPag = useClientPagination(indexDraftRows.length);
   const pageIndexRows = useMemo(
     () => indexDraftRows.slice(indexPag.startIndex, indexPag.startIndex + indexPag.pageSize),
-    [indexDraftRows, indexPag.startIndex, indexPag.pageSize]
+    [indexDraftRows, indexPag.startIndex, indexPag.pageSize],
   );
 
   const {
@@ -374,7 +374,7 @@ function ChannelsPage() {
 
   const pageDetailRows = useMemo(
     () => filteredRowsWithIndex.slice(detailStartIndex, detailStartIndex + detailPageSize),
-    [filteredRowsWithIndex, detailStartIndex, detailPageSize]
+    [filteredRowsWithIndex, detailStartIndex, detailPageSize],
   );
 
   const canSetStartFrom = Boolean(detail?.fileName?.toLowerCase().endsWith('.xlsx') && detailLayout.startFromKey);
@@ -400,8 +400,8 @@ function ChannelsPage() {
   const detailTheadHeaders = detailLoading
     ? DETAIL_TABLE_LOADING_HEADERS
     : detailLayout.tableHeaders.length > 0
-    ? detailLayout.tableHeaders
-    : ['—'];
+      ? detailLayout.tableHeaders
+      : ['—'];
 
   const detailColCount = Math.max(detailTheadHeaders.length, 1);
 
@@ -607,11 +607,11 @@ function ChannelsPage() {
               const p = payloads[0];
               const n = p.totalVideos == null ? 'tất cả thư mục con có .mp4' : String(p.totalVideos);
               setUploadScheduleInfo(
-                `Upload YouTube đã chạy xong — kênh «${p.channelFolder}», profile GPM ${p.gpmProfileId} (theo email ↔ name), tối đa ${n}. Kiểm tra GPM / YouTube Studio và tab Logs.`
+                `Upload YouTube đã chạy xong — kênh «${p.channelFolder}», profile GPM ${p.gpmProfileId} (theo email ↔ name), tối đa ${n}. Kiểm tra GPM / YouTube Studio và tab Logs.`,
               );
             } else if (payloads.length > 1) {
               setUploadScheduleInfo(
-                `Upload YouTube đồng loạt đã chạy xong cho ${payloads.length} kênh. Kiểm tra GPM / YouTube Studio và tab Logs.`
+                `Upload YouTube đồng loạt đã chạy xong cho ${payloads.length} kênh. Kiểm tra GPM / YouTube Studio và tab Logs.`,
               );
             }
           }}

@@ -98,3 +98,134 @@ OUTPUT:
 - Enhanced version of the original image
 - Preserving core elements and structure
 `;
+
+export const promptToCreateThumbnail = (title, summary) => `
+You are an expert Japanese YouTube thumbnail designer and visual editor.
+
+Your task is to CREATE A NEW THUMBNAIL by editing the provided reference image.
+
+INPUT:
+- Reference Image (attached)
+- Title: ${title}
+- Summary: ${summary}
+--------------------------------------------------
+CORE RULE (HIGHEST PRIORITY – MUST FOLLOW):
+
+You MUST PRESERVE the EXACT SAME CHARACTERS from the reference image.
+
+- Keep identical face identity, facial structure, hairstyle, hair color, outfit, and overall design.
+- DO NOT redesign or reinterpret the characters.
+- DO NOT change them into another person.
+- DO NOT change art style of the characters.
+- Treat the reference image as the ONLY source of truth.
+
+If uncertain, COPY the character appearance from the reference image instead of generating new ones.
+
+Allowed changes ONLY:
+- facial expression (emotion)
+- pose / body language
+- position in the frame
+- lighting / color / effects
+- scene context (background)
+
+--------------------------------------------------
+ANTI-DRIFT CONSTRAINTS:
+
+- Image-to-image transformation strength MUST be LOW (preserve identity strongly).
+- Keep 90–100% visual similarity of characters.
+- Do NOT add new main characters.
+- Do NOT crop out important facial features.
+- Avoid distortion, mutation, or style shift.
+
+--------------------------------------------------
+AUTO CONTENT UNDERSTANDING:
+
+- Analyze Title + Summary to detect the content type automatically:
+  (drama, betrayal, horror, romance, revenge, comedy, mystery, etc.)
+
+- Select the MOST emotionally intense or curiosity-driven moment.
+
+- Build the thumbnail around:
+  → conflict
+  → emotional peak
+  → unexpected situation
+
+--------------------------------------------------
+EMOTION DESIGN (CRITICAL FOR CTR):
+
+- Strong exaggerated expressions:
+  shock, rage, fear, panic, crying, smug, guilt
+
+- Eyes must be highly expressive and sharp
+- Emotion must be readable at small thumbnail size
+
+--------------------------------------------------
+COMPOSITION (HIGH CTR):
+
+- Focus on 1 main scene only
+- Close-up or medium shot (faces clearly visible)
+- Use asymmetric layout (one dominant subject, one reacting)
+- Clear foreground vs background separation
+- Avoid clutter
+
+--------------------------------------------------
+JAPANESE THUMBNAIL STYLE:
+
+- Automatically adapt style based on content:
+  - drama → cinematic / realistic
+  - 2ch → manga/anime exaggerated
+  - horror → dark, high contrast
+  - romance → softer lighting
+
+- Add short Japanese text (3–6 words max):
+  - bold, large, readable on mobile
+  - curiosity-driven, NOT full sentence
+
+Examples:
+「裏切り!?」
+「何が起きた」
+「衝撃の真実」
+「まさか…」
+
+--------------------------------------------------
+VISUAL IMPACT:
+
+- High contrast lighting
+- Dramatic shadows / rim light
+- Color storytelling:
+  red = danger / betrayal
+  blue = sadness
+  yellow = shock
+
+- Optional elements:
+  phone, message bubble, broken objects, symbolic hints
+
+--------------------------------------------------
+QUALITY:
+
+- ultra sharp
+- high resolution
+- cinematic lighting
+- clear focal point
+- optimized for small mobile view
+
+--------------------------------------------------
+NEGATIVE CONSTRAINTS:
+
+- no new characters
+- no face distortion
+- no identity change
+- no blurry image
+- no low contrast
+- no clutter
+- no unreadable text
+- no extreme violence or explicit content
+
+--------------------------------------------------
+OUTPUT:
+
+A high-CTR Japanese-style YouTube thumbnail that:
+- keeps EXACT SAME characters from the reference image
+- reflects the story from title + summary
+- maximizes curiosity and emotional impact
+`;

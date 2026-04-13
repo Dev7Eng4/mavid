@@ -148,7 +148,7 @@ export function buildExtraEnvForIndexChannelRow(
   folder: string,
   videoType: 'from_audio' | 'reup_full',
   bgList: string[],
-  opts?: { maxVideosPerBatch?: number }
+  opts?: { maxVideosPerBatch?: number },
 ): Record<string, string> {
   const maxBatch = opts?.maxVideosPerBatch ?? 5;
 
@@ -170,7 +170,7 @@ export function buildExtraEnvForIndexChannelRow(
         minDurationMinutes: 0,
         showLogo: false,
       },
-      bgList
+      bgList,
     );
   }
   const overlayReup = videoType === 'reup_full' ? bgRaw : '';
@@ -196,7 +196,7 @@ export function parseVideoPerDayCell(raw: unknown): VideoPerDayPreset {
   return '1';
 }
 
-/** Số ô giờ cần nhập (preset `1-2` → 3 ô: 1 + 2). */
+/** Số ô giờ cần nhập (`1`→1, `2`→2, `3`→3; preset `1-2` → 3 ô: 1 ngày thường + 2 cuối tuần). */
 export function timeSlotCountForVideoPerDayPreset(p: VideoPerDayPreset): number {
   return p === '1-2' ? 3 : Number(p);
 }
@@ -413,7 +413,7 @@ export function channelAddDialogInitialFromIndexRow(row: ChannelRow, headers: st
 export function buildChannelRowFromAddForm(
   headers: string[],
   input: ChannelAddFormInput,
-  opts?: { preserveChannelFromRow?: ChannelRow | null }
+  opts?: { preserveChannelFromRow?: ChannelRow | null },
 ): { row: ChannelRow; error?: string } {
   const row: ChannelRow = {};
   for (const h of headers) row[h] = '';

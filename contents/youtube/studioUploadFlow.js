@@ -295,7 +295,6 @@ export async function fillVideoDetails(page, videoFolderPath, showErrorLogs) {
  * @param {string} [mp4Path] — đường dẫn .mp4 để ffprobe lấy duration và điền Start time (duration − 17s)
  */
 export async function addRelatedVideo(page, _isNeedAddRelatedVideo = false, mp4Path, showErrorLogs) {
-  const ab = true;
   await clickElement(page, YOUTUBE_SELECTOR.btnAddVideoRelated);
   await delay(2000);
   try {
@@ -311,7 +310,7 @@ export async function addRelatedVideo(page, _isNeedAddRelatedVideo = false, mp4P
 
   await delay(200);
 
-  if (ab) {
+  if (_isNeedAddRelatedVideo) {
     await clickElement(page, YOUTUBE_SELECTOR.btnSelectElement);
     // await delay(500);
     await clickElement(page, YOUTUBE_SELECTOR.btnSelectVideo);
@@ -433,6 +432,23 @@ export async function chooseVisibility(page, ctx) {
     await page.keyboard.insertText(slot.time);
     await delay(500);
     await page.keyboard.press('Enter');
+  }
+
+  try {
+    await page.waitForFunction(
+      () => {
+        const el = document.querySelector(YOUTUBE_SELECTOR.progressUpload);
+
+        // Điều kiện 1: element không còn trong DOM
+        if (!el) return true;
+
+        // Điều kiện 2: có attribute aria-describedby
+        return el.hasAttribute('aria-describedby');
+      },
+      { timeout: 60000 },
+    );
+  } catch {
+    // showErrorLogs(`Không tìm thấy popup warning`);
   }
 
   await clickElement(page, YOUTUBE_SELECTOR.btnSaveSchedule);

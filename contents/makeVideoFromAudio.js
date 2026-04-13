@@ -4,8 +4,8 @@
  * - N video stock từ MaVidMedia/backgrounds/<tên> (VIDEO_STORAGE_ROOT trong settings; N = STOCK_VIDEO_COUNT, cat, dog, ...)
  * - Bước 1: chỉnh tempo audio (ffmpeg atempo; nhỏ hơn 1 = chậm hơn → thời lượng dài hơn)
  * - Độ dài video = độ dài audio (sau khi chỉnh tốc độ), loop video nếu không đủ
- * - Phụ đề: copy file .srt/.vtt từ downloads/ — nếu SPEED ≠ 1 sẽ tự động scale timestamps cho khớp tốc độ audio
- * - Ghép stock: crossfade (xfade) giữa các clip — clip cũ mờ dần, clip mới sáng dần
+ * - Phụ đề: copy file .srt/.vtt từ downloads/ — nếu SPEED ≠ 1 sẽ tự động scale timestamps; ASS dùng NotoSansJP-Black (viền ~6% cỡ chữ + bóng nhẹ)
+ * - Ghép stock: crossfade (xfade) giữa các clip — clip cũ mờ dần, clip mới sáng dần; encode nền stock dùng cùng encoder với bước merge (NVENC/AMF/QSV/libx264 theo hardware.util)
  * - Chỉ batch: đọc CSV/Excel, tải từng link rồi xử lý
  * - `main({ stockFolder, stockVideoCount, audioSpeed, showLogo, channel })` — xem JSDoc `main`
  */
@@ -25,28 +25,33 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.join(__dirname, '..');
 const DOWNLOADS_DIR = path.join(ROOT, 'downloads');
 const OUTPUT_DIR = path.join(ROOT, 'outputs');
+const SUBTITLE_FONT_FILE = path.join(ROOT, 'assets', 'fonts', 'NotoSansJP-Black.ttf');
+const SUBTITLE_FONT_DIR = path.join(ROOT, 'assets', 'fonts');
+/** Face name trong TTF — khớp NotoSansJP-Black.ttf (libass + ffmpeg `fontsdir`). */
+const SUBTITLE_FONT_ASS_NAME = 'Noto Sans JP Black';
 
-/** Mặc định tốc độ audio (atempo) khi không có options/env — dùng cho export SPEED (convertAudio CLI). */
-export const DEFAULT_AUDIO_SPEED = 0.91;
+/** Tốc độ phát audio (atempo): mỗi lần render chọn ngẫu nhiên trong khoảng này */
+const SPEED_MIN = 0.93;
+const SPEED_MAX = 0.95;
 
-function audioSpeedFromEnv() {
-  const env = parseFloat(process.env.MAVID_AUDIO_SPEED);
-  return Number.isFinite(env) && env > 0 ? env : DEFAULT_AUDIO_SPEED;
+/** @returns {number} Giá trị trong [SPEED_MIN, SPEED_MAX) */
+export function randomPlaybackSpeed() {
+  return SPEED_MIN + Math.random() * (SPEED_MAX - SPEED_MIN);
 }
 
 /**
- * Ưu tiên: `options.audioSpeed` → `MAVID_AUDIO_SPEED` → DEFAULT_AUDIO_SPEED.
+ * Ưu tiên: `options.audioSpeed` → `randomPlaybackSpeed()`.
  * @param {object} [options]
  * @param {number} [options.audioSpeed]
  */
 export function resolveAudioSpeed(options = {}) {
   const o = options.audioSpeed;
   if (o != null && Number.isFinite(Number(o)) && Number(o) > 0) return Number(o);
-  return audioSpeedFromEnv();
+  return randomPlaybackSpeed();
 }
 
-/** Dùng khi không gọi resolveAudioSpeed (vd. convertAudio chỉ đọc env). */
-export const SPEED = audioSpeedFromEnv();
+/** Một lần lấy mẫu khi load module (tương thích import cũ). */
+export const SPEED = randomPlaybackSpeed();
 
 function getDynamicStockVideoCount(audioDurationSec) {
   const minutes = audioDurationSec / 60;
@@ -73,7 +78,7 @@ function stockNormalizeFilterChain(inputLabel, outLabel) {
 /**
  * SPEED được dùng làm hệ số atempo cho audio.
  * Nhỏ hơn 1 = đọc chậm hơn → thời lượng dài hơn.
- * Ví dụ 0.91 → ~9.9% dài hơn.
+ * Ví dụ 0.94 → ~6.4% dài hơn.
  * Khi SPEED ≠ 1, timestamps trong SRT cũng được scale theo.
  */
 
@@ -86,13 +91,23 @@ function getImageFilesFromDir(dir) {
     .map(f => path.join(dir, f));
 }
 
+/** Cache kết quả ffprobe (theo mtime+size) để tránh spawn lặp khi lập kế hoạch nhiều clip stock */
+const mediaDurationCache = new Map();
+
 /**
  * Lấy duration (giây) của file media bằng ffprobe
  */
 function getDuration(filePath) {
+  if (!filePath || !fs.existsSync(filePath)) return 0;
+  const st = fs.statSync(filePath);
+  const cacheKey = `fmt:${filePath}:${st.mtimeMs}:${st.size}`;
+  if (mediaDurationCache.has(cacheKey)) return mediaDurationCache.get(cacheKey);
+
   const cmd = `ffprobe -v error -show_entries format=duration -of default=noprint_wrappers=1:nokey=1 "${filePath}"`;
   const result = execSync(cmd, { encoding: 'utf-8' }).trim();
-  return parseFloat(result) || 0;
+  const dur = parseFloat(result) || 0;
+  mediaDurationCache.set(cacheKey, dur);
+  return dur;
 }
 
 /**
@@ -100,11 +115,21 @@ function getDuration(filePath) {
  * Dùng cho file đã qua atempo: mọi chỗ “thời lượng để ghép video” phải gọi trên file đó, không phải MP3 gốc.
  */
 function getAudioDurationSeconds(filePath) {
+  if (!filePath || !fs.existsSync(filePath)) return 0;
+  const st = fs.statSync(filePath);
+  const cacheKey = `a0:${filePath}:${st.mtimeMs}:${st.size}`;
+  if (mediaDurationCache.has(cacheKey)) return mediaDurationCache.get(cacheKey);
+
   const streamCmd = `ffprobe -v error -select_streams a:0 -show_entries stream=duration -of default=noprint_wrappers=1:nokey=1 "${filePath}"`;
   const raw = execSync(streamCmd, { encoding: 'utf-8' }).trim();
   const streamDur = parseFloat(raw);
-  if (Number.isFinite(streamDur) && streamDur > 0) return streamDur;
-  return getDuration(filePath);
+  if (Number.isFinite(streamDur) && streamDur > 0) {
+    mediaDurationCache.set(cacheKey, streamDur);
+    return streamDur;
+  }
+  const fallback = getDuration(filePath);
+  mediaDurationCache.set(cacheKey, fallback);
+  return fallback;
 }
 
 /** Hiển thị m:ss (vd 13:08) — dùng log so sánh thời lượng */
@@ -218,7 +243,7 @@ function renderStockVideoWithCrossfades(segments, targetDuration, outputPath, fi
     } else {
       args.push('-i', segments[0].path);
     }
-    args.push('-vf', vf, '-t', String(targetDuration), '-c:v', 'libx264', '-crf', '18', '-preset', 'ultrafast', '-an', outputPath);
+    args.push('-vf', vf, '-t', String(targetDuration), ...GPU_INFO.videoEncodeArgs, '-an', outputPath);
     const r = spawnSync('ffmpeg', args, { stdio: 'inherit', shell: false });
     if (r.error) throw r.error;
     if (r.status !== 0) throw new Error(`ffmpeg thoát mã ${r.status}`);
@@ -263,14 +288,9 @@ function renderStockVideoWithCrossfades(segments, targetDuration, outputPath, fi
     '[vout]',
     '-t',
     String(targetDuration),
-    '-c:v',
-    'libx264',
-    '-crf',
-    '18',
-    '-preset',
-    'ultrafast',
+    ...GPU_INFO.videoEncodeArgs,
     '-an',
-    outputPath
+    outputPath,
   );
 
   const r = spawnSync('ffmpeg', args, { stdio: 'inherit', shell: false });
@@ -297,15 +317,15 @@ function buildSpeedAdjustedAudio(sourcePath, destPath, speed) {
   const pctChange = ((1 / speed - 1) * 100).toFixed(1);
   console.log(
     `Đang chỉnh tốc độ audio (SPEED=${speed}: ${speed < 1 ? 'chậm hơn → dài hơn' : 'nhanh hơn → ngắn hơn'} ~${Math.abs(
-      pctChange
-    )}%; dự kiến ~${formatClockDuration(expectedAfter)} / ${expectedAfter.toFixed(1)}s)...`
+      pctChange,
+    )}%; dự kiến ~${formatClockDuration(expectedAfter)} / ${expectedAfter.toFixed(1)}s)...`,
   );
   convertAudioFile(sourcePath, destPath, speed);
   const durAfter = getAudioDurationSeconds(destPath);
   console.log(
     `Sau chỉnh tốc độ: ${formatClockDuration(durBefore)} (${durBefore.toFixed(1)}s) → ${formatClockDuration(durAfter)} (${durAfter.toFixed(
-      1
-    )}s) | dự kiến ~${expectedAfter.toFixed(1)}s`
+      1,
+    )}s) | dự kiến ~${expectedAfter.toFixed(1)}s`,
   );
 }
 
@@ -349,6 +369,11 @@ function scaleSrtTimestamps(srtPath, outputSrtPath, speed) {
   console.log(`Đã scale SRT timestamps (factor=${factor.toFixed(4)}, speed=${speed}): ${path.basename(outputSrtPath)}`);
 }
 
+/** Đường dẫn cho filter ffmpeg `subtitles=` (Windows drive, dấu nháy). */
+function escapePathForFfmpegSubtitles(p) {
+  return p.replace(/\\/g, '/').replace(/:/g, '\\:').replace(/'/g, "'\\''");
+}
+
 /**
  * Chuyển SRT sang định dạng file ASS với cấu hình Style: Box nền Mờ, dễ đọc.
  * @param {string} srtPath - Đường dẫn file SRT đầu vào
@@ -357,6 +382,10 @@ function scaleSrtTimestamps(srtPath, outputSrtPath, speed) {
 function convertSrtToAss(srtPath, assPath) {
   const content = fs.readFileSync(srtPath, 'utf8');
   const cues = content.split(/\n\n+/).filter(Boolean);
+
+  const fontName = fs.existsSync(SUBTITLE_FONT_FILE) ? SUBTITLE_FONT_ASS_NAME : 'Arial';
+  const outlinePx = +(SUBTITLE.FONT_SIZE * 0.06).toFixed(2);
+  const shadowPx = 1.5;
 
   // Alignment=8 (Top Center) - chữ sẽ neo ở mép trên và văn bản mọc dần xuống dưới nếu nhiều dòng.
   // MarginV đo từ màn hình xuống mép trên chữ (= H_video - H_box + Padding_Top)
@@ -370,7 +399,7 @@ WrapStyle: 1
 
 [V4+ Styles]
 Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
-Style: Default,Arial,${SUBTITLE.FONT_SIZE},&H00FFFFFF,&H000000FF,&H00000000,&H00000000,-1,0,0,0,100,100,${SUBTITLE.CHAR_SPACING},0,1,2.0,0,8,${SUBTITLE.PADDING_HORIZONTAL},${SUBTITLE.PADDING_HORIZONTAL},${marginV},1
+Style: Default,${fontName},${SUBTITLE.FONT_SIZE},&H00FFFFFF,&H000000FF,&H00000000,&H00000000,0,0,0,0,100,100,${SUBTITLE.CHAR_SPACING},0,1,${outlinePx},${shadowPx},8,${SUBTITLE.PADDING_HORIZONTAL},${SUBTITLE.PADDING_HORIZONTAL},${marginV},1
 
 [Events]
 Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
@@ -446,13 +475,22 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
  * @param {string} [options.tags] - Tags gốc
  * @param {string} [options.url] - URL video (dùng cho lookup geminiByUrl)
  * @param {object} [options.geminiByUrl] - Map chứa metadata từ Gemini
- * @param {number} [options.audioSpeed] - atempo (bắt buộc truyền từ main)
+ * @param {number} [options.audioSpeed] - atempo; bỏ qua → `resolveAudioSpeed({})` (random)
  * @param {number} [options.stockVideoCount] - Số clip stock; 0 / undefined → getDynamicStockVideoCount
  * @param {string|null} [options.logoPath] - File logo (đã resolve); null → không vẽ logo
  */
 async function processOne(bgNameArg, options = {}) {
-  const { perVideoDir, originalTitle, description, tags, url, geminiByUrl, audioSpeed: speedIn, stockVideoCount: stockCountOpt, logoPath: logoPathOpt } =
-    options;
+  const {
+    perVideoDir,
+    originalTitle,
+    description,
+    tags,
+    url,
+    geminiByUrl,
+    audioSpeed: speedIn,
+    stockVideoCount: stockCountOpt,
+    logoPath: logoPathOpt,
+  } = options;
   const speed = speedIn != null && Number.isFinite(Number(speedIn)) && Number(speedIn) > 0 ? Number(speedIn) : resolveAudioSpeed({});
   const stockBgRoot = resolveStockBackgroundsDir();
   let backgroundName = bgNameArg || 'cat';
@@ -469,7 +507,7 @@ async function processOne(bgNameArg, options = {}) {
   }
   if (!fs.existsSync(backgroundsDir)) {
     throw new Error(
-      `Không tìm thấy folder stock "${backgroundName}" trong ${stockBgRoot}/ — kiểm tra Settings (VIDEO_STORAGE_ROOT) và tạo thư mục con tương ứng.`
+      `Không tìm thấy folder stock "${backgroundName}" trong ${stockBgRoot}/ — kiểm tra Settings (VIDEO_STORAGE_ROOT) và tạo thư mục con tương ứng.`,
     );
   }
 
@@ -488,8 +526,8 @@ async function processOne(bgNameArg, options = {}) {
   const audioDurationAfterTempo = getAudioDurationSeconds(workingAudioPath);
   console.log(
     `Thời lượng audio sau SPEED=${speed} (dùng cho stock + merge): ${formatClockDuration(
-      audioDurationAfterTempo
-    )} (${audioDurationAfterTempo.toFixed(1)}s) — ${path.basename(workingAudioPath)}`
+      audioDurationAfterTempo,
+    )} (${audioDurationAfterTempo.toFixed(1)}s) — ${path.basename(workingAudioPath)}`,
   );
 
   // 2. Lấy video stock dựa trên thời lượng MỚI
@@ -524,11 +562,11 @@ async function processOne(bgNameArg, options = {}) {
     const fadeHint = Math.max(0.15, Math.min(STOCK_VIDEO.CROSSFADE_SEC, minSegDur * 0.45));
     console.log(
       `Đang tạo nền stock (${stockSegments.length} clip, crossfade ~${fadeHint.toFixed(2)}s; độ dài xfade ≥ ${stockRenderTarget.toFixed(
-        1
-      )}s)...`
+        1,
+      )}s) — encode: ${GPU_INFO.encoderLabel}...`,
     );
   } else {
-    console.log('Đang tạo nền stock (1 clip, loop nếu clip ngắn hơn audio)...');
+    console.log(`Đang tạo nền stock (1 clip, loop nếu clip ngắn hơn audio) — encode: ${GPU_INFO.encoderLabel}...`);
   }
   renderStockVideoWithCrossfades(stockSegments, stockRenderTarget, tempVideoPath, xfadeFilterPath);
   if (fs.existsSync(xfadeFilterPath)) fs.unlinkSync(xfadeFilterPath);
@@ -544,7 +582,8 @@ async function processOne(bgNameArg, options = {}) {
     if (!hasLogo) return inputLabel;
     const r = Math.floor(LOGO.SIZE / 2);
     const geqExpr = `if(lte(hypot(X-W/2,Y-H/2),${r}),255,0)`;
-    return `[2:v]scale=${LOGO.SIZE}:${LOGO.SIZE},format=rgba,geq=r='r(X,Y)':g='g(X,Y)':b='b(X,Y)':a='${geqExpr}'[logo];[${inputLabel}][logo]overlay=main_w-overlay_w-${LOGO.MARGIN_RIGHT}:${LOGO.MARGIN_TOP}[vout]`;
+    // scale nhỏ (LOGO.SIZE) — fast_bilinear đủ, nhẹ hơn so với mặc định
+    return `[2:v]scale=${LOGO.SIZE}:${LOGO.SIZE}:flags=fast_bilinear,format=rgba,geq=r='r(X,Y)':g='g(X,Y)':b='b(X,Y)':a='${geqExpr}'[logo];[${inputLabel}][logo]overlay=main_w-overlay_w-${LOGO.MARGIN_RIGHT}:${LOGO.MARGIN_TOP}[vout]`;
   };
 
   const mergeEncoderLabel = GPU_INFO.encoderLabel;
@@ -552,9 +591,12 @@ async function processOne(bgNameArg, options = {}) {
   if (subtitlePath) {
     convertSrtToAss(subtitlePath, tempSubPath);
 
-    const subPathEscaped = tempSubPath.replace(/\\/g, '/').replace(/:/g, '\\:').replace(/'/g, "'\\''");
+    const subPathEscaped = escapePathForFfmpegSubtitles(tempSubPath);
+    const fontsDirEscaped = escapePathForFfmpegSubtitles(SUBTITLE_FONT_DIR);
     const drawboxFilter = `drawbox=x=0:y=ih-h:w=iw:h=${SUBTITLE.BOX_HEIGHT}:color=black@${SUBTITLE.BOX_OPACITY}:t=fill`;
-    const subFilter = `subtitles='${subPathEscaped}'`;
+    const subFilter = fs.existsSync(SUBTITLE_FONT_FILE)
+      ? `subtitles='${subPathEscaped}:fontsdir=${fontsDirEscaped}'`
+      : `subtitles='${subPathEscaped}'`;
 
     const v1 = `${videoToScale};[vpadded]${drawboxFilter}[v1b];[v1b]${subFilter}[v2]`;
     const filterComplexFinal = hasLogo ? v1 + `;${buildLogoOverlay('v2')}` : v1 + ';[v2]copy[vout]';
@@ -571,7 +613,7 @@ async function processOne(bgNameArg, options = {}) {
       ...videoEncodeArgs,
       '-t',
       String(audioDurationAfterTempo),
-      outputPath
+      outputPath,
     );
 
     console.log(`Đang merge video + audio + subtitle ASS (720p, ${mergeEncoderLabel})` + (hasLogo ? ' + logo...' : '...'));
@@ -596,7 +638,7 @@ async function processOne(bgNameArg, options = {}) {
       ...videoEncodeArgs,
       '-t',
       String(audioDurationAfterTempo),
-      outputPath
+      outputPath,
     );
 
     console.log(`Đang merge video + audio (720p, ${mergeEncoderLabel})` + (hasLogo ? ' + logo...' : '...'));
@@ -706,7 +748,7 @@ function pickStockVideoCountOverride(mainOptions) {
  *
  * @param {object} [options]
  * @param {number} [options.stockVideoCount] — Số clip stock; bỏ qua hoặc 0 → `getDynamicStockVideoCount` theo độ dài audio
- * @param {number} [options.audioSpeed] — atempo; mặc định 0.91 hoặc `MAVID_AUDIO_SPEED`
+ * @param {number} [options.audioSpeed] — atempo; không set → `randomPlaybackSpeed()`
  * @param {string} [options.stockFolder] — Tên folder trong MaVidMedia/backgrounds (mặc định cat hoặc MAVID_BACKGROUND)
  * @param {boolean} [options.showLogo] — true: lấy ảnh logo trong `MaVidMedia/channels/{channel}`; false: không logo
  * @param {string} [options.channel] — Tên folder channel (kèm showLogo / MAVID_SHOW_LOGO=1)
@@ -727,7 +769,10 @@ async function main(options = {}) {
   const { downloadSingleVideo } = await import('./downloadVideo.js');
 
   const defaultStockFolder = resolveDefaultStockFolder(options);
-  const batchAudioSpeed = resolveAudioSpeed(options);
+  const batchAudioSpeedOverride =
+    options.audioSpeed != null && Number.isFinite(Number(options.audioSpeed)) && Number(options.audioSpeed) > 0
+      ? Number(options.audioSpeed)
+      : undefined;
   const stockCountOverride = pickStockVideoCountOverride(options);
 
   // Tìm file thực tế được dùng để lấy thư mục đích (folder channel)
@@ -822,7 +867,7 @@ async function main(options = {}) {
           tags: result.tags,
           url,
           geminiByUrl,
-          audioSpeed: batchAudioSpeed,
+          audioSpeed: batchAudioSpeedOverride,
           stockVideoCount: stockCountOverride,
         });
         console.log(`ĐÃ HOÀN THÀNH VIDEO: ${url}`);
