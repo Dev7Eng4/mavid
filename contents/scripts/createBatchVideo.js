@@ -31,6 +31,20 @@ function resolveMaxDurationMinutes(props = {}) {
 }
 
 /**
+ * Số video tối đa mỗi lượt — 0 = không giới hạn (xử lý hết danh sách).
+ * Env: MAVID_MAX_VIDEOS_PER_BATCH; props.maxVideosPerBatch ưu tiên hơn env.
+ */
+function resolveMaxVideosPerBatch(props = {}) {
+  const raw = props.maxVideosPerBatch ?? process.env.MAVID_MAX_VIDEOS_PER_BATCH;
+  if (raw === undefined || raw === null) return 0;
+  const s = String(raw).trim();
+  if (s === '') return 0;
+  const n = Number(s);
+  if (!Number.isFinite(n) || n < 1) return 0;
+  return Math.min(100, Math.floor(n));
+}
+
+/**
  * Tự động tìm GPM Profile ID bằng cách khớp Name Profile = Email trong config.
  * @param {string} email
  * @returns {Promise<string | null>}
@@ -587,6 +601,7 @@ function buildMakeVideoFromAudioOptions(props, channelFolderName) {
  * @param {string|number} [props.videoCropPercent] — (reup_full) VIDEO_CROP_PERCENT
  * @param {number} [props.minDurationMinutes] — chỉ xử lý video có độ dài (cột DURATION) ≥ N phút; 0 = không lọc; env MAVID_MIN_DURATION_MINUTES
  * @param {number} [props.maxDurationMinutes] — chỉ xử lý video có độ dài (cột DURATION) ≤ N phút; 0 = không lọc; env MAVID_MAX_DURATION_MINUTES
+ * @param {number} [props.maxVideosPerBatch] — tối đa N video mỗi lượt; env MAVID_MAX_VIDEOS_PER_BATCH; 0/không set = không giới hạn
  */
 async function main(props = {}) {
   const { MAKE_VIDEO_MODE } = await import('../constants/index.js');
@@ -682,13 +697,21 @@ async function main(props = {}) {
   const { videoType } = mergedProps;
   const minDurationMinutes = resolveMinDurationMinutes(mergedProps);
   const maxDurationMinutes = resolveMaxDurationMinutes(mergedProps);
+  const maxVideosThisRun = resolveMaxVideosPerBatch(mergedProps);
 
   let items = await readVideoUrlsFromFile(inputFile, {
     minDurationMinutes,
     maxDurationMinutes,
     channelFolder: effectiveChannelName ?? undefined,
     email: mergedProps.email != null ? String(mergedProps.email) : undefined,
+    ...(maxVideosThisRun > 0 ? { batchLimit: maxVideosThisRun } : {}),
   });
+  if (maxVideosThisRun > 0 && items.length > maxVideosThisRun) {
+    console.log(
+      `[MaVid] Giới hạn ${maxVideosThisRun} video/lượt (MAVID_MAX_VIDEOS_PER_BATCH) — xử lý ${maxVideosThisRun}/${items.length} link.`
+    );
+    items = items.slice(0, maxVideosThisRun);
+  }
   if (minDurationMinutes > 0 || maxDurationMinutes > 0) {
     const parts = [];
     if (minDurationMinutes > 0) parts.push(`≥ ${minDurationMinutes} phút`);

@@ -65,3 +65,93 @@ export const createThumbnailFromImage = (title, niche, summary) => `
 * 구도:
 * 강조 요소:
 `;
+
+export const promptToCreateThumbnail = (title, summary) => `
+You are an expert Korean YouTube thumbnail designer and digital artist specializing in "K-Drama" aesthetics and "Variety Show" visual hooks.
+
+Your task is to CREATE A NEW THUMBNAIL by editing the provided reference image to maximize CTR for the South Korean market.
+
+INPUT:
+- Reference Image (attached)
+- Title: ${title}
+- Summary: ${summary}
+--------------------------------------------------
+CORE RULE (HIGHEST PRIORITY):
+
+You MUST PRESERVE the EXACT SAME CHARACTERS from the reference image.
+- Absolute face identity consistency is mandatory.
+- Keep the same hair color, hairstyle, and facial features.
+- Maintain the original art style (do not switch from 2D to 3D or vice-versa).
+- Treat the reference image as a strict template for character appearance.
+
+Allowed changes:
+- Facial expressions (must be more intense/dramatic)
+- Body pose and hand gestures
+- Lighting and color grading
+- Background environment (K-style interiors, urban Seoul, or dramatic voids)
+
+--------------------------------------------------
+KOREAN "SAIDA" (REFRESHING) & DRAMA VIBE:
+
+- Analyze Title + Summary to detect tone:
+  (Saida/Revenge, K-Drama, Mystery, Reality Show, Health/Info)
+
+- Apply Korean "Kkam-jjak" (Surprise) factor:
+  → Focus on the "Reaction" (Face) vs the "Action" (Situation).
+  → For revenge stories: Use a "Smug/Cold" vs "Despair" contrast.
+  → For info/health: Use a "Shocking/Warning" vs "Solution" visual.
+
+--------------------------------------------------
+EMOTION DESIGN (K-VARIETY STYLE):
+
+- Exaggerated but "Aesthetic" expressions:
+  - The "Gasp" (Hand over mouth)
+  - The "Cold Stare" (High-angle lighting)
+  - The "Tearful Rage" (Subtle redness around eyes)
+- Eyes must be sharp and looking slightly off-camera or at the "Problem" object to create curiosity.
+
+--------------------------------------------------
+KOREAN TYPOGRAPHY & LAYOUT:
+
+- Adapt the text style to Korean YouTube trends:
+  - Use BOLD, modern Sans-serif (like Black Han Sans or Gmarket Sans style).
+  - Use "Subtitle Backgrounds" (rounded rectangles behind text) like Korean TV shows.
+  - Text should be 2-5 words max, using high-impact Korean slang/hooks.
+
+Examples of Korean Hooks:
+- 「진짜 역대급...」 (Truly legendary...)
+- 「결국 터졌다」 (It finally exploded/happened)
+- 「소름돋는 반전」 (Goosebumps-inducing twist)
+- 「참교육 완료」 (True education/Justice served)
+- 「충격 실화」 (Shocking true story)
+
+--------------------------------------------------
+VISUAL AESTHETICS (K-STYLE):
+
+- Color Palette: 
+  - Use "Cinematic Teal & Orange" for drama.
+  - Use high-saturation Red/Yellow for "Breaking News" or "Warning" vibes.
+  - Clean, soft-focus backgrounds (Bokeh) to make characters pop.
+- UI Elements:
+  - If relevant, add KakaoTalk-style message bubbles or YouTube "Search Bar" overlays.
+  - Use "Impact lines" but keep them subtle and professional, not messy.
+
+--------------------------------------------------
+COMPOSITION:
+
+- Rule of thirds: Character on the left/right, text/object on the opposite.
+- "Face-Close-up": Ensure the face occupies at least 40% of the height.
+- Depth of Field: Strong separation between foreground and background.
+
+--------------------------------------------------
+NEGATIVE CONSTRAINTS:
+- NO identity drift (character must be 100% recognizable).
+- NO messy or cluttered backgrounds.
+- NO low-quality font styles.
+- NO distortion of facial proportions.
+- NO generic AI-looking "perfect" faces that lose the reference's soul.
+
+--------------------------------------------------
+OUTPUT:
+A high-CTR Korean-style thumbnail that looks like a professional Web-Drama poster or a top-tier Korean YouTube channel (e.g., short-drama or commentary style).
+`;

@@ -48,6 +48,17 @@ export function headerNorm(h: string): string {
   return String(h).trim().toUpperCase();
 }
 
+/** Trạng thái vòng đời kênh trong `index.xlsx` (cột STATUS). */
+export type ChannelIndexLifecycleStatus = 'INIT' | 'LIVE' | 'STOPPED';
+
+export function normalizeChannelIndexStatus(raw: unknown): ChannelIndexLifecycleStatus {
+  const v = String(raw ?? '')
+    .trim()
+    .toUpperCase();
+  if (v === 'INIT' || v === 'LIVE' || v === 'STOPPED') return v;
+  return 'INIT';
+}
+
 export function findIndexHeaderKey(headers: string[], normName: string): string | undefined {
   const n = normName.trim().toUpperCase();
   return headers.find(h => headerNorm(h) === n);
@@ -213,6 +224,8 @@ export function labelForPublishTimeSlot(preset: VideoPerDayPreset, index: number
 export interface ChannelAddFormInput {
   channelUrl: string;
   email: string;
+  /** Cột index «KÊNH CỦA TÔI» (sau EMAIL). */
+  myChannel: string;
   videoType: 'from_audio' | 'reup_full';
   durationOption: string;
   /** from_audio — tên folder trong MaVidMedia/backgrounds */
@@ -225,12 +238,15 @@ export interface ChannelAddFormInput {
   publishTimes: string[];
   /** Nếu có — ghi đè suy luận từ URL cho ID/CHANNEL */
   folderIdOverride: string;
+  /** Cột STATUS index (INIT | LIVE | STOPPED). */
+  channelStatus: string;
 }
 
 /** Giá trị khởi tạo form thêm/sửa kênh (map từ một dòng index). */
 export interface ChannelAddDialogInitialFields {
   channelUrl: string;
   email: string;
+  myChannel: string;
   videoType: string;
   /** Chuỗi cấu hình duration (vd. "0_30"). */
   durationOption: string;
@@ -242,6 +258,7 @@ export interface ChannelAddDialogInitialFields {
   folderIdOverride: string;
   videosPerDayPreset: VideoPerDayPreset;
   publishTimes: string[];
+  channelStatus: ChannelIndexLifecycleStatus;
 }
 
 /** Danh sách NAME hợp lệ cho dropdown Reup (đồng bộ makeVideoFromFull). */
@@ -360,6 +377,9 @@ export function channelAddDialogInitialFromIndexRow(row: ChannelRow, headers: st
   const emailKey = findIndexHeaderKey(headers, 'EMAIL');
   const email = emailKey ? String(row[emailKey] ?? '').trim() : '';
 
+  const myChannelKey = findIndexHeaderKey(headers, 'KÊNH CỦA TÔI');
+  const myChannel = myChannelKey ? String(row[myChannelKey] ?? '').trim() : '';
+
   let videoType = resolveIndexRowVideoType(row, headers);
   if (!videoType) videoType = 'from_audio';
 
@@ -396,9 +416,12 @@ export function channelAddDialogInitialFromIndexRow(row: ChannelRow, headers: st
   while (publishTimes.length < slotCount) publishTimes.push('09:00');
   publishTimes = publishTimes.slice(0, slotCount);
 
+  const statusKey = findIndexHeaderKey(headers, 'STATUS');
+
   return {
     channelUrl,
     email,
+    myChannel,
     videoType,
     durationOption,
     selectedBackground,
@@ -407,6 +430,7 @@ export function channelAddDialogInitialFromIndexRow(row: ChannelRow, headers: st
     folderIdOverride: folder,
     videosPerDayPreset,
     publishTimes,
+    channelStatus: statusKey ? normalizeChannelIndexStatus(row[statusKey]) : 'INIT',
   };
 }
 
@@ -437,6 +461,9 @@ export function buildChannelRowFromAddForm(
   const emailKey = findIndexHeaderKey(headers, 'EMAIL');
   if (emailKey) row[emailKey] = input.email.trim();
 
+  const myChannelKey = findIndexHeaderKey(headers, 'KÊNH CỦA TÔI');
+  if (myChannelKey) row[myChannelKey] = input.myChannel.trim();
+
   const videoTypeColumnKey = findIndexHeaderKey(headers, 'LOẠI VIDEO');
   if (videoTypeColumnKey) row[videoTypeColumnKey] = input.videoType;
 
@@ -462,6 +489,9 @@ export function buildChannelRowFromAddForm(
 
   const publishTimesColumnKey = findIndexHeaderKeyAny(headers, ['GIỜ UPDATE', 'GIỜ UPLOAD MỖI NGÀY', 'GIỜ UPLOAD']);
   if (publishTimesColumnKey) row[publishTimesColumnKey] = input.publishTimes.join(', ');
+
+  const statusKey = findIndexHeaderKey(headers, 'STATUS');
+  if (statusKey) row[statusKey] = normalizeChannelIndexStatus(input.channelStatus);
 
   return { row };
 }

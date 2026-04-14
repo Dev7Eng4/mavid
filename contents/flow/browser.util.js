@@ -32,7 +32,7 @@ export async function openFlowPage(page, projectUrl) {
  * @param {object} [setting] — merge lên flowSettings
  * @param {boolean} [isNeedImage]
  */
-export async function generateImageWithFlow(prompt, pathSave, exportName, setting = {}, isNeedImage = false) {
+export async function generateImageWithFlow(prompt, pathSave, exportName, setting = {}, isNeedImage = false, pathOldImage) {
   const cfg = { ...flowSettings, ...setting };
   const chromeProfile = resolveFlowChromeProfile(cfg);
   console.log('🔄 Đang generate ảnh thumbnail từ Flow...');
@@ -99,7 +99,7 @@ export async function generateImageWithFlow(prompt, pathSave, exportName, settin
             return btn && !btn.disabled;
           },
           FLOW_SELECTOR.btnCreateHaveImage,
-          { timeout: 60000 },
+          { timeout: 60000 }
         );
         console.log('✅ Nút đã sẵn sàng!');
 
@@ -135,7 +135,7 @@ export async function generateImageWithFlow(prompt, pathSave, exportName, settin
           }
           return false;
         },
-        { timeout: 3 * 60 * 1000 },
+        { timeout: 3 * 60 * 1000 }
       ),
     ]);
 
