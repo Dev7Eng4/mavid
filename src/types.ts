@@ -194,7 +194,8 @@ export type DirectScriptId =
   | 'makeChromeProfile'
   | 'createThumbnailFlow'
   | 'summaryMetaFromTranscript'
-  | 'uploadYoutubeViaGpm';
+  | 'uploadYoutubeViaGpm'
+  | 'updateChannelVideosMeta';
 
 export interface ScriptResult<T = unknown> {
   success: boolean;

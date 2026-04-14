@@ -9,6 +9,7 @@ import { ChannelUploadVideoDialog, type ChannelUploadVideoPayload, type ChannelI
 import { ChannelsDetailSection } from './ChannelsDetailSection';
 import { DETAIL_TABLE_LOADING_HEADERS } from './channelsDetailSectionShared';
 import { ChannelsIndexSection } from './ChannelsIndexSection';
+import { CHANNELS_INDEX_TABLE_HEADERS } from './channelsIndexSection.model';
 import { ChannelsPageHeaderActions } from './ChannelsPageHeaderActions';
 import { durationPresetToSecRange, parseDurationToSeconds } from './channelDurationFormat';
 import { gpmApi } from '@/services';
@@ -18,7 +19,6 @@ import {
   channelFolderFromRow,
   findIndexHeaderKey,
   headerNorm,
-  indexRowMatchesPickedEmail,
   resolveIndexRowVideoType,
   SCRIPT_FROM_AUDIO,
   SCRIPT_REUP_FULL,
@@ -36,6 +36,7 @@ function ChannelsPage() {
   const [detailDurationPreset, setDetailDurationPreset] = useState('0_null');
   const [detailStatusFilter, setDetailStatusFilter] = useState<string>('__all__');
   const [startMarkingIndex, setStartMarkingIndex] = useState<number | null>(null);
+  const [detailUpdateMetaBusy, setDetailUpdateMetaBusy] = useState(false);
   const [detailActionError, setDetailActionError] = useState<string | null>(null);
 
   const [indexDraftRows, setIndexDraftRows] = useState<ChannelRow[]>([]);
@@ -69,11 +70,13 @@ function ChannelsPage() {
       const d = await window.runner.readChannelData(INDEX_FILE);
       setIndexData(d);
       setIndexDraftRows(d.rows?.map(r => ({ ...r })) ?? []);
+      setIndexSelectedRowIndices(new Set());
       setIndexListError(null);
       setIndexEditRowIndex(null);
     } catch {
       setIndexData({ headers: [], rows: [] });
       setIndexDraftRows([]);
+      setIndexSelectedRowIndices(new Set());
       setIndexEditRowIndex(null);
     } finally {
       setIndexLoading(false);
@@ -133,7 +136,10 @@ function ChannelsPage() {
     return ['ID', 'LINK', 'EMAIL', 'LAST UPLOAD'];
   }, [indexData]);
 
-  const indexColCount = Math.max(indexHeaders.length, 1) + 1;
+  /** Checkbox + các cột cố định (ID, …) — không còn cột Thao tác */
+  const indexColCount = 1 + CHANNELS_INDEX_TABLE_HEADERS.length;
+
+  const [indexSelectedRowIndices, setIndexSelectedRowIndices] = useState<Set<number>>(() => new Set());
 
   const canWriteIndex = typeof window.runner?.writeChannelIndex === 'function';
 
@@ -175,53 +181,67 @@ function ChannelsPage() {
     [canWriteIndex, indexHeaders, loadIndex]
   );
 
-  type IndexCreateVideoQueueEntry = { row: ChannelRow; folder: string; videoType: 'from_audio' | 'reup_full' };
+  type IndexCreateVideoQueueEntry = {
+    row: ChannelRow;
+    folder: string;
+    videoType: 'from_audio' | 'reup_full';
+    /** Chỉ số dòng trong `indexDraftRows` — khớp checkbox bảng index. */
+    draftRowIndex: number;
+  };
 
   const indexCreateVideoQueue = useMemo((): IndexCreateVideoQueueEntry[] => {
     const queue: IndexCreateVideoQueueEntry[] = [];
     const emailKey = findIndexHeaderKey(indexHeaders, 'EMAIL');
-    for (const row of indexDraftRows) {
+    for (let i = 0; i < indexDraftRows.length; i++) {
+      const row = indexDraftRows[i];
       const folder = channelFolderFromRow(row, indexHeaders);
       const email = emailKey ? String(row[emailKey] ?? '').trim() : '';
       const videoType = resolveIndexRowVideoType(row, indexHeaders);
       if (folder && email && videoType) {
-        queue.push({ row, folder, videoType: videoType as 'from_audio' | 'reup_full' });
+        queue.push({
+          row,
+          folder,
+          videoType: videoType as 'from_audio' | 'reup_full',
+          draftRowIndex: i,
+        });
       }
     }
     return queue;
   }, [indexDraftRows, indexHeaders]);
 
-  const createVideoDialogChannels = useMemo(() => {
-    const emailKey = findIndexHeaderKey(indexHeaders, 'EMAIL');
-    const byFolder = new Map<string, { types: Set<string>; emails: Set<string> }>();
-    for (const q of indexCreateVideoQueue) {
-      if (!byFolder.has(q.folder)) byFolder.set(q.folder, { types: new Set(), emails: new Set() });
-      const rec = byFolder.get(q.folder)!;
-      rec.types.add(q.videoType);
-      if (emailKey) {
-        const raw = String(q.row[emailKey] ?? '').trim();
-        raw
-          .split(',')
-          .map(e => e.trim())
-          .filter(Boolean)
-          .forEach(e => rec.emails.add(e));
-      }
-    }
-    return Array.from(byFolder.entries())
-      .map(([folder, { types, emails }]) => ({
-        folder,
-        emails: Array.from(emails).sort((a, b) => a.localeCompare(b, undefined, { sensitivity: 'base' })),
-        videoTypesLabel: [...types].sort((a, b) => a.localeCompare(b)).join(', '),
-      }))
-      .sort((a, b) => a.folder.localeCompare(b.folder, undefined, { sensitivity: 'base' }));
-  }, [indexCreateVideoQueue, indexHeaders]);
+  const createVideoQueueFromSelection = useMemo(
+    () => indexCreateVideoQueue.filter(q => indexSelectedRowIndices.has(q.draftRowIndex)),
+    [indexCreateVideoQueue, indexSelectedRowIndices]
+  );
+
+  const indexSingleSelectedRowIndex = useMemo((): number | null => {
+    if (indexSelectedRowIndices.size !== 1) return null;
+    const [only] = indexSelectedRowIndices;
+    return only ?? null;
+  }, [indexSelectedRowIndices]);
+
+  const indexSingleSelectedFolder = useMemo(() => {
+    if (indexSingleSelectedRowIndex == null) return null;
+    const row = indexDraftRows[indexSingleSelectedRowIndex];
+    if (!row) return null;
+    return channelFolderFromRow(row, indexHeaders);
+  }, [indexSingleSelectedRowIndex, indexDraftRows, indexHeaders]);
+
+  const openIndexEditForSingleSelection = useCallback(() => {
+    if (indexSingleSelectedRowIndex == null) return;
+    setIndexEditRowIndex(indexSingleSelectedRowIndex);
+  }, [indexSingleSelectedRowIndex]);
+
+  const openIndexDetailForSingleSelection = useCallback(() => {
+    const folder = indexSingleSelectedFolder?.trim();
+    if (!folder) return;
+    setSelectedChannel(folder);
+  }, [indexSingleSelectedFolder]);
 
   const canRunIndexBatchVideo = typeof window.runner?.runNpmScript === 'function';
 
   const runCreateVideoForQueue = useCallback(
     async (queue: IndexCreateVideoQueueEntry[], maxVideosPerBatch: number) => {
-      console.log('🚀 ~ ChannelsPage ~ maxVideosPerBatch:', maxVideosPerBatch);
-      console.log('🚀 ~ ChannelsPage ~ queue:', queue);
       if (!window.runner?.runNpmScript) {
         setIndexListError('Runner chưa sẵn sàng.');
         return;
@@ -237,7 +257,6 @@ function ChannelsPage() {
 
       try {
         for (let i = 0; i < queue.length; i++) {
-          console.log('runCreateVideoForQueue', queue[i]);
           const { row, folder, videoType } = queue[i];
           setIndexBatchVideo({ current: i + 1, total: queue.length, channelLabel: folder });
           const def = scriptDefs.find(s => s.id === (videoType === 'reup_full' ? SCRIPT_REUP_FULL : SCRIPT_FROM_AUDIO));
@@ -367,6 +386,39 @@ function ChannelsPage() {
     [indexDraftRows, indexPag.startIndex, indexPag.pageSize]
   );
 
+  const indexPageSelectionFlags = useMemo(() => {
+    const start = indexPag.startIndex;
+    const end = Math.min(start + indexPag.pageSize, indexDraftRows.length);
+    const onPage: number[] = [];
+    for (let i = start; i < end; i++) onPage.push(i);
+    const all = onPage.length > 0 && onPage.every(i => indexSelectedRowIndices.has(i));
+    const some = onPage.some(i => indexSelectedRowIndices.has(i));
+    return { all, some };
+  }, [indexPag.startIndex, indexPag.pageSize, indexDraftRows.length, indexSelectedRowIndices]);
+
+  const toggleIndexRowSelected = useCallback((globalIndex: number) => {
+    setIndexSelectedRowIndices(prev => {
+      const next = new Set(prev);
+      if (next.has(globalIndex)) next.delete(globalIndex);
+      else next.add(globalIndex);
+      return next;
+    });
+  }, []);
+
+  const toggleIndexSelectAllOnPage = useCallback(() => {
+    const start = indexPag.startIndex;
+    const end = Math.min(start + indexPag.pageSize, indexDraftRows.length);
+    const onPage: number[] = [];
+    for (let i = start; i < end; i++) onPage.push(i);
+    setIndexSelectedRowIndices(prev => {
+      const next = new Set(prev);
+      const allSelected = onPage.length > 0 && onPage.every(i => next.has(i));
+      if (allSelected) onPage.forEach(i => next.delete(i));
+      else onPage.forEach(i => next.add(i));
+      return next;
+    });
+  }, [indexPag.startIndex, indexPag.pageSize, indexDraftRows.length]);
+
   const {
     page: detailPageNum,
     setPage: setDetailPage,
@@ -385,6 +437,48 @@ function ChannelsPage() {
   );
 
   const canSetStartFrom = Boolean(detail?.fileName?.toLowerCase().endsWith('.xlsx') && detailLayout.startFromKey);
+
+  const handleDetailUpdateMeta = useCallback(
+    async (originalIndices: number[]) => {
+      if (!selectedChannel || !detail?.rows?.length || originalIndices.length === 0) return;
+      const lk = detailLayout.linkVideoKey;
+      if (!lk) {
+        setDetailActionError('File chi tiết không có cột LINK VIDEO.');
+        return;
+      }
+      const items: { url: string }[] = [];
+      for (const i of originalIndices) {
+        const row = detail.rows[i];
+        if (!row) continue;
+        const url = String(row[lk] ?? '').trim();
+        if (url) items.push({ url });
+      }
+      if (items.length === 0) {
+        setDetailActionError('Các dòng đã chọn không có link video hợp lệ.');
+        return;
+      }
+      if (!window.runner?.runScript) {
+        setDetailActionError('Chỉ chạy cập nhật meta trong app Electron.');
+        return;
+      }
+      setDetailActionError(null);
+      setDetailUpdateMetaBusy(true);
+      try {
+        if (typeof window.runner.minimizeApp === 'function') {
+          window.runner.minimizeApp();
+        }
+        await window.runner.runScript('updateChannelVideosMeta', {
+          channelFolder: selectedChannel,
+          items,
+        });
+      } catch (e) {
+        setDetailActionError(e instanceof Error ? e.message : String(e));
+      } finally {
+        setDetailUpdateMetaBusy(false);
+      }
+    },
+    [selectedChannel, detail?.rows, detailLayout.linkVideoKey]
+  );
 
   async function handleSetStartFromRow(dataRowIndex: number) {
     if (!selectedChannel || startMarkingIndex !== null) return;
@@ -426,11 +520,13 @@ function ChannelsPage() {
   const refreshBusy = selectedChannel ? detailLoading : indexLoading;
   const hasIndexRows = (indexData?.rows?.length ?? 0) > 0;
 
-  /** Chỉ kênh có EMAIL không rỗng trong index (popup Upload video). */
-  const uploadChannels = useMemo(() => {
+  /** Kênh có ID + EMAIL trong các dòng đã tick (popup Upload video). */
+  const uploadChannelsFromSelection = useMemo((): ChannelItem[] => {
     const emailKey = findIndexHeaderKey(indexHeaders, 'EMAIL');
     const map = new Map<string, Set<string>>();
-    for (const row of indexDraftRows) {
+    for (const idx of indexSelectedRowIndices) {
+      const row = indexDraftRows[idx];
+      if (!row) continue;
       const f = channelFolderFromRow(row, indexHeaders);
       if (!f?.trim()) continue;
       if (!emailKey) continue;
@@ -452,7 +548,7 @@ function ChannelsPage() {
       emails: Array.from(emails).sort((a, b) => a.localeCompare(b, undefined, { sensitivity: 'base' })),
     }));
     return result.sort((a, b) => a.folder.localeCompare(b.folder, undefined, { sensitivity: 'base' }));
-  }, [indexDraftRows, indexHeaders]);
+  }, [indexDraftRows, indexHeaders, indexSelectedRowIndices]);
 
   return (
     <div className='space-y-6 w-full min-w-0'>
@@ -467,9 +563,14 @@ function ChannelsPage() {
             indexSaving={indexSaving}
             indexLoading={indexLoading}
             indexBatchVideo={indexBatchVideo}
-            indexCreateVideoQueueLength={indexCreateVideoQueue.length}
+            indexSelectedRowCount={indexSelectedRowIndices.size}
+            indexCreateVideoEligibleSelectedCount={createVideoQueueFromSelection.length}
             canRunIndexBatchVideo={canRunIndexBatchVideo}
-            uploadChannelsLength={uploadChannels.length}
+            indexSingleSelectedRowIndex={indexSingleSelectedRowIndex}
+            indexSingleSelectedFolder={indexSingleSelectedFolder}
+            onOpenEditSelectedRow={openIndexEditForSingleSelection}
+            onOpenDetailSelectedRow={openIndexDetailForSingleSelection}
+            uploadEligibleSelectedCount={uploadChannelsFromSelection.length}
             youtubeUploadProgress={youtubeUploadProgress}
             refreshBusy={refreshBusy}
             onOpenCreateVideo={() => setCreateVideoOpen(true)}
@@ -559,8 +660,11 @@ function ChannelsPage() {
               startIndex: indexPag.startIndex,
             }}
             indexColCount={indexColCount}
-            onEditRow={setIndexEditRowIndex}
-            onOpenChannel={setSelectedChannel}
+            selectedRowIndices={indexSelectedRowIndices}
+            onToggleRowSelected={toggleIndexRowSelected}
+            onToggleSelectAllOnPage={toggleIndexSelectAllOnPage}
+            pageSelectAll={indexPageSelectionFlags.all}
+            pageSelectSome={indexPageSelectionFlags.some}
           />
 
           {indexEditRowIndex !== null && indexDraftRows[indexEditRowIndex] != null && (
@@ -608,30 +712,32 @@ function ChannelsPage() {
           canSetStartFrom={canSetStartFrom}
           startMarkingIndex={startMarkingIndex}
           onSetStartFromRow={handleSetStartFromRow}
+          canUpdateMeta={Boolean(
+            selectedChannel && detailLayout.linkVideoKey && typeof window.runner?.runScript === 'function'
+          )}
+          updateMetaBusy={detailUpdateMetaBusy}
+          onUpdateMeta={handleDetailUpdateMeta}
         />
       )}
 
       {createVideoOpen ? (
         <ChannelCreateVideoDialog
-          channels={createVideoDialogChannels}
+          selectedRowCount={indexSelectedRowIndices.size}
+          eligibleQueueLength={createVideoQueueFromSelection.length}
           onClose={() => setCreateVideoOpen(false)}
-          onConfirm={async ({ folderPick, emailForSingleChannel, maxVideosPerBatch }) => {
+          onConfirm={async ({ maxVideosPerBatch }) => {
             if (typeof window.runner?.minimizeApp === 'function') {
               window.runner.minimizeApp();
             }
-            const emailKey = findIndexHeaderKey(indexHeaders, 'EMAIL');
-            let queue = folderPick === '__all__' ? indexCreateVideoQueue : indexCreateVideoQueue.filter(q => q.folder === folderPick);
-            if (folderPick !== '__all__' && emailForSingleChannel && emailKey) {
-              queue = queue.filter(q => indexRowMatchesPickedEmail(q.row, emailKey, emailForSingleChannel));
-            }
-            await runCreateVideoForQueue(queue, maxVideosPerBatch);
+            await runCreateVideoForQueue(createVideoQueueFromSelection, maxVideosPerBatch);
           }}
         />
       ) : null}
 
       {uploadVideoOpen ? (
         <ChannelUploadVideoDialog
-          channels={uploadChannels}
+          channels={uploadChannelsFromSelection}
+          selectedRowCount={indexSelectedRowIndices.size}
           onClose={() => setUploadVideoOpen(false)}
           onConfirm={(payloads: ChannelUploadVideoPayload[]) => {
             void (async () => {

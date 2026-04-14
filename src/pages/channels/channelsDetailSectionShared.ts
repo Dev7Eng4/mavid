@@ -50,4 +50,9 @@ export interface ChannelsDetailSectionProps {
   canSetStartFrom: boolean;
   startMarkingIndex: number | null;
   onSetStartFromRow: (dataRowIndex: number) => void;
+  /** Electron + có cột link video — bật nút cập nhật meta. */
+  canUpdateMeta: boolean;
+  updateMetaBusy: boolean;
+  /** `originalIndex` trong `detail.rows` (khớp checkbox bảng chi tiết). */
+  onUpdateMeta: (originalRowIndices: number[]) => void | Promise<void>;
 }

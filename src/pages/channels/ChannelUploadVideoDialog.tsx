@@ -1,8 +1,7 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import type { GpmProfileRow } from '@/types';
 import { gpmApi } from '@/services';
 import { AppButton } from '@/components/ui/AppButton';
-import { CustomSelect, type SelectOption } from '@/components/ui/CustomSelect';
 
 function pickStr(obj: Record<string, unknown>, keys: string[]): string {
   for (const k of keys) {
@@ -72,8 +71,10 @@ export interface ChannelItem {
 }
 
 export interface ChannelUploadVideoDialogProps {
-  /** Danh sách kênh đủ điều kiện (có email trong index). */
+  /** Kênh đủ điều kiện trong phần đã chọn (ID + EMAIL). */
   channels: ChannelItem[];
+  /** Số dòng đã tick trên bảng. */
+  selectedRowCount: number;
   onClose: () => void;
   /** Gọi khi đã có payloads hợp lệ; parent tự chạy upload nền (không cần await). */
   onConfirm: (payloads: ChannelUploadVideoPayload[]) => void;
@@ -84,45 +85,18 @@ function clampInt(n: number, min: number, max: number): number {
   return Math.min(max, Math.max(min, Math.trunc(n)));
 }
 
-export function ChannelUploadVideoDialog({ channels, onClose, onConfirm }: ChannelUploadVideoDialogProps) {
-  const [folderPick, setFolderPick] = useState<string>('');
-  const [emailPick, setEmailPick] = useState<string>('');
+export function ChannelUploadVideoDialog({
+  channels,
+  selectedRowCount,
+  onClose,
+  onConfirm,
+}: ChannelUploadVideoDialogProps) {
   const [totalVideos, setTotalVideos] = useState<number | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
-  useEffect(() => {
-    if (channels.length > 0 && !folderPick) {
-      setFolderPick(channels.length > 1 ? '__all__' : channels[0].folder);
-    } else if (folderPick && folderPick !== '__all__' && !channels.some(c => c.folder === folderPick)) {
-      setFolderPick(channels.length > 1 ? '__all__' : channels[0]?.folder || '');
-    }
-  }, [channels, folderPick]);
-
-  const channelOptions = useMemo<SelectOption[]>(() => {
-    const opts = channels.map(c => ({ value: c.folder, label: c.folder }));
-    if (channels.length > 1) {
-      opts.unshift({ value: '__all__', label: 'Tất cả kênh' });
-    }
-    return opts;
-  }, [channels]);
-
-  const activeChannel = useMemo(() => channels.find(c => c.folder === folderPick), [channels, folderPick]);
-
-  const emailOptions = useMemo<SelectOption[]>(() => {
-    if (!activeChannel) return [];
-    return activeChannel.emails.map(e => ({ value: e, label: e }));
-  }, [activeChannel]);
-
-  useEffect(() => {
-    if (emailOptions.length > 0) {
-      if (!emailPick || !emailOptions.some(o => o.value === emailPick)) {
-        setEmailPick(emailOptions[0].value);
-      }
-    } else {
-      setEmailPick('');
-    }
-  }, [emailOptions, emailPick]);
+  const eligibleCount = channels.length;
+  const skippedCount = Math.max(0, selectedRowCount - eligibleCount);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -134,48 +108,31 @@ export function ChannelUploadVideoDialog({ channels, onClose, onConfirm }: Chann
 
   const handleConfirm = useCallback(async () => {
     if (channels.length === 0) {
-      setFormError('Không có kênh đủ điều kiện: cần cột ID/CHANNEL và EMAIL có giá trị trong index.');
-      return;
-    }
-    if (!folderPick || (folderPick !== '__all__' && !channels.some(c => c.folder === folderPick))) {
-      setFormError('Chọn một kênh.');
+      setFormError('Không có kênh đủ điều kiện trong phần đã chọn (cần ID/CHANNEL và EMAIL trong index).');
       return;
     }
 
-    const total = totalVideos == null ? null : clampInt(totalVideos, 1, 5);
+    const total = totalVideos == null ? null : clampInt(totalVideos, 1, 99_999);
     setFormError(null);
     setBusy(true);
     try {
       const profiles = await fetchAllGpmProfileRows();
       const payloads: ChannelUploadVideoPayload[] = [];
 
-      if (folderPick === '__all__') {
-        for (const ch of channels) {
-          const email = ch.emails[0];
-          if (!email) continue;
-          const gpmProfileId = resolveGpmProfileIdByEmail(profiles, email);
-          if (!gpmProfileId) {
-            setFormError(`Kênh ${ch.folder}: Không tìm thấy profile GPM có trường name trùng email «${email}».`);
-            return;
-          }
-          payloads.push({ channelFolder: ch.folder, email, totalVideos: total, gpmProfileId });
-        }
-        if (payloads.length === 0) {
-          setFormError('Không có kênh nào có email hợp lệ.');
-          return;
-        }
-      } else {
-        const email = emailPick.trim();
-        if (!email) {
-          setFormError('Vui lòng chọn email (thêm email vào index nếu chưa có).');
-          return;
-        }
+      for (const ch of channels) {
+        const email = ch.emails[0];
+        if (!email) continue;
         const gpmProfileId = resolveGpmProfileIdByEmail(profiles, email);
         if (!gpmProfileId) {
-          setFormError(`Không tìm thấy profile GPM có trường name trùng email «${email}». Trong GPM hãy đặt tên profile = email.`);
+          setFormError(`Kênh ${ch.folder}: Không tìm thấy profile GPM có trường name trùng email «${email}».`);
           return;
         }
-        payloads.push({ channelFolder: folderPick, email, totalVideos: total, gpmProfileId });
+        payloads.push({ channelFolder: ch.folder, email, totalVideos: total, gpmProfileId });
+      }
+
+      if (payloads.length === 0) {
+        setFormError('Không có kênh nào có email hợp lệ.');
+        return;
       }
 
       if (typeof window.runner?.minimizeApp === 'function') {
@@ -188,12 +145,11 @@ export function ChannelUploadVideoDialog({ channels, onClose, onConfirm }: Chann
     } finally {
       setBusy(false);
     }
-  }, [channels, folderPick, emailPick, onClose, onConfirm, totalVideos]);
+  }, [channels, onClose, onConfirm, totalVideos]);
 
   const inputClass = 'w-full rounded-xl px-3 py-2.5 text-base outline-none border transition-colors duration-150';
 
-  const noChannels = channels.length === 0;
-  const canSubmit = !noChannels;
+  const canSubmit = eligibleCount > 0;
 
   return (
     <div
@@ -214,44 +170,31 @@ export function ChannelUploadVideoDialog({ channels, onClose, onConfirm }: Chann
           Upload video
         </h2>
         <p className='text-sm leading-snug mt-2 shrink-0' style={{ color: 'var(--text-muted)' }}>
-          Profile GPM được chọn tự động theo <code className='text-xs'>email</code> của kênh trong{' '}
-          <code className='text-xs'>index.xlsx</code>. Hệ thống sẽ tìm trong API <code className='text-xs'>listProfiles</code> dòng có{' '}
-          <code className='text-xs'>name</code> trùng email (bạn cần cấu hình tên profile = email trong GPM). Sau đó mở YouTube và upload
-          từng .mp4 trong các thư mục con của kênh (sắp xếp theo tên). Để trống «Số lượng» = tất cả thư mục có .mp4.
+          Profile GPM được chọn theo <code className='text-xs'>name</code> = email (từ index). Upload lần lượt các .mp4 trong thư mục con của
+          từng kênh đã chọn trên bảng.
         </p>
 
         <div className='grid grid-cols-1 gap-y-4 mt-4 overflow-y-auto min-h-0 flex-1 pr-1 content-start'>
-          <div className='min-w-0'>
-            <div className='block text-sm font-medium mb-1.5' style={{ color: 'var(--text-h)' }}>
-              Kênh
-            </div>
-            {noChannels ? (
-              <p className='text-sm' style={{ color: '#fecaca' }}>
-                Không có kênh nào có email trong index (cần cột ID/CHANNEL và EMAIL).
+          <div
+            className='rounded-xl px-3 py-2.5 text-sm border'
+            style={{ background: 'var(--code-bg)', borderColor: 'var(--border)', color: 'var(--text-h)' }}
+          >
+            <p>
+              Đã chọn <strong>{selectedRowCount}</strong> dòng trên index.
+              {eligibleCount > 0 ? (
+                <>
+                  {' '}
+                  Sẽ upload cho <strong>{eligibleCount}</strong> kênh có ID và EMAIL.
+                </>
+              ) : (
+                <> Chưa có kênh đủ điều kiện.</>
+              )}
+            </p>
+            {skippedCount > 0 ? (
+              <p className='mt-2' style={{ color: 'var(--text-muted)' }}>
+                {skippedCount} dòng bị bỏ qua (thiếu ID/CHANNEL hoặc EMAIL).
               </p>
-            ) : (
-              <CustomSelect value={folderPick} options={channelOptions} onChange={setFolderPick} placeholder='Chọn kênh' menuZIndex={110} />
-            )}
-          </div>
-
-          <div className='min-w-0'>
-            <div className='block text-sm font-medium mb-1.5' style={{ color: 'var(--text-h)' }}>
-              Email tải lên
-            </div>
-            {folderPick === '__all__' ? (
-              <div
-                className='w-full rounded-xl px-3 py-2.5 text-base outline-none border transition-colors duration-150 cursor-not-allowed opacity-80'
-                style={{ background: 'var(--code-bg)', color: 'var(--text-muted)', borderColor: 'var(--border)' }}
-              >
-                Tự động dùng email đầu tiên của từng kênh
-              </div>
-            ) : emailOptions.length === 0 ? (
-              <p className='text-sm' style={{ color: '#fecaca' }}>
-                Kênh này chưa có email trong index.
-              </p>
-            ) : (
-              <CustomSelect value={emailPick} options={emailOptions} onChange={setEmailPick} placeholder='Chọn email' menuZIndex={100} />
-            )}
+            ) : null}
           </div>
 
           <div className='min-w-0'>

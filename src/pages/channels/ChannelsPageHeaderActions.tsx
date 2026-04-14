@@ -7,9 +7,19 @@ export interface ChannelsPageHeaderActionsProps {
   indexSaving: boolean;
   indexLoading: boolean;
   indexBatchVideo: { current: number; total: number; channelLabel: string } | null;
-  indexCreateVideoQueueLength: number;
+  /** Số dòng đã tick trên bảng index (Tạo video). */
+  indexSelectedRowCount: number;
+  /** Trong phần đã chọn, số kênh đủ điều kiện chạy script tạo video. */
+  indexCreateVideoEligibleSelectedCount: number;
   canRunIndexBatchVideo: boolean;
-  uploadChannelsLength: number;
+  /** Chỉnh sửa / chi tiết: bật khi đúng một dòng được chọn. */
+  indexSingleSelectedRowIndex: number | null;
+  /** Folder kênh (ID) của dòng đơn chọn — null nếu thiếu ID. */
+  indexSingleSelectedFolder: string | null;
+  onOpenEditSelectedRow: () => void;
+  onOpenDetailSelectedRow: () => void;
+  /** Số kênh đủ ID+EMAIL trong phần đã chọn (Upload video). */
+  uploadEligibleSelectedCount: number;
   /** Đang chạy upload YouTube (GPM) — hiển thị trên nút Upload video. */
   youtubeUploadProgress: { current: number; total: number; channelLabel: string } | null;
   refreshBusy: boolean;
@@ -28,9 +38,14 @@ export function ChannelsPageHeaderActions({
   indexSaving,
   indexLoading,
   indexBatchVideo,
-  indexCreateVideoQueueLength,
+  indexSelectedRowCount,
+  indexCreateVideoEligibleSelectedCount,
   canRunIndexBatchVideo,
-  uploadChannelsLength,
+  indexSingleSelectedRowIndex,
+  indexSingleSelectedFolder,
+  onOpenEditSelectedRow,
+  onOpenDetailSelectedRow,
+  uploadEligibleSelectedCount,
   youtubeUploadProgress,
   refreshBusy,
   onOpenCreateVideo,
@@ -40,6 +55,10 @@ export function ChannelsPageHeaderActions({
   onBackToIndex,
   onRefresh,
 }: ChannelsPageHeaderActionsProps) {
+  const indexActionsLocked = indexLoading || indexSaving || indexBatchVideo !== null;
+  const canEditSingleSelected = !indexActionsLocked && indexSingleSelectedRowIndex !== null;
+  const canOpenDetailSelected = canEditSingleSelected && Boolean(indexSingleSelectedFolder?.trim());
+
   return (
     <>
       {!selectedChannel && (
@@ -54,15 +73,48 @@ export function ChannelsPageHeaderActions({
               ) : null}
               <AppButton
                 type='button'
+                variant='secondary'
+                onClick={onOpenEditSelectedRow}
+                disabled={!canEditSingleSelected}
+                title={
+                  indexSingleSelectedRowIndex == null
+                    ? 'Chọn đúng một dòng trên bảng (checkbox) để sửa kênh đó.'
+                    : 'Sửa dòng index đã chọn'
+                }
+              >
+                Sửa
+              </AppButton>
+              <AppButton
+                type='button'
+                variant='primary'
+                onClick={onOpenDetailSelectedRow}
+                disabled={!canOpenDetailSelected}
+                title={
+                  indexSingleSelectedRowIndex == null
+                    ? 'Chọn đúng một dòng trên bảng để mở chi tiết kênh.'
+                    : !indexSingleSelectedFolder?.trim()
+                      ? 'Dòng đã chọn cần có ID/CHANNEL (thư mục kênh) để mở chi tiết.'
+                      : `Mở chi tiết kênh «${indexSingleSelectedFolder}»`
+                }
+              >
+                Chi tiết
+              </AppButton>
+              <AppButton
+                type='button'
                 variant='primary'
                 onClick={onOpenCreateVideo}
                 disabled={
-                  indexLoading || indexSaving || indexBatchVideo !== null || indexCreateVideoQueueLength === 0 || !canRunIndexBatchVideo
+                  indexActionsLocked ||
+                  indexSelectedRowCount === 0 ||
+                  indexCreateVideoEligibleSelectedCount === 0 ||
+                  !canRunIndexBatchVideo
                 }
                 title={
-                  indexCreateVideoQueueLength === 0
-                    ? 'Cần ít nhất một dòng có ID/CHANNEL và LOẠI VIDEO (from_audio hoặc reup_full).'
-                    : `Mở hộp thoại chọn kênh — ${indexCreateVideoQueueLength} lượt chạy theo bảng index hiện tại.`
+                  indexSelectedRowCount === 0
+                    ? 'Tick chọn ít nhất một dòng trên bảng index (cột đầu), rồi bấm Tạo video.'
+                    : indexCreateVideoEligibleSelectedCount === 0
+                      ? 'Các dòng đã chọn cần có ID/CHANNEL, EMAIL và LOẠI VIDEO (from_audio hoặc reup_full).'
+                      : `Mở hộp thoại — tạo video cho ${indexCreateVideoEligibleSelectedCount} kênh đã chọn (đủ điều kiện).`
                 }
               >
                 {indexBatchVideo ? (
@@ -72,8 +124,10 @@ export function ChannelsPageHeaderActions({
                       Tạo video {indexBatchVideo.current}/{indexBatchVideo.total}: {indexBatchVideo.channelLabel}
                     </span>
                   </span>
+                ) : indexCreateVideoEligibleSelectedCount > 0 ? (
+                  `Tạo video (${indexCreateVideoEligibleSelectedCount})`
                 ) : (
-                  `Tạo video (${indexCreateVideoQueueLength} kênh)`
+                  'Tạo video'
                 )}
               </AppButton>
             </>
@@ -91,13 +145,24 @@ export function ChannelsPageHeaderActions({
             type='button'
             variant='primary'
             onClick={onOpenUploadVideo}
-            disabled={indexLoading || uploadChannelsLength === 0 || youtubeUploadProgress !== null}
+            disabled={
+              indexLoading ||
+              indexSaving ||
+              indexBatchVideo !== null ||
+              indexSelectedRowCount === 0 ||
+              uploadEligibleSelectedCount === 0 ||
+              youtubeUploadProgress !== null
+            }
             title={
-              uploadChannelsLength === 0
-                ? 'Cần ít nhất một dòng index có thư mục kênh (ID/CHANNEL) và cột EMAIL có giá trị.'
-                : youtubeUploadProgress
-                  ? 'Đang upload YouTube — chờ kết thúc hoặc xem GPM / tab Logs.'
-                  : 'Lịch upload video theo kênh (chỉ kênh có email trong index).'
+              indexBatchVideo !== null
+                ? 'Đang chạy tạo video — chờ xong rồi thử lại.'
+                : indexSelectedRowCount === 0
+                  ? 'Tick chọn ít nhất một dòng trên bảng index, rồi bấm Upload video.'
+                  : uploadEligibleSelectedCount === 0
+                    ? 'Các dòng đã chọn cần có ID/CHANNEL và EMAIL để upload.'
+                    : youtubeUploadProgress
+                      ? 'Đang upload YouTube — chờ kết thúc hoặc xem GPM / tab Logs.'
+                      : `Mở hộp thoại — upload cho ${uploadEligibleSelectedCount} kênh đã chọn (đủ điều kiện).`
             }
           >
             {youtubeUploadProgress ? (
@@ -107,6 +172,8 @@ export function ChannelsPageHeaderActions({
                   Đang upload {youtubeUploadProgress.current}/{youtubeUploadProgress.total}: {youtubeUploadProgress.channelLabel}
                 </span>
               </span>
+            ) : uploadEligibleSelectedCount > 0 ? (
+              `Upload video (${uploadEligibleSelectedCount})`
             ) : (
               'Upload video'
             )}

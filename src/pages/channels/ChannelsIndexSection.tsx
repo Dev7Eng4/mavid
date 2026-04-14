@@ -1,7 +1,7 @@
+import { useEffect, useRef } from 'react';
 import type { ChannelsIndexSectionProps } from './channelsIndexSection.model';
 import { SpinnerIcon } from '@/components/ui/Icons';
 import { TablePaginationBar } from '@/components/ui/TablePaginationBar';
-import { channelFolderFromRow } from './channelIndexHelpers';
 import { CHANNELS_INDEX_TABLE_HEADERS } from './channelsIndexSection.model';
 
 export function ChannelsIndexSection({
@@ -12,10 +12,19 @@ export function ChannelsIndexSection({
   pageIndexRows,
   indexPag,
   indexColCount,
-  onEditRow,
-  onOpenChannel,
+  selectedRowIndices,
+  onToggleRowSelected,
+  onToggleSelectAllOnPage,
+  pageSelectAll,
+  pageSelectSome,
 }: ChannelsIndexSectionProps) {
   const headers = CHANNELS_INDEX_TABLE_HEADERS;
+  const headerSelectRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    const el = headerSelectRef.current;
+    if (el) el.indeterminate = pageSelectSome && !pageSelectAll;
+  }, [pageSelectAll, pageSelectSome]);
 
   return (
     <div className='space-y-4 w-full min-w-0'>
@@ -40,6 +49,22 @@ export function ChannelsIndexSection({
           <table className='w-full min-w-0 text-base' style={{ borderCollapse: 'collapse', tableLayout: 'auto' }}>
             <thead>
               <tr style={{ background: 'var(--code-bg)' }}>
+                <th
+                  className='w-12 px-2 py-3 text-center align-middle'
+                  style={{ borderBottom: '1px solid var(--border)' }}
+                  scope='col'
+                >
+                  <input
+                    ref={headerSelectRef}
+                    type='checkbox'
+                    className='w-4 h-4 cursor-pointer rounded border align-middle'
+                    style={{ borderColor: 'var(--border)', accentColor: 'var(--accent)' }}
+                    checked={pageSelectAll}
+                    onChange={() => onToggleSelectAllOnPage()}
+                    disabled={indexLoading || indexSaving || pageIndexRows.length === 0}
+                    aria-label='Chọn tất cả kênh trên trang này'
+                  />
+                </th>
                 {headers.map(h => (
                   <th
                     key={h}
@@ -49,12 +74,6 @@ export function ChannelsIndexSection({
                     {h}
                   </th>
                 ))}
-                <th
-                  className='text-left px-4 py-3 font-medium whitespace-nowrap uppercase text-base tracking-wider w-44 shrink-0'
-                  style={{ color: 'var(--text-muted)', borderBottom: '1px solid var(--border)' }}
-                >
-                  Thao tác
-                </th>
               </tr>
             </thead>
 
@@ -71,12 +90,14 @@ export function ChannelsIndexSection({
               ) : indexDraftRows.length > 0 ? (
                 pageIndexRows.map((row, i) => {
                   const globalIndex = indexPag.startIndex + i;
-                  const folder = channelFolderFromRow(row, [...headers]);
                   return (
                     <tr
                       key={globalIndex}
-                      className='transition-colors duration-150'
+                      className={`transition-colors duration-150${indexSaving ? '' : ' cursor-pointer'}`}
                       style={{ borderBottom: '1px solid var(--border)' }}
+                      onClick={() => {
+                        if (!indexSaving) onToggleRowSelected(globalIndex);
+                      }}
                       onMouseEnter={e => {
                         e.currentTarget.style.background = 'var(--hover-bg)';
                       }}
@@ -84,6 +105,20 @@ export function ChannelsIndexSection({
                         e.currentTarget.style.background = 'transparent';
                       }}
                     >
+                      <td
+                        className='px-2 py-3 align-middle text-center'
+                        onClick={e => e.stopPropagation()}
+                      >
+                        <input
+                          type='checkbox'
+                          className='w-4 h-4 cursor-pointer rounded border align-middle'
+                          style={{ borderColor: 'var(--border)', accentColor: 'var(--accent)' }}
+                          checked={selectedRowIndices.has(globalIndex)}
+                          onChange={() => onToggleRowSelected(globalIndex)}
+                          disabled={indexSaving}
+                          aria-label={`Chọn kênh dòng ${globalIndex + 1}`}
+                        />
+                      </td>
                       {headers.map(h => (
                         <td
                           key={h}
@@ -94,42 +129,6 @@ export function ChannelsIndexSection({
                           {String(row[h] ?? '')}
                         </td>
                       ))}
-
-                      <td className='px-4 py-3 align-top'>
-                        <div className='flex gap-1.5 items-stretch'>
-                          <button
-                            type='button'
-                            onClick={() => onEditRow(globalIndex)}
-                            disabled={indexSaving}
-                            className='text-base font-medium rounded-lg px-3 py-1.5 cursor-pointer transition-colors duration-150 whitespace-nowrap disabled:opacity-45 disabled:cursor-not-allowed'
-                            style={{
-                              color: 'var(--text)',
-                              background: 'var(--code-bg)',
-                              border: '1px solid var(--border)',
-                            }}
-                          >
-                            Sửa
-                          </button>
-                          {folder ? (
-                            <button
-                              type='button'
-                              onClick={() => onOpenChannel(folder)}
-                              className='text-base font-medium rounded-lg px-3 py-1.5 cursor-pointer transition-colors duration-150 whitespace-nowrap'
-                              style={{
-                                color: 'var(--accent)',
-                                background: 'var(--accent-bg)',
-                                border: '1px solid var(--accent-border)',
-                              }}
-                            >
-                              Chi tiết
-                            </button>
-                          ) : (
-                            <span className='text-base' style={{ color: 'var(--text-muted)' }}>
-                              —
-                            </span>
-                          )}
-                        </div>
-                      </td>
                     </tr>
                   );
                 })

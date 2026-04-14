@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { AppButton } from '@/components/ui/AppButton';
 import { CustomSelect } from '@/components/ui/CustomSelect';
 import { SpinnerIcon } from '@/components/ui/Icons';
 import { TablePaginationBar } from '@/components/ui/TablePaginationBar';
@@ -29,6 +30,9 @@ export function ChannelsDetailSection({
   canSetStartFrom,
   startMarkingIndex,
   onSetStartFromRow,
+  canUpdateMeta,
+  updateMetaBusy,
+  onUpdateMeta,
 }: ChannelsDetailSectionProps) {
   const [selectedRowIndices, setSelectedRowIndices] = useState<Set<number>>(new Set());
 
@@ -123,6 +127,41 @@ export function ChannelsDetailSection({
               </div>
             ) : null}
           </div>
+        </div>
+      ) : null}
+
+      {!detailLoading && detailRowsLength > 0 && detailLayout.tableHeaders.length > 0 ? (
+        <div
+          className='rounded-2xl px-4 py-3 w-full min-w-0 flex flex-wrap items-center justify-between gap-3'
+          style={{ background: 'var(--card-bg)', border: '1px solid var(--border)' }}
+        >
+          <p className='text-sm min-w-0' style={{ color: 'var(--text-muted)' }}>
+            Chọn một hoặc nhiều dòng video (checkbox / click dòng), rồi cập nhật meta Gemini + thumbnail Flow nếu thiếu.
+          </p>
+          <AppButton
+            type='button'
+            variant='secondary'
+            disabled={
+              !canUpdateMeta || updateMetaBusy || detailLoading || selectedRowIndices.size === 0 || startMarkingIndex !== null
+            }
+            title={
+              !canUpdateMeta
+                ? 'Cần cột LINK VIDEO và chạy trong Electron.'
+                : selectedRowIndices.size === 0
+                  ? 'Chọn ít nhất một dòng video trên bảng.'
+                  : 'Tải transcript → Gemini (4 trường) → tạo thumbnail nếu chưa có .png/.jpg/.jpeg'
+            }
+            onClick={() => void onUpdateMeta(Array.from(selectedRowIndices))}
+          >
+            {updateMetaBusy ? (
+              <span className='inline-flex items-center gap-2'>
+                <SpinnerIcon className='w-4 h-4' />
+                Đang cập nhật meta…
+              </span>
+            ) : (
+              `Cập nhật meta${selectedRowIndices.size > 0 ? ` (${selectedRowIndices.size})` : ''}`
+            )}
+          </AppButton>
         </div>
       ) : null}
 

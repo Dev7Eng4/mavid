@@ -281,6 +281,7 @@ const SCRIPT_MAP = {
   createThumbnailFlow: '../contents/flow/createThumbnailFlow.js',
   summaryMetaFromTranscript: '../contents/scripts/summaryMetaFromTranscript.js',
   uploadYoutubeViaGpm: '../contents/youtube/uploadViaGpm.js',
+  updateChannelVideosMeta: '../contents/scripts/updateChannelVideosMeta.js',
 };
 
 ipcMain.handle('run-script', async (_event, { script, params = {} }) => {
