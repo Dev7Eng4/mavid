@@ -5,6 +5,7 @@ import { PipelinePage } from '@/pages/PipelinePage';
 import CreateVideoPage from '@/pages/create-video';
 import { SettingsPage } from '@/pages/SettingsPage';
 import ChannelsPage from '@/pages/channels';
+import AnalystPage from '@/pages/analyst';
 import { GpmPage } from '@/pages/GpmPage';
 import { LogsPage } from '@/pages/LogsPage';
 
@@ -90,6 +91,7 @@ export default function App() {
         )}
         {activePage === 'settings' && <SettingsPage key='settings' disabled={runningScript !== null} />}
         {activePage === 'channels' && <ChannelsPage key='channels' />}
+        {activePage === 'analyst' && <AnalystPage key='analyst' />}
         {activePage === 'gpm' && <GpmPage key='gpm' />}
         {activePage === 'logs' && <LogsPage errorLogs={errorLogs} clearErrorLogs={clearErrorLogs} />}
       </main>

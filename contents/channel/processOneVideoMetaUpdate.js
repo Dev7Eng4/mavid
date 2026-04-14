@@ -56,6 +56,12 @@ export async function processOneVideoMetaUpdate({ videoDir, url, thumbnailPrompt
 
   try {
     let meta = readVideoMetaFile(videoDir);
+    const needGemini = geminiMetaFieldsIncomplete(meta);
+    const needThumb = !hasRasterThumbnailInFolder(videoDir);
+    if (!needGemini && !needThumb) {
+      console.log('[update-meta] Đủ 4 trường Gemini + đã có thumbnail raster — bỏ qua.');
+      return { ok: true };
+    }
 
     if (geminiMetaFieldsIncomplete(meta)) {
       const { videoTitle, description, tags } = transcriptHintsFromVideoMeta(meta);

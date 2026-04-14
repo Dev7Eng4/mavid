@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { ChannelData, ChannelFolderDataResult, ChannelRow } from '@/types';
 import { scriptDefs } from '@/types';
 import { useClientPagination } from '@/hooks/useClientPagination';
@@ -9,7 +9,7 @@ import { ChannelUploadVideoDialog, type ChannelUploadVideoPayload, type ChannelI
 import { ChannelsDetailSection } from './ChannelsDetailSection';
 import { DETAIL_TABLE_LOADING_HEADERS } from './channelsDetailSectionShared';
 import { ChannelsIndexSection } from './ChannelsIndexSection';
-import { CHANNELS_INDEX_TABLE_HEADERS } from './channelsIndexSection.model';
+import { CHANNELS_INDEX_VISIBLE_COLUMNS } from './channelsIndexSection.model';
 import { ChannelsPageHeaderActions } from './ChannelsPageHeaderActions';
 import { durationPresetToSecRange, parseDurationToSeconds } from './channelDurationFormat';
 import { gpmApi } from '@/services';
@@ -25,6 +25,13 @@ import {
 } from './channelIndexHelpers';
 
 const INDEX_FILE = 'channels/index.xlsx';
+
+/** Khớp cột STATUS trong file chi tiết kênh (khi đã tạo file video). */
+const DETAIL_STATUS_VIDEO_CREATED = 'Đã tạo video';
+
+function normalizeYoutubeUploadEmailKey(email: string): string {
+  return email.trim().toLowerCase();
+}
 
 function ChannelsPage() {
   const [indexData, setIndexData] = useState<ChannelData | null>(null);
@@ -52,12 +59,10 @@ function ChannelsPage() {
 
   const [indexEditRowIndex, setIndexEditRowIndex] = useState<number | null>(null);
   const [uploadVideoOpen, setUploadVideoOpen] = useState(false);
-  /** Upload YouTube chạy nền sau khi đóng popup — hiển thị trên nút header. */
-  const [youtubeUploadProgress, setYoutubeUploadProgress] = useState<{
-    current: number;
-    total: number;
-    channelLabel: string;
-  } | null>(null);
+  /** Số luồng upload YouTube (runScript) đang chạy — hiển thị trên header / dialog. */
+  const [youtubeUploadActiveThreads, setYoutubeUploadActiveThreads] = useState(0);
+  /** Email (chuẩn hóa) đang giữ bởi một runScript upload — không chạy trùng cho đến khi xong. */
+  const uploadingYoutubeEmailsRef = useRef(new Set<string>());
   const [createVideoOpen, setCreateVideoOpen] = useState(false);
   const [uploadScheduleInfo, setUploadScheduleInfo] = useState<string | null>(null);
   const [addChannelOpen, setAddChannelOpen] = useState(false);
@@ -127,19 +132,21 @@ function ChannelsPage() {
     setDetailActionError(null);
     setUploadVideoOpen(false);
     setCreateVideoOpen(false);
+    setDetailSelectedRowIndices(new Set());
   }, [selectedChannel]);
 
   const indexHeaders = useMemo(() => {
     if (indexData?.headers?.length) return indexData.headers;
     const first = indexData?.rows?.[0];
     if (first && typeof first === 'object') return Object.keys(first);
-    return ['ID', 'LINK', 'EMAIL', 'LAST UPLOAD'];
+    return [...CHANNELS_INDEX_VISIBLE_COLUMNS];
   }, [indexData]);
 
-  /** Checkbox + các cột cố định (ID, …) — không còn cột Thao tác */
-  const indexColCount = 1 + CHANNELS_INDEX_TABLE_HEADERS.length;
+  /** Checkbox + các cột cố định (`CHANNELS_INDEX_VISIBLE_COLUMNS`) trên bảng index. */
+  const indexColCount = 1 + CHANNELS_INDEX_VISIBLE_COLUMNS.length;
 
   const [indexSelectedRowIndices, setIndexSelectedRowIndices] = useState<Set<number>>(() => new Set());
+  const [detailSelectedRowIndices, setDetailSelectedRowIndices] = useState<Set<number>>(() => new Set());
 
   const canWriteIndex = typeof window.runner?.writeChannelIndex === 'function';
 
@@ -149,16 +156,17 @@ function ChannelsPage() {
 
   /** Ghi `MaVidMedia/channels/index.xlsx` (token UI: channels/index.xlsx). */
   const persistIndexRows = useCallback(
-    async (rows: ChannelRow[]) => {
+    async (rows: ChannelRow[], headersOverride?: string[]) => {
       if (!canWriteIndex) {
         throw new Error('Chỉ lưu index được trong app Electron.');
       }
+      const headers = headersOverride?.length ? headersOverride : indexHeaders;
       setIndexSaving(true);
       setIndexListError(null);
       try {
         const normalized = rows.map(row => {
           const o: ChannelRow = {};
-          for (const h of indexHeaders) {
+          for (const h of headers) {
             const v = row[h];
             o[h] = v == null || v === '' ? '' : v;
           }
@@ -166,7 +174,7 @@ function ChannelsPage() {
         });
         await window.runner.writeChannelIndex({
           filePath: INDEX_FILE,
-          headers: indexHeaders,
+          headers,
           rows: normalized,
         });
         await loadIndex();
@@ -226,6 +234,78 @@ function ChannelsPage() {
     if (!row) return null;
     return channelFolderFromRow(row, indexHeaders);
   }, [indexSingleSelectedRowIndex, indexDraftRows, indexHeaders]);
+
+  const indexChannelStatusToggle = useMemo(() => {
+    if (indexSingleSelectedRowIndex == null) {
+      return {
+        nextStatus: null as 'LIVE' | 'STOPPED' | null,
+        label: 'ACTIVE / DEACTIVE',
+        enabled: false,
+        title: 'Chọn đúng một dòng trên bảng (checkbox).',
+      };
+    }
+    const sk = findIndexHeaderKey(indexHeaders, 'STATUS');
+    if (!sk) {
+      return {
+        nextStatus: null as 'LIVE' | 'STOPPED' | null,
+        label: 'ACTIVE / DEACTIVE',
+        enabled: false,
+        title:
+          'File index chưa có cột STATUS. Cập nhật index (Thêm channel / script getInfoChannel) hoặc thêm cột STATUS ở cuối sheet.',
+      };
+    }
+    const raw = String(indexDraftRows[indexSingleSelectedRowIndex]?.[sk] ?? '')
+      .trim()
+      .toUpperCase();
+    const st = raw === 'LIVE' || raw === 'STOPPED' || raw === 'INIT' ? raw : 'INIT';
+    if (st === 'LIVE') {
+      return {
+        nextStatus: 'STOPPED' as const,
+        label: 'DEACTIVE',
+        enabled: true,
+        title: 'Đặt trạng thái kênh thành STOPPED.',
+      };
+    }
+    if (st === 'STOPPED') {
+      return {
+        nextStatus: 'LIVE' as const,
+        label: 'ACTIVE',
+        enabled: true,
+        title: 'Đặt trạng thái kênh thành LIVE.',
+      };
+    }
+    return {
+      nextStatus: null as 'LIVE' | 'STOPPED' | null,
+      label: 'ACTIVE / DEACTIVE',
+      enabled: false,
+      title: 'Chỉ kênh LIVE hoặc STOPPED mới bật/tắt từ đây (INIT: dùng Thêm channel hoặc chỉnh index).',
+    };
+  }, [indexSingleSelectedRowIndex, indexHeaders, indexDraftRows]);
+
+  const onChannelStatusToggle = useCallback(async () => {
+    const { nextStatus, enabled } = indexChannelStatusToggle;
+    if (!enabled || !nextStatus || indexSingleSelectedRowIndex == null || indexSaving) return;
+
+    const rowIdx = indexSingleSelectedRowIndex;
+    const existingKey = findIndexHeaderKey(indexHeaders, 'STATUS');
+    const headersOut = existingKey ? [...indexHeaders] : [...indexHeaders, 'STATUS'];
+    const writeKey = existingKey ?? 'STATUS';
+
+    const nextRows = indexDraftRows.map((r, i) => {
+      const copy: ChannelRow = { ...r };
+      for (const h of headersOut) {
+        if (copy[h] === undefined || copy[h] === null) copy[h] = '';
+      }
+      if (i === rowIdx) copy[writeKey] = nextStatus;
+      return copy;
+    });
+
+    try {
+      await persistIndexRows(nextRows, headersOut);
+    } catch {
+      /* persistIndexRows đã set indexListError */
+    }
+  }, [indexChannelStatusToggle, indexSingleSelectedRowIndex, indexSaving, indexHeaders, indexDraftRows, persistIndexRows]);
 
   const openIndexEditForSingleSelection = useCallback(() => {
     if (indexSingleSelectedRowIndex == null) return;
@@ -438,23 +518,59 @@ function ChannelsPage() {
 
   const canSetStartFrom = Boolean(detail?.fileName?.toLowerCase().endsWith('.xlsx') && detailLayout.startFromKey);
 
+  const toggleDetailRowSelected = useCallback((originalRowIndex: number) => {
+    setDetailSelectedRowIndices(prev => {
+      const next = new Set(prev);
+      if (next.has(originalRowIndex)) next.delete(originalRowIndex);
+      else next.add(originalRowIndex);
+      return next;
+    });
+  }, []);
+
+  const detailMetaSelectionStats = useMemo(() => {
+    const rows = detail?.rows;
+    if (!rows?.length) {
+      return { hasCreatedVideoInSelection: false, createdVideoSelectedCount: 0 };
+    }
+    const sk = detailLayout.statusKey;
+    let hasCreatedVideoInSelection = false;
+    let createdVideoSelectedCount = 0;
+    for (const i of detailSelectedRowIndices) {
+      const row = rows[i];
+      if (!row) continue;
+      const st = sk ? String(row[sk] ?? '').trim() : '';
+      if (st === DETAIL_STATUS_VIDEO_CREATED) {
+        hasCreatedVideoInSelection = true;
+        createdVideoSelectedCount += 1;
+      }
+    }
+    return { hasCreatedVideoInSelection, createdVideoSelectedCount };
+  }, [detail?.rows, detailSelectedRowIndices, detailLayout.statusKey]);
+
   const handleDetailUpdateMeta = useCallback(
     async (originalIndices: number[]) => {
       if (!selectedChannel || !detail?.rows?.length || originalIndices.length === 0) return;
       const lk = detailLayout.linkVideoKey;
+      const sk = detailLayout.statusKey;
       if (!lk) {
         setDetailActionError('File chi tiết không có cột LINK VIDEO.');
+        return;
+      }
+      if (!sk) {
+        setDetailActionError('File chi tiết không có cột STATUS — không lọc được «Đã tạo video».');
         return;
       }
       const items: { url: string }[] = [];
       for (const i of originalIndices) {
         const row = detail.rows[i];
         if (!row) continue;
+        const status = String(row[sk] ?? '').trim();
+        if (status !== DETAIL_STATUS_VIDEO_CREATED) continue;
         const url = String(row[lk] ?? '').trim();
         if (url) items.push({ url });
       }
       if (items.length === 0) {
-        setDetailActionError('Các dòng đã chọn không có link video hợp lệ.');
+        setDetailActionError('Không có dòng «Đã tạo video» nào (trong phần đã chọn) có link video hợp lệ.');
         return;
       }
       if (!window.runner?.runScript) {
@@ -477,7 +593,7 @@ function ChannelsPage() {
         setDetailUpdateMetaBusy(false);
       }
     },
-    [selectedChannel, detail?.rows, detailLayout.linkVideoKey]
+    [selectedChannel, detail?.rows, detailLayout.linkVideoKey, detailLayout.statusKey]
   );
 
   async function handleSetStartFromRow(dataRowIndex: number) {
@@ -550,6 +666,90 @@ function ChannelsPage() {
     return result.sort((a, b) => a.folder.localeCompare(b.folder, undefined, { sensitivity: 'base' }));
   }, [indexDraftRows, indexHeaders, indexSelectedRowIndices]);
 
+  const handleYoutubeUploadConfirm = useCallback((payloads: ChannelUploadVideoPayload[]) => {
+    if (!window.runner?.runScript) {
+      setUploadScheduleInfo('Chỉ chạy upload trong app Electron.');
+      return;
+    }
+
+    const claimed: ChannelUploadVideoPayload[] = [];
+    const skippedBusy: string[] = [];
+    const seenInRequest = new Set<string>();
+    for (const p of payloads) {
+      const k = normalizeYoutubeUploadEmailKey(p.email);
+      if (!k) continue;
+      if (seenInRequest.has(k)) continue;
+      seenInRequest.add(k);
+      if (uploadingYoutubeEmailsRef.current.has(k)) {
+        skippedBusy.push(p.email);
+        continue;
+      }
+      uploadingYoutubeEmailsRef.current.add(k);
+      claimed.push(p);
+    }
+
+    if (skippedBusy.length > 0) {
+      const uniq = [...new Set(skippedBusy)];
+      setUploadScheduleInfo(
+        `Bỏ qua ${uniq.length} email đang upload trên luồng khác: ${uniq.join(', ')}. Chờ xong rồi mới chạy lại cho các email đó.`,
+      );
+    }
+
+    if (claimed.length === 0) {
+      if (skippedBusy.length === 0) {
+        setUploadScheduleInfo('Không có kênh hợp lệ để upload.');
+      }
+      return;
+    }
+
+    if (skippedBusy.length === 0) {
+      setUploadScheduleInfo(null);
+    }
+    setYoutubeUploadActiveThreads(n => n + claimed.length);
+
+    const skipNote =
+      skippedBusy.length > 0
+        ? `Đã bỏ qua email đang bận: ${[...new Set(skippedBusy)].join(', ')}. `
+        : '';
+
+    void (async () => {
+      const tasks = claimed.map(p => {
+        const k = normalizeYoutubeUploadEmailKey(p.email);
+        return window.runner
+          .runScript('uploadYoutubeViaGpm', {
+            gpmProfileId: p.gpmProfileId,
+            channelFolder: p.channelFolder,
+            email: p.email,
+            maxUploads: p.totalVideos,
+            gpmApiBase: gpmApi.getBaseUrl(),
+          })
+          .finally(() => {
+            uploadingYoutubeEmailsRef.current.delete(k);
+            setYoutubeUploadActiveThreads(c => Math.max(0, c - 1));
+          });
+      });
+
+      try {
+        const settled = await Promise.allSettled(tasks);
+        let ok = 0;
+        let fail = 0;
+        for (const r of settled) {
+          if (r.status === 'fulfilled') ok += 1;
+          else fail += 1;
+        }
+        const parts: string[] = [];
+        if (ok > 0) parts.push(`${ok} kênh xong`);
+        if (fail > 0) parts.push(`${fail} kênh lỗi`);
+        setUploadScheduleInfo(
+          `${skipNote}Upload YouTube (${claimed.length} luồng song song): ${parts.join(' — ')}. Kiểm tra GPM / YouTube Studio và tab Logs.`,
+        );
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : String(e);
+        setUploadScheduleInfo(`${skipNote}Upload YouTube lỗi: ${msg}`);
+      }
+    })();
+  }, []);
+
   return (
     <div className='space-y-6 w-full min-w-0'>
       <PageHeader
@@ -570,8 +770,10 @@ function ChannelsPage() {
             indexSingleSelectedFolder={indexSingleSelectedFolder}
             onOpenEditSelectedRow={openIndexEditForSingleSelection}
             onOpenDetailSelectedRow={openIndexDetailForSingleSelection}
+            indexChannelStatusToggle={indexChannelStatusToggle}
+            onChannelStatusToggle={() => void onChannelStatusToggle()}
             uploadEligibleSelectedCount={uploadChannelsFromSelection.length}
-            youtubeUploadProgress={youtubeUploadProgress}
+            youtubeUploadActiveThreads={youtubeUploadActiveThreads}
             refreshBusy={refreshBusy}
             onOpenCreateVideo={() => setCreateVideoOpen(true)}
             onOpenAddChannel={() => {
@@ -601,6 +803,22 @@ function ChannelsPage() {
             }}
             onBackToIndex={() => setSelectedChannel(null)}
             onRefresh={handleRefresh}
+            detailUpdateMeta={
+              selectedChannel
+                ? {
+                    canUpdateMeta: Boolean(
+                      detailLayout.linkVideoKey &&
+                        detailLayout.statusKey &&
+                        typeof window.runner?.runScript === 'function'
+                    ),
+                    updateMetaBusy: detailUpdateMetaBusy,
+                    detailActionsLocked: startMarkingIndex !== null,
+                    createdVideoSelectedCount: detailMetaSelectionStats.createdVideoSelectedCount,
+                    hasCreatedVideoInSelection: detailMetaSelectionStats.hasCreatedVideoInSelection,
+                    onUpdateMeta: () => void handleDetailUpdateMeta(Array.from(detailSelectedRowIndices)),
+                  }
+                : undefined
+            }
           />
         }
       />
@@ -647,6 +865,7 @@ function ChannelsPage() {
       {!selectedChannel ? (
         <>
           <ChannelsIndexSection
+            indexHeaders={indexHeaders}
             indexListError={indexListError}
             indexLoading={indexLoading}
             indexSaving={indexSaving}
@@ -712,11 +931,8 @@ function ChannelsPage() {
           canSetStartFrom={canSetStartFrom}
           startMarkingIndex={startMarkingIndex}
           onSetStartFromRow={handleSetStartFromRow}
-          canUpdateMeta={Boolean(
-            selectedChannel && detailLayout.linkVideoKey && typeof window.runner?.runScript === 'function'
-          )}
-          updateMetaBusy={detailUpdateMetaBusy}
-          onUpdateMeta={handleDetailUpdateMeta}
+          detailSelectedRowIndices={detailSelectedRowIndices}
+          onToggleDetailRowSelected={toggleDetailRowSelected}
         />
       )}
 
@@ -738,49 +954,9 @@ function ChannelsPage() {
         <ChannelUploadVideoDialog
           channels={uploadChannelsFromSelection}
           selectedRowCount={indexSelectedRowIndices.size}
+          activeBackgroundUploadThreads={youtubeUploadActiveThreads}
           onClose={() => setUploadVideoOpen(false)}
-          onConfirm={(payloads: ChannelUploadVideoPayload[]) => {
-            void (async () => {
-              if (!window.runner?.runScript) {
-                setUploadScheduleInfo('Chỉ chạy upload trong app Electron.');
-                return;
-              }
-              setUploadScheduleInfo(null);
-              try {
-                for (let i = 0; i < payloads.length; i++) {
-                  const p = payloads[i];
-                  setYoutubeUploadProgress({
-                    current: i + 1,
-                    total: payloads.length,
-                    channelLabel: p.channelFolder,
-                  });
-                  await window.runner.runScript('uploadYoutubeViaGpm', {
-                    gpmProfileId: p.gpmProfileId,
-                    channelFolder: p.channelFolder,
-                    email: p.email,
-                    maxUploads: p.totalVideos,
-                    gpmApiBase: gpmApi.getBaseUrl(),
-                  });
-                }
-                if (payloads.length === 1) {
-                  const p = payloads[0];
-                  const n = p.totalVideos == null ? 'tất cả thư mục con có .mp4' : String(p.totalVideos);
-                  setUploadScheduleInfo(
-                    `Upload YouTube đã chạy xong — kênh «${p.channelFolder}», profile GPM ${p.gpmProfileId} (theo email ↔ name), tối đa ${n}. Kiểm tra GPM / YouTube Studio và tab Logs.`
-                  );
-                } else if (payloads.length > 1) {
-                  setUploadScheduleInfo(
-                    `Upload YouTube đồng loạt đã chạy xong cho ${payloads.length} kênh. Kiểm tra GPM / YouTube Studio và tab Logs.`
-                  );
-                }
-              } catch (e) {
-                const msg = e instanceof Error ? e.message : String(e);
-                setUploadScheduleInfo(`Upload YouTube lỗi: ${msg}`);
-              } finally {
-                setYoutubeUploadProgress(null);
-              }
-            })();
-          }}
+          onConfirm={handleYoutubeUploadConfirm}
         />
       ) : null}
 

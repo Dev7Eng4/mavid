@@ -1,4 +1,4 @@
-export type Page = 'pipeline' | 'create-video' | 'settings' | 'channels' | 'gpm' | 'logs';
+export type Page = 'pipeline' | 'create-video' | 'settings' | 'channels' | 'analyst' | 'gpm' | 'logs';
 
 export type ScriptId =
   | 'tao-chrome-profile'
@@ -260,6 +260,8 @@ export interface GetInfoChannelResult {
 /** `MaVidMedia/channels/{folder}/mavid-channel-config.json` — đồng bộ với form Thêm/Sửa channel. */
 export interface MavidChannelConfigItem {
   email?: string;
+  /** Đồng bộ cột index «KÊNH CỦA TÔI». */
+  myChannel?: string;
   videoType?: string;
   durationMinuteFrom?: number;
   durationMinuteTo?: number | null;

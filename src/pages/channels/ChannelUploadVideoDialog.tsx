@@ -75,6 +75,8 @@ export interface ChannelUploadVideoDialogProps {
   channels: ChannelItem[];
   /** Số dòng đã tick trên bảng. */
   selectedRowCount: number;
+  /** Số luồng upload đang chạy nền (từ parent). */
+  activeBackgroundUploadThreads?: number;
   onClose: () => void;
   /** Gọi khi đã có payloads hợp lệ; parent tự chạy upload nền (không cần await). */
   onConfirm: (payloads: ChannelUploadVideoPayload[]) => void;
@@ -88,23 +90,23 @@ function clampInt(n: number, min: number, max: number): number {
 export function ChannelUploadVideoDialog({
   channels,
   selectedRowCount,
+  activeBackgroundUploadThreads = 0,
   onClose,
   onConfirm,
 }: ChannelUploadVideoDialogProps) {
   const [totalVideos, setTotalVideos] = useState<number | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
-  const [busy, setBusy] = useState(false);
 
   const eligibleCount = channels.length;
   const skippedCount = Math.max(0, selectedRowCount - eligibleCount);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape' && !busy) onClose();
+      if (e.key === 'Escape') onClose();
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [onClose, busy]);
+  }, [onClose]);
 
   const handleConfirm = useCallback(async () => {
     if (channels.length === 0) {
@@ -114,7 +116,6 @@ export function ChannelUploadVideoDialog({
 
     const total = totalVideos == null ? null : clampInt(totalVideos, 1, 99_999);
     setFormError(null);
-    setBusy(true);
     try {
       const profiles = await fetchAllGpmProfileRows();
       const payloads: ChannelUploadVideoPayload[] = [];
@@ -142,8 +143,6 @@ export function ChannelUploadVideoDialog({
       onClose();
     } catch (e) {
       setFormError(e instanceof Error ? e.message : 'Không chạy được upload.');
-    } finally {
-      setBusy(false);
     }
   }, [channels, onClose, onConfirm, totalVideos]);
 
@@ -155,7 +154,7 @@ export function ChannelUploadVideoDialog({
     <div
       className='fixed inset-0 z-50 flex items-center justify-center p-4 overflow-y-auto overflow-x-hidden'
       style={{ background: 'rgba(0, 0, 0, 0.45)' }}
-      onClick={() => !busy && onClose()}
+      onClick={() => onClose()}
       role='presentation'
     >
       <div
@@ -207,7 +206,6 @@ export function ChannelUploadVideoDialog({
               min={1}
               max={99999}
               value={totalVideos ?? ''}
-              disabled={busy}
               onChange={e => {
                 const v = e.target.value.trim();
                 if (v === '') setTotalVideos(null);
@@ -231,14 +229,21 @@ export function ChannelUploadVideoDialog({
               {formError}
             </p>
           ) : null}
+
+          {activeBackgroundUploadThreads > 0 ? (
+            <p className='text-sm' style={{ color: 'var(--text-muted)' }}>
+              Đang chạy nền: <strong style={{ color: 'var(--text-h)' }}>{activeBackgroundUploadThreads}</strong> luồng upload (mỗi email một
+              profile GPM riêng). Có thể bấm Xác nhận thêm; email đang bận sẽ bị bỏ qua cho đến khi xong.
+            </p>
+          ) : null}
         </div>
 
         <div className='flex flex-wrap justify-end gap-2 mt-6 pt-4 shrink-0 border-t' style={{ borderColor: 'var(--border)' }}>
-          <AppButton type='button' variant='neutral' onClick={() => onClose()} disabled={busy}>
+          <AppButton type='button' variant='neutral' onClick={() => onClose()}>
             Hủy
           </AppButton>
-          <AppButton type='button' variant='primary' onClick={() => void handleConfirm()} disabled={!canSubmit || busy}>
-            {busy ? 'Đang chạy…' : 'Xác nhận'}
+          <AppButton type='button' variant='primary' onClick={() => void handleConfirm()} disabled={!canSubmit}>
+            Xác nhận
           </AppButton>
         </div>
       </div>

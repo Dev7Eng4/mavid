@@ -35,7 +35,50 @@ const ALLOWED_NPM_SCRIPTS = new Set([
   'syncVideosToDrive',
 ]);
 
-let jobRunning = false;
+/** Chỉ dùng cho `run-npm-script` (spawn npm). */
+let npmJobRunning = false;
+/** Số lần gọi `run-script` đang thực thi (cho phép nhiều script song song). */
+let activeRunScriptCount = 0;
+
+/** Bọc console cho run-script — refcount để nhiều job song song không restore sai. */
+let runScriptConsoleWrapDepth = 0;
+/** @type {{ log: typeof console.log; warn: typeof console.warn; error: typeof console.error } | null} */
+let runScriptConsolePinned = null;
+
+function beginRunScriptConsoleCapture() {
+  if (runScriptConsoleWrapDepth === 0) {
+    runScriptConsolePinned = {
+      log: console.log,
+      warn: console.warn,
+      error: console.error,
+    };
+    const base = runScriptConsolePinned;
+    console.log = (...args) => {
+      base.log.apply(console, args);
+    };
+    console.warn = (...args) => {
+      const line = args.map(a => (typeof a === 'object' ? JSON.stringify(a) : String(a))).join(' ');
+      broadcastScriptError(`[warn] ${line}`);
+      base.warn.apply(console, args);
+    };
+    console.error = (...args) => {
+      const line = args.map(a => (typeof a === 'object' ? JSON.stringify(a) : String(a))).join(' ');
+      broadcastScriptError(`[error] ${line}`);
+      base.error.apply(console, args);
+    };
+  }
+  runScriptConsoleWrapDepth += 1;
+}
+
+function endRunScriptConsoleCapture() {
+  runScriptConsoleWrapDepth = Math.max(0, runScriptConsoleWrapDepth - 1);
+  if (runScriptConsoleWrapDepth === 0 && runScriptConsolePinned) {
+    console.log = runScriptConsolePinned.log;
+    console.warn = runScriptConsolePinned.warn;
+    console.error = runScriptConsolePinned.error;
+    runScriptConsolePinned = null;
+  }
+}
 
 /** Dòng giống lỗi trên stdout npm — đẩy lên tab Logs. */
 const NPM_STDOUT_ERR_LIKE =
@@ -186,9 +229,10 @@ ipcMain.handle('clear-persisted-error-logs', async () => {
 ipcMain.handle('run-npm-script', async (_event, { npmScript, extraEnv }) => {
   if (!npmScript || typeof npmScript !== 'string') throw new Error('npmScript không hợp lệ.');
   if (!ALLOWED_NPM_SCRIPTS.has(npmScript)) throw new Error(`Script không được phép: ${npmScript}`);
-  if (jobRunning) throw new Error('Đang có job chạy. Vui lòng chờ kết thúc.');
+  if (npmJobRunning) throw new Error('Đang có job npm chạy. Vui lòng chờ kết thúc.');
+  if (activeRunScriptCount > 0) throw new Error('Đang có script chạy. Vui lòng chờ kết thúc hoặc đợi upload xong.');
 
-  jobRunning = true;
+  npmJobRunning = true;
   npmRunUserCancelled = false;
 
   writeRunnerTerminalLine(`[MaVid] Bắt đầu: npm run ${npmScript}`);
@@ -264,7 +308,7 @@ ipcMain.handle('run-npm-script', async (_event, { npmScript, extraEnv }) => {
     }
     throw e;
   } finally {
-    jobRunning = false;
+    npmJobRunning = false;
     npmChildProcess = null;
     npmRunUserCancelled = false;
   }
@@ -287,28 +331,10 @@ const SCRIPT_MAP = {
 ipcMain.handle('run-script', async (_event, { script, params = {} }) => {
   if (!script || typeof script !== 'string') throw new Error('script không hợp lệ.');
   if (!SCRIPT_MAP[script]) throw new Error(`Script không được phép: ${script}`);
-  if (jobRunning) throw new Error('Đang có job chạy. Vui lòng chờ kết thúc.');
+  if (npmJobRunning) throw new Error('Đang chạy npm script. Vui lòng chờ kết thúc.');
 
-  jobRunning = true;
-
-  // Intercept console: chỉ đẩy warn/error lên tab Logs (contents thường dùng console.error trong catch).
-  const originalLog = console.log;
-  const originalWarn = console.warn;
-  const originalError = console.error;
-
-  console.log = (...args) => {
-    originalLog.apply(console, args);
-  };
-  console.warn = (...args) => {
-    const line = args.map(a => (typeof a === 'object' ? JSON.stringify(a) : String(a))).join(' ');
-    broadcastScriptError(`[warn] ${line}`);
-    originalWarn.apply(console, args);
-  };
-  console.error = (...args) => {
-    const line = args.map(a => (typeof a === 'object' ? JSON.stringify(a) : String(a))).join(' ');
-    broadcastScriptError(`[error] ${line}`);
-    originalError.apply(console, args);
-  };
+  activeRunScriptCount += 1;
+  beginRunScriptConsoleCapture();
 
   writeRunnerTerminalLine(`[MaVid] Bắt đầu: ${script}`);
 
@@ -326,11 +352,8 @@ ipcMain.handle('run-script', async (_event, { script, params = {} }) => {
     broadcastScriptError(`[MaVid] Lỗi: ${em}`);
     throw err;
   } finally {
-    // Restore console
-    console.log = originalLog;
-    console.warn = originalWarn;
-    console.error = originalError;
-    jobRunning = false;
+    endRunScriptConsoleCapture();
+    activeRunScriptCount = Math.max(0, activeRunScriptCount - 1);
   }
 });
 
@@ -1068,22 +1091,37 @@ async function readXlsxAsChannelData(absPath) {
   }
   const sheet = workbook.worksheets[0];
   if (!sheet) return { headers: [], rows: [] };
-  const headers = [];
   const headerRow = sheet.getRow(1);
-  headerRow.eachCell((cell, colNum) => {
-    headers[colNum - 1] = cell.text || `Col${colNum}`;
-  });
-  const rows = [];
-  sheet.eachRow((row, rowNum) => {
-    if (rowNum === 1) return;
-    const obj = {};
-    row.eachCell((cell, colNum) => {
-      const key = headers[colNum - 1] || `Col${colNum}`;
-      obj[key] = cell.text ?? cell.value;
+
+  /** `eachCell` mặc định bỏ ô trống → mảng tiêu đề bị co cột, giá trị lệch (vd. STATUS vào LAST UPLOAD). */
+  let maxCol = 0;
+  for (let rowNum = 1; rowNum <= sheet.rowCount; rowNum++) {
+    sheet.getRow(rowNum).eachCell((cell, colNumber) => {
+      if (colNumber > maxCol) maxCol = colNumber;
     });
+  }
+  if (maxCol < 1) return { headers: [], rows: [] };
+
+  const headers = [];
+  for (let c = 1; c <= maxCol; c++) {
+    const cell = headerRow.getCell(c);
+    const raw = cell.text ?? cell.value;
+    const t = raw == null ? '' : String(raw).trim();
+    headers.push(t || `Col${c}`);
+  }
+
+  const rows = [];
+  for (let rowNum = 2; rowNum <= sheet.rowCount; rowNum++) {
+    const row = sheet.getRow(rowNum);
+    const obj = {};
+    for (let c = 1; c <= maxCol; c++) {
+      const key = headers[c - 1] || `Col${c}`;
+      const cell = row.getCell(c);
+      obj[key] = cell.text ?? cell.value ?? '';
+    }
     rows.push(obj);
-  });
-  return { headers: headers.filter(Boolean), rows };
+  }
+  return { headers, rows };
 }
 
 function readCsvAsChannelData(absPath) {
@@ -1179,16 +1217,19 @@ ipcMain.handle('write-channel-index', async (_event, { filePath, headers, rows }
     LINK: 60,
     ID: 40,
     EMAIL: 45,
+    'KÊNH CỦA TÔI': 36,
     'LOẠI VIDEO': 18,
     'THỜI GIAN VIDEO': 18,
     BACKGROUND: 22,
     'LAST UPLOAD': 30,
+    STATUS: 12,
   };
   sheet.columns = headers.map(h => ({ width: colWidths[h] ?? 20 }));
 
   const typeCol = headers.findIndex(h => normHeaderCell(h) === normHeaderCell('LOẠI VIDEO')) + 1;
   const thoiGianCol = headers.findIndex(h => normHeaderCell(h) === normHeaderCell('THỜI GIAN VIDEO')) + 1;
   const bgCol = headers.findIndex(h => normHeaderCell(h) === normHeaderCell('BACKGROUND')) + 1;
+  const statusCol = headers.findIndex(h => normHeaderCell(h) === normHeaderCell('STATUS')) + 1;
 
   const backgroundsDir = await resolveStockBackgroundsDirFromDisk();
   let bgOptions = [];
@@ -1198,6 +1239,7 @@ ipcMain.handle('write-channel-index', async (_event, { filePath, headers, rows }
 
   const typeFormula = `"${INDEX_VIDEO_TYPE_OPTIONS.join(',')}"`;
   const thoiGianFormula = `"${INDEX_THOI_GIAN_OPTIONS.join(',')}"`;
+  const statusFormula = '"INIT,LIVE,STOPPED"';
 
   for (let r = 2; r <= sheet.rowCount; r++) {
     if (typeCol > 0) {
@@ -1220,6 +1262,13 @@ ipcMain.handle('write-channel-index', async (_event, { filePath, headers, rows }
         type: 'list',
         allowBlank: true,
         formulae: [bgFormula],
+      };
+    }
+    if (statusCol > 0) {
+      sheet.getRow(r).getCell(statusCol).dataValidation = {
+        type: 'list',
+        allowBlank: true,
+        formulae: [statusFormula],
       };
     }
   }

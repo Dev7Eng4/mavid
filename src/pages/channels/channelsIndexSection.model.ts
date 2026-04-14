@@ -1,7 +1,21 @@
 import type { ChannelRow } from '@/types';
 
-/** Cột hiển thị bảng index (cố định; khớp MaVidMedia/channels/index.xlsx). */
-export const CHANNELS_INDEX_TABLE_HEADERS = ['ID', 'LINK', 'EMAIL', 'LOẠI VIDEO', 'THỜI GIAN VIDEO', 'LAST UPLOAD'] as const;
+/**
+ * Cột hiển thị bảng index trên trang Channels — cố định và đúng thứ tự.
+ * Giá trị ô lấy từ `index.xlsx` theo khóa cột thực tế (map ID ↔ ID hoặc CHANNEL).
+ */
+export const CHANNELS_INDEX_VISIBLE_COLUMNS = [
+  'ID',
+  'LINK',
+  'EMAIL',
+  'LOẠI VIDEO',
+  'THỜI GIAN VIDEO',
+  'LAST UPLOAD',
+  'STATUS',
+] as const;
+
+/** Alias tương thích — cùng danh sách với `CHANNELS_INDEX_VISIBLE_COLUMNS`. */
+export const CHANNELS_INDEX_TABLE_HEADERS = CHANNELS_INDEX_VISIBLE_COLUMNS;
 
 export interface ChannelsIndexPagination {
   page: number;
@@ -12,6 +26,8 @@ export interface ChannelsIndexPagination {
 }
 
 export interface ChannelsIndexSectionProps {
+  /** Tiêu đề cột đọc từ index.xlsx (dòng 1) — dùng để map ô vào `CHANNELS_INDEX_VISIBLE_COLUMNS`. */
+  indexHeaders: string[];
   indexListError: string | null;
   indexLoading: boolean;
   indexSaving: boolean;

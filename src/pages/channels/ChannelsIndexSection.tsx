@@ -1,10 +1,12 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useMemo, useRef } from 'react';
 import type { ChannelsIndexSectionProps } from './channelsIndexSection.model';
 import { SpinnerIcon } from '@/components/ui/Icons';
 import { TablePaginationBar } from '@/components/ui/TablePaginationBar';
-import { CHANNELS_INDEX_TABLE_HEADERS } from './channelsIndexSection.model';
+import { findIndexHeaderKey, findIndexHeaderKeyAny } from './channelIndexHelpers';
+import { CHANNELS_INDEX_VISIBLE_COLUMNS } from './channelsIndexSection.model';
 
 export function ChannelsIndexSection({
+  indexHeaders,
   indexListError,
   indexLoading,
   indexSaving,
@@ -18,7 +20,17 @@ export function ChannelsIndexSection({
   pageSelectAll,
   pageSelectSome,
 }: ChannelsIndexSectionProps) {
-  const headers = CHANNELS_INDEX_TABLE_HEADERS;
+  /** Nhãn cột cố định + khóa thực tế trên `row` (theo header file). */
+  const indexDisplayColumns = useMemo(() => {
+    const fileHeaders = indexHeaders;
+    return CHANNELS_INDEX_VISIBLE_COLUMNS.map(label => {
+      const rowKey =
+        label === 'ID'
+          ? findIndexHeaderKeyAny(fileHeaders, ['ID', 'CHANNEL'])
+          : findIndexHeaderKey(fileHeaders, label);
+      return { label, rowKey: rowKey ?? '' };
+    });
+  }, [indexHeaders]);
   const headerSelectRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -65,13 +77,13 @@ export function ChannelsIndexSection({
                     aria-label='Chọn tất cả kênh trên trang này'
                   />
                 </th>
-                {headers.map(h => (
+                {indexDisplayColumns.map((col, colIdx) => (
                   <th
-                    key={h}
+                    key={`idx-h-${colIdx}-${col.label}`}
                     className='text-left px-4 py-3 font-medium whitespace-nowrap uppercase text-base tracking-wider'
                     style={{ color: 'var(--text-muted)', borderBottom: '1px solid var(--border)' }}
                   >
-                    {h}
+                    {col.label}
                   </th>
                 ))}
               </tr>
@@ -119,22 +131,25 @@ export function ChannelsIndexSection({
                           aria-label={`Chọn kênh dòng ${globalIndex + 1}`}
                         />
                       </td>
-                      {headers.map(h => (
-                        <td
-                          key={h}
-                          className='px-4 py-3 align-top wrap-break-word min-w-0'
-                          style={{ color: 'var(--text-h)' }}
-                          title={String(row[h] ?? '')}
-                        >
-                          {String(row[h] ?? '')}
-                        </td>
-                      ))}
+                      {indexDisplayColumns.map((col, colIdx) => {
+                        const cell = col.rowKey ? row[col.rowKey] : '';
+                        return (
+                          <td
+                            key={`idx-c-${colIdx}-${col.label}`}
+                            className='px-4 py-3 align-top wrap-break-word min-w-0'
+                            style={{ color: 'var(--text-h)' }}
+                            title={String(cell ?? '')}
+                          >
+                            {String(cell ?? '')}
+                          </td>
+                        );
+                      })}
                     </tr>
                   );
                 })
               ) : (
                 <tr>
-                  <td colSpan={headers.length + 1} className='px-4 py-8 text-center' style={{ color: 'var(--text-muted)' }}>
+                  <td colSpan={indexDisplayColumns.length + 1} className='px-4 py-8 text-center' style={{ color: 'var(--text-muted)' }}>
                     Chưa có dữ liệu trong index. Hãy thêm channel từ Pipeline.
                   </td>
                 </tr>
