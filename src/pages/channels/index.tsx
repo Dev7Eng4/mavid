@@ -250,8 +250,7 @@ function ChannelsPage() {
         nextStatus: null as 'LIVE' | 'STOPPED' | null,
         label: 'ACTIVE / DEACTIVE',
         enabled: false,
-        title:
-          'File index chưa có cột STATUS. Cập nhật index (Thêm channel / script getInfoChannel) hoặc thêm cột STATUS ở cuối sheet.',
+        title: 'File index chưa có cột STATUS. Cập nhật index (Thêm channel / script getInfoChannel) hoặc thêm cột STATUS ở cuối sheet.',
       };
     }
     const raw = String(indexDraftRows[indexSingleSelectedRowIndex]?.[sk] ?? '')
@@ -411,7 +410,11 @@ function ChannelsPage() {
     };
 
     const skip = new Set([emailKey, nameKey, tagsKey].filter(Boolean) as string[]);
-    const tableHeaders = headers.filter(h => !skip.has(h));
+    const rest = headers.filter(h => !skip.has(h));
+    const linkVideoKey = findKey('LINK VIDEO');
+    /** Cột 2 (sau checkbox): LINK VIDEO nếu có, còn lại giữ thứ tự sheet. */
+    const tableHeaders =
+      linkVideoKey && rest.includes(linkVideoKey) ? [linkVideoKey, ...rest.filter(h => h !== linkVideoKey)] : rest;
 
     return {
       meta,
@@ -419,7 +422,7 @@ function ChannelsPage() {
       showEmail: Boolean(emailKey),
       showChannelName: Boolean(nameKey),
       showTags: Boolean(tagsKey),
-      linkVideoKey: findKey('LINK VIDEO'),
+      linkVideoKey,
       durationKey: findKey('DURATION'),
       statusKey: findKey('STATUS'),
       startFromKey: findKey('START FROM'),
@@ -516,6 +519,24 @@ function ChannelsPage() {
     [filteredRowsWithIndex, detailStartIndex, detailPageSize]
   );
 
+  const detailPageSelectionFlags = useMemo(() => {
+    const onPage = pageDetailRows.map(({ originalIndex }) => originalIndex);
+    const all = onPage.length > 0 && onPage.every(i => detailSelectedRowIndices.has(i));
+    const some = onPage.some(i => detailSelectedRowIndices.has(i));
+    return { all, some };
+  }, [pageDetailRows, detailSelectedRowIndices]);
+
+  const toggleDetailSelectAllOnPage = useCallback(() => {
+    const onPage = pageDetailRows.map(({ originalIndex }) => originalIndex);
+    setDetailSelectedRowIndices(prev => {
+      const next = new Set(prev);
+      const allSelected = onPage.length > 0 && onPage.every(i => next.has(i));
+      if (allSelected) onPage.forEach(i => next.delete(i));
+      else onPage.forEach(i => next.add(i));
+      return next;
+    });
+  }, [pageDetailRows]);
+
   const canSetStartFrom = Boolean(detail?.fileName?.toLowerCase().endsWith('.xlsx') && detailLayout.startFromKey);
 
   const toggleDetailRowSelected = useCallback((originalRowIndex: number) => {
@@ -549,6 +570,7 @@ function ChannelsPage() {
 
   const handleDetailUpdateMeta = useCallback(
     async (originalIndices: number[]) => {
+      console.log('🚀 ~ ChannelsPage ~ originalIndices:', originalIndices);
       if (!selectedChannel || !detail?.rows?.length || originalIndices.length === 0) return;
       const lk = detailLayout.linkVideoKey;
       const sk = detailLayout.statusKey;
@@ -620,7 +642,9 @@ function ChannelsPage() {
     ? detailLayout.tableHeaders
     : ['—'];
 
-  const detailColCount = Math.max(detailTheadHeaders.length, 1);
+  /** Cột checkbox riêng (chỉ khi có bảng video hoặc đang load). */
+  const detailShowSelectColumn = detailLoading || detailLayout.tableHeaders.length > 0;
+  const detailColCount = Math.max(detailTheadHeaders.length, 1) + (detailShowSelectColumn ? 1 : 0);
 
   const showDetailMetaAbove =
     !detailLoading && detail != null && (detailLayout.showEmail || detailLayout.showChannelName || detailLayout.showTags);
@@ -691,7 +715,7 @@ function ChannelsPage() {
     if (skippedBusy.length > 0) {
       const uniq = [...new Set(skippedBusy)];
       setUploadScheduleInfo(
-        `Bỏ qua ${uniq.length} email đang upload trên luồng khác: ${uniq.join(', ')}. Chờ xong rồi mới chạy lại cho các email đó.`,
+        `Bỏ qua ${uniq.length} email đang upload trên luồng khác: ${uniq.join(', ')}. Chờ xong rồi mới chạy lại cho các email đó.`
       );
     }
 
@@ -707,10 +731,7 @@ function ChannelsPage() {
     }
     setYoutubeUploadActiveThreads(n => n + claimed.length);
 
-    const skipNote =
-      skippedBusy.length > 0
-        ? `Đã bỏ qua email đang bận: ${[...new Set(skippedBusy)].join(', ')}. `
-        : '';
+    const skipNote = skippedBusy.length > 0 ? `Đã bỏ qua email đang bận: ${[...new Set(skippedBusy)].join(', ')}. ` : '';
 
     void (async () => {
       const tasks = claimed.map(p => {
@@ -741,7 +762,7 @@ function ChannelsPage() {
         if (ok > 0) parts.push(`${ok} kênh xong`);
         if (fail > 0) parts.push(`${fail} kênh lỗi`);
         setUploadScheduleInfo(
-          `${skipNote}Upload YouTube (${claimed.length} luồng song song): ${parts.join(' — ')}. Kiểm tra GPM / YouTube Studio và tab Logs.`,
+          `${skipNote}Upload YouTube (${claimed.length} luồng song song): ${parts.join(' — ')}. Kiểm tra GPM / YouTube Studio và tab Logs.`
         );
       } catch (e) {
         const msg = e instanceof Error ? e.message : String(e);
@@ -807,9 +828,7 @@ function ChannelsPage() {
               selectedChannel
                 ? {
                     canUpdateMeta: Boolean(
-                      detailLayout.linkVideoKey &&
-                        detailLayout.statusKey &&
-                        typeof window.runner?.runScript === 'function'
+                      detailLayout.linkVideoKey && detailLayout.statusKey && typeof window.runner?.runScript === 'function'
                     ),
                     updateMetaBusy: detailUpdateMetaBusy,
                     detailActionsLocked: startMarkingIndex !== null,
@@ -836,7 +855,7 @@ function ChannelsPage() {
         </div>
       ) : null}
 
-      {addChannelInfo ? (
+      {/* {addChannelInfo ? (
         <div
           className='rounded-2xl px-4 py-3 text-base wrap-break-word'
           style={{
@@ -847,7 +866,7 @@ function ChannelsPage() {
         >
           {addChannelInfo}
         </div>
-      ) : null}
+      ) : null} */}
 
       {googleDriveSyncInfo ? (
         <div
@@ -933,6 +952,9 @@ function ChannelsPage() {
           onSetStartFromRow={handleSetStartFromRow}
           detailSelectedRowIndices={detailSelectedRowIndices}
           onToggleDetailRowSelected={toggleDetailRowSelected}
+          detailPageSelectAll={detailPageSelectionFlags.all}
+          detailPageSelectSome={detailPageSelectionFlags.some}
+          onToggleDetailSelectAllOnPage={toggleDetailSelectAllOnPage}
         />
       )}
 

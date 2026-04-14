@@ -1,3 +1,4 @@
+import { useEffect, useRef } from 'react';
 import { CustomSelect } from '@/components/ui/CustomSelect';
 import { SpinnerIcon } from '@/components/ui/Icons';
 import { TablePaginationBar } from '@/components/ui/TablePaginationBar';
@@ -30,12 +31,27 @@ export function ChannelsDetailSection({
   onSetStartFromRow,
   detailSelectedRowIndices,
   onToggleDetailRowSelected,
+  detailPageSelectAll,
+  detailPageSelectSome,
+  onToggleDetailSelectAllOnPage,
 }: ChannelsDetailSectionProps) {
   const lk = detailLayout.linkVideoKey;
   const dk = detailLayout.durationKey;
   const sk = detailLayout.statusKey;
   const showSearchBar =
     !detailLoading && detailRowsLength > 0 && detailLayout.tableHeaders.length > 0 && (Boolean(lk) || Boolean(dk) || Boolean(sk));
+
+  /** Cột 1: checkbox; cột 2 trở đi: dữ liệu (giống bảng index). */
+  const showSelectColumn = detailLoading || detailLayout.tableHeaders.length > 0;
+
+  const headerSelectRef = useRef<HTMLInputElement>(null);
+  const detailBulkSelectDisabled =
+    detailLoading || pageDetailRows.length === 0 || startMarkingIndex !== null;
+
+  useEffect(() => {
+    const el = headerSelectRef.current;
+    if (el) el.indeterminate = detailPageSelectSome && !detailPageSelectAll;
+  }, [detailPageSelectAll, detailPageSelectSome]);
 
   return (
     <div className='space-y-4 w-full min-w-0'>
@@ -113,18 +129,6 @@ export function ChannelsDetailSection({
         </div>
       ) : null}
 
-      {!detailLoading && detailRowsLength > 0 && detailLayout.tableHeaders.length > 0 ? (
-        <div
-          className='rounded-2xl px-4 py-3 w-full min-w-0'
-          style={{ background: 'var(--card-bg)', border: '1px solid var(--border)' }}
-        >
-          <p className='text-sm min-w-0' style={{ color: 'var(--text-muted)' }}>
-            Chọn một hoặc nhiều dòng video (checkbox / click dòng). Nút <strong style={{ color: 'var(--text-h)' }}>Cập nhật meta</strong> trên
-            thanh tiêu đề chỉ chạy cho dòng có status «Đã tạo video» (thiếu Gemini hoặc thiếu ảnh thumbnail).
-          </p>
-        </div>
-      ) : null}
-
       <div
         className='rounded-2xl w-full min-w-0 flex flex-col max-h-[min(70vh,720px)]'
         style={{ background: 'var(--card-bg)', border: '1px solid var(--border)' }}
@@ -133,6 +137,24 @@ export function ChannelsDetailSection({
           <table className='w-full min-w-0 text-base' style={{ borderCollapse: 'collapse', tableLayout: 'auto' }}>
             <thead className='sticky top-0 z-1'>
               <tr style={{ background: 'var(--code-bg)' }}>
+                {showSelectColumn ? (
+                  <th
+                    className='w-12 px-2 py-3 text-center align-middle'
+                    style={{ borderBottom: '1px solid var(--border)' }}
+                    scope='col'
+                  >
+                    <input
+                      ref={headerSelectRef}
+                      type='checkbox'
+                      className='w-4 h-4 cursor-pointer rounded border align-middle'
+                      style={{ borderColor: 'var(--border)', accentColor: 'var(--accent)' }}
+                      checked={detailPageSelectAll}
+                      onChange={() => onToggleDetailSelectAllOnPage()}
+                      disabled={detailBulkSelectDisabled}
+                      aria-label='Chọn tất cả video trên trang này'
+                    />
+                  </th>
+                ) : null}
                 {detailTheadHeaders.map(h => (
                   <th
                     key={h}
@@ -180,58 +202,61 @@ export function ChannelsDetailSection({
                         e.currentTarget.style.background = 'var(--hover-bg)';
                       }}
                       onMouseLeave={e => {
-                        e.currentTarget.style.background = detailSelectedRowIndices.has(originalIndex)
-                          ? 'var(--hover-bg)'
-                          : 'transparent';
+                        e.currentTarget.style.background = detailSelectedRowIndices.has(originalIndex) ? 'var(--hover-bg)' : 'transparent';
                       }}
                       onClick={e => {
                         if (window.getSelection()?.toString()) return;
-                        if ((e.target as HTMLElement).closest('button, a')) return;
+                        if ((e.target as HTMLElement).closest('button, a, input')) return;
                         onToggleDetailRowSelected(originalIndex);
                       }}
                     >
-                      {detailLayout.tableHeaders.map((h, colIndex) => {
+                      {showSelectColumn ? (
+                        <td
+                          className='px-2 py-3 align-top text-center w-12'
+                          onClick={e => e.stopPropagation()}
+                        >
+                          <input
+                            type='checkbox'
+                            className='mt-1 cursor-pointer w-4 h-4 shrink-0 rounded border align-middle'
+                            style={{ borderColor: 'var(--border)', accentColor: 'var(--accent)' }}
+                            checked={detailSelectedRowIndices.has(originalIndex)}
+                            onChange={() => onToggleDetailRowSelected(originalIndex)}
+                            aria-label={`Chọn dòng ${originalIndex + 1}`}
+                          />
+                        </td>
+                      ) : null}
+                      {detailLayout.tableHeaders.map(h => {
                         const isStartCol = canSetStartFrom && detailLayout.startFromKey === h;
                         if (isStartCol) {
                           const marked = String(row[h] ?? '').trim();
                           return (
                             <td key={h} className='px-4 py-3 align-top min-w-28'>
-                              <div className='flex items-start gap-2'>
-                                {colIndex === 0 && (
-                                  <input
-                                    type='checkbox'
-                                    className='mt-1 cursor-pointer w-4 h-4 shrink-0'
-                                    checked={detailSelectedRowIndices.has(originalIndex)}
-                                    readOnly
-                                  />
-                                )}
-                                <div className='flex flex-col gap-2 items-start'>
-                                  {marked ? (
-                                    <span className='text-sm font-medium uppercase tracking-wider' style={{ color: 'var(--accent)' }}>
-                                      Điểm bắt đầu
+                              <div className='flex flex-col gap-2 items-start'>
+                                {marked ? (
+                                  <span className='text-sm font-medium uppercase tracking-wider' style={{ color: 'var(--accent)' }}>
+                                    Điểm bắt đầu
+                                  </span>
+                                ) : null}
+                                <button
+                                  type='button'
+                                  disabled={startMarkingIndex !== null}
+                                  onClick={() => void onSetStartFromRow(originalIndex)}
+                                  className='rounded-lg px-3 py-1.5 text-base font-medium cursor-pointer transition-opacity duration-150 disabled:opacity-40 disabled:cursor-not-allowed'
+                                  style={{
+                                    color: '#fff',
+                                    background: 'var(--accent)',
+                                    border: '1px solid var(--accent)',
+                                  }}
+                                >
+                                  {startMarkingIndex === originalIndex ? (
+                                    <span className='inline-flex items-center gap-2'>
+                                      <SpinnerIcon className='w-3.5 h-3.5' />
+                                      Đang lưu…
                                     </span>
-                                  ) : null}
-                                  <button
-                                    type='button'
-                                    disabled={startMarkingIndex !== null}
-                                    onClick={() => void onSetStartFromRow(originalIndex)}
-                                    className='rounded-lg px-3 py-1.5 text-base font-medium cursor-pointer transition-opacity duration-150 disabled:opacity-40 disabled:cursor-not-allowed'
-                                    style={{
-                                      color: '#fff',
-                                      background: 'var(--accent)',
-                                      border: '1px solid var(--accent)',
-                                    }}
-                                  >
-                                    {startMarkingIndex === originalIndex ? (
-                                      <span className='inline-flex items-center gap-2'>
-                                        <SpinnerIcon className='w-3.5 h-3.5' />
-                                        Đang lưu…
-                                      </span>
-                                    ) : (
-                                      'Start'
-                                    )}
-                                  </button>
-                                </div>
+                                  ) : (
+                                    'Start'
+                                  )}
+                                </button>
                               </div>
                             </td>
                           );
@@ -243,17 +268,7 @@ export function ChannelsDetailSection({
                             style={{ color: 'var(--text-h)' }}
                             title={String(row[h] ?? '')}
                           >
-                            <div className='flex items-start gap-2'>
-                              {colIndex === 0 && (
-                                <input
-                                  type='checkbox'
-                                  className='mt-1 cursor-pointer w-4 h-4 shrink-0'
-                                  checked={detailSelectedRowIndices.has(originalIndex)}
-                                  readOnly
-                                />
-                              )}
-                              <span className='flex-1 break-all'>{String(row[h] ?? '')}</span>
-                            </div>
+                            <span className='break-all'>{String(row[h] ?? '')}</span>
                           </td>
                         );
                       })}

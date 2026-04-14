@@ -61,8 +61,7 @@ export function mergeGeminiIntoVideoMeta(base, gemini) {
   out.titleGemini = gemini.title != null ? String(gemini.title) : '';
   out.descriptionGemini = gemini.description != null ? String(gemini.description) : '';
   const tagsVal = gemini.tags;
-  out.tagsGemini =
-    typeof tagsVal === 'string' ? tagsVal : Array.isArray(tagsVal) ? tagsVal.join(', ') : String(tagsVal ?? '');
+  out.tagsGemini = typeof tagsVal === 'string' ? tagsVal : Array.isArray(tagsVal) ? tagsVal.join(', ') : String(tagsVal ?? '');
   out.summaryGemini = gemini.summary != null ? String(gemini.summary) : '';
   return out;
 }

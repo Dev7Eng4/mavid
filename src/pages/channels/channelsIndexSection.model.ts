@@ -2,11 +2,12 @@ import type { ChannelRow } from '@/types';
 
 /**
  * Cột hiển thị bảng index trên trang Channels — cố định và đúng thứ tự.
+ * Cột 1 trong `<table>` là checkbox; cột dữ liệu đầu tiên là LINK (khớp bảng chi tiết: chọn → link).
  * Giá trị ô lấy từ `index.xlsx` theo khóa cột thực tế (map ID ↔ ID hoặc CHANNEL).
  */
 export const CHANNELS_INDEX_VISIBLE_COLUMNS = [
-  'ID',
   'LINK',
+  'ID',
   'EMAIL',
   'LOẠI VIDEO',
   'THỜI GIAN VIDEO',

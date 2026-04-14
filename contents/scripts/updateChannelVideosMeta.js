@@ -8,15 +8,9 @@ import { extractYoutubeVideoId } from '../channel/youtubeUrl.util.js';
 import { readThumbnailPromptKeyFromChannelDir } from '../channel/readChannelThumbnailPrompt.util.js';
 import { processOneVideoMetaUpdate } from '../channel/processOneVideoMetaUpdate.js';
 
-export default async function updateChannelVideosMeta(params = {}) {
-  const channelFolder = params.channelFolder;
-  const items = Array.isArray(params.items) ? params.items : [];
-  if (!channelFolder || typeof channelFolder !== 'string' || !channelFolder.trim()) {
-    throw new Error('Thiếu channelFolder.');
-  }
-  if (items.length === 0) {
-    throw new Error('Không có video nào (items rỗng).');
-  }
+export default async function updateChannelVideosMeta(params = { channelFolder: '', items: [] }) {
+  console.log('🚀 ~ updateChannelVideosMeta ~ params:', params);
+  const { channelFolder, items } = params;
 
   const channelsDir = resolveChannelsDir();
   const channelDir = path.join(channelsDir, channelFolder.trim());
@@ -35,6 +29,7 @@ export default async function updateChannelVideosMeta(params = {}) {
       continue;
     }
     const videoDir = path.join(channelDir, videoId);
+    console.log('🚀 ~ updateChannelVideosMeta ~ videoDir:', videoDir);
     const r = await processOneVideoMetaUpdate({ videoDir, url, thumbnailPromptKey });
     results.push({ ok: r.ok, url, videoId, reason: r.reason });
   }

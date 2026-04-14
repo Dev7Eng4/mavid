@@ -399,12 +399,10 @@ export function ChannelAddDialog({
         }
         const statusKey = findIndexHeaderKey(indexHeaders, 'STATUS');
         const emailKeyForInit = findIndexHeaderKey(indexHeaders, 'EMAIL');
-        const initialStatusNorm =
-          initialRow && statusKey ? normalizeChannelIndexStatus(initialRow[statusKey]) : ('INIT' as const);
+        const initialStatusNorm = initialRow && statusKey ? normalizeChannelIndexStatus(initialRow[statusKey]) : ('INIT' as const);
         const initialEmailTrim = emailKeyForInit && initialRow ? String(initialRow[emailKeyForInit] ?? '').trim() : '';
         const emailNowTrim = email.trim();
-        const statusForIndex =
-          initialStatusNorm === 'INIT' && !initialEmailTrim && emailNowTrim ? 'LIVE' : channelStatus;
+        const statusForIndex = initialStatusNorm === 'INIT' && !initialEmailTrim && emailNowTrim ? 'LIVE' : channelStatus;
 
         const { row, error } = buildChannelRowFromAddForm(
           indexHeaders,

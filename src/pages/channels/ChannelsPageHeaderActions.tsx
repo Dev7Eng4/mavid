@@ -230,8 +230,8 @@ export function ChannelsPageHeaderActions({
             !detailUpdateMeta.canUpdateMeta
               ? 'Cần cột LINK VIDEO + STATUS và chạy trong Electron.'
               : !detailUpdateMeta.hasCreatedVideoInSelection
-                ? 'Chọn ít nhất một dòng có status «Đã tạo video».'
-                : 'Chỉ xử lý các dòng đã chọn có status «Đã tạo video»: thiếu Gemini (4 trường) hoặc thiếu thumbnail .png/.jpg/.jpeg.'
+              ? 'Chọn ít nhất một dòng có status «Đã tạo video».'
+              : 'Chỉ xử lý các dòng đã chọn có status «Đã tạo video»: thiếu Gemini (4 trường) hoặc thiếu thumbnail .png/.jpg/.jpeg.'
           }
           onClick={() => void detailUpdateMeta.onUpdateMeta()}
         >
@@ -241,9 +241,7 @@ export function ChannelsPageHeaderActions({
               Đang cập nhật meta…
             </span>
           ) : (
-            `Cập nhật meta${
-              detailUpdateMeta.createdVideoSelectedCount > 0 ? ` (${detailUpdateMeta.createdVideoSelectedCount})` : ''
-            }`
+            `Cập nhật meta${detailUpdateMeta.createdVideoSelectedCount > 0 ? ` (${detailUpdateMeta.createdVideoSelectedCount})` : ''}`
           )}
         </AppButton>
       ) : null}
