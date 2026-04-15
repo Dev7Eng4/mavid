@@ -1,5 +1,5 @@
 /**
- * Quét thư mục kênh: danh sách job upload (.mp4 theo thư mục con).
+ * Quét thư mục kênh: danh sách job upload (.mp4 theo thư mục con, bắt buộc có ảnh thumbnail .png/.jpg/.jpeg).
  */
 import fs from 'fs';
 import path from 'path';
@@ -30,6 +30,19 @@ export function firstMp4InDir(dir) {
     .filter(f => /\.mp4$/i.test(f))
     .sort((a, b) => a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' }));
   return files.length ? path.join(dir, files[0]) : null;
+}
+
+/** Đuôi ảnh thumbnail hợp lệ (khớp `studioUploadFlow.fillVideoDetails`). */
+const THUMB_IMAGE_EXTS = new Set(['.png', '.jpg', '.jpeg']);
+
+/**
+ * Thư mục có ít nhất một file ảnh thumbnail (png, jpg, jpeg — không phân biệt hoa thường).
+ * @param {string} dir
+ * @returns {boolean}
+ */
+export function hasThumbnailImageInDir(dir) {
+  if (!fs.existsSync(dir) || !fs.statSync(dir).isDirectory()) return false;
+  return fs.readdirSync(dir).some(f => THUMB_IMAGE_EXTS.has(path.extname(f).toLowerCase()));
 }
 
 /** @param {string} name */
@@ -230,9 +243,9 @@ async function readVideoIdsWithStatusDone(channelAbs, durBounds) {
 }
 
 /**
- * Danh sách thư mục con có .mp4.
- * - Có `folderNamesOrder`: theo đúng thứ tự danh sách (chỉ thư mục có .mp4), tối đa `maxUploads` nếu có.
- * - Không có: đọc Excel lấy video ID có status "Đã tạo video" + lọc duration → kiểm tra folder + .mp4.
+ * Danh sách thư mục con có .mp4 và có file ảnh thumbnail (.png/.jpg/.jpeg).
+ * - Có `folderNamesOrder`: theo đúng thứ tự danh sách (chỉ thư mục có .mp4 + thumbnail), tối đa `maxUploads` nếu có.
+ * - Không có: đọc Excel lấy video ID có status "Đã tạo video" + lọc duration → kiểm tra folder + .mp4 + thumbnail.
  * @param {string} channelAbs
  * @param {string} email
  * @param {number | null} maxUploads
@@ -250,6 +263,10 @@ export async function listUploadJobs(channelAbs, email, maxUploads, folderNamesO
       const mp4 = firstMp4InDir(sub);
       if (!mp4) {
         console.warn(`[upload] Bỏ qua «${name}» — không có file .mp4 trong thư mục.`);
+        continue;
+      }
+      if (!hasThumbnailImageInDir(sub)) {
+        console.warn(`[upload] Bỏ qua «${name}» — không có file thumbnail (.png/.jpg/.jpeg).`);
         continue;
       }
       jobs.push({ folderName: name, folderPath: sub, mp4Path: mp4 });
@@ -276,6 +293,7 @@ export async function listUploadJobs(channelAbs, email, maxUploads, folderNamesO
     const sub = path.join(channelAbs, name);
     const mp4 = firstMp4InDir(sub);
     if (!mp4) continue;
+    if (!hasThumbnailImageInDir(sub)) continue;
     jobs.push({ folderName: name, folderPath: sub, mp4Path: mp4 });
     if (maxUploads != null && Number.isFinite(maxUploads) && maxUploads > 0 && jobs.length >= maxUploads) break;
   }

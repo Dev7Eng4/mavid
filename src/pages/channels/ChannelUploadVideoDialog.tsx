@@ -59,7 +59,7 @@ export interface ChannelUploadVideoPayload {
   channelFolder: string;
   /** Email kênh (index / config) — script upload dùng để lấy lịch publish. */
   email: string;
-  /** `null` = mọi thư mục con có .mp4 (theo thứ tự tên). */
+  /** `null` = mọi thư mục con đủ .mp4 + thumbnail ảnh (theo thứ tự từ Excel khi không truyền uploadFolderNames). */
   totalVideos: number | null;
   /** GPM profile id — suy ra từ email trong mavid-channel-config.json khớp `name` profile. */
   gpmProfileId: string;
@@ -169,8 +169,8 @@ export function ChannelUploadVideoDialog({
           Upload video
         </h2>
         <p className='text-sm leading-snug mt-2 shrink-0' style={{ color: 'var(--text-muted)' }}>
-          Profile GPM được chọn theo <code className='text-xs'>name</code> = email (từ index). Upload lần lượt các .mp4 trong thư mục con của
-          từng kênh đã chọn trên bảng.
+          Profile GPM được chọn theo <code className='text-xs'>name</code> = email (từ index). Upload lần lượt các thư mục con có .mp4{' '}
+          <strong>và</strong> có ít nhất một ảnh thumbnail (.png, .jpg, .jpeg) — thư mục thiếu thumbnail sẽ bị bỏ qua.
         </p>
 
         <div className='grid grid-cols-1 gap-y-4 mt-4 overflow-y-auto min-h-0 flex-1 pr-1 content-start'>
@@ -211,7 +211,7 @@ export function ChannelUploadVideoDialog({
                 if (v === '') setTotalVideos(null);
                 else setTotalVideos(clampInt(parseInt(v, 10), 1, 99_999));
               }}
-              placeholder='Tất cả thư mục có .mp4'
+              placeholder='Tất cả thư mục có .mp4 + thumbnail'
               className={inputClass}
               style={{
                 background: 'var(--code-bg)',
@@ -220,7 +220,7 @@ export function ChannelUploadVideoDialog({
               }}
             />
             <p className='text-xs mt-1.5' style={{ color: 'var(--text-muted)' }}>
-              Để trống = lần lượt mọi thư mục con (có .mp4), theo thứ tự tên.
+              Để trống = lần lượt mọi thư mục con đủ .mp4 và thumbnail ảnh, theo thứ tự từ Excel (status Đã tạo video).
             </p>
           </div>
 

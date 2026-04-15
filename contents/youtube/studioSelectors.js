@@ -50,4 +50,8 @@ export const YOUTUBE_SELECTOR = {
   btnCloseProcessing: 'ytcp-uploads-still-processing-dialog .footer button',
   popupShare: 'ytcp-video-share-dialog #dialog',
   btnCloseShare: 'ytcp-video-share-dialog .footer button',
+
+  // dialog
+  dialog: 'tp-yt-paper-dialog[role="dialog"]',
+  btnCloseDialog: 'tp-yt-paper-dialog .footer button',
 };

@@ -1,6 +1,6 @@
 /**
  * Upload tuần tự file .mp4 lên YouTube qua trình duyệt profile GPM (API Local + CDP).
- * Mỗi thư mục con (sắp xếp tên) trong `MaVidMedia/channels/{channelFolder}/` có ít nhất một .mp4 → một lần upload.
+ * Mỗi thư mục con trong `MaVidMedia/channels/{channelFolder}/` có ít nhất một .mp4 và một ảnh thumbnail (.png/.jpg/.jpeg) → một lần upload.
  *
  * @param {object} params
  * @param {string} params.gpmProfileId — id profile GPM (UUID)
@@ -69,7 +69,9 @@ export default async function main(raw = {}) {
 
   if (jobs.length === 0) {
     throw new Error(
-      `Không có thư mục con nào chứa file .mp4 trong ${channelAbs} (đã giới hạn ${maxUploads == null ? 'tất cả' : maxUploads} video).`
+      `Không có thư mục con nào đủ điều kiện (.mp4 + thumbnail .png/.jpg/.jpeg) trong ${channelAbs} (đã giới hạn ${
+        maxUploads == null ? 'tất cả' : maxUploads
+      } video).`
     );
   }
 

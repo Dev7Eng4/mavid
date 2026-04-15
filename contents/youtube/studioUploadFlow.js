@@ -114,7 +114,7 @@ export async function openYoutubeUpload(page, mp4Path, index) {
 
   console.log('[upload] Step 3: Chọn mục Tải video lên...');
   await clickElement(page, YOUTUBE_SELECTOR.btnUploadVideo);
-  // await delay(3000);
+  await delay(3000);
   // } else {
   //   await clickElement(page, YOUTUBE_SELECTOR.btnCreateInStudio);
   //   await clickElement(page, YOUTUBE_SELECTOR.btnUploadVideoInStudio);
@@ -124,7 +124,7 @@ export async function openYoutubeUpload(page, mp4Path, index) {
 }
 
 export async function selectFile(page, mp4Path) {
-  await delay(5000);
+  await delay(3000);
   // 1. Tạo CDP Session kết nối với trang hiện tại
   const session = await page.context().newCDPSession(page);
 
@@ -193,6 +193,9 @@ export async function fillVideoDetails(page, videoFolderPath, showErrorLogs) {
   const tags = [meta.tagsGemini, meta.tags].filter(Boolean).join(', ');
 
   await page.waitForTimeout(getRandomNumber(200));
+
+  await clickElement(page, YOUTUBE_SELECTOR.btnNextToRelatedStep);
+  return;
 
   if (title) {
     console.log('[edit] Step 1: Nhập Title...');
@@ -309,6 +312,14 @@ export async function fillVideoDetails(page, videoFolderPath, showErrorLogs) {
  * @param {string} [mp4Path] — đường dẫn .mp4 để ffprobe lấy duration và điền Start time (duration − 17s)
  */
 export async function addRelatedVideo(page, _isNeedAddRelatedVideo = false, mp4Path, showErrorLogs) {
+  await delay(500);
+
+  await clickElement(page, YOUTUBE_SELECTOR.btnNextToCheckStep);
+  await delay(200);
+  await clickElement(page, YOUTUBE_SELECTOR.btnNextToVisibilityStep);
+
+  return;
+
   await clickElement(page, YOUTUBE_SELECTOR.btnAddVideoRelated);
   await delay(500);
   try {
@@ -427,25 +438,46 @@ export async function addRelatedVideo(page, _isNeedAddRelatedVideo = false, mp4P
 export async function chooseVisibility(page, ctx) {
   const slot = ctx?.slot;
 
-  if (slot?.date && slot?.time) {
-    await clickElement(page, YOUTUBE_SELECTOR.btnChooseSchedule);
-    await delay(500);
-    await clickElement(page, YOUTUBE_SELECTOR.btnSelectDate);
-    await delay(200);
-    await clickElement(page, YOUTUBE_SELECTOR.inputDate);
-    await clearContent(page);
-    await delay(500);
-    await page.keyboard.insertText(slot.date);
-    await delay(200);
-    await page.keyboard.press('Enter');
-    await page.keyboard.press('Escape');
+  await clickElement(page, YOUTUBE_SELECTOR.btnChooseSchedule);
 
-    await clickElement(page, YOUTUBE_SELECTOR.inputTime);
-    await clearContent(page);
-    await delay(500);
-    await page.keyboard.insertText(slot.time);
-    await delay(200);
-    await page.keyboard.press('Enter');
+  // if (slot?.date && slot?.time) {
+  //   await clickElement(page, YOUTUBE_SELECTOR.btnChooseSchedule);
+  //   await delay(500);
+  //   await clickElement(page, YOUTUBE_SELECTOR.btnSelectDate);
+  //   await delay(200);
+  //   await clickElement(page, YOUTUBE_SELECTOR.inputDate);
+  //   await clearContent(page);
+  //   await delay(500);
+  //   await page.keyboard.insertText(slot.date);
+  //   await delay(200);
+  //   await page.keyboard.press('Enter');
+  //   await page.keyboard.press('Escape');
+
+  //   await clickElement(page, YOUTUBE_SELECTOR.inputTime);
+  //   await clearContent(page);
+  //   await delay(500);
+  //   await page.keyboard.insertText(slot.time);
+  //   await delay(200);
+  //   await page.keyboard.press('Enter');
+  // }
+
+  let isUploading = true;
+
+  try {
+    const progressUploadEle = page.locator(YOUTUBE_SELECTOR.progressUpload);
+
+    if (progressUploadEle) {
+      while (isUploading) {
+        const txt = await progressUploadEle.innerText();
+        if (!txt.toLowerCase().includes('uploading')) {
+          isUploading = false;
+        }
+
+        await delay(1000);
+      }
+    }
+  } catch {
+    isUploading = false;
   }
 
   // try {
@@ -465,21 +497,21 @@ export async function chooseVisibility(page, ctx) {
   //   // showErrorLogs(`Không tìm thấy popup warning`);
   // }
 
-  try {
-    await page.waitForFunction(
-      () => {
-        const el = document.querySelector('#dialog ytcp-video-upload-progress .progress-label');
-        if (!el) return false;
-        return !el.textContent.toLowerCase().includes('uploading');
-      },
-      { timeout: 0 }
-    ); // timeout: 0 = chờ vô hạn (tuỳ bạn chỉnh)
-  } catch {
-    // showErrorLogs(`Không tìm thấy popup upload progress`);
-  }
+  // try {
+  //   await page.waitForFunction(
+  //     () => {
+  //       const el = document.querySelector('#dialog ytcp-video-upload-progress .progress-label');
+  //       if (!el) return false;
+  //       return !el.textContent.toLowerCase().includes('uploading');
+  //     },
+  //     { timeout: 0 }
+  //   ); // timeout: 0 = chờ vô hạn (tuỳ bạn chỉnh)
+  // } catch {
+  //   // showErrorLogs(`Không tìm thấy popup upload progress`);
+  // }
 
   await clickElement(page, YOUTUBE_SELECTOR.btnSaveSchedule);
-  await delay(400);
+  await delay(2000);
 
   try {
     // Cố gắng chờ popup xuất hiện trong 3 giây
@@ -487,14 +519,14 @@ export async function chooseVisibility(page, ctx) {
       state: 'visible',
       timeout: 4000,
     });
-
     await clickElement(page, YOUTUBE_SELECTOR.btnGotItWarning);
-    await delay(500);
   } catch (error) {
     // 👇 Nếu sau 3 giây không có popup, Playwright sẽ nhảy vào đây.
     // Chúng ta không làm gì cả để tool bỏ qua và chạy tiếp các bước bên dưới.
     console.log('[Info] Không có popup cảnh báo, tiếp tục luồng chính.');
   }
+
+  await delay(1500);
 
   await page.reload({ timeout: 30000 });
 
