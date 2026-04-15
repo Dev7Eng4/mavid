@@ -30,7 +30,7 @@ function getVideoDurationSeconds(mp4Path) {
     const out = execFileSync(
       'ffprobe',
       ['-v', 'error', '-show_entries', 'format=duration', '-of', 'default=noprint_wrappers=1:nokey=1', mp4Path],
-      { encoding: 'utf-8' }
+      { encoding: 'utf-8' },
     ).trim();
     const n = parseFloat(out);
     return Number.isFinite(n) && n > 0 ? n : null;
@@ -234,7 +234,7 @@ export async function fillVideoDetails(page, videoFolderPath, showErrorLogs) {
   if (boxUpload) {
     await page.mouse.move(
       boxUpload.x + boxUpload.width / 2 + (Math.random() * 20 - 10),
-      boxUpload.y + boxUpload.height / 2 + (Math.random() * 20 - 10)
+      boxUpload.y + boxUpload.height / 2 + (Math.random() * 20 - 10),
     );
   }
 
@@ -351,27 +351,31 @@ export async function addRelatedVideo(page, _isNeedAddRelatedVideo = false, mp4P
       const elementsTimeline = page.locator(YOUTUBE_SELECTOR.elementTimeline);
       // const countElementsTimeline = await elementsTimeline.count();
 
-      for (let i = 0; i < 3; i++) {
-        const ele = elementsTimeline.nth(i);
+      try {
+        for (let i = 0; i < 3; i++) {
+          const ele = elementsTimeline.nth(i);
 
-        if (ele) {
-          console.log('🚀 ~ addRelatedVideo ~ ele:', ele);
-          await clickElement(page, ele, false, true);
+          if (ele) {
+            console.log('🚀 ~ addRelatedVideo ~ ele:', ele);
+            await clickElement(page, ele, false, true);
+            await delay(300);
+          }
+
+          await clickElement(page, YOUTUBE_SELECTOR.startTime);
+          await delay(400);
+
+          await page.keyboard.down('Control');
+          await page.keyboard.press('A');
+          await page.keyboard.up('Control');
+
+          await page.waitForTimeout(300);
+
+          await page.keyboard.insertText(stamp);
+          await page.keyboard.press('Enter');
           await delay(300);
         }
-
-        await clickElement(page, YOUTUBE_SELECTOR.startTime);
-        await delay(400);
-
-        await page.keyboard.down('Control');
-        await page.keyboard.press('A');
-        await page.keyboard.up('Control');
-
-        await page.waitForTimeout(300);
-
-        await page.keyboard.insertText(stamp);
-        await page.keyboard.press('Enter');
-        await delay(300);
+      } catch (error) {
+        // showErrorLogs(`Không tìm thấy box choose specific video`);
       }
 
       // if (countElementsTimeline > 0) {
@@ -472,7 +476,7 @@ export async function chooseVisibility(page, ctx) {
         if (!el) return false;
         return !el.textContent.toLowerCase().includes('uploading');
       },
-      { timeout: 0 }
+      { timeout: 0 },
     ); // timeout: 0 = chờ vô hạn (tuỳ bạn chỉnh)
   } catch {
     // showErrorLogs(`Không tìm thấy popup upload progress`);
