@@ -64,7 +64,7 @@ async function resolveGpmProfileIdByEmail(email) {
         p =>
           String(p.name || '')
             .trim()
-            .toLowerCase() === normEmail
+            .toLowerCase() === normEmail,
       );
       return hit?.id || null;
     }
@@ -274,7 +274,7 @@ function tryGetUploadedVideosForSelection(channelsDir, filePath, options) {
           c &&
           String(c.email || '')
             .trim()
-            .toLowerCase() === want
+            .toLowerCase() === want,
       ) || null;
   }
   if (!item && list.length > 0) item = list[0];
@@ -337,8 +337,8 @@ function finalizeVideoItemsOrder(items, filePath, options) {
   console.log(
     `[MaVid] uploadedVideos=${uploaded} (≥${UPLOADED_VIDEOS_SPREAD_THRESHOLD}) — sắp ${Math.min(
       batchLimit,
-      items.length
-    )} video đầu theo đầu/giữa/cuối danh sách file.`
+      items.length,
+    )} video đầu theo đầu/giữa/cuối danh sách file.`,
   );
   return reordered;
 }
@@ -379,14 +379,14 @@ export async function readVideoUrlsFromFile(inputFile = null, options = {}) {
     const trangThaiIdx = headerRow.values.findIndex(v =>
       String(v || '')
         .toLowerCase()
-        .includes('status')
+        .includes('status'),
     );
     const bgIdx = headerRow.values.findIndex(v => String(v || '').toLowerCase() === 'background video');
     const durationIdx = headerRow.values.findIndex(
       v =>
         String(v || '')
           .trim()
-          .toLowerCase() === 'duration'
+          .toLowerCase() === 'duration',
     );
 
     const items = [];
@@ -605,6 +605,7 @@ function buildMakeVideoFromAudioOptions(props, channelFolderName) {
  */
 async function main(props = {}) {
   const { MAKE_VIDEO_MODE } = await import('../constants/index.js');
+  console.time('createBatchVideo');
 
   const channelParam = props.channel || process.env.MAVID_CHANNEL;
   const email = props.email || process.env.MAVID_EMAIL;
@@ -632,7 +633,7 @@ async function main(props = {}) {
         inputFile = pick.absPath;
         if (pick.usedRandom) {
           console.log(
-            `[MaVid] Channel: ${channelParam} → ${pick.displayName} (chọn ngẫu nhiên — uploadedVideos≥${UPLOADED_VIDEOS_SPREAD_THRESHOLD})`
+            `[MaVid] Channel: ${channelParam} → ${pick.displayName} (chọn ngẫu nhiên — uploadedVideos≥${UPLOADED_VIDEOS_SPREAD_THRESHOLD})`,
           );
         } else {
           console.log(`[MaVid] Channel: ${channelParam} → ${pick.displayName}`);
@@ -676,7 +677,7 @@ async function main(props = {}) {
         inputFile = pick.absPath;
         if (pick.usedRandom) {
           console.log(
-            `[MaVid] Channel: ${selectedFolder} → ${pick.displayName} (chọn ngẫu nhiên — uploadedVideos≥${UPLOADED_VIDEOS_SPREAD_THRESHOLD})`
+            `[MaVid] Channel: ${selectedFolder} → ${pick.displayName} (chọn ngẫu nhiên — uploadedVideos≥${UPLOADED_VIDEOS_SPREAD_THRESHOLD})`,
           );
         } else {
           console.log(`[MaVid] Channel: ${selectedFolder} → ${pick.displayName}`);
@@ -708,7 +709,7 @@ async function main(props = {}) {
   });
   if (maxVideosThisRun > 0 && items.length > maxVideosThisRun) {
     console.log(
-      `[MaVid] Giới hạn ${maxVideosThisRun} video/lượt (MAVID_MAX_VIDEOS_PER_BATCH) — xử lý ${maxVideosThisRun}/${items.length} link.`
+      `[MaVid] Giới hạn ${maxVideosThisRun} video/lượt (MAVID_MAX_VIDEOS_PER_BATCH) — xử lý ${maxVideosThisRun}/${items.length} link.`,
     );
     items = items.slice(0, maxVideosThisRun);
   }
@@ -725,7 +726,7 @@ async function main(props = {}) {
         ? `Không có link video nào thỏa điều kiện độ dài (${minDurationMinutes > 0 ? `tối thiểu ${minDurationMinutes} phút` : ''}${
             minDurationMinutes > 0 && maxDurationMinutes > 0 ? ', ' : ''
           }${maxDurationMinutes > 0 ? `tối đa ${maxDurationMinutes} phút` : ''}) trong CSV/Excel.`
-        : 'Không có link video nào trong CSV/Excel.'
+        : 'Không có link video nào trong CSV/Excel.',
     );
   }
 
@@ -733,7 +734,7 @@ async function main(props = {}) {
 
   if (videoType !== MAKE_VIDEO_MODE.FROM_AUDIO && videoType !== MAKE_VIDEO_MODE.REUP_FULL) {
     throw new Error(
-      'Thiếu hoặc không hợp lệ videoType (from_audio | reup_full). Truyền props.videoType hoặc ghi videoType trong mavid-channel-config.json khi chạy với MAVID_CHANNEL.'
+      'Thiếu hoặc không hợp lệ videoType (from_audio | reup_full). Truyền props.videoType hoặc ghi videoType trong mavid-channel-config.json khi chạy với MAVID_CHANNEL.',
     );
   }
 
@@ -769,6 +770,8 @@ async function main(props = {}) {
       console.warn('[sync] Đồng bộ STATUS từ progress → Excel/CSV:', e.message);
     }
   }
+
+  console.timeEnd('createBatchVideo');
 
   return {
     success: true,
@@ -835,10 +838,10 @@ async function main(props = {}) {
             const remainingDays = MAX_SCHEDULED_DAYS - scheduledDays;
 
             console.log(
-              `[schedule] latestUploadDate: ${latestUploadDateStr} | videosPerDayPreset: ${videosPerDayPresetRaw} (max ${maxVideosPerDay}/ngày)`
+              `[schedule] latestUploadDate: ${latestUploadDateStr} | videosPerDayPreset: ${videosPerDayPresetRaw} (max ${maxVideosPerDay}/ngày)`,
             );
             console.log(
-              `[schedule] Ngày đã schedule trước: ${scheduledDays} | MAX_SCHEDULED_DAYS: ${MAX_SCHEDULED_DAYS} | Còn lại: ${remainingDays}`
+              `[schedule] Ngày đã schedule trước: ${scheduledDays} | MAX_SCHEDULED_DAYS: ${MAX_SCHEDULED_DAYS} | Còn lại: ${remainingDays}`,
             );
 
             if (remainingDays <= 0) {
@@ -847,7 +850,7 @@ async function main(props = {}) {
               // Số video upload = remainingDays × maxVideosPerDay, không vượt quá số video đã tạo
               maxUploadsFromSchedule = Math.min(remainingDays * maxVideosPerDay, result.processedCount);
               console.log(
-                `[schedule] Sẽ upload tối đa ${maxUploadsFromSchedule} video (${remainingDays} ngày × ${maxVideosPerDay} video/ngày).`
+                `[schedule] Sẽ upload tối đa ${maxUploadsFromSchedule} video (${remainingDays} ngày × ${maxVideosPerDay} video/ngày).`,
               );
             }
           } else {
@@ -862,7 +865,7 @@ async function main(props = {}) {
         const gpmProfileId = await resolveGpmProfileIdByEmail(mergedProps.email);
         if (gpmProfileId) {
           console.log(
-            `\n[upload] Đã hoàn thành batch ${result.processedCount} video. Upload ${maxUploadsFromSchedule} video lên YouTube qua GPM profile: ${gpmProfileId}`
+            `\n[upload] Đã hoàn thành batch ${result.processedCount} video. Upload ${maxUploadsFromSchedule} video lên YouTube qua GPM profile: ${gpmProfileId}`,
           );
           const { default: uploadYoutubeViaGpm } = await import('../youtube/uploadViaGpm.js');
 

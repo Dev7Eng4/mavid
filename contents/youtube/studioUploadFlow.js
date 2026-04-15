@@ -362,27 +362,31 @@ export async function addRelatedVideo(page, _isNeedAddRelatedVideo = false, mp4P
       const elementsTimeline = page.locator(YOUTUBE_SELECTOR.elementTimeline);
       // const countElementsTimeline = await elementsTimeline.count();
 
-      for (let i = 0; i < 3; i++) {
-        const ele = elementsTimeline.nth(i);
+      try {
+        for (let i = 0; i < 3; i++) {
+          const ele = elementsTimeline.nth(i);
 
-        if (ele) {
-          console.log('🚀 ~ addRelatedVideo ~ ele:', ele);
-          await clickElement(page, ele, false, true);
+          if (ele) {
+            console.log('🚀 ~ addRelatedVideo ~ ele:', ele);
+            await clickElement(page, ele, false, true);
+            await delay(300);
+          }
+
+          await clickElement(page, YOUTUBE_SELECTOR.startTime);
+          await delay(400);
+
+          await page.keyboard.down('Control');
+          await page.keyboard.press('A');
+          await page.keyboard.up('Control');
+
+          await page.waitForTimeout(300);
+
+          await page.keyboard.insertText(stamp);
+          await page.keyboard.press('Enter');
           await delay(300);
         }
-
-        await clickElement(page, YOUTUBE_SELECTOR.startTime);
-        await delay(400);
-
-        await page.keyboard.down('Control');
-        await page.keyboard.press('A');
-        await page.keyboard.up('Control');
-
-        await page.waitForTimeout(300);
-
-        await page.keyboard.insertText(stamp);
-        await page.keyboard.press('Enter');
-        await delay(300);
+      } catch (error) {
+        // showErrorLogs(`Không tìm thấy box choose specific video`);
       }
 
       // if (countElementsTimeline > 0) {
@@ -497,18 +501,18 @@ export async function chooseVisibility(page, ctx) {
   //   // showErrorLogs(`Không tìm thấy popup warning`);
   // }
 
-  // try {
-  //   await page.waitForFunction(
-  //     () => {
-  //       const el = document.querySelector('#dialog ytcp-video-upload-progress .progress-label');
-  //       if (!el) return false;
-  //       return !el.textContent.toLowerCase().includes('uploading');
-  //     },
-  //     { timeout: 0 }
-  //   ); // timeout: 0 = chờ vô hạn (tuỳ bạn chỉnh)
-  // } catch {
-  //   // showErrorLogs(`Không tìm thấy popup upload progress`);
-  // }
+  try {
+    await page.waitForFunction(
+      () => {
+        const el = document.querySelector('#dialog ytcp-video-upload-progress .progress-label');
+        if (!el) return false;
+        return !el.textContent.toLowerCase().includes('uploading');
+      },
+      { timeout: 0 }
+    ); // timeout: 0 = chờ vô hạn (tuỳ bạn chỉnh)
+  } catch {
+    // showErrorLogs(`Không tìm thấy popup upload progress`);
+  }
 
   await clickElement(page, YOUTUBE_SELECTOR.btnSaveSchedule);
   await delay(2000);
