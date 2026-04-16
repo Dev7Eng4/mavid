@@ -2,7 +2,7 @@
  * Tương tác Playwright với giao diện web Gemini.
  */
 import { GEMINI_CONFIG } from '../constants/index.js';
-import { clearContent, clickElement } from '../utils/dom.util.js';
+import { clearContent, clickElement, getRandomNumber } from '../utils/dom.util.js';
 import { GEMINI_SELECTOR } from './selectors.js';
 
 export async function waitForGeminiResponse(page, timeoutMs = 120000) {
@@ -81,7 +81,7 @@ export async function sendPromptToGemini(page, prompt) {
 export async function openGeminiPage(page) {
   await page.goto(GEMINI_CONFIG.URL, { waitUntil: 'domcontentloaded', timeout: 30000 });
 
-  await page.waitForTimeout(500);
+  await page.waitForTimeout(getRandomNumber(1000));
 
   await chooseThinkingMode(page);
 }

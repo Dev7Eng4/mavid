@@ -17,4 +17,10 @@ export {
   updateChannelConfigInfo,
   MAVID_CHANNEL_CONFIG_FILENAME,
 } from './uploadAfterSync.js';
-export { apiRootForPlaywright, firstMp4InDir, assertSafeSubfolderName, listUploadJobs } from './uploadJobs.util.js';
+export {
+  apiRootForPlaywright,
+  firstMp4InDir,
+  hasThumbnailImageInDir,
+  assertSafeSubfolderName,
+  listUploadJobs,
+} from './uploadJobs.util.js';

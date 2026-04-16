@@ -1,3 +1,4 @@
+import { useEffect, useRef } from 'react';
 import { CustomSelect } from '@/components/ui/CustomSelect';
 import { SpinnerIcon } from '@/components/ui/Icons';
 import { TablePaginationBar } from '@/components/ui/TablePaginationBar';
@@ -28,12 +29,29 @@ export function ChannelsDetailSection({
   canSetStartFrom,
   startMarkingIndex,
   onSetStartFromRow,
+  detailSelectedRowIndices,
+  onToggleDetailRowSelected,
+  detailPageSelectAll,
+  detailPageSelectSome,
+  onToggleDetailSelectAllOnPage,
 }: ChannelsDetailSectionProps) {
   const lk = detailLayout.linkVideoKey;
   const dk = detailLayout.durationKey;
   const sk = detailLayout.statusKey;
   const showSearchBar =
     !detailLoading && detailRowsLength > 0 && detailLayout.tableHeaders.length > 0 && (Boolean(lk) || Boolean(dk) || Boolean(sk));
+
+  /** Cột 1: checkbox; cột 2 trở đi: dữ liệu (giống bảng index). */
+  const showSelectColumn = detailLoading || detailLayout.tableHeaders.length > 0;
+
+  const headerSelectRef = useRef<HTMLInputElement>(null);
+  const detailBulkSelectDisabled =
+    detailLoading || pageDetailRows.length === 0 || startMarkingIndex !== null;
+
+  useEffect(() => {
+    const el = headerSelectRef.current;
+    if (el) el.indeterminate = detailPageSelectSome && !detailPageSelectAll;
+  }, [detailPageSelectAll, detailPageSelectSome]);
 
   return (
     <div className='space-y-4 w-full min-w-0'>
@@ -119,6 +137,24 @@ export function ChannelsDetailSection({
           <table className='w-full min-w-0 text-base' style={{ borderCollapse: 'collapse', tableLayout: 'auto' }}>
             <thead className='sticky top-0 z-1'>
               <tr style={{ background: 'var(--code-bg)' }}>
+                {showSelectColumn ? (
+                  <th
+                    className='w-12 px-2 py-3 text-center align-middle'
+                    style={{ borderBottom: '1px solid var(--border)' }}
+                    scope='col'
+                  >
+                    <input
+                      ref={headerSelectRef}
+                      type='checkbox'
+                      className='w-4 h-4 cursor-pointer rounded border align-middle'
+                      style={{ borderColor: 'var(--border)', accentColor: 'var(--accent)' }}
+                      checked={detailPageSelectAll}
+                      onChange={() => onToggleDetailSelectAllOnPage()}
+                      disabled={detailBulkSelectDisabled}
+                      aria-label='Chọn tất cả video trên trang này'
+                    />
+                  </th>
+                ) : null}
                 {detailTheadHeaders.map(h => (
                   <th
                     key={h}
@@ -157,15 +193,38 @@ export function ChannelsDetailSection({
                   pageDetailRows.map(({ row, originalIndex }) => (
                     <tr
                       key={originalIndex}
-                      className='transition-colors duration-150'
-                      style={{ borderBottom: '1px solid var(--border)' }}
+                      className='transition-colors duration-150 cursor-pointer'
+                      style={{
+                        borderBottom: '1px solid var(--border)',
+                        background: detailSelectedRowIndices.has(originalIndex) ? 'var(--hover-bg)' : 'transparent',
+                      }}
                       onMouseEnter={e => {
                         e.currentTarget.style.background = 'var(--hover-bg)';
                       }}
                       onMouseLeave={e => {
-                        e.currentTarget.style.background = 'transparent';
+                        e.currentTarget.style.background = detailSelectedRowIndices.has(originalIndex) ? 'var(--hover-bg)' : 'transparent';
+                      }}
+                      onClick={e => {
+                        if (window.getSelection()?.toString()) return;
+                        if ((e.target as HTMLElement).closest('button, a, input')) return;
+                        onToggleDetailRowSelected(originalIndex);
                       }}
                     >
+                      {showSelectColumn ? (
+                        <td
+                          className='px-2 py-3 align-top text-center w-12'
+                          onClick={e => e.stopPropagation()}
+                        >
+                          <input
+                            type='checkbox'
+                            className='mt-1 cursor-pointer w-4 h-4 shrink-0 rounded border align-middle'
+                            style={{ borderColor: 'var(--border)', accentColor: 'var(--accent)' }}
+                            checked={detailSelectedRowIndices.has(originalIndex)}
+                            onChange={() => onToggleDetailRowSelected(originalIndex)}
+                            aria-label={`Chọn dòng ${originalIndex + 1}`}
+                          />
+                        </td>
+                      ) : null}
                       {detailLayout.tableHeaders.map(h => {
                         const isStartCol = canSetStartFrom && detailLayout.startFromKey === h;
                         if (isStartCol) {
@@ -209,7 +268,7 @@ export function ChannelsDetailSection({
                             style={{ color: 'var(--text-h)' }}
                             title={String(row[h] ?? '')}
                           >
-                            {String(row[h] ?? '')}
+                            <span className='break-all'>{String(row[h] ?? '')}</span>
                           </td>
                         );
                       })}

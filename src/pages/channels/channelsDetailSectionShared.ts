@@ -50,4 +50,11 @@ export interface ChannelsDetailSectionProps {
   canSetStartFrom: boolean;
   startMarkingIndex: number | null;
   onSetStartFromRow: (dataRowIndex: number) => void;
+  /** Checkbox chi tiết — state nằm ở parent (nút Cập nhật meta trên header). */
+  detailSelectedRowIndices: Set<number>;
+  onToggleDetailRowSelected: (originalRowIndex: number) => void;
+  /** Chọn tất cả / bỏ chọn các dòng đang hiển thị trên trang (sau lọc + phân trang). */
+  detailPageSelectAll: boolean;
+  detailPageSelectSome: boolean;
+  onToggleDetailSelectAllOnPage: () => void;
 }

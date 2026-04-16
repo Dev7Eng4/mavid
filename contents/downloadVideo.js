@@ -11,6 +11,7 @@ import { detectVideoLang, getLanguageOptions } from './utils/detectLanguage.util
 
 import { MAKE_VIDEO_MODE, LANGUAGES_NEED_UPDATE_TRANSCRIPT } from './constants/index.js';
 import { optimizeFlowThumbnailJpegIfLarge } from './flow/thumbnailOptimize.util.js';
+import { loadPromptByLanguage } from './prompts/index.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const DEFAULT_OUTPUT_DIR = path.join(__dirname, '..', 'downloads');
@@ -68,11 +69,6 @@ async function downloadVideo(url, options = {}) {
 
   console.log('Đang tải video...');
 
-  /**
-   * Windows / Movies & TV cần H.264 (AVC), không chỉ đuôi .mp4.
-   * YouTube có stream MP4 với codec AV1 (av01) — `bestvideo[ext=mp4]` vẫn có thể chọn AV1.
-   * Ưu tiên vcodec avc1; cuối cùng dùng format itag 22/18 (mp4 H.264+AAC gộp sẵn).
-   */
   const FORMAT_H264_MP4 =
     'bestvideo[vcodec^=avc1]+bestaudio[ext=m4a]/' +
     'bestvideo[vcodec^=avc1]+bestaudio/' +
@@ -86,8 +82,7 @@ async function downloadVideo(url, options = {}) {
   const subprocess = youtubedl.exec(url, {
     output: outputTemplate,
     format: actualFormat,
-    mergeOutputFormat: 'mp4', // Yêu cầu ffmpeg gộp vào container mp4
-    // Không writeThumbnail ở đây: downloadThumbnail() đã tải thumbnail → thumbnail.%(ext)s (tránh trùng file title-id.*)
+    mergeOutputFormat: 'mp4',
     noCheckCertificates: true,
     noWarnings: true,
     addHeader: ['referer:youtube.com', 'user-agent:googlebot'],
@@ -116,11 +111,9 @@ async function downloadVideo(url, options = {}) {
   return outputDir;
 }
 
-/**
- * Tải thumbnail
- */
 async function downloadThumbnail(url, options = {}) {
   const { outputDir = DEFAULT_OUTPUT_DIR } = options;
+
   if (!fs.existsSync(outputDir)) fs.mkdirSync(outputDir, { recursive: true });
 
   const outputTemplate = path.join(outputDir, 'thumbnail.%(ext)s');
@@ -137,9 +130,16 @@ async function downloadThumbnail(url, options = {}) {
   console.log('Tải thumbnail xong!');
 }
 
-/**
- * Pipeline VTT: cleanSrt → SRT → Gemini → ghi SRT + callback title/description/tags (không ghi file meta).
- */
+async function cleanVttTranscriptsToSrt(outputDir) {
+  const { cleanSrt } = await import('./utils/srt.util.js');
+  const vttFiles = fs.readdirSync(outputDir).filter(f => f.endsWith('.vtt'));
+  for (const file of vttFiles) {
+    const vttPath = path.join(outputDir, file);
+    cleanSrt(vttPath);
+    fs.unlinkSync(vttPath);
+  }
+}
+
 async function processVttTranscriptsWithGemini(
   url,
   outputDir,
@@ -153,13 +153,14 @@ async function processVttTranscriptsWithGemini(
     thumbnailFlowOutputDir = null,
     generateThumbnailWithFlow = true,
     thumbnailPrompt = null,
-  },
+  }
 ) {
   const { cleanSrt } = await import('./utils/srt.util.js');
   const { updateVideoInfo } = await import('./gemini/updateContent.js');
   const { PROMPTS_CREATE_THUMBNAIL, PROMPTS_NEED_IMAGE } = await import('./prompts/index.js');
 
   const vttFiles = fs.readdirSync(outputDir).filter(f => f.endsWith('.vtt'));
+  console.log('🚀 ~ processVttTranscriptsWithGemini ~ vttFiles:', vttFiles);
   for (const file of vttFiles) {
     const vttPath = path.join(outputDir, file);
     cleanSrt(vttPath);
@@ -180,6 +181,7 @@ async function processVttTranscriptsWithGemini(
         tags,
         language,
       });
+
       finalSrt = geminiOut.srt;
       if ('title' in geminiOut && typeof callback === 'function') {
         try {
@@ -190,7 +192,7 @@ async function processVttTranscriptsWithGemini(
               description: geminiOut.description ?? '',
               tags: geminiOut.tags ?? '',
               summary: geminiOut.summary ?? '',
-            }),
+            })
           );
           console.log('✅ Đã gửi title/description/tags/summary (Gemini) qua callback.');
         } catch (cbErr) {
@@ -206,10 +208,12 @@ async function processVttTranscriptsWithGemini(
           try {
             const { runCreateThumbnailFlow } = await import('./flow/runCreateThumbnail.js');
 
+            const prompts = await loadPromptByLanguage(language);
+
             let promptFn = PROMPTS_CREATE_THUMBNAIL[thumbnailPrompt];
             if (!promptFn) {
               console.warn(
-                `[thumbnail-flow] thumbnailPrompt "${thumbnailPrompt}" không hợp lệ hoặc thiếu, dùng fallback ja2CHFromOldThumbnail`,
+                `[thumbnail-flow] thumbnailPrompt "${thumbnailPrompt}" không hợp lệ hoặc thiếu, dùng fallback ja2CHFromOldThumbnail`
               );
               promptFn = PROMPTS_CREATE_THUMBNAIL.ja2CHFromOldThumbnail;
             }
@@ -217,7 +221,7 @@ async function processVttTranscriptsWithGemini(
             const isNeedImage = PROMPTS_NEED_IMAGE.includes(thumbnailPrompt);
 
             await runCreateThumbnailFlow({
-              prompt: promptFn(titleG, summaryG),
+              prompt: prompts.promptToCreateThumbnail(titleG, summaryG),
               pathSave: thumbnailFlowOutputDir,
               exportName: 'flow-thumbnail',
               isNeedImage,
@@ -240,16 +244,25 @@ async function processVttTranscriptsWithGemini(
 }
 
 /**
- * Tải transcript (phụ đề) dạng SRT và/hoặc VTT
- * @param {object} options.subFormat - 'srt' | 'vtt' (mặc định: vtt)
- * @param {string} options.videoTitle - Tiêu đề video để tự detect ngôn ngữ (ja/ko/en)
- * @param {string} [options.description] - Mô tả gốc (dùng cho bước Gemini title/description/tags khi video ngắn)
- * @param {string[]} [options.tags] - Tags gốc từ YouTube
- * @param {(p: { url: string, title: string, description: string, tags: string }) => void | Promise<void>} [options.callback] - Sau khi Gemini trả title/description/tags (video ngắn)
- * @param {boolean} [options.vttOnlyClean] - Khi `subFormat: 'vtt'`: chỉ cleanSrt → SRT và xóa VTT, không gọi Gemini (dùng cho script meta-only).
- * Chỉnh từng dòng SRT qua Gemini khi `updateTranscript` và ngôn ngữ phụ đề đã tải ∈ `LANGUAGES_NEED_UPDATE_TRANSCRIPT` (constants); ngược lại vẫn có thể chạy bước metadata Gemini.
+ * Sau khi `downloadTranscript` tải xong: clean VTT→SRT và/hoặc pipeline Gemini + thumbnail Flow (khi `subFormat: 'vtt'`).
+ * Với `subFormat: 'srt'` không làm gì thêm (file .srt đã nằm trong outputDir).
+ * @param {string} url
+ * @param {{ transcriptLang: string | null }} downloadResult — kết quả từ `downloadTranscript`
+ * @param {object} [options]
+ * @param {boolean} [options.updateTranscript=true]
+ * @param {string} [options.outputDir]
+ * @param {'srt'|'vtt'} [options.subFormat='srt']
+ * @param {string} [options.videoTitle]
+ * @param {string} [options.description]
+ * @param {string[]} [options.tags]
+ * @param {(p: { url: string, title: string, description: string, tags: string }) => void | Promise<void>} [options.callback]
+ * @param {boolean} [options.vttOnlyClean=false]
+ * @param {string|null} [options.thumbnailFlowOutputDir]
+ * @param {boolean} [options.generateThumbnailWithFlow=true]
+ * @param {string|null} [options.thumbnailPrompt]
  */
-async function downloadTranscript(url, options = {}) {
+async function finalizeDownloadedTranscript(url, downloadResult, options = {}) {
+  const { transcriptLang } = downloadResult;
   const {
     updateTranscript = true,
     outputDir = DEFAULT_OUTPUT_DIR,
@@ -263,14 +276,44 @@ async function downloadTranscript(url, options = {}) {
     generateThumbnailWithFlow = true,
     thumbnailPrompt = null,
   } = options;
+
+  const targetFormat = subFormat === 'vtt' ? 'vtt' : 'srt';
+
+  const needsGeminiTranscriptUpdate =
+    updateTranscript &&
+    transcriptLang != null &&
+    LANGUAGES_NEED_UPDATE_TRANSCRIPT.some(l => String(l).toLowerCase() === String(transcriptLang).toLowerCase());
+  console.log('🚀 ~ finalizeDownloadedTranscript ~ needsGeminiTranscriptUpdate:', needsGeminiTranscriptUpdate);
+
+  if (targetFormat === 'vtt') {
+    if (vttOnlyClean) {
+      await cleanVttTranscriptsToSrt(outputDir);
+    } else {
+      await processVttTranscriptsWithGemini(url, outputDir, {
+        updateTranscript: needsGeminiTranscriptUpdate,
+        videoTitle,
+        description,
+        tags,
+        callback,
+        language: transcriptLang,
+        thumbnailFlowOutputDir,
+        generateThumbnailWithFlow,
+        thumbnailPrompt,
+      });
+    }
+  }
+}
+
+async function downloadTranscript(url, options = {}) {
+  const { outputDir = DEFAULT_OUTPUT_DIR, subFormat = 'vtt', videoTitle = '' } = options;
   if (!fs.existsSync(outputDir)) fs.mkdirSync(outputDir, { recursive: true });
 
   const outputTemplate = path.join(outputDir, '%(title)s-%(id)s.%(ext)s');
+
   const targetFormat = subFormat === 'vtt' ? 'vtt' : 'srt';
   const detectedLang = detectVideoLang(videoTitle);
   const langOrder = [detectedLang, ...getLanguageOptions()].filter((l, i, a) => a.indexOf(l) === i);
   let lastErr = null;
-  /** Ngôn ngữ phụ đề đã tải được (mã ISO, vd: ja, ko) */
   let transcriptLang = null;
 
   for (const lang of langOrder) {
@@ -299,44 +342,8 @@ async function downloadTranscript(url, options = {}) {
 
   if (lastErr) throw lastErr;
 
-  const needsGeminiTranscriptUpdate =
-    updateTranscript &&
-    transcriptLang != null &&
-    LANGUAGES_NEED_UPDATE_TRANSCRIPT.some(l => String(l).toLowerCase() === String(transcriptLang).toLowerCase());
-
-  if (updateTranscript && transcriptLang != null && !needsGeminiTranscriptUpdate) {
-    console.log(
-      `Phụ đề ${String(transcriptLang).toUpperCase()}: bỏ chỉnh từng dòng qua Gemini (chỉ áp dụng: ${LANGUAGES_NEED_UPDATE_TRANSCRIPT.join(
-        ', ',
-      )}). Vẫn chạy metadata/title nếu có.`,
-    );
-  }
-
-  if (targetFormat === 'vtt') {
-    if (vttOnlyClean) {
-      const { cleanSrt } = await import('./utils/srt.util.js');
-      const vttFiles = fs.readdirSync(outputDir).filter(f => f.endsWith('.vtt'));
-      for (const file of vttFiles) {
-        const vttPath = path.join(outputDir, file);
-        cleanSrt(vttPath);
-        fs.unlinkSync(vttPath);
-      }
-    } else {
-      await processVttTranscriptsWithGemini(url, outputDir, {
-        updateTranscript: needsGeminiTranscriptUpdate,
-        videoTitle,
-        description,
-        tags,
-        callback,
-        language: transcriptLang,
-        thumbnailFlowOutputDir,
-        generateThumbnailWithFlow,
-        thumbnailPrompt,
-      });
-    }
-  }
-
   console.log('Tải transcript xong!');
+  return { transcriptLang, outputDir };
 }
 
 /**
@@ -384,7 +391,7 @@ async function downloadAudio(url, options = {}) {
  * Tải 1 video: video + transcript + audio (dùng cho xử lý batch)
  * @param {string} url - Link YouTube
  * @param {object} [options]
- * @param {(p: { url: string, title: string, description: string, tags: string }) => void | Promise<void>} [options.callback] - Truyền xuống downloadTranscript (batch: cập nhật progress từ makeVideoFromAudio)
+ * @param {(p: { url: string, title: string, description: string, tags: string }) => void | Promise<void>} [options.callback] - Truyền xuống `finalizeDownloadedTranscript` → Gemini (batch: cập nhật progress từ makeVideoFromAudio)
  * @param {string} [options.thumbnailChannelRoot] — thư mục kênh (cha của từng folder video-id); nếu có, sau Gemini gọi Flow lưu `flow-thumbnail.jpg` trong `thumbnailChannelRoot/<videoId>/` (thumbnail YouTube vẫn tải về downloads, batch copy thành `thumbnail.*`)
  * @param {boolean} [options.generateThumbnailWithFlow=true] — tắt nếu không muốn chạy Flow
  * @returns {Promise<(object & { filePath?: string }) | null>} - Thông tin video; `filePath` = file video trong downloads/ (khi tải được)
@@ -422,17 +429,18 @@ async function downloadSingleVideo(url, options = {}) {
     }
 
     await downloadThumbnail(url, { outputDir: DEFAULT_OUTPUT_DIR });
-    if (mode === MAKE_VIDEO_MODE.FROM_AUDIO) {
-      await downloadAudio(url, { outputDir: DEFAULT_OUTPUT_DIR });
-    } else {
-      await downloadVideo(url, { outputDir: DEFAULT_OUTPUT_DIR });
-    }
 
-    try {
-      await downloadTranscript(url, {
+    // [OPT-2] Song song hóa download video + transcript (transcript tải subtitle riêng, không cần file video local)
+    const transcriptOptions = {
+      outputDir: DEFAULT_OUTPUT_DIR,
+      videoTitle: result.title,
+    };
+
+    async function downloadAndFinalizeTranscript() {
+      const dl = await downloadTranscript(url, transcriptOptions);
+      await finalizeDownloadedTranscript(url, dl, {
+        ...transcriptOptions,
         updateTranscript: mode === MAKE_VIDEO_MODE.FROM_AUDIO,
-        outputDir: DEFAULT_OUTPUT_DIR,
-        videoTitle: result.title,
         description: result.description,
         tags: result.tags,
         callback,
@@ -440,8 +448,28 @@ async function downloadSingleVideo(url, options = {}) {
         generateThumbnailWithFlow,
         thumbnailPrompt,
       });
-    } catch (err) {
-      console.warn('Không tải được transcript:', err.message);
+    }
+
+    if (mode === MAKE_VIDEO_MODE.FROM_AUDIO) {
+      // FROM_AUDIO: tuần tự (transcript cần updateTranscript = true, phụ thuộc tiến trình)
+      await downloadAudio(url, { outputDir: DEFAULT_OUTPUT_DIR });
+      try {
+        await downloadAndFinalizeTranscript();
+      } catch (err) {
+        console.warn('Không tải được transcript:', err.message);
+      }
+    } else {
+      // REUP_FULL: song song hóa → tiết kiệm ~5-10 phút
+      console.log('[OPT-2] Song song: download video + transcript/Gemini/thumbnail...');
+      const [videoResult, transcriptResult] = await Promise.allSettled([
+        downloadVideo(url, { outputDir: DEFAULT_OUTPUT_DIR }),
+        downloadAndFinalizeTranscript().catch(err => {
+          console.warn('Không tải được transcript:', err.message);
+        }),
+      ]);
+      if (videoResult.status === 'rejected') {
+        throw videoResult.reason;
+      }
     }
 
     const videoExt = /\.(mp4|mkv|mov|webm|avi)$/i;
@@ -513,8 +541,7 @@ async function main() {
 
     let mergedResult = { ...result };
     try {
-      await downloadTranscript(url, {
-        // updateTranscript: false,
+      const transcriptOpts = {
         videoTitle: result.title,
         description: result.description,
         tags: result.tags,
@@ -524,7 +551,9 @@ async function main() {
           if (tags != null) mergedResult.tags = tags;
           if (summary != null) mergedResult.summary = summary;
         },
-      });
+      };
+      const dl = await downloadTranscript(url, transcriptOpts);
+      await finalizeDownloadedTranscript(url, dl, transcriptOpts);
     } catch (err) {
       console.warn('Không tải được transcript (có thể do 429):', err.message);
     }
@@ -539,4 +568,13 @@ async function main() {
 }
 
 export default downloadVideo;
-export { main, getVideoInfo, downloadThumbnail, downloadTranscript, downloadAudio, downloadSingleVideo };
+export {
+  main,
+  getVideoInfo,
+  downloadThumbnail,
+  downloadTranscript,
+  finalizeDownloadedTranscript,
+  cleanVttTranscriptsToSrt,
+  downloadAudio,
+  downloadSingleVideo,
+};

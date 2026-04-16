@@ -1,4 +1,4 @@
-export type Page = 'pipeline' | 'create-video' | 'settings' | 'channels' | 'gpm' | 'logs';
+export type Page = 'pipeline' | 'create-video' | 'settings' | 'channels' | 'analyst' | 'gpm' | 'logs';
 
 export type ScriptId =
   | 'tao-chrome-profile'
@@ -93,8 +93,8 @@ export interface ConstantsUiModel {
    * Rỗng trong file → app gợi ý mặc định (Windows: ổ không C:; macOS: volume ngoài hoặc HOME).
    */
   VIDEO_STORAGE_ROOT: string;
-  /** Số video được lên lịch đăng tối đa (cùng lúc / mỗi đợt — tùy luồng dùng hằng này). */
-  MAX_SCHEDULED_VIDEOS: number;
+  /** Số ngày lên lịch trước tối đa (cùng lúc / mỗi đợt — tùy luồng dùng hằng này). */
+  MAX_SCHEDULED_DAYS: number;
   /** Số video tạo / chuẩn bị trước tối đa (buffer trước khi đăng). */
   MAX_VIDEOS_PREPARE_AHEAD: number;
 }
@@ -194,7 +194,8 @@ export type DirectScriptId =
   | 'makeChromeProfile'
   | 'createThumbnailFlow'
   | 'summaryMetaFromTranscript'
-  | 'uploadYoutubeViaGpm';
+  | 'uploadYoutubeViaGpm'
+  | 'updateChannelVideosMeta';
 
 export interface ScriptResult<T = unknown> {
   success: boolean;
@@ -259,6 +260,8 @@ export interface GetInfoChannelResult {
 /** `MaVidMedia/channels/{folder}/mavid-channel-config.json` — đồng bộ với form Thêm/Sửa channel. */
 export interface MavidChannelConfigItem {
   email?: string;
+  /** Đồng bộ cột index «KÊNH CỦA TÔI». */
+  myChannel?: string;
   videoType?: string;
   durationMinuteFrom?: number;
   durationMinuteTo?: number | null;

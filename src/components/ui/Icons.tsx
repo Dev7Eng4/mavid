@@ -142,3 +142,15 @@ export function GpmIcon({ className = 'w-5 h-5' }: IconProps) {
     </svg>
   );
 }
+
+/** Bảng / analyst — biểu đồ cột đơn giản */
+export function ChartBarsIcon({ className = 'w-5 h-5' }: IconProps) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M3 3v18h18" />
+      <rect x="7" y="12" width="3" height="6" rx="0.5" />
+      <rect x="12" y="8" width="3" height="10" rx="0.5" />
+      <rect x="17" y="14" width="3" height="4" rx="0.5" />
+    </svg>
+  );
+}

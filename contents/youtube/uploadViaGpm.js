@@ -1,6 +1,6 @@
 /**
  * Upload tuần tự file .mp4 lên YouTube qua trình duyệt profile GPM (API Local + CDP).
- * Mỗi thư mục con (sắp xếp tên) trong `MaVidMedia/channels/{channelFolder}/` có ít nhất một .mp4 → một lần upload.
+ * Mỗi thư mục con trong `MaVidMedia/channels/{channelFolder}/` có ít nhất một .mp4 và một ảnh thumbnail (.png/.jpg/.jpeg) → một lần upload.
  *
  * @param {object} params
  * @param {string} params.gpmProfileId — id profile GPM (UUID)
@@ -16,23 +16,41 @@ import { connectPlaywrightToGpmProfile, closeProfile } from '../scripts/openGpmP
 import { syncChannelAfterYoutubeUpload } from './uploadAfterSync.js';
 import { moveSuccessfulUploadFoldersToVideosArchive } from './moveUploadedFoldersToVideosArchive.js';
 import { getYoutubePublishPlan } from './publishSchedule.util.js';
+import { assignPublishSlotsByVideoDuration } from './publishScheduleByDuration.util.js';
 import { apiRootForPlaywright, listUploadJobs } from './uploadJobs.util.js';
 import { assertSafeChannelFolder } from './channelFolder.util.js';
 import { resolveChannelsDir } from '../utils/channelsStoragePath.js';
 import { openYoutubeUpload, selectFile, fillVideoDetails, addRelatedVideo, chooseVisibility } from './studioUploadFlow.js';
+import { logToLogsPage } from '../utils/logToLogsPage.util.js';
+import { resolveGpmProfileIdByEmail } from '../utils/gpm.util.js';
 
 /**
- * @param {Record<string, unknown>} raw
+ * Email kênh trong `mavid-channel-config.json` → `getYoutubePublishPlan` (ngày/giờ public) ở bước Schedule.
+ * @param {string} email
+ * @param {string} channelFolder
+ * @param {number | null | undefined} maxUploads
+ * @param {string[]} [uploadFolderNames]
+ * @param {string} [gpmApiBase]
  */
 export default async function main(raw = {}) {
-  const gpmProfileId = typeof raw.gpmProfileId === 'string' ? raw.gpmProfileId.trim() : '';
-  if (!gpmProfileId) throw new Error('Thiếu gpmProfileId.');
+  if (!raw.email) {
+    logToLogsPage(`[upload] Thiếu email. Không thể upload YouTube qua GPM.`, 'error');
+    return;
+  }
+
+  const scheduleEmail = raw.email.trim();
+
+  const gpmProfileId = await resolveGpmProfileIdByEmail(scheduleEmail);
+  console.log('🚀 ~ main ~ gpmProfileId:', gpmProfileId);
+
+  if (!gpmProfileId) {
+    logToLogsPage(`[upload] Không tìm thấy profile GPM cho email ${scheduleEmail}`, 'error');
+    return;
+  }
 
   const channelFolder = assertSafeChannelFolder(typeof raw.channelFolder === 'string' ? raw.channelFolder : '');
-  const scheduleEmail = typeof raw.email === 'string' ? raw.email.trim() : '';
   const maxRaw = raw.maxUploads;
-  const maxUploads =
-    maxRaw == null || maxRaw === '' ? null : Number.isFinite(Number(maxRaw)) && Number(maxRaw) > 0 ? Math.floor(Number(maxRaw)) : null;
+  const maxUploads = !!maxRaw ? maxRaw : 5;
 
   const apiBase = apiRootForPlaywright(typeof raw.gpmApiBase === 'string' ? raw.gpmApiBase.trim() : '');
 
@@ -41,13 +59,26 @@ export default async function main(raw = {}) {
     : null;
 
   const channelAbs = path.join(resolveChannelsDir(), channelFolder);
-  const jobs = listUploadJobs(channelAbs, maxUploads, uploadFolderNames && uploadFolderNames.length > 0 ? uploadFolderNames : null);
+  console.log('🚀 ~ main ~ channelAbs:', channelAbs);
+  const jobs = await listUploadJobs(
+    channelAbs,
+    scheduleEmail,
+    maxUploads,
+    uploadFolderNames && uploadFolderNames.length > 0 ? uploadFolderNames : null
+  );
+  console.log('🚀 ~ main ~ jobs:', jobs);
 
   if (jobs.length === 0) {
     throw new Error(
-      `Không có thư mục con nào chứa file .mp4 trong ${channelAbs} (đã giới hạn ${maxUploads == null ? 'tất cả' : maxUploads} video).`
+      `Không có thư mục con nào đủ điều kiện (.mp4 + thumbnail .png/.jpg/.jpeg) trong ${channelAbs} (đã giới hạn ${
+        maxUploads == null ? 'tất cả' : maxUploads
+      } video).`
     );
   }
+
+  const showErrorLogs = message => {
+    logToLogsPage(`[upload] Channel ${channelFolder} - Email ${scheduleEmail} - ${message}`, 'error');
+  };
 
   console.log(`[upload] Kênh «${channelFolder}»: ${jobs.length} video — GPM profile ${gpmProfileId}`);
 
@@ -62,7 +93,10 @@ export default async function main(raw = {}) {
         email: scheduleEmail,
         uploadCount: jobs.length,
       });
-      publishSchedule = schedule;
+      publishSchedule = assignPublishSlotsByVideoDuration(jobs, schedule);
+      if (publishSchedule !== schedule) {
+        console.log('[upload] Đã gán lịch publish theo độ dài video (ngắn → ban ngày, dài → buổi tối).');
+      }
       baselineUploadedVideosFromConfig = Number.isFinite(Number(settings?.uploadedVideos))
         ? Math.max(0, Math.floor(Number(settings.uploadedVideos)))
         : 0;
@@ -81,6 +115,10 @@ export default async function main(raw = {}) {
   let context;
   /** Profile id thực tế từ GPM sau khi start — dùng cho API đóng Chrome. */
   let profileIdToStop = /** @type {string | null} */ (null);
+  /** Chỉ true khi upload + sync + archive xong bình thường — chờ trước khi đóng GPM. */
+  let delayBeforeGpmClose = false;
+  /** 15 phút (ms) giữ browser GPM mở sau khi xong để xử lý hậu kỳ / YouTube. */
+  const GPM_CLOSE_DELAY_MS = 15 * 60 * 1000;
   try {
     const connected = await connectPlaywrightToGpmProfile(gpmProfileId, gpmOpts);
     browser = connected.browser;
@@ -99,13 +137,13 @@ export default async function main(raw = {}) {
 
       try {
         if (i === 0) {
-          await openYoutubeUpload(page, mp4Path);
+          await openYoutubeUpload(page, mp4Path, i);
         } else {
           await selectFile(page, mp4Path);
         }
 
-        await fillVideoDetails(page, folderPath);
-        await addRelatedVideo(page, baselineUploadedVideosFromConfig === 2, mp4Path);
+        await fillVideoDetails(page, folderPath, showErrorLogs);
+        await addRelatedVideo(page, baselineUploadedVideosFromConfig === 2, mp4Path, showErrorLogs);
         await chooseVisibility(page, {
           slot: publishSchedule?.[i] ?? null,
           jobIndex: i,
@@ -114,8 +152,7 @@ export default async function main(raw = {}) {
         baselineUploadedVideosFromConfig++;
         successfulFolderNames.push(folderName);
         const slot = publishSchedule?.[i];
-        latestSuccessfulScheduleSlot =
-          slot && String(slot.date || '').trim() && String(slot.time || '').trim() ? slot : null;
+        latestSuccessfulScheduleSlot = slot && String(slot.date || '').trim() && String(slot.time || '').trim() ? slot : null;
       } catch (e) {
         console.warn('[upload]', e instanceof Error ? e.message : e);
       }
@@ -138,6 +175,7 @@ export default async function main(raw = {}) {
       successfulFolderNames,
     });
 
+    delayBeforeGpmClose = true;
     return {
       ok: true,
       uploaded: jobs.length,
@@ -147,6 +185,13 @@ export default async function main(raw = {}) {
       videosArchive,
     };
   } finally {
+    if (profileIdToStop && delayBeforeGpmClose) {
+      logToLogsPage(
+        `[upload] Đã xong — chờ ${GPM_CLOSE_DELAY_MS / 60000} phút rồi mới đóng trình duyệt GPM (profile ${profileIdToStop}).`,
+        'info'
+      );
+      await delay(GPM_CLOSE_DELAY_MS);
+    }
     /* Chrome do GPM mở: bắt buộc GPM Local API `profiles/close/{id}` (cùng `gpmApi.closeProfile`), sau đó mới ngắt CDP. */
     if (profileIdToStop) {
       try {

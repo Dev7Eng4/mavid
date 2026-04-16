@@ -1,4 +1,5 @@
-export const getRandomNumber = number => number + Math.random() * 1000;
+export const getRandomNumber = (number, size = 1000) => number + Math.random() * size;
+
 const randomBetween = (min, max) => min + Math.random() * (max - min);
 
 function bezier(t, p0, p1, p2, p3) {
@@ -11,9 +12,9 @@ function rand(min, max) {
   return min + Math.random() * (max - min);
 }
 
-export const delay = ms =>
+export const delay = (ms, size = 1000) =>
   new Promise(resolve => {
-    return setTimeout(resolve, getRandomNumber(ms));
+    return setTimeout(resolve, getRandomNumber(ms, 1000));
   });
 
 export async function moveToTopLeft(
@@ -83,8 +84,8 @@ export async function moveToTopLeft(
   }
 }
 
-export const clickElement = async (page, selector, isXpath = false) => {
-  const element = isXpath ? page.locator(`xpath=${selector}`) : selectElement(page, selector);
+export const clickElement = async (page, selector, isXpath = false, isElement = false) => {
+  const element = isElement ? selector : isXpath ? page.locator(`xpath=${selector}`) : selectElement(page, selector);
   console.log('🚀 ~ clickElement ~ element:', element);
 
   const box = await element.boundingBox();
@@ -141,8 +142,7 @@ async function humanScroll(page, distance) {
     await page.mouse.wheel(0, amount);
 
     // Delay giữa các tick: không đều, đôi khi dừng nhẹ
-    const delay = 30 + Math.random() * 60;
-    await page.waitForTimeout(delay);
+    await page.waitForTimeout(30 + Math.random() * 60);
   }
 
   // Đôi khi người thật dừng lại đọc nội dung
@@ -152,14 +152,73 @@ async function humanScroll(page, distance) {
 }
 
 async function isElementInViewport(page, selector, isFullXpath = false) {
+  // const locator = isFullXpath ? page.locator(`xpath=${selector}`) : page.locator(selector);
+
+  // const count = await locator.count();
+  // if (count === 0) return false;
+
+  // return locator.evaluate(el => {
+  //   const rect = el.getBoundingClientRect();
+  //   return rect.top >= 0 && rect.bottom <= window.innerHeight;
+  // });
   const locator = isFullXpath ? page.locator(`xpath=${selector}`) : page.locator(selector);
 
-  const count = await locator.count();
+  // Tránh lỗi strict mode nếu có nhiều element, ta lấy cái đầu tiên
+  const firstLocator = locator.first();
+
+  const count = await firstLocator.count();
   if (count === 0) return false;
 
-  return locator.evaluate(el => {
+  return firstLocator.evaluate(el => {
     const rect = el.getBoundingClientRect();
-    return rect.top >= 0 && rect.bottom <= window.innerHeight;
+
+    // Sử dụng window.inner... hoặc document.documentElement.client... để hỗ trợ nhiều trình duyệt
+    const windowHeight = window.innerHeight || document.documentElement.clientHeight;
+    const windowWidth = window.innerWidth || document.documentElement.clientWidth;
+
+    return (
+      rect.top >= 0 &&
+      rect.left >= 0 &&
+      rect.bottom <= windowHeight &&
+      rect.right <= windowWidth &&
+      rect.width > 0 && // Đảm bảo element không bị vô hình
+      rect.height > 0
+    );
+  });
+}
+
+async function isElementFullyInViewport(page, selector, isFullXpath = false) {
+  const locator = isFullXpath ? page.locator(`xpath=${selector}`) : page.locator(selector);
+  const firstLocator = locator.first();
+
+  // 1. Kiểm tra element có tồn tại trong DOM không
+  const count = await firstLocator.count();
+  if (count === 0) return false;
+
+  // 2. [QUAN TRỌNG] Playwright sẽ check xem UI có thực sự "nhìn thấy được" không
+  // (loại trừ display: none, opacity: 0, visibility: hidden...)
+  const isVisible = await firstLocator.isVisible();
+  if (!isVisible) return false;
+
+  // 3. Kiểm tra tọa độ đảm bảo lọt thỏm 100% trong khung nhìn
+  return firstLocator.evaluate(el => {
+    const rect = el.getBoundingClientRect();
+    const windowHeight = window.innerHeight || document.documentElement.clientHeight;
+    const windowWidth = window.innerWidth || document.documentElement.clientWidth;
+
+    // Edge case: Nếu bản thân phần tử to hơn cả cái màn hình,
+    // thì không bao giờ có chuyện "toàn bộ UI ở trong viewport" được.
+    if (rect.height > windowHeight || rect.width > windowWidth) {
+      return false;
+    }
+
+    // Trả về true CHỈ KHI toàn bộ 4 cạnh đều cách mép màn hình một khoảng >= 0
+    return (
+      rect.top >= 0 && // Không lẹm lên trên
+      rect.left >= 0 && // Không lẹm sang trái
+      rect.bottom <= windowHeight - 100 && // Không lẹm xuống dưới
+      rect.right <= windowWidth // Không lẹm sang phải
+    );
   });
 }
 
@@ -167,10 +226,10 @@ export async function scrollUntilVisible(page, selector, isFullXpath = false, ju
   const maxAttempts = 25;
 
   for (let i = 0; i < maxAttempts; i++) {
-    if (await isElementInViewport(page, selector, isFullXpath)) return;
+    if (await isElementFullyInViewport(page, selector, isFullXpath)) return;
 
     // Cuộn từng đoạn ngắn, không nhảy một cú 500px
-    await humanScroll(page, jump + Math.random() * 200);
+    await humanScroll(page, jump + Math.random() * 100);
   }
 
   throw new Error(`Không tìm thấy "${selector}"`);
@@ -183,4 +242,42 @@ export async function clearContent(page) {
   await page.waitForTimeout(300);
   await page.keyboard.press('Backspace');
   await page.waitForTimeout(200);
+}
+
+export const isVisible = async (locator, timeout = 8000) => {
+  try {
+    await locator.waitFor({ state: 'visible', timeout });
+    return true;
+  } catch {
+    return false;
+  }
+};
+
+/**
+ * Poll `locator.isVisible()` theo chu kỳ — dùng sau khi đóng dialog khác: popup kế thường mount trễ,
+ * hoặc `waitFor(visible)` kết thúc sớm khi DOM đang chuyển.
+ * @param {import('playwright').Page} page
+ * @param {import('playwright').Locator[]} locators
+ * @param {{ timeoutMs?: number, intervalMs?: number, settleMs?: number }} [options]
+ * @returns {Promise<boolean[]>} — cờ visible tương ứng từng locator (sau bước settle)
+ */
+export async function pollUntilAnyLocatorVisible(page, locators, options = {}) {
+  const { timeoutMs = 15000, intervalMs = 350, settleMs = 500 } = options;
+  const deadline = Date.now() + timeoutMs;
+
+  /** @type {boolean[]} */
+  let flags = locators.map(() => false);
+
+  while (Date.now() < deadline) {
+    flags = await Promise.all(locators.map(l => l.isVisible().catch(() => false)));
+    if (flags.some(Boolean)) break;
+    await page.waitForTimeout(intervalMs);
+  }
+
+  if (settleMs > 0) {
+    await page.waitForTimeout(settleMs);
+    flags = await Promise.all(locators.map(l => l.isVisible().catch(() => false)));
+  }
+
+  return flags;
 }

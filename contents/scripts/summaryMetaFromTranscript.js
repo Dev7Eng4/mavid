@@ -3,7 +3,7 @@
  * tóm tắt nội dung (summary) + niche, title, description, tags.
  *
  * Không chỉnh từng dòng phụ đề (khác pipeline VTT + update transcript).
- * Tải VTT rồi `cleanSrt` → SRT (qua `downloadTranscript` + `vttOnlyClean`, không Gemini).
+ * Tải VTT rồi `cleanVttTranscriptsToSrt` (cleanSrt → SRT), không pipeline Gemini trong bước tải.
  *
  * Chạy:
  *   node contents/scripts/summaryMetaFromTranscript.js
@@ -18,7 +18,7 @@ import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 
-import { getVideoInfo, downloadTranscript } from '../downloadVideo.js';
+import { getVideoInfo, downloadTranscript, cleanVttTranscriptsToSrt } from '../downloadVideo.js';
 import { updateVideoMeta } from '../gemini/updateContent.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -89,10 +89,10 @@ async function main() {
   console.log('Đang tải transcript (VTT → cleanSrt → SRT, không pipeline Gemini)...');
   await downloadTranscript(url, {
     subFormat: 'vtt',
-    vttOnlyClean: true,
     outputDir: DOWNLOADS_DIR,
     videoTitle: info.title,
   });
+  await cleanVttTranscriptsToSrt(DOWNLOADS_DIR);
 
   const srtPath = resolveSrtPath(DOWNLOADS_DIR, videoId);
   if (!srtPath || !fs.existsSync(srtPath)) {

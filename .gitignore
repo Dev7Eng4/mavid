@@ -8,6 +8,7 @@ pnpm-debug.log*
 lerna-debug.log*
 
 node_modules
+.env
 dist
 dist-ssr
 *.local
@@ -30,3 +31,8 @@ downloads
 MaVidMedia
 
 contents/constants/appSettings.user.json
+
+# Google Drive OAuth (đồng bộ MaVidMedia → Drive)
+contents/ggdrive/oauth-credentials.json
+contents/ggdrive/oauth-token.json
+

@@ -18,6 +18,7 @@ import {
   isValidReupOverlayName,
   isValidthumbnailPrompt,
   labelForPublishTimeSlot,
+  normalizeChannelIndexStatus,
   normalizeWallClockTimeToHHmm,
   parseVideoPerDayCell,
   reupOverlaySelectOptions,
@@ -53,7 +54,8 @@ function readPublishTimesFromTimeInputs(slotCount: number, fallback: string[]): 
 const ADD_FORM_DEFAULT: ChannelAddDialogInitialFields = {
   channelUrl: '',
   email: '',
-  videoType: 'from_audio',
+  myChannel: '',
+  videoType: 'reup_full',
   durationOption: '0_null',
   selectedBackground: '',
   reupOverlayOption: defaultReupOverlayName(),
@@ -61,11 +63,13 @@ const ADD_FORM_DEFAULT: ChannelAddDialogInitialFields = {
   folderIdOverride: '',
   videosPerDayPreset: '1',
   publishTimes: ['09:00'],
+  channelStatus: 'INIT',
 };
 
 const VIDEO_PER_DAY_OPTIONS: { value: VideoPerDayPreset; label: string }[] = [
   { value: '1', label: '1' },
   { value: '2', label: '2' },
+  { value: '3', label: '3' },
   { value: '1-2', label: '1–2 (2 suất cuối tuần)' },
 ];
 
@@ -75,6 +79,8 @@ export interface ChannelAddSavePayload {
   folderIdOverride: string;
   channels: {
     email: string;
+    /** Cột index «KÊNH CỦA TÔI» + lưu trong mavid-channel-config. */
+    myChannel?: string;
     videoType: 'from_audio' | 'reup_full';
     durationMinuteFrom: number;
     durationMinuteTo: number | null;
@@ -122,6 +128,7 @@ export function ChannelAddDialog({
   const {
     channelUrl,
     email,
+    myChannel,
     videoType,
     durationOption,
     selectedBackground,
@@ -130,6 +137,7 @@ export function ChannelAddDialog({
     folderIdOverride,
     videosPerDayPreset,
     publishTimes,
+    channelStatus,
   } = form;
   console.log('🚀 ~ ChannelAddDialog ~ folderIdOverride:', folderIdOverride);
 
@@ -202,6 +210,7 @@ export function ChannelAddDialog({
           if (!ch) return next;
 
           if (typeof ch.email === 'string' && ch.email.trim()) next.email = ch.email.trim();
+          if (typeof ch.myChannel === 'string') next.myChannel = ch.myChannel.trim();
           if (ch.videoType === 'from_audio' || ch.videoType === 'reup_full') next.videoType = ch.videoType;
 
           if (ch.durationMinuteFrom !== undefined) {
@@ -249,8 +258,8 @@ export function ChannelAddDialog({
   }, []);
 
   const videoTypeOptions = [
-    { value: 'from_audio', label: 'Tạo video từ audio' },
     { value: 'reup_full', label: 'Tạo video reup toàn bộ' },
+    { value: 'from_audio', label: 'Tạo video từ audio' },
   ];
 
   /** Email trùng lặp (reactive, hiển thị inline). */
@@ -296,26 +305,15 @@ export function ChannelAddDialog({
     return used;
   }, [channelUrl, indexRows, indexHeaders, isEditMode, initialRow]);
 
-  /** Lọc các option thời gian không bị overlap với đã dùng. */
-  const durationMinuteOptions = useMemo(() => {
-    if (usedDurationOptions.size === 0) return CHANNEL_ADD_DURATION_SELECT_OPTIONS;
-    return CHANNEL_ADD_DURATION_SELECT_OPTIONS.filter(opt => {
-      // Giữ lại option hiện tại đang chọn (edit mode)
-      if (opt.value === durationOption) return true;
-      // Loại nếu overlap bất kỳ option đã dùng
-      for (const used of usedDurationOptions) {
-        if (isDurationOverlap(opt.value, used)) return false;
-      }
-      return true;
-    });
-  }, [usedDurationOptions, durationOption]);
+  /** Luôn hiển thị đủ preset — cho phép chọn khoảng trùng; chỉ cảnh báo, không chặn lưu. */
+  const durationMinuteOptions = CHANNEL_ADD_DURATION_SELECT_OPTIONS;
 
-  /** Thông báo lỗi inline cho duration nếu option hiện tại overlap. */
-  const durationOverlapError = useMemo(() => {
+  /** Cảnh báo (không chặn submit): cùng URL đã có dòng với khoảng thời gian trùng. */
+  const durationOverlapWarning = useMemo(() => {
     if (usedDurationOptions.size === 0) return '';
     for (const used of usedDurationOptions) {
       if (isDurationOverlap(durationOption, used)) {
-        return 'Khoảng thời gian đã tồn tại cho URL kênh này.';
+        return 'Đã tồn tại — cùng URL và khoảng thời gian video đã có trong index (vẫn có thể lưu).';
       }
     }
     return '';
@@ -366,15 +364,8 @@ export function ChannelAddDialog({
 
       if (indexRows && indexRows.length > 0) {
         let hasDuplicateEmail = false;
-        let hasDurationOverlap = false;
-
-        const normUrlRaw = channelUrl.trim();
-        const normUrl = /^https?:\/\//i.test(normUrlRaw) ? normUrlRaw : normUrlRaw ? `https://${normUrlRaw}` : '';
         const inputEmail = email.trim().toLowerCase();
-
         const emailKey = findIndexHeaderKey(indexHeaders, 'EMAIL');
-        const linkKey = findIndexHeaderKey(indexHeaders, 'LINK');
-        const durationColumnKey = findIndexHeaderKey(indexHeaders, 'THỜI GIAN VIDEO');
 
         for (const r of indexRows) {
           if (isEditMode && initialRow === r) continue;
@@ -389,29 +380,10 @@ export function ChannelAddDialog({
               hasDuplicateEmail = true;
             }
           }
-
-          if (linkKey && durationColumnKey) {
-            const rowUrlRaw = String(r[linkKey] ?? '').trim();
-            const rowNormUrl = /^https?:\/\//i.test(rowUrlRaw) ? rowUrlRaw : rowUrlRaw ? `https://${rowUrlRaw}` : '';
-            if (normUrl && rowNormUrl === normUrl) {
-              const rowDurationLabel = String(r[durationColumnKey] ?? '').trim();
-              if (rowDurationLabel) {
-                const rowOpt = durationLabelToOption(rowDurationLabel);
-                if (isDurationOverlap(durationOption, rowOpt)) {
-                  hasDurationOverlap = true;
-                }
-              }
-            }
-          }
         }
 
         if (hasDuplicateEmail) {
           setFormError('Email đã được sử dụng trong index.xlsx. Vui lòng chọn email khác hoặc để trống.');
-          return;
-        }
-
-        if (hasDurationOverlap) {
-          setFormError('URL này đã tồn tại với khoảng thời gian bị trùng lặp trong index.xlsx. Hãy chọn thời gian khác.');
           return;
         }
       }
@@ -425,11 +397,19 @@ export function ChannelAddDialog({
           setFormError('Cập nhật file config chỉ dùng trong app Electron.');
           return;
         }
+        const statusKey = findIndexHeaderKey(indexHeaders, 'STATUS');
+        const emailKeyForInit = findIndexHeaderKey(indexHeaders, 'EMAIL');
+        const initialStatusNorm = initialRow && statusKey ? normalizeChannelIndexStatus(initialRow[statusKey]) : ('INIT' as const);
+        const initialEmailTrim = emailKeyForInit && initialRow ? String(initialRow[emailKeyForInit] ?? '').trim() : '';
+        const emailNowTrim = email.trim();
+        const statusForIndex = initialStatusNorm === 'INIT' && !initialEmailTrim && emailNowTrim ? 'LIVE' : channelStatus;
+
         const { row, error } = buildChannelRowFromAddForm(
           indexHeaders,
           {
             channelUrl,
             email,
+            myChannel,
             videoType: videoType as 'from_audio' | 'reup_full',
             durationOption,
             background: videoType === 'from_audio' ? resolvedBackground.trim() : '',
@@ -438,6 +418,7 @@ export function ChannelAddDialog({
             videosPerDayPreset,
             publishTimes: times,
             folderIdOverride,
+            channelStatus: statusForIndex,
           },
           { preserveChannelFromRow: initialRow }
         );
@@ -460,6 +441,7 @@ export function ChannelAddDialog({
               channels: [
                 {
                   email: email.trim(),
+                  myChannel: myChannel.trim(),
                   videoType: videoType as 'from_audio' | 'reup_full',
                   durationMinuteFrom: from,
                   durationMinuteTo: to,
@@ -508,6 +490,7 @@ export function ChannelAddDialog({
           channels: [
             {
               email: email.trim(),
+              myChannel: myChannel.trim(),
               videoType: videoType as 'from_audio' | 'reup_full',
               durationMinuteFrom: from,
               durationMinuteTo: to,
@@ -530,6 +513,7 @@ export function ChannelAddDialog({
     channelUrl,
     durationOption,
     email,
+    myChannel,
     folderIdOverride,
     requireBackground,
     requireReupOverlay,
@@ -548,6 +532,7 @@ export function ChannelAddDialog({
     videosPerDayPreset,
     indexRows,
     initialRow,
+    channelStatus,
   ]);
 
   const inputClass = 'w-full rounded-xl px-3 py-2.5 text-base outline-none border transition-colors duration-150';
@@ -610,28 +595,50 @@ export function ChannelAddDialog({
             />
           </div>
 
-          <div className='mb-4'>
-            <label className='block text-sm font-medium mb-2' style={{ color: 'var(--text-h)' }} htmlFor='add-email'>
-              Email tạo kênh
+          <div className='mb-4 space-y-4'>
+            <div>
+              <label className='block text-sm font-medium mb-2' style={{ color: 'var(--text-h)' }} htmlFor='add-email'>
+                Email tạo kênh
+              </label>
+              <input
+                id='add-email'
+                type='email'
+                autoComplete='off'
+                value={email}
+                onChange={e => setForm(f => ({ ...f, email: e.target.value }))}
+                className={inputClass}
+                style={{
+                  background: 'var(--code-bg)',
+                  color: 'var(--text-h)',
+                  borderColor: emailDuplicateWarning ? '#f87171' : 'var(--border)',
+                }}
+              />
+              {emailDuplicateWarning ? (
+                <p className='text-xs mt-1' style={{ color: '#fecaca' }}>
+                  {emailDuplicateWarning}
+                </p>
+              ) : null}
+            </div>
+          </div>
+
+          <div>
+            <label className='block text-sm font-medium mb-2' style={{ color: 'var(--text-h)' }} htmlFor='add-my-channel'>
+              Kênh của tôi
             </label>
             <input
-              id='add-email'
-              type='email'
+              id='add-my-channel'
+              type='text'
               autoComplete='off'
-              value={email}
-              onChange={e => setForm(f => ({ ...f, email: e.target.value }))}
+              placeholder=''
+              value={myChannel}
+              onChange={e => setForm(f => ({ ...f, myChannel: e.target.value }))}
               className={inputClass}
               style={{
                 background: 'var(--code-bg)',
                 color: 'var(--text-h)',
-                borderColor: emailDuplicateWarning ? '#f87171' : 'var(--border)',
+                borderColor: 'var(--border)',
               }}
             />
-            {emailDuplicateWarning ? (
-              <p className='text-xs mt-1' style={{ color: '#fecaca' }}>
-                {emailDuplicateWarning}
-              </p>
-            ) : null}
           </div>
 
           <div className='mb-4'>
@@ -658,9 +665,9 @@ export function ChannelAddDialog({
               placeholder='Phút'
               menuZIndex={100}
             />
-            {durationOverlapError ? (
-              <p className='text-xs mt-1' style={{ color: '#fecaca' }}>
-                {durationOverlapError}
+            {durationOverlapWarning ? (
+              <p className='text-xs mt-1' style={{ color: '#f87171' }}>
+                {durationOverlapWarning}
               </p>
             ) : null}
           </div>

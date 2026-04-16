@@ -226,21 +226,21 @@ export function SettingsPage({ disabled }: Props) {
 
           <SectionCard title='LÊN LỊCH ĐĂNG'>
             <p className='text-sm leading-relaxed mb-3' style={{ color: 'var(--text-muted)' }}>
-              Giới hạn lịch đăng và số video tạo trước; các luồng trong app đọc <code className='text-xs'>MAX_SCHEDULED_VIDEOS</code> và{' '}
+              Giới hạn lịch đăng và số video tạo trước; các luồng trong app đọc <code className='text-xs'>MAX_SCHEDULED_DAYS</code> và{' '}
               <code className='text-xs'>MAX_VIDEOS_PREPARE_AHEAD</code> trong constants.
             </p>
             <div className='grid gap-3 sm:grid-cols-2'>
-              <Field label='Số video lên lịch tối đa'>
+              <Field label='Số ngày lên lịch trước tối đa'>
                 <input
                   type='number'
                   min={1}
                   max={500}
-                  value={model.MAX_SCHEDULED_VIDEOS}
+                  value={model.MAX_SCHEDULED_DAYS}
                   disabled={!canEdit || constantsLoading}
                   onChange={e => {
-                    const raw = toNum(e.target.value, model.MAX_SCHEDULED_VIDEOS);
+                    const raw = toNum(e.target.value, model.MAX_SCHEDULED_DAYS);
                     const n = Math.max(1, Math.min(500, Math.floor(raw)));
-                    patch('MAX_SCHEDULED_VIDEOS', n);
+                    patch('MAX_SCHEDULED_DAYS', n);
                   }}
                   className='w-full max-w-xs rounded-xl px-3 py-2 text-sm outline-none'
                   style={inputStyle}

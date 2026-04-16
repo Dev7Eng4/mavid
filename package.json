@@ -17,14 +17,18 @@
     "tao-batch-video-reup-full": "node -e \"import('./contents/scripts/createBatchVideo.js').then(m => m.default({ videoType: 'reup_full' }))\"",
     "tao-thumbnail-flow": "node contents/flow/createThumbnail.cli.js",
     "tom-tat-meta-tu-transcript": "node contents/scripts/summaryMetaFromTranscript.js",
-    "syncProgressToSpreadsheet": "node contents/scripts/syncProgressToSpreadsheet.js"
+    "syncProgressToSpreadsheet": "node contents/scripts/syncProgressToSpreadsheet.js",
+    "syncVideosToDrive": "node contents/ggdrive/syncVideosToDrive.cli.js"
   },
   "dependencies": {
     "@tailwindcss/vite": "4.2.2",
     "concurrently": "9.2.1",
+    "dotenv": "^16.4.7",
     "electron": "41.1.1",
     "exceljs": "4.4.0",
     "glob": "13.0.6",
+    "google-auth-library": "^10.2.0",
+    "googleapis": "^159.0.0",
     "inquirer": "13.3.2",
     "playwright": "1.59.1",
     "react": "19.2.4",
