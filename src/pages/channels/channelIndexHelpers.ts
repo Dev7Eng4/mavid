@@ -1,4 +1,4 @@
-import type { ChannelRow, ScriptId } from '@/types';
+import type { ChannelRow, MavidChannelConfig, MavidChannelConfigItem, ScriptId } from '@/types';
 import { PROMPTS_CREATE_THUMBNAIL_OPTIONS } from '@contents/prompts/index.js';
 import { OVERLAY_OPTIONS } from '@contents/constants/overlayOptions.js';
 import { buildMavidEnvForVideoFromAudio, defaultBackgroundFolder } from '@/utils/videoFromAudioEnv';
@@ -307,6 +307,81 @@ export function isValidthumbnailPrompt(name: string): boolean {
 }
 
 /**
+ * Tìm phần tử `channels[]` trong `mavid-channel-config.json` khớp một trong các email (ô index có thể `a, b`).
+ */
+export function findMavidChannelConfigItemByIndexEmails(cfg: MavidChannelConfig, indexEmails: string[]): MavidChannelConfigItem | null {
+  const list = Array.isArray(cfg.channels) ? cfg.channels : [];
+  if (!list.length) return null;
+  for (const raw of indexEmails) {
+    const want = raw.trim().toLowerCase();
+    if (!want) continue;
+    const hit = list.find(it => String(it?.email ?? '').trim().toLowerCase() === want);
+    if (hit) return hit;
+  }
+  return null;
+}
+
+/**
+ * Entry dùng để merge form: ưu tiên `channels[]` khớp email; nếu mảng rỗng thì dùng field root (file cũ).
+ */
+export function resolveMavidChannelItemForInitialMerge(
+  cfg: MavidChannelConfig,
+  indexEmails: string[]
+): MavidChannelConfigItem | MavidChannelConfig | null {
+  const list = Array.isArray(cfg.channels) ? cfg.channels : [];
+  if (list.length > 0) {
+    return findMavidChannelConfigItemByIndexEmails(cfg, indexEmails);
+  }
+  return cfg;
+}
+
+/**
+ * Ghi đè các trường form từ một entry trong `mavid-channel-config` (và URL root nếu cột LINK trống).
+ */
+export function applyMavidChannelItemToAddDialogInitial(
+  base: ChannelAddDialogInitialFields,
+  cfg: MavidChannelConfig,
+  item: MavidChannelConfigItem | MavidChannelConfig | null
+): ChannelAddDialogInitialFields {
+  if (!item || typeof item !== 'object') return { ...base };
+
+  const next = { ...base };
+  if (!next.channelUrl.trim() && typeof cfg.channelUrl === 'string' && cfg.channelUrl.trim()) {
+    next.channelUrl = cfg.channelUrl.trim();
+  }
+
+  const ch = item as MavidChannelConfigItem;
+
+  if (typeof ch.email === 'string' && ch.email.trim()) next.email = ch.email.trim();
+  if (typeof ch.myChannel === 'string') next.myChannel = ch.myChannel.trim();
+  if (ch.videoType === 'from_audio' || ch.videoType === 'reup_full') next.videoType = ch.videoType;
+
+  if (ch.durationMinuteFrom !== undefined) {
+    const toPart = ch.durationMinuteTo === null || ch.durationMinuteTo === undefined ? 'null' : String(ch.durationMinuteTo);
+    next.durationOption = `${ch.durationMinuteFrom}_${toPart}`;
+  }
+
+  if (typeof ch.background === 'string') next.selectedBackground = ch.background;
+  if (typeof ch.overlay === 'string' && ch.overlay.trim() && isValidReupOverlayName(ch.overlay)) {
+    next.reupOverlayOption = ch.overlay.trim();
+  }
+  if (typeof ch.thumbnailPrompt === 'string' && ch.thumbnailPrompt.trim() && isValidthumbnailPrompt(ch.thumbnailPrompt)) {
+    next.thumbnailPrompt = ch.thumbnailPrompt.trim();
+  }
+  if (typeof ch.videosPerDayPreset === 'string' && ch.videosPerDayPreset.trim()) {
+    next.videosPerDayPreset = parseVideoPerDayCell(ch.videosPerDayPreset);
+  }
+  if (Array.isArray(ch.publishTimes) && ch.publishTimes.length > 0) {
+    const preset = next.videosPerDayPreset;
+    const slots = timeSlotCountForVideoPerDayPreset(preset);
+    const times = ch.publishTimes.map(t => normalizeWallClockTimeToHHmm(String(t)));
+    while (times.length < slots) times.push('09:00');
+    next.publishTimes = times.slice(0, slots);
+  }
+  return next;
+}
+
+/**
  * Chuẩn hóa giờ từ `<input type="time">` (HH:mm hoặc HH:mm:ss) → `HH:mm`.
  * Tránh lệch giữa UI và state / JSON khi trình duyệt trả về định dạng khác nhau.
  */
@@ -384,27 +459,35 @@ export function parseIndexPublishTimesCell(raw: unknown): string[] {
   return out.length > 0 ? out : ['09:00'];
 }
 
-/** Điền form «Thêm/Sửa channel» từ một dòng bảng nháp. */
-export function channelAddDialogInitialFromIndexRow(row: ChannelRow, headers: string[]): ChannelAddDialogInitialFields {
+/**
+ * Điền form «Thêm/Sửa channel» từ một dòng bảng nháp.
+ * Khi có `mavidChannelConfig` và dòng có cột ID + EMAIL: merge từ `MaVidMedia/channels/<ID>/mavid-channel-config.json`,
+ * entry `channels[]` khớp email (không phân biệt hoa thường; ô EMAIL có thể nhiều địa chỉ phân tách dấu phẩy).
+ */
+export function channelAddDialogInitialFromIndexRow(
+  row: ChannelRow,
+  headers: string[],
+  mavidChannelConfig?: MavidChannelConfig | null
+): ChannelAddDialogInitialFields {
   const linkKey = findIndexHeaderKey(headers, 'LINK');
   const channelUrl = linkKey ? String(row[linkKey] ?? '').trim() : '';
 
   const emailKey = findIndexHeaderKey(headers, 'EMAIL');
   const email = emailKey ? String(row[emailKey] ?? '').trim() : '';
 
-  const myChannelKey = findIndexHeaderKey(headers, 'KÊNH CỦA TÔI');
+  const myChannelKey =
+    findIndexHeaderKey(headers, 'KÊNH CỦA TÔI') ?? findIndexHeaderKey(headers, 'CHANNEL');
   const myChannel = myChannelKey ? String(row[myChannelKey] ?? '').trim() : '';
 
   let videoType = resolveIndexRowVideoType(row, headers);
   if (!videoType) videoType = 'from_audio';
 
-  const durationColumnKey = findIndexHeaderKey(headers, 'THỜI GIAN VIDEO');
+  const durationColumnKey = findIndexHeaderKeyAny(headers, ['THỜI GIAN VIDEO', 'VIDEO DURATION']);
   let durationOption = '0_null';
   if (durationColumnKey != null && row[durationColumnKey] != null && row[durationColumnKey] !== '') {
     const v = String(row[durationColumnKey]);
-    // It might be a label from the new format, or numbers from the old format
     if (['15', '20', '30', '60'].includes(v)) {
-      durationOption = '0_null'; // Or mapping for legacy? "0_null" is safest
+      durationOption = '0_null';
     } else {
       durationOption = durationLabelToOption(v);
     }
@@ -418,7 +501,12 @@ export function channelAddDialogInitialFromIndexRow(row: ChannelRow, headers: st
 
   const folder = channelFolderFromRow(row, headers) ?? '';
 
-  const videosPerDayColumnKey = findIndexHeaderKeyAny(headers, ['SỐ VIDEO MỖI NGÀY', 'VIDEO MỖI NGÀY', 'SỐ VIDEO UPDATE MỖI NGÀY']);
+  const videosPerDayColumnKey = findIndexHeaderKeyAny(headers, [
+    'SỐ VIDEO MỖI NGÀY',
+    'VIDEO MỖI NGÀY',
+    'SỐ VIDEO UPDATE MỖI NGÀY',
+    'VIDEO PER DAY',
+  ]);
   const videosPerDayPreset =
     videosPerDayColumnKey != null && row[videosPerDayColumnKey] != null && String(row[videosPerDayColumnKey]).trim() !== ''
       ? parseVideoPerDayCell(row[videosPerDayColumnKey])
@@ -433,7 +521,7 @@ export function channelAddDialogInitialFromIndexRow(row: ChannelRow, headers: st
 
   const statusKey = findIndexHeaderKey(headers, 'STATUS');
 
-  return {
+  const result: ChannelAddDialogInitialFields = {
     channelUrl,
     email,
     myChannel,
@@ -447,6 +535,17 @@ export function channelAddDialogInitialFromIndexRow(row: ChannelRow, headers: st
     publishTimes,
     channelStatus: statusKey ? normalizeChannelIndexStatus(row[statusKey]) : 'INIT',
   };
+
+  const folderId = channelFolderFromRow(row, headers);
+  const indexEmails = emailKey ? parseIndexEmailCell(row[emailKey]) : [];
+  if (mavidChannelConfig && folderId && indexEmails.length > 0) {
+    const item = resolveMavidChannelItemForInitialMerge(mavidChannelConfig, indexEmails);
+    if (item) {
+      return applyMavidChannelItemToAddDialogInitial(result, mavidChannelConfig, item);
+    }
+  }
+
+  return result;
 }
 
 export function buildChannelRowFromAddForm(

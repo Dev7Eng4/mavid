@@ -1,21 +1,56 @@
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import { spawn, execSync } from 'child_process';
+import { spawn, execFile } from 'child_process';
+import { promisify } from 'util';
 import { MAKE_VIDEO_MODE } from './constants/index.js';
 import { GPU_INFO } from './utils/hardware.util.js';
 import { OVERLAY_OPTIONS } from './constants/overlayOptions.js';
 import { resolveChannelsDir } from './utils/channelsStoragePath.js';
 import { unlinkProgressSidecarForSpreadsheet } from './syncProgressToSpreadsheet.js';
 
+const execFileAsync = promisify(execFile);
+
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.join(__dirname, '..');
 const CHANNELS_DIR = resolveChannelsDir();
-
 const DOWNLOADS_DIR = path.join(ROOT, 'downloads');
 
 /** Re-export để code cũ `import { OVERLAY_OPTIONS } from './makeVideoFromFull.js'` vẫn dùng được. */
 export { OVERLAY_OPTIONS };
+
+// ---------------------------------------------------------------------------
+// Concurrency limit (số video encode song song). Mặc định 2 để cân bằng
+// GPU/CPU + I/O. Có thể override qua env REMAKE_CONCURRENCY=3.
+// ---------------------------------------------------------------------------
+const REMAKE_CONCURRENCY = Math.max(1, parseInt(process.env.REMAKE_CONCURRENCY ?? '2', 10));
+
+/**
+ * Giới hạn số Promise chạy đồng thời (thay thế p-limit không cần thêm dep).
+ * @param {number} concurrency
+ * @returns {(fn: () => Promise<any>) => Promise<any>}
+ */
+function createLimiter(concurrency) {
+  let active = 0;
+  const queue = [];
+  const next = () => {
+    if (active >= concurrency || queue.length === 0) return;
+    active++;
+    const { fn, resolve, reject } = queue.shift();
+    fn()
+      .then(resolve)
+      .catch(reject)
+      .finally(() => {
+        active--;
+        next();
+      });
+  };
+  return fn =>
+    new Promise((resolve, reject) => {
+      queue.push({ fn, resolve, reject });
+      next();
+    });
+}
 
 function overlaySubdirFromOptionName(name) {
   if (!name || typeof name !== 'string') return 'default';
@@ -30,7 +65,6 @@ function opacityOrDefault(v, fallback) {
 /**
  * Zoom trung tâm + cắt 4 phía trên video gốc (input 0) trước khi overlay.
  * 0 = tắt. Ví dụ 10 ≈ phóng to rồi cắt ~10% mỗi phía; giới hạn 0–49.
- * Truyền qua `main({ VIDEO_CROP_PERCENT })` hoặc `videoCropPercent` (mặc định 0).
  */
 export function normalizeVideoCropPercent(raw) {
   const n = Number(raw);
@@ -64,35 +98,40 @@ export function resolveOverlayByName(overlayKey) {
 
 /**
  * Lấy resolution (width × height) của video bằng ffprobe.
- * Dùng để scale overlay chính xác thay vì scale2ref mỗi frame.
+ * FIX #7: Warn rõ ràng nếu fallback, tránh silent render sai resolution.
  */
-function getVideoResolution(filePath) {
+async function getVideoResolution(filePath) {
   try {
-    const cmd = `ffprobe -v error -select_streams v:0 -show_entries stream=width,height -of csv=s=x:p=0 "${filePath}"`;
-    const result = execSync(cmd, { encoding: 'utf-8' }).trim();
-    const [w, h] = result.split('x').map(Number);
+    const { stdout } = await execFileAsync('ffprobe', [
+      '-v',
+      'error',
+      '-select_streams',
+      'v:0',
+      '-show_entries',
+      'stream=width,height',
+      '-of',
+      'csv=s=x:p=0',
+      filePath,
+    ]);
+    const [w, h] = stdout.trim().split('x').map(Number);
     if (w > 0 && h > 0) return { width: w, height: h };
   } catch {
-    // fallback
+    // fallback bên dưới
   }
+  console.warn(`⚠️  Không lấy được resolution của "${path.basename(filePath)}", fallback 1920×1080 — kiểm tra lại ffprobe.`);
   return { width: 1920, height: 1080 };
 }
 
 function ensureOverlayDirs(overlayDir, overlayCacheDir) {
-  if (!fs.existsSync(overlayDir)) {
-    fs.mkdirSync(overlayDir, { recursive: true });
-  }
-  if (!fs.existsSync(overlayCacheDir)) {
-    fs.mkdirSync(overlayCacheDir, { recursive: true });
-  }
+  fs.mkdirSync(overlayDir, { recursive: true });
+  fs.mkdirSync(overlayCacheDir, { recursive: true });
 }
 
 /**
  * Pre-process ảnh overlay: scale đúng WxH + nhân sẵn alpha → lưu cache PNG.
- * Lần sau cùng resolution + opacity + ảnh gốc → dùng lại, không cần tính lại mỗi frame.
- * Trả về đường dẫn file cache (RGBA PNG, đã baked alpha).
+ * FIX #2: Dùng execFileAsync (async) thay execSync (blocking event loop).
  */
-function getPreprocessedImageOverlay(imagePath, width, height, opacity, overlayCacheDir) {
+async function getPreprocessedImageOverlay(imagePath, width, height, opacity, overlayCacheDir) {
   const srcStat = fs.statSync(imagePath);
   const cacheKey = `img_${path.parse(imagePath).name}_${width}x${height}_a${Math.round(opacity * 100)}_${srcStat.mtimeMs}`;
   const cachePath = path.join(overlayCacheDir, `${cacheKey}.png`);
@@ -104,10 +143,19 @@ function getPreprocessedImageOverlay(imagePath, width, height, opacity, overlayC
 
   console.log(`Pre-processing ảnh overlay → ${width}x${height}, alpha=${opacity}...`);
   try {
-    execSync(
-      `ffmpeg -hide_banner -loglevel error -y -i "${imagePath}" -vf "scale=${width}:${height},format=rgba,colorchannelmixer=aa=${opacity}" -frames:v 1 "${cachePath}"`,
-      { encoding: 'utf-8', stdio: 'pipe' },
-    );
+    await execFileAsync('ffmpeg', [
+      '-hide_banner',
+      '-loglevel',
+      'error',
+      '-y',
+      '-i',
+      imagePath,
+      '-vf',
+      `scale=${width}:${height},format=rgba,colorchannelmixer=aa=${opacity}`,
+      '-frames:v',
+      '1',
+      cachePath,
+    ]);
     console.log(`Đã tạo cache: ${path.basename(cachePath)}`);
   } catch (err) {
     console.warn('Không tạo được cache ảnh overlay, dùng pipeline cũ:', err.message);
@@ -117,11 +165,10 @@ function getPreprocessedImageOverlay(imagePath, width, height, opacity, overlayC
 }
 
 /**
- * Pre-process video overlay: scale đúng WxH + nhân sẵn alpha → lưu cache ProRes 4444 (giữ alpha).
- * Video overlay là clip loop ngắn, chỉ xử lý 1 lần rồi dùng lại cho toàn bộ video dài.
- * Giảm ~30-40% thời gian render vì không cần scale+format+colorchannelmixer mỗi frame.
+ * Pre-process video overlay: scale đúng WxH + nhân sẵn alpha → lưu cache ProRes 4444.
+ * FIX #2: Dùng execFileAsync (async) thay execSync (blocking event loop).
  */
-function getPreprocessedVideoOverlay(videoPath, width, height, opacity, overlayCacheDir) {
+async function getPreprocessedVideoOverlay(videoPath, width, height, opacity, overlayCacheDir) {
   const srcStat = fs.statSync(videoPath);
   const cacheKey = `vid_${path.parse(videoPath).name}_${width}x${height}_a${Math.round(opacity * 100)}_${srcStat.mtimeMs}`;
   const cachePath = path.join(overlayCacheDir, `${cacheKey}.mov`);
@@ -133,10 +180,23 @@ function getPreprocessedVideoOverlay(videoPath, width, height, opacity, overlayC
 
   console.log(`Pre-processing video overlay → ${width}x${height}, alpha=${opacity}...`);
   try {
-    execSync(
-      `ffmpeg -hide_banner -loglevel error -y -i "${videoPath}" -vf "scale=${width}:${height},format=yuva420p,colorchannelmixer=aa=${opacity}" -c:v prores_ks -profile:v 4444 -pix_fmt yuva444p10le "${cachePath}"`,
-      { encoding: 'utf-8', stdio: 'pipe' },
-    );
+    await execFileAsync('ffmpeg', [
+      '-hide_banner',
+      '-loglevel',
+      'error',
+      '-y',
+      '-i',
+      videoPath,
+      '-vf',
+      `scale=${width}:${height},format=yuva420p,colorchannelmixer=aa=${opacity}`,
+      '-c:v',
+      'prores_ks',
+      '-profile:v',
+      '4444',
+      '-pix_fmt',
+      'yuva444p10le',
+      cachePath,
+    ]);
     console.log(`Đã tạo cache video overlay: ${path.basename(cachePath)}`);
   } catch (err) {
     console.warn('Không tạo được cache video overlay, dùng pipeline cũ:', err.message);
@@ -145,11 +205,15 @@ function getPreprocessedVideoOverlay(videoPath, width, height, opacity, overlayC
   return cachePath;
 }
 
+/**
+ * FIX #4: Sort theo tên để đảm bảo deterministic (không phụ thuộc thứ tự filesystem).
+ */
 function getFiles(dir, exts) {
   if (!fs.existsSync(dir)) return [];
   return fs
     .readdirSync(dir)
     .filter(f => exts.some(ext => f.toLowerCase().endsWith(ext)))
+    .sort()
     .map(f => path.join(dir, f));
 }
 
@@ -160,21 +224,20 @@ function sanitizeFilename(name) {
 
 async function remakeVideo(videoPath, imagePath, overlayVideoPath, outputPath, overlayRender) {
   const { imageOpacity, videoOpacity, overlayCacheDir, videoCropPercent = 0 } = overlayRender;
-  return new Promise((resolve, reject) => {
+  return new Promise(async (resolve, reject) => {
     const encoderLabel = GPU_INFO.encoderLabel;
     console.log(`\nĐang xử lý: ${path.basename(videoPath)}`);
     console.log(`Encoder: ${encoderLabel}`);
     console.log(`Ảnh phủ (dưới, opacity ${imageOpacity}): ${path.basename(imagePath)}`);
     console.log(`Video phủ (trên, loop, opacity ${videoOpacity}): ${path.basename(overlayVideoPath)}`);
 
-    const { width, height } = getVideoResolution(videoPath);
+    // FIX #2: getVideoResolution nay là async, await bình thường trong async wrapper
+    const { width, height } = await getVideoResolution(videoPath);
 
-    // [A] Pre-process ảnh overlay: scale + alpha 1 lần, dùng cache
-    const cachedImage = getPreprocessedImageOverlay(imagePath, width, height, imageOpacity, overlayCacheDir);
+    const cachedImage = await getPreprocessedImageOverlay(imagePath, width, height, imageOpacity, overlayCacheDir);
     const useImageCache = cachedImage != null;
 
-    // [OPT-1] Pre-process video overlay: scale + alpha 1 lần, dùng cache (giảm ~30-40% render)
-    const cachedVideo = getPreprocessedVideoOverlay(overlayVideoPath, width, height, videoOpacity, overlayCacheDir);
+    const cachedVideo = await getPreprocessedVideoOverlay(overlayVideoPath, width, height, videoOpacity, overlayCacheDir);
     const useVideoCache = cachedVideo != null;
 
     const p = videoCropPercent;
@@ -185,12 +248,10 @@ async function remakeVideo(videoPath, imagePath, overlayVideoPath, outputPath, o
       console.log(`Video gốc: zoom + crop ${p}% mỗi phía (4 phía), đầu ra ${width}x${height}.`);
     }
 
-    // [A] Ảnh đã baked alpha → chỉ overlay thuần, không scale/format/colorchannelmixer mỗi frame
     const imgFilter = useImageCache
       ? `${vid0}[1:v]overlay=0:0[base1];`
       : `[1:v]scale=${width}:${height},format=yuva420p,colorchannelmixer=aa=${imageOpacity}[timg];` + `${vid0}[timg]overlay=0:0[base1];`;
 
-    // [OPT-1] Video overlay đã baked alpha → chỉ overlay thuần, bỏ scale/format/colorchannelmixer mỗi frame
     const vidOverlayFilter = useVideoCache
       ? `[base1][2:v]overlay=0:0:shortest=1,format=yuv420p[outv]`
       : `[2:v]scale=${width}:${height},format=yuva420p,colorchannelmixer=aa=${videoOpacity}[ova];` +
@@ -198,7 +259,6 @@ async function remakeVideo(videoPath, imagePath, overlayVideoPath, outputPath, o
 
     const filterComplex = headCrop + imgFilter + vidOverlayFilter;
 
-    // [OPT-3] Dùng -hwaccel auto: cho FFmpeg tự chọn HW decode tối ưu, không đổi filter graph
     const args = ['-y', '-hwaccel', 'auto', '-threads', '0'];
 
     args.push(
@@ -216,12 +276,10 @@ async function remakeVideo(videoPath, imagePath, overlayVideoPath, outputPath, o
       '[outv]',
       '-map',
       '0:a?',
-      '-shortest',
+      '-shortest'
     );
 
-    // [OPT-4] Dùng encode args giảm bitrate cho reup (video đã overlay, không cần bitrate cao)
     args.push(...GPU_INFO.reupVideoEncodeArgs);
-
     args.push('-c:a', 'copy', '-movflags', '+faststart', '-f', 'mp4', outputPath);
 
     console.log(`[OPT] Image cache: ${useImageCache ? 'YES' : 'no'} | Video cache: ${useVideoCache ? 'YES' : 'no'} | HW decode: auto`);
@@ -233,7 +291,6 @@ async function remakeVideo(videoPath, imagePath, overlayVideoPath, outputPath, o
         console.log(`=> Hoàn thành: ${path.basename(outputPath)}`);
         resolve();
       } else {
-        console.error(`Lỗi tạo video (mã thoát: ${code})`);
         reject(new Error(`FFmpeg exited with code ${code}`));
       }
     });
@@ -249,11 +306,9 @@ async function main(options = {}) {
     return { success: false, processedCount: 0, processedFolderNames: [] };
   }
 
-  /** Tên thư mục con trong kênh (video ID), theo thứ tự tạo thành công — dùng cho upload GPM. */
   const processedFolderNames = [];
 
   const overlayResolved = resolveOverlayByName(options.overlay);
-
   const { dir: OVERLAY_DIR, imageOpacity, videoOpacity, cacheDir: overlayCacheDir } = overlayResolved;
   ensureOverlayDirs(OVERLAY_DIR, overlayCacheDir);
 
@@ -266,7 +321,6 @@ async function main(options = {}) {
 
   const { downloadSingleVideo } = await import('./downloadVideo.js');
 
-  // Tìm file thực tế được dùng để lấy thư mục đích (folder channel)
   const actualInputFile = inputFile;
   let destFolder = CHANNELS_DIR;
   if (actualInputFile) {
@@ -281,21 +335,31 @@ async function main(options = {}) {
   if (fs.existsSync(progressFile)) {
     try {
       progressData = JSON.parse(fs.readFileSync(progressFile, 'utf8'));
-    } catch (e) {}
+    } catch (_) {}
   }
 
-  /** @type {{ syncProgressStatusToSpreadsheet?: (f: string, d: object) => Promise<void> } | null} */
-  let syncProgressModule = null;
+  // FIX #6: Import 1 lần duy nhất, dùng Promise để tránh double-import race condition
+  const syncModulePromise = import('./syncProgressToSpreadsheet.js');
+
   async function flushProgressToSpreadsheet() {
     if (!actualInputFile) return;
     try {
-      if (!syncProgressModule) {
-        syncProgressModule = await import('./syncProgressToSpreadsheet.js');
-      }
-      await syncProgressModule.syncProgressStatusToSpreadsheet(actualInputFile, progressData);
+      const mod = await syncModulePromise;
+      await mod.syncProgressStatusToSpreadsheet(actualInputFile, progressData);
     } catch (e) {
       console.warn('[sync] Đồng bộ STATUS → Excel/CSV:', e.message);
     }
+  }
+
+  // Mutex nhỏ để ghi progressData + file an toàn khi chạy song song
+  let progressLock = Promise.resolve();
+  async function updateProgress(url, status, extra = {}) {
+    progressLock = progressLock.then(async () => {
+      progressData[url] = { status, ...extra };
+      fs.writeFileSync(progressFile, JSON.stringify(progressData, null, 2), 'utf8');
+      await flushProgressToSpreadsheet();
+    });
+    return progressLock;
   }
 
   const images = getFiles(OVERLAY_DIR, ['.png', '.jpg', '.jpeg', '.webp']);
@@ -308,46 +372,65 @@ async function main(options = {}) {
   const overlayImage = images[0];
   const overlayClip = overlayVideos[0];
 
-  /** Metadata Gemini theo URL (callback downloadTranscript) — ghi vào video-meta.json sau render */
   const geminiByUrl = {};
 
-  /** Thư mục cho 1 video: destFolder/<videoID> */
   function resolveVideoOutputDir(videoId) {
-    const base = videoId || 'unknown_id';
-    const dir = path.join(destFolder, base);
-    return dir;
+    return path.join(destFolder, videoId || 'unknown_id');
   }
 
-  for (let i = 0; i < items.length; i++) {
-    const { url } = items[i];
-    console.log(`\n[${i + 1}/${items.length}] ${url} (Remake Full)`);
+  console.log(`\nBắt đầu batch ${items.length} video | concurrency = ${REMAKE_CONCURRENCY}`);
 
-    const result = await downloadSingleVideo(url, {
-      mode: MAKE_VIDEO_MODE.REUP_FULL, // Tải cả video
-      thumbnailChannelRoot: destFolder,
-      thumbnailPrompt: options.thumbnailPrompt,
-      callback: ({ title: gemTitle, description: gemDesc, tags: gemTags, summary: gemSummary }) => {
-        const tagsStr = typeof gemTags === 'string' ? gemTags : Array.isArray(gemTags) ? gemTags.join(', ') : '';
-        geminiByUrl[url] = {
-          title: gemTitle || '',
-          description: gemDesc || '',
-          tags: tagsStr,
-          summary: gemSummary || '',
-        };
-        console.log('Đã nhận title/description/tags/summary từ Gemini (sẽ ghi video-meta.json sau khi render).');
-      },
-    });
+  // FIX #1: Chạy song song với giới hạn concurrency
+  const limit = createLimiter(REMAKE_CONCURRENCY);
 
-    if (result) {
+  const tasks = items.map((item, i) =>
+    limit(async () => {
+      const { url } = item;
+      console.log(`\n[${i + 1}/${items.length}] ${url} (Remake Full)`);
+
+      let result;
+      try {
+        result = await downloadSingleVideo(url, {
+          mode: MAKE_VIDEO_MODE.REUP_FULL,
+          thumbnailChannelRoot: destFolder,
+          thumbnailPrompt: options.thumbnailPrompt,
+          callback: ({ title: gemTitle, description: gemDesc, tags: gemTags, summary: gemSummary }) => {
+            const tagsStr = typeof gemTags === 'string' ? gemTags : Array.isArray(gemTags) ? gemTags.join(', ') : '';
+            geminiByUrl[url] = {
+              title: gemTitle || '',
+              description: gemDesc || '',
+              tags: tagsStr,
+              summary: gemSummary || '',
+            };
+            console.log(`[${url}] Đã nhận title/description/tags/summary từ Gemini.`);
+          },
+        });
+      } catch (err) {
+        console.error(`[${url}] Lỗi download:`, err.message);
+        // FIX #3: Ghi status lỗi để retry biết bỏ qua / xử lý lại
+        await updateProgress(url, 'Lỗi download', { error: err.message });
+        return;
+      }
+
+      if (!result) {
+        console.error(`[${url}] downloadSingleVideo trả về null/undefined.`);
+        await updateProgress(url, 'Lỗi download', { error: 'No result' });
+        return;
+      }
+
       const videoId = result.metadata?.id || 'unknown_id';
       const perVideoDir = resolveVideoOutputDir(videoId);
       fs.mkdirSync(perVideoDir, { recursive: true });
 
       const videoPath = result.filePath;
       if (!fs.existsSync(videoPath)) {
-        console.error(`Không tìm thấy file video đã tải: ${videoPath}`);
-        continue;
+        console.error(`[${url}] Không tìm thấy file video đã tải: ${videoPath}`);
+        await updateProgress(url, 'Lỗi download', { error: 'File not found after download' });
+        return;
       }
+
+      // FIX #5: Mỗi video có tempDir riêng → tránh race condition khi cleanup song song
+      const tempDir = path.dirname(videoPath);
 
       const baseName = sanitizeFilename(result.title || path.basename(videoPath, path.extname(videoPath)));
       const finalVideoPath = path.join(perVideoDir, `${baseName}.mp4`);
@@ -355,24 +438,24 @@ async function main(options = {}) {
       try {
         await remakeVideo(videoPath, overlayImage, overlayClip, finalVideoPath, overlayRender);
 
-        // Thumbnail YouTube (downloads) → thumbnail.{ext}; Flow → flow-thumbnail.jpg (cùng tồn tại)
-        if (fs.existsSync(DOWNLOADS_DIR)) {
-          const downloadFiles = fs.readdirSync(DOWNLOADS_DIR);
+        // Copy thumbnail YouTube nếu có trong tempDir
+        if (fs.existsSync(tempDir)) {
+          const downloadFiles = fs.readdirSync(tempDir);
           const thumbFile = downloadFiles.find(f => /\.(jpg|jpeg|png|webp)$/i.test(f));
           if (thumbFile) {
             const thumbExt = path.extname(thumbFile);
             const thumbDestPath = path.join(perVideoDir, `thumbnail${thumbExt}`);
-            fs.copyFileSync(path.join(DOWNLOADS_DIR, thumbFile), thumbDestPath);
-            console.log(`>>> Đã copy thumbnail YouTube: ${thumbDestPath}`);
+            fs.copyFileSync(path.join(tempDir, thumbFile), thumbDestPath);
+            console.log(`[${videoId}] Copy thumbnail YouTube: ${thumbDestPath}`);
           }
         }
         const flowThumbJpg = path.join(perVideoDir, 'flow-thumbnail.jpg');
         if (fs.existsSync(flowThumbJpg)) {
-          console.log(`>>> Đã có thumbnail Flow: ${flowThumbJpg}`);
+          console.log(`[${videoId}] Đã có thumbnail Flow: ${flowThumbJpg}`);
         }
 
         // Lưu metadata
-        let gem = geminiByUrl[url] || {};
+        const gem = geminiByUrl[url] || {};
         const metaPayload = {
           title: result.title || '',
           description: result.description || '',
@@ -382,35 +465,36 @@ async function main(options = {}) {
           tagsGemini: gem.tags || '',
           summaryGemini: gem.summary || '',
         };
-        const metaPath = path.join(perVideoDir, 'video-meta.json');
-        fs.writeFileSync(metaPath, JSON.stringify(metaPayload, null, 2), 'utf8');
+        fs.writeFileSync(path.join(perVideoDir, 'video-meta.json'), JSON.stringify(metaPayload, null, 2), 'utf8');
 
-        progressData[url] = { status: 'Đã tạo video' };
-        fs.writeFileSync(progressFile, JSON.stringify(progressData, null, 2), 'utf8');
-        await flushProgressToSpreadsheet();
+        // FIX #3: Ghi status thành công rõ ràng
+        await updateProgress(url, 'Đã tạo video');
 
-        console.log(`ĐÃ HOÀN THÀNH VIDEO: ${url}`);
+        console.log(`[${videoId}] ĐÃ HOÀN THÀNH VIDEO: ${url}`);
         processedFolderNames.push(String(videoId).trim() || 'unknown_id');
       } catch (err) {
-        console.error('Lỗi remake video:', err.message);
+        console.error(`[${url}] Lỗi remake video:`, err.message);
+        // FIX #3: Ghi status lỗi + message để retry / debug dễ hơn
+        await updateProgress(url, 'Lỗi render', { error: err.message });
       } finally {
-        // Xóa file tạm trong downloads để video tiếp theo không bị lẫn
-        if (fs.existsSync(DOWNLOADS_DIR)) {
-          const files = fs.readdirSync(DOWNLOADS_DIR);
-          for (const f of files) {
-            try {
-              fs.unlinkSync(path.join(DOWNLOADS_DIR, f));
-            } catch (e) {}
+        // FIX #5: Xóa tempDir riêng của từng video, không xóa global DOWNLOADS_DIR
+        if (fs.existsSync(tempDir) && tempDir !== DOWNLOADS_DIR) {
+          try {
+            fs.rmSync(tempDir, { recursive: true, force: true });
+          } catch (e) {
+            console.warn(`[${videoId}] Không xóa được tempDir: ${e.message}`);
           }
         }
       }
-    }
-  }
+    })
+  );
+
+  await Promise.all(tasks);
 
   await flushProgressToSpreadsheet();
   unlinkProgressSidecarForSpreadsheet(actualInputFile);
 
-  console.log(`\nHoàn thành xử lý ${items.length} video.`);
+  console.log(`\nHoàn thành xử lý ${items.length} video (thành công: ${processedFolderNames.length}).`);
 
   return {
     success: processedFolderNames.length > 0,

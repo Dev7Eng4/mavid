@@ -20,7 +20,6 @@ import {
   labelForPublishTimeSlot,
   normalizeChannelIndexStatus,
   normalizeWallClockTimeToHHmm,
-  parseVideoPerDayCell,
   reupOverlaySelectOptions,
   timeSlotCountForVideoPerDayPreset,
   type ChannelAddDialogInitialFields,
@@ -139,7 +138,6 @@ export function ChannelAddDialog({
     publishTimes,
     channelStatus,
   } = form;
-  console.log('🚀 ~ ChannelAddDialog ~ folderIdOverride:', folderIdOverride);
 
   const resolvedBackground = useMemo(() => {
     const pick = selectedBackground.trim();
@@ -199,44 +197,9 @@ export function ChannelAddDialog({
     void (async () => {
       try {
         const cfg = await window.runner.readMavidChannelConfig(folder);
-        console.log('🚀 ~ ChannelAddDialog ~ cfg:', cfg, initialRow);
         if (cancelled || !cfg || typeof cfg !== 'object') return;
 
-        setForm(prev => {
-          const next = { ...prev };
-          const ch: any =
-            Array.isArray(cfg.channels) && cfg.channels.length > 0 ? cfg.channels.find(channel => channel.email === initialRow.EMAIL) : cfg;
-
-          if (!ch) return next;
-
-          if (typeof ch.email === 'string' && ch.email.trim()) next.email = ch.email.trim();
-          if (typeof ch.myChannel === 'string') next.myChannel = ch.myChannel.trim();
-          if (ch.videoType === 'from_audio' || ch.videoType === 'reup_full') next.videoType = ch.videoType;
-
-          if (ch.durationMinuteFrom !== undefined) {
-            next.durationOption = `${ch.durationMinuteFrom}_${ch.durationMinuteTo === null ? 'null' : ch.durationMinuteTo}`;
-          }
-
-          if (typeof ch.background === 'string') next.selectedBackground = ch.background;
-          if (typeof ch.overlay === 'string' && ch.overlay.trim() && isValidReupOverlayName(ch.overlay)) {
-            next.reupOverlayOption = ch.overlay.trim();
-          }
-          if (typeof ch.thumbnailPrompt === 'string' && ch.thumbnailPrompt.trim() && isValidthumbnailPrompt(ch.thumbnailPrompt)) {
-            next.thumbnailPrompt = ch.thumbnailPrompt.trim();
-          }
-          if (typeof ch.videosPerDayPreset === 'string' && ch.videosPerDayPreset.trim()) {
-            next.videosPerDayPreset = parseVideoPerDayCell(ch.videosPerDayPreset);
-          }
-          if (Array.isArray(ch.publishTimes) && ch.publishTimes.length > 0) {
-            const preset = next.videosPerDayPreset;
-            const slots = timeSlotCountForVideoPerDayPreset(preset);
-            let times = ch.publishTimes.map((t: string) => normalizeWallClockTimeToHHmm(String(t)));
-            while (times.length < slots) times.push('09:00');
-            times = times.slice(0, slots);
-            next.publishTimes = times;
-          }
-          return next;
-        });
+        setForm(channelAddDialogInitialFromIndexRow(initialRow, indexHeaders, cfg));
       } finally {
         if (!cancelled) setConfigHydrated(true);
       }

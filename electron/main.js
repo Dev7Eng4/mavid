@@ -139,8 +139,7 @@ function readPersistedErrorLogs() {
 
 function writePersistedErrorLogs(lines) {
   const p = getErrorLogFilePath();
-  const trimmed =
-    lines.length > MAX_PERSISTED_ERROR_LOG_LINES ? lines.slice(-MAX_PERSISTED_ERROR_LOG_LINES) : [...lines];
+  const trimmed = lines.length > MAX_PERSISTED_ERROR_LOG_LINES ? lines.slice(-MAX_PERSISTED_ERROR_LOG_LINES) : [...lines];
   fs.mkdirSync(path.dirname(p), { recursive: true });
   fs.writeFileSync(p, JSON.stringify({ lines: trimmed }, null, 0), 'utf8');
 }
@@ -833,7 +832,7 @@ async function importConstantsFresh() {
   } catch (e) {
     console.warn(
       '[MaVid] Không import được contents/constants/index.js. Dùng giá trị fallback trong main cho đến khi sửa lỗi / Lưu settings.',
-      e instanceof Error ? e.message : e,
+      e instanceof Error ? e.message : e
     );
     mod = getDefaultConstantsModule();
   }
@@ -1172,6 +1171,20 @@ const INDEX_THOI_GIAN_OPTIONS = [15, 20, 30, 60];
 
 ipcMain.handle('read-channel-data', async (_event, { filePath }) => {
   if (!filePath || typeof filePath !== 'string') throw new Error('filePath không hợp lệ.');
+
+  const { channelsDir, abs: norm } = await resolvePathUnderChannelsDir(filePath);
+
+  if (!isPathInsideDir(channelsDir, norm)) throw new Error('Truy cập bị từ chối.');
+
+  if (!fs.existsSync(norm)) return { headers: [], rows: [] };
+  const st = fs.statSync(norm);
+  if (st.size === 0) return { headers: [], rows: [] };
+
+  return readSpreadsheetAsChannelData(norm);
+});
+
+ipcMain.handle('read-channels-information', async (_event, { filePath }) => {
+  if (!filePath || typeof filePath !== 'string') throw new Error('FilePath không hợp lệ.');
 
   const { channelsDir, abs: norm } = await resolvePathUnderChannelsDir(filePath);
 

@@ -19,49 +19,20 @@ const INPUT_FILE = path.join(__dirname, '..', 'input.txt');
 const INDEX_FILE = path.join(DEFAULT_OUTPUT_DIR, 'index.xlsx');
 
 /** Headers cho file index.xlsx — cột ID = tên thư mục kênh (MaVidMedia/channels/<ID>/) */
-const INDEX_HEADERS = [
-  'CHANNEL',
-  'LINK',
-  'ID',
-  'EMAIL',
-  'KÊNH CỦA TÔI',
-  'LOẠI VIDEO',
-  'THỜI GIAN VIDEO',
-  'BACKGROUND',
-  'LAST UPLOAD',
-  'STATUS',
-];
+const INDEX_HEADERS = ['ID', 'LINK', 'EMAIL', 'CHANNEL', 'VIDEO TYPE', 'VIDEO DURATION', 'BACKGROUND', 'LAST UPLOAD', 'STATUS'];
 
 /** Chỉ số cột 1-based (khớp INDEX_HEADERS). */
 const IDX = {
-  CHANNEL: 1,
+  ID: 1,
   LINK: 2,
-  ID: 3,
-  EMAIL: 4,
-  MY_CHANNEL: 5,
-  LOAI_VIDEO: 6,
-  THOI_GIAN: 7,
-  BACKGROUND: 8,
-  LAST_UPLOAD: 9,
-  STATUS: 10,
+  EMAIL: 3,
+  CHANNEL: 4,
+  VIDEO_TYPE: 5,
+  VIDEO_DURATION: 6,
+  BACKGROUND: 7,
+  LAST_UPLOAD: 8,
+  STATUS: 9,
 };
-
-/**
- * Gỡ dataValidation cũ trên index (file từng có dropdown); không đổi giá trị ô.
- * @param {import('exceljs').Worksheet} sheet
- */
-function migrateIndexSheetIfNeeded(sheet) {
-  if (!sheet) return;
-  const maxR = Math.min(sheet.rowCount || 0, 2000);
-  const maxC = Math.min(sheet.columnCount || 12, 20);
-  for (let r = 1; r <= maxR; r++) {
-    const row = sheet.getRow(r);
-    for (let c = 1; c <= maxC; c++) {
-      const cell = row.getCell(c);
-      if (cell.dataValidation) cell.dataValidation = null;
-    }
-  }
-}
 
 /**
  * Ánh xạ cột file Excel trong thư mục kênh (hỗ trợ layout 4 cột chuẩn hoặc file cũ nhiều cột).
@@ -143,26 +114,25 @@ function resolveIndexMetaColumns(channelData) {
   if (!('email' in channelData)) {
     return {
       colEmail: '',
-      colMyChannel: '',
-      colLoai: '',
-      colThoiGian: '',
+      colChannel: '',
+      colVideoType: '',
+      colVideoDuration: '',
       colBg: '',
       /** Dòng mới (CLI): mặc định INIT — cập nhật dòng cũ không có khóa `email` thì không ghi cột STATUS. */
       colStatus: 'INIT',
     };
   }
   const colEmail = String(channelData.email ?? '').trim();
-  const colMyChannel = String(channelData.myChannel ?? '').trim();
-  const colLoai = String(channelData.videoType ?? '').trim();
-  const dm = channelData.durationMinutes;
-  const colThoiGian = dm === '' || dm == null ? '' : String(dm);
+  const colChannel = String(channelData.channel ?? '').trim();
+  const colVideoType = String(channelData.videoType ?? '').trim();
+  const dm = channelData.videoDuration;
+  const colVideoDuration = dm === '' || dm == null ? '' : String(dm);
   const colBg = String(channelData.background ?? '').trim();
   const rawSt = String(channelData.channelStatus ?? '')
     .trim()
     .toUpperCase();
-  const colStatus =
-    rawSt === 'INIT' || rawSt === 'LIVE' || rawSt === 'STOPPED' ? rawSt : colEmail ? 'LIVE' : 'INIT';
-  return { colEmail, colMyChannel, colLoai, colThoiGian, colBg, colStatus };
+  const colStatus = rawSt === 'INIT' || rawSt === 'LIVE' || rawSt === 'STOPPED' ? rawSt : colEmail ? 'LIVE' : 'INIT';
+  return { colEmail, colChannel, colVideoType, colVideoDuration, colBg, colStatus };
 }
 
 /**
@@ -186,7 +156,7 @@ async function updateIndexFile(channelData) {
     workbook = new ExcelJS.Workbook();
     await workbook.xlsx.readFile(INDEX_FILE);
     sheet = workbook.worksheets[0];
-    migrateIndexSheetIfNeeded(sheet);
+    // migrateIndexSheetIfNeeded(sheet);
 
     // Đồng bộ dòng tiêu đề nếu lệch INDEX_HEADERS (sau migrate hoặc file chỉnh tay)
     const r1 = sheet.getRow(1);
@@ -201,20 +171,19 @@ async function updateIndexFile(channelData) {
       r1.values = [undefined, ...INDEX_HEADERS];
     }
 
-    // Tìm xem channel đã tồn tại chưa (mặc định theo ID - cột 3)
+    // Tìm xem channel đã tồn tại chưa (mặc định theo ID)
     let existingRowIndex = -1;
-    for (let i = 2; i <= sheet.rowCount; i++) {
+    for (let i = 0; i <= sheet.rowCount; i++) {
       const row = sheet.getRow(i);
       const rowId = String(row.getCell(IDX.ID).value || '').trim();
       const rowEmail = String(row.getCell(IDX.EMAIL).value || '').trim();
 
       if (rowId === id) {
-        // Nếu luồng CLI (không có email), cập nhật dòng khớp ID đầu tiên
         if (!('email' in channelData)) {
           existingRowIndex = i;
           break;
         }
-        // Nếu luồng app (có email/meta), chỉ cập nhật nếu EMAIL khớp
+
         if (rowEmail === meta.colEmail) {
           existingRowIndex = i;
           break;
@@ -231,9 +200,9 @@ async function updateIndexFile(channelData) {
       row.getCell(IDX.LAST_UPLOAD).value = lastUpload;
       if ('email' in channelData) {
         row.getCell(IDX.EMAIL).value = meta.colEmail;
-        row.getCell(IDX.MY_CHANNEL).value = meta.colMyChannel;
-        row.getCell(IDX.LOAI_VIDEO).value = meta.colLoai;
-        row.getCell(IDX.THOI_GIAN).value = meta.colThoiGian;
+        row.getCell(IDX.CHANNEL).value = meta.colChannel;
+        row.getCell(IDX.VIDEO_TYPE).value = meta.colVideoType;
+        row.getCell(IDX.VIDEO_DURATION).value = meta.colVideoDuration;
         row.getCell(IDX.BACKGROUND).value = meta.colBg;
         row.getCell(IDX.STATUS).value = meta.colStatus;
       }
@@ -241,13 +210,12 @@ async function updateIndexFile(channelData) {
     } else {
       // Thêm row mới
       sheet.addRow([
-        name,
-        link,
         id,
+        link,
         meta.colEmail,
-        meta.colMyChannel,
-        meta.colLoai,
-        meta.colThoiGian,
+        meta.colChannel,
+        meta.colVideoType,
+        meta.colVideoDuration,
         meta.colBg,
         lastUpload,
         meta.colStatus,
@@ -260,29 +228,27 @@ async function updateIndexFile(channelData) {
     sheet = workbook.addWorksheet('Channels', { views: [{ state: 'frozen', ySplit: 1 }] });
     sheet.addRow(INDEX_HEADERS);
     sheet.addRow([
-      name,
-      link,
       id,
+      link,
       meta.colEmail,
-      meta.colMyChannel,
-      meta.colLoai,
-      meta.colThoiGian,
+      meta.colChannel,
+      meta.colVideoType,
+      meta.colVideoDuration,
       meta.colBg,
       lastUpload,
       meta.colStatus,
     ]);
 
     sheet.columns = [
-      { width: 45 }, // CHANNEL
-      { width: 60 }, // LINK
       { width: 40 }, // ID
+      { width: 60 }, // LINK
       { width: 45 }, // EMAIL
       { width: 36 }, // KÊNH CỦA TÔI
-      { width: 18 }, // LOẠI VIDEO
-      { width: 18 }, // THỜI GIAN VIDEO
-      { width: 22 }, // BACKGROUND
+      { width: 20 }, // LOẠI VIDEO
+      { width: 20 }, // THỜI GIAN VIDEO
+      { width: 25 }, // BACKGROUND
       { width: 30 }, // LAST UPLOAD
-      { width: 12 }, // STATUS
+      { width: 20 }, // STATUS
     ];
 
     console.log(`Đã tạo file index.xlsx và thêm channel "${name}"`);
@@ -468,7 +434,7 @@ function resolveChannelFolderNameFromResult(url, result) {
  * @param {string} options.url - URL kênh / playlist
  * @param {Object} options.formMeta
  * @param {string} options.formMeta.email
- * @param {string} [options.formMeta.myChannel] — cột «KÊNH CỦA TÔI» index (sau EMAIL)
+ * @param {string} [options.formMeta.channel] — cột «KÊNH CỦA TÔI» index (sau EMAIL)
  * @param {string} options.formMeta.videoType - from_audio | reup_full
  * @param {number} options.formMeta.durationMinutes
  * @param {string} options.formMeta.background
@@ -477,12 +443,17 @@ function resolveChannelFolderNameFromResult(url, result) {
  * @param {string} [options.formMeta.folderIdOverride] - tên thư mục (ID kênh), tùy chọn
  */
 export async function addChannelFromForm(options = {}) {
+  console.log('🚀 ~ addChannelFromForm ~ options:', options);
   const url = (options.url || '').trim();
   const formMeta = options.formMeta;
+
   if (!url) throw new Error('Thiếu URL kênh.');
   if (!formMeta) throw new Error('Thiếu formMeta.');
+
   const channelsConfig = Array.isArray(formMeta.channels) && formMeta.channels.length > 0 ? formMeta.channels : [formMeta];
+  console.log('🚀 ~ addChannelFromForm ~ C:', channelsConfig);
   const channelItem = channelsConfig[0];
+  console.log('🚀 ~ addChannelFromForm ~ channelItem:', channelItem);
   const seedEmail = (channelItem.email || '').trim();
 
   const urlType = detectUrlType(url);
@@ -492,7 +463,6 @@ export async function addChannelFromForm(options = {}) {
 
   console.log(`[addChannelFromForm] Đang lấy thông tin: ${url}`);
   const result = await getChannelInfo(url);
-  console.log('🚀 ~ addChannelFromForm ~ result:', result);
 
   let usernameId = result.metadata?.uploader_id || '';
   if (usernameId.startsWith('@')) usernameId = usernameId.slice(1);
@@ -592,7 +562,6 @@ export async function addChannelFromForm(options = {}) {
   }
 
   await workbook.xlsx.writeFile(outputExcelPath);
-  console.log(`[addChannelFromForm] Đã ghi/cập nhật ${outputExcelPath}`);
 
   const tomorrow = new Date();
   tomorrow.setDate(tomorrow.getDate() + 1);
@@ -659,21 +628,19 @@ export async function addChannelFromForm(options = {}) {
   else if (f === 30 && t === 60) durationLabel = '30 - 60 phút';
   else if (f === 30 && t === null) durationLabel = 'Từ 30 phút';
   else if (f === 60 && t === null) durationLabel = 'Từ 60 phút';
+  console.log('🚀 ~ addChannelFromForm ~ durationLabel:', durationLabel);
 
   await updateIndexFile({
-    name: channelName,
-    link: channelLink,
     id: folderName,
-    lastUpload,
+    link: channelLink,
     email: seedEmail,
-    myChannel: String(channelItem.myChannel ?? '').trim(),
+    // channel: String(channelItem.channel ?? '').trim(),
+    channel: '',
     videoType: channelItem.videoType,
-    durationMinutes: durationLabel,
-    background:
-      channelItem.videoType === 'reup_full'
-        ? String(channelItem.overlay ?? channelItem.background ?? '').trim()
-        : String(channelItem.background ?? '').trim(),
-    channelStatus: seedEmail ? 'LIVE' : 'INIT',
+    videoDuration: durationLabel,
+    background: String(channelItem.background ?? '').trim(),
+    lastUpload,
+    status: seedEmail ? 'LIVE' : 'INIT',
   });
   console.log(`[addChannelFromForm] Đã cập nhật ${path.relative(path.join(__dirname, '..'), INDEX_FILE)}`);
 

@@ -12,6 +12,7 @@ contextBridge.exposeInMainWorld('runner', {
   selectVideoStorageFolder: currentPath => ipcRenderer.invoke('select-video-storage-folder', { currentPath }),
   listChannels: () => ipcRenderer.invoke('list-channels'),
   readChannelData: filePath => ipcRenderer.invoke('read-channel-data', { filePath }),
+  readChannelsInformation: filePath => ipcRenderer.invoke('read-channels-information', { filePath }),
   writeChannelIndex: payload => ipcRenderer.invoke('write-channel-index', payload),
   readChannelFolderData: channelFolder => ipcRenderer.invoke('read-channel-folder-data', { channelFolder }),
   readMavidChannelConfig: channelFolder => ipcRenderer.invoke('read-mavid-channel-config', { channelFolder }),

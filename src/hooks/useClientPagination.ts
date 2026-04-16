@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState, type Dispatch, type SetStateAction } from 'react';
 
-export const DEFAULT_TABLE_PAGE_SIZE = 15;
+export const DEFAULT_TABLE_PAGE_SIZE = 2;
 
 export interface ClientPaginationResult {
   page: number;
@@ -15,10 +15,7 @@ export interface ClientPaginationResult {
 /**
  * Phân trang phía client cho bảng (cắt mảng bằng slice(startIndex, startIndex + pageSize)).
  */
-export function useClientPagination(
-  itemCount: number,
-  pageSize: number = DEFAULT_TABLE_PAGE_SIZE,
-): ClientPaginationResult {
+export function useClientPagination(itemCount: number, pageSize: number = DEFAULT_TABLE_PAGE_SIZE): ClientPaginationResult {
   const [page, setPage] = useState(1);
   const totalPages = useMemo(() => {
     if (itemCount <= 0) return 1;
