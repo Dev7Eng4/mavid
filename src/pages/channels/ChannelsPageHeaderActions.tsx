@@ -49,6 +49,18 @@ export interface ChannelsPageHeaderActionsProps {
     hasCreatedVideoInSelection: boolean;
     onUpdateMeta: () => void | Promise<void>;
   };
+  /** Chi tiết kênh: Tạo video / Upload video (cùng hàng với Cập nhật meta). */
+  detailBulkVideo?: {
+    actionsLocked: boolean;
+    createVideoBusy: boolean;
+    detailUploadPrepBusy: boolean;
+    emptyStatusSelectedCount: number;
+    createdVideoSelectedCount: number;
+    canCreateVideo: boolean;
+    canUploadVideo: boolean;
+    onCreateVideo: () => void;
+    onUploadVideo: () => void | Promise<void>;
+  };
 }
 
 export function ChannelsPageHeaderActions({
@@ -76,6 +88,7 @@ export function ChannelsPageHeaderActions({
   onBackToIndex,
   onRefresh,
   detailUpdateMeta,
+  detailBulkVideo,
 }: ChannelsPageHeaderActionsProps) {
   const indexActionsLocked = indexLoading || indexSaving || indexBatchVideo !== null;
   const canEditSingleSelected = !indexActionsLocked && indexSingleSelectedRowIndex !== null;
@@ -215,6 +228,66 @@ export function ChannelsPageHeaderActions({
           ← Danh sách
         </AppButton>
       )}
+      {selectedChannel && detailBulkVideo ? (
+        <>
+          <AppButton
+            type='button'
+            variant='primary'
+            disabled={
+              !detailBulkVideo.canCreateVideo ||
+              detailBulkVideo.actionsLocked ||
+              detailBulkVideo.createVideoBusy ||
+              detailBulkVideo.detailUploadPrepBusy ||
+              refreshBusy
+            }
+            title={
+              !detailBulkVideo.canCreateVideo
+                ? 'Cần cột LINK VIDEO + STATUS, kênh phải có trong index (EMAIL, LOẠI VIDEO) và ít nhất một dòng đã chọn có status trống + link hợp lệ.'
+                : 'Chỉ tạo video cho các dòng đã chọn có status trống (chưa tạo).'
+            }
+            onClick={() => detailBulkVideo.onCreateVideo()}
+          >
+            {detailBulkVideo.createVideoBusy ? (
+              <span className='inline-flex items-center gap-2'>
+                <SpinnerIcon className='w-4 h-4' />
+                Đang tạo video…
+              </span>
+            ) : detailBulkVideo.emptyStatusSelectedCount > 0 ? (
+              `Tạo video (${detailBulkVideo.emptyStatusSelectedCount})`
+            ) : (
+              'Tạo video'
+            )}
+          </AppButton>
+          <AppButton
+            type='button'
+            variant='secondary'
+            disabled={
+              !detailBulkVideo.canUploadVideo ||
+              detailBulkVideo.actionsLocked ||
+              detailBulkVideo.createVideoBusy ||
+              detailBulkVideo.detailUploadPrepBusy ||
+              refreshBusy
+            }
+            title={
+              !detailBulkVideo.canUploadVideo
+                ? 'Cần cột LINK VIDEO + STATUS, kênh trong index có EMAIL, và ít nhất một dòng đã chọn có status «Đã tạo video» + link YouTube (?v=…).'
+                : 'Upload các video đã chọn có status «Đã tạo video» (đủ thư mục .mp4 + thumbnail).'
+            }
+            onClick={() => void detailBulkVideo.onUploadVideo()}
+          >
+            {detailBulkVideo.detailUploadPrepBusy ? (
+              <span className='inline-flex items-center gap-2'>
+                <SpinnerIcon className='w-4 h-4' />
+                Đang chuẩn bị…
+              </span>
+            ) : detailBulkVideo.createdVideoSelectedCount > 0 ? (
+              `Upload video (${detailBulkVideo.createdVideoSelectedCount})`
+            ) : (
+              'Upload video'
+            )}
+          </AppButton>
+        </>
+      ) : null}
       {selectedChannel && detailUpdateMeta ? (
         <AppButton
           type='button'

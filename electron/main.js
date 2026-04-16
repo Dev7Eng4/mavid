@@ -230,7 +230,8 @@ ipcMain.handle('run-npm-script', async (_event, { npmScript, extraEnv }) => {
   if (!npmScript || typeof npmScript !== 'string') throw new Error('npmScript không hợp lệ.');
   if (!ALLOWED_NPM_SCRIPTS.has(npmScript)) throw new Error(`Script không được phép: ${npmScript}`);
   if (npmJobRunning) throw new Error('Đang có job npm chạy. Vui lòng chờ kết thúc.');
-  if (activeRunScriptCount > 0) throw new Error('Đang có script chạy. Vui lòng chờ kết thúc hoặc đợi upload xong.');
+  // Không chặn theo `activeRunScriptCount`: upload YouTube (`run-script`) có thể chạy nền lâu;
+  // người dùng vẫn cần chạy `npm run` tạo video / batch khác trên kênh khác.
 
   npmJobRunning = true;
   npmRunUserCancelled = false;

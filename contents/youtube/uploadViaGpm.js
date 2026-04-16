@@ -16,6 +16,7 @@ import { connectPlaywrightToGpmProfile, closeProfile } from '../scripts/openGpmP
 import { syncChannelAfterYoutubeUpload } from './uploadAfterSync.js';
 import { moveSuccessfulUploadFoldersToVideosArchive } from './moveUploadedFoldersToVideosArchive.js';
 import { getYoutubePublishPlan } from './publishSchedule.util.js';
+import { assignPublishSlotsByVideoDuration } from './publishScheduleByDuration.util.js';
 import { apiRootForPlaywright, listUploadJobs } from './uploadJobs.util.js';
 import { assertSafeChannelFolder } from './channelFolder.util.js';
 import { resolveChannelsDir } from '../utils/channelsStoragePath.js';
@@ -92,7 +93,10 @@ export default async function main(raw = {}) {
         email: scheduleEmail,
         uploadCount: jobs.length,
       });
-      publishSchedule = schedule;
+      publishSchedule = assignPublishSlotsByVideoDuration(jobs, schedule);
+      if (publishSchedule !== schedule) {
+        console.log('[upload] Đã gán lịch publish theo độ dài video (ngắn → ban ngày, dài → buổi tối).');
+      }
       baselineUploadedVideosFromConfig = Number.isFinite(Number(settings?.uploadedVideos))
         ? Math.max(0, Math.floor(Number(settings.uploadedVideos)))
         : 0;

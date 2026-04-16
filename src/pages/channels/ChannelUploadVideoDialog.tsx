@@ -27,7 +27,8 @@ type GpmListProfilesEnvelope = {
   pagination?: { total_page?: number; page?: number; page_size?: number; total?: number };
 };
 
-async function fetchAllGpmProfileRows(): Promise<GpmProfileRow[]> {
+/** Dùng chung cho dialog Upload và nút upload từ màn chi tiết kênh. */
+export async function fetchAllGpmProfileRows(): Promise<GpmProfileRow[]> {
   const rows: GpmProfileRow[] = [];
   let page = 1;
   let totalPage = 1;
@@ -47,7 +48,7 @@ async function fetchAllGpmProfileRows(): Promise<GpmProfileRow[]> {
   return rows;
 }
 
-function resolveGpmProfileIdByEmail(profiles: GpmProfileRow[], email: string): string | null {
+export function resolveGpmProfileIdByEmail(profiles: GpmProfileRow[], email: string): string | null {
   const norm = email.trim().toLowerCase();
   if (!norm) return null;
   const hit = profiles.find(p => p.name.trim().toLowerCase() === norm);
@@ -63,6 +64,8 @@ export interface ChannelUploadVideoPayload {
   totalVideos: number | null;
   /** GPM profile id — suy ra từ email trong mavid-channel-config.json khớp `name` profile. */
   gpmProfileId: string;
+  /** Chỉ upload các thư mục con (tên = video ID YouTube), đúng thứ tự — dùng từ màn chi tiết kênh. */
+  uploadFolderNames?: string[];
 }
 
 export interface ChannelItem {

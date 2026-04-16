@@ -76,6 +76,21 @@ export function findIndexHeaderKeyAny(headers: string[], normNames: string[]): s
 /**
  * Suy ra tên thư mục kênh (ID) từ URL YouTube — dùng cho cột ID/CHANNEL.
  */
+/** Trích video ID từ URL watch YouTube (?v=…) — khớp thư mục con sau khi tạo video. */
+export function extractYoutubeVideoIdFromUrl(url: string): string | null {
+  const s = String(url ?? '').trim();
+  if (!s) return null;
+  try {
+    const u = /^https?:\/\//i.test(s) ? new URL(s) : new URL(`https://${s}`);
+    const v = u.searchParams.get('v');
+    if (v?.trim()) return v.trim();
+  } catch {
+    /* ignore */
+  }
+  const m = s.match(/[?&]v=([^&]+)/);
+  return m ? m[1].trim() : null;
+}
+
 export function folderFromChannelUrl(raw: string): string | null {
   const s = raw.trim();
   if (!s) return null;

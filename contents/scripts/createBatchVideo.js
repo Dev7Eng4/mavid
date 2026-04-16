@@ -700,13 +700,50 @@ async function main(props = {}) {
   const maxDurationMinutes = resolveMaxDurationMinutes(mergedProps);
   const maxVideosThisRun = resolveMaxVideosPerBatch(mergedProps);
 
+  /**
+   * MAVID_ONLY_LINKS: JSON mảng URL hoặc mỗi URL một dòng — chỉ giữ link có trong danh sách (sau khi đọc file).
+   * Dùng UI chi tiết kênh khi user chọn một số dòng status trống.
+   */
+  function parseOnlyLinksFromEnv() {
+    const raw = process.env.MAVID_ONLY_LINKS;
+    if (!raw || !String(raw).trim()) return null;
+    try {
+      const j = JSON.parse(String(raw).trim());
+      if (Array.isArray(j)) {
+        const list = j.map(x => String(x ?? '').trim()).filter(Boolean);
+        return list.length ? list : null;
+      }
+    } catch {
+      /* fall through */
+    }
+    const list = String(raw)
+      .split(/\r?\n/)
+      .map(s => s.trim())
+      .filter(Boolean);
+    return list.length ? list : null;
+  }
+
+  function filterItemsByOnlyLinksEnv(list) {
+    const allowList = parseOnlyLinksFromEnv();
+    if (!allowList) return list;
+    const allow = new Set(allowList);
+    const next = list.filter(it => allow.has(String(it.url ?? '').trim()));
+    if (next.length !== list.length) {
+      console.log(`[MaVid] MAVID_ONLY_LINKS — giữ ${next.length}/${list.length} link sau lọc.`);
+    }
+    return next;
+  }
+
+  const onlyLinksForRead = parseOnlyLinksFromEnv();
+
   let items = await readVideoUrlsFromFile(inputFile, {
     minDurationMinutes,
     maxDurationMinutes,
     channelFolder: effectiveChannelName ?? undefined,
     email: mergedProps.email != null ? String(mergedProps.email) : undefined,
-    ...(maxVideosThisRun > 0 ? { batchLimit: maxVideosThisRun } : {}),
+    ...(maxVideosThisRun > 0 && !onlyLinksForRead ? { batchLimit: maxVideosThisRun } : {}),
   });
+  items = filterItemsByOnlyLinksEnv(items);
   if (maxVideosThisRun > 0 && items.length > maxVideosThisRun) {
     console.log(
       `[MaVid] Giới hạn ${maxVideosThisRun} video/lượt (MAVID_MAX_VIDEOS_PER_BATCH) — xử lý ${maxVideosThisRun}/${items.length} link.`,

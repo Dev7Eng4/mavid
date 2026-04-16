@@ -1,4 +1,5 @@
-export const getRandomNumber = number => number + Math.random() * 1000;
+export const getRandomNumber = (number, size = 1000) => number + Math.random() * size;
+
 const randomBetween = (min, max) => min + Math.random() * (max - min);
 
 function bezier(t, p0, p1, p2, p3) {
@@ -11,9 +12,9 @@ function rand(min, max) {
   return min + Math.random() * (max - min);
 }
 
-export const delay = ms =>
+export const delay = (ms, size = 1000) =>
   new Promise(resolve => {
-    return setTimeout(resolve, getRandomNumber(ms));
+    return setTimeout(resolve, getRandomNumber(ms, 1000));
   });
 
 export async function moveToTopLeft(
