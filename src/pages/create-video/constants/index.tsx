@@ -1,3 +1,5 @@
+export const DETAIL_PAGE_SIZE = 15;
+
 export const INDEX_FILE = 'channels/index.xlsx';
 
 export const COLUMN_KEYS = [
@@ -65,3 +67,13 @@ export const TABLE_COLUMNS = [
     label: 'HÀNH ĐỘNG',
   },
 ];
+
+export const VIDEO_STATUS = {
+  CREATED: 'Đã tạo video',
+  UPLOADED: 'Đã tải lên',
+};
+
+export const VIDEO_MAKE_TYPE = {
+  FROM_AUDIO: 'from_audio',
+  REUP_FULL: 'reup_full',
+};

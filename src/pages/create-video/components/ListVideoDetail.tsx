@@ -26,12 +26,9 @@ import {
   SCRIPT_FROM_AUDIO,
   SCRIPT_REUP_FULL,
 } from '../utils/channelIndexHelpers';
-
-const DETAIL_PAGE_SIZE = 15;
+import { DETAIL_PAGE_SIZE, VIDEO_MAKE_TYPE, VIDEO_STATUS } from '../constants';
 
 const searchInputClass = 'w-full rounded-xl px-3 py-2.5 text-sm outline-none border transition-colors duration-150';
-
-const DETAIL_STATUS_VIDEO_CREATED = 'Đã tạo video';
 
 function isDetailRowStatusEmpty(raw: unknown): boolean {
   const s = String(raw ?? '').trim();
@@ -55,7 +52,7 @@ export interface ListVideoDetailProps {
   /** Header index (đủ cột như file `index.xlsx`) — dùng cho `buildExtraEnvForIndexChannelRow` / EMAIL. */
   indexHeaders: string[];
   /** Quay về trang danh sách kênh (index). */
-  onBack: () => void;
+  onBack: VoidFunction;
 }
 
 /**
@@ -65,7 +62,6 @@ export function ListVideoDetail({ row, indexHeaders, onBack }: ListVideoDetailPr
   const channelFolder = useMemo(() => String(row['ID'] ?? '').trim(), [row]);
 
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
   const [detail, setDetail] = useState<ChannelFolderDataResult | null>(null);
   /** Chỉ số dòng trong toàn bộ `rows` (0-based). */
   const [selectedIndices, setSelectedIndices] = useState<Set<number>>(() => new Set());
@@ -86,7 +82,7 @@ export function ListVideoDetail({ row, indexHeaders, onBack }: ListVideoDetailPr
   const indexChannelEntry = useMemo(() => {
     const folder = channelFolder.trim();
     const videoType = resolveIndexRowVideoType(row, indexHeaders);
-    if (!folder || (videoType !== 'from_audio' && videoType !== 'reup_full')) return null;
+    if (!folder || (videoType !== VIDEO_MAKE_TYPE.FROM_AUDIO && videoType !== VIDEO_MAKE_TYPE.REUP_FULL)) return null;
     return { row, folder, videoType: videoType as 'from_audio' | 'reup_full' };
   }, [row, indexHeaders, channelFolder]);
 
@@ -107,14 +103,10 @@ export function ListVideoDetail({ row, indexHeaders, onBack }: ListVideoDetailPr
     }
     const hdrs = detail.headers.length > 0 ? detail.headers : detail.rows[0] ? Object.keys(detail.rows[0]) : [];
     const findKey = (name: string) => hdrs.find(h => headerNorm(h) === headerNorm(name));
-    const emailKey = findKey('EMAIL');
-    const nameKey = findKey('CHANNEL NAME');
-    const tagsKey = findKey('CHANNEL TAGS');
-    const skip = new Set([emailKey, nameKey, tagsKey].filter(Boolean) as string[]);
+    const skip = new Set([findKey('EMAIL'), findKey('CHANNEL NAME'), findKey('CHANNEL TAGS')].filter(Boolean) as string[]);
     const rest = hdrs.filter(h => !skip.has(h));
     const linkVideoKey = findKey('LINK VIDEO');
-    const tableHeaders =
-      linkVideoKey && rest.includes(linkVideoKey) ? [linkVideoKey, ...rest.filter(h => h !== linkVideoKey)] : rest;
+    const tableHeaders = linkVideoKey && rest.includes(linkVideoKey) ? [linkVideoKey, ...rest.filter(h => h !== linkVideoKey)] : rest;
 
     return {
       linkVideoKey,
@@ -150,7 +142,7 @@ export function ListVideoDetail({ row, indexHeaders, onBack }: ListVideoDetailPr
           emptyStatusWithLink += 1;
         }
       }
-      if (st === DETAIL_STATUS_VIDEO_CREATED) {
+      if (st === VIDEO_STATUS.CREATED) {
         hasCreatedVideoInSelection = true;
         createdVideoCount += 1;
         if (extractYoutubeVideoIdFromUrl(url)) createdWithYoutubeId += 1;
@@ -166,8 +158,7 @@ export function ListVideoDetail({ row, indexHeaders, onBack }: ListVideoDetailPr
 
   const canRunNpm = typeof window.runner?.runNpmScript === 'function';
   const canRunScript = typeof window.runner?.runScript === 'function';
-  const actionsLocked =
-    loading || createVideoBusy || updateMetaBusy || uploadPrepBusy || youtubeUploadThreads > 0;
+  const actionsLocked = loading || createVideoBusy || updateMetaBusy || uploadPrepBusy || youtubeUploadThreads > 0;
 
   const canCreateVideo =
     canRunNpm &&
@@ -182,25 +173,20 @@ export function ListVideoDetail({ row, indexHeaders, onBack }: ListVideoDetailPr
     selectionStats.createdWithYoutubeId > 0;
 
   const canUpdateMeta =
-    canRunScript &&
-    Boolean(detailLayout.linkVideoKey && detailLayout.statusKey) &&
-    selectionStats.hasCreatedVideoInSelection;
+    canRunScript && Boolean(detailLayout.linkVideoKey && detailLayout.statusKey) && selectionStats.hasCreatedVideoInSelection;
 
   const load = useCallback(async () => {
     if (!channelFolder) {
       setDetail(null);
-      setError('Dòng index thiếu cột ID (thư mục kênh).');
       setLoading(false);
       return;
     }
     if (typeof window.runner?.readChannelFolderData !== 'function') {
       setDetail(null);
-      setError('Chỉ đọc được danh sách video trong app Electron.');
       setLoading(false);
       return;
     }
     setLoading(true);
-    setError(null);
     setDetail(null);
     try {
       const d = await window.runner.readChannelFolderData(channelFolder);
@@ -212,7 +198,6 @@ export function ListVideoDetail({ row, indexHeaders, onBack }: ListVideoDetailPr
         fileName: null,
         channelFolder,
       });
-      setError('Không đọc được dữ liệu kênh.');
     } finally {
       setLoading(false);
     }
@@ -271,8 +256,13 @@ export function ListVideoDetail({ row, indexHeaders, onBack }: ListVideoDetailPr
     filterStatusFixed,
   ]);
 
-  const { page: listPage, setPage: setListPage, startIndex: listStartIndex, totalPages: listTotalPages, pageSize: listPageSize } =
-    useClientPagination(filteredRowsWithIndex.length, DETAIL_PAGE_SIZE);
+  const {
+    page: listPage,
+    setPage: setListPage,
+    startIndex: listStartIndex,
+    totalPages: listTotalPages,
+    pageSize: listPageSize,
+  } = useClientPagination(filteredRowsWithIndex.length, DETAIL_PAGE_SIZE);
 
   useEffect(() => {
     setListPage(1);
@@ -280,7 +270,7 @@ export function ListVideoDetail({ row, indexHeaders, onBack }: ListVideoDetailPr
 
   const pageFilteredRows = useMemo(
     () => filteredRowsWithIndex.slice(listStartIndex, listStartIndex + listPageSize),
-    [filteredRowsWithIndex, listStartIndex, listPageSize]
+    [filteredRowsWithIndex, listStartIndex, listPageSize],
   );
 
   const pageSelectionFlags = useMemo(() => {
@@ -346,7 +336,7 @@ export function ListVideoDetail({ row, indexHeaders, onBack }: ListVideoDetailPr
     if (skippedBusy.length > 0) {
       const uniq = [...new Set(skippedBusy)];
       setScheduleInfo(
-        `Bỏ qua ${uniq.length} email đang upload trên luồng khác: ${uniq.join(', ')}. Chờ xong rồi mới chạy lại cho các email đó.`
+        `Bỏ qua ${uniq.length} email đang upload trên luồng khác: ${uniq.join(', ')}. Chờ xong rồi mới chạy lại cho các email đó.`,
       );
     }
 
@@ -390,7 +380,7 @@ export function ListVideoDetail({ row, indexHeaders, onBack }: ListVideoDetailPr
         if (ok > 0) parts.push(`${ok} kênh xong`);
         if (fail > 0) parts.push(`${fail} kênh lỗi`);
         setScheduleInfo(
-          `${skipNote}Upload YouTube (${claimed.length} luồng song song): ${parts.join(' — ')}. Kiểm tra GPM / YouTube Studio và tab Logs.`
+          `${skipNote}Upload YouTube (${claimed.length} luồng song song): ${parts.join(' — ')}. Kiểm tra GPM / YouTube Studio và tab Logs.`,
         );
       } catch (e) {
         const msg = e instanceof Error ? e.message : String(e);
@@ -437,11 +427,8 @@ export function ListVideoDetail({ row, indexHeaders, onBack }: ListVideoDetailPr
     }
     setCreateVideoBusy(true);
     try {
-      const bgList =
-        typeof window.runner.listBackgrounds === 'function' ? await window.runner.listBackgrounds().catch(() => []) : [];
-      const def = scriptDefs.find(s =>
-        s.id === (indexChannelEntry.videoType === 'reup_full' ? SCRIPT_REUP_FULL : SCRIPT_FROM_AUDIO)
-      );
+      const bgList = typeof window.runner.listBackgrounds === 'function' ? await window.runner.listBackgrounds().catch(() => []) : [];
+      const def = scriptDefs.find(s => s.id === (indexChannelEntry.videoType === 'reup_full' ? SCRIPT_REUP_FULL : SCRIPT_FROM_AUDIO));
       if (!def) {
         setActionError('Không tìm thấy script tạo video.');
         return;
@@ -452,7 +439,7 @@ export function ListVideoDetail({ row, indexHeaders, onBack }: ListVideoDetailPr
         channelFolder,
         indexChannelEntry.videoType,
         bgList.length > 0 ? bgList : [],
-        { maxVideosPerBatch: defaultMaxVideosPerBatch }
+        { maxVideosPerBatch: defaultMaxVideosPerBatch },
       );
       const extraEnv = { ...baseEnv, MAVID_ONLY_LINKS: JSON.stringify(onlyLinks) };
       const res = await window.runner.runNpmScript(def.npmScript, extraEnv);
@@ -492,7 +479,7 @@ export function ListVideoDetail({ row, indexHeaders, onBack }: ListVideoDetailPr
     for (const i of selectedIndices) {
       const r = detail.rows[i];
       if (!r) continue;
-      if (String(r[sk] ?? '').trim() !== DETAIL_STATUS_VIDEO_CREATED) continue;
+      if (String(r[sk] ?? '').trim() !== VIDEO_STATUS.CREATED) continue;
       const id = extractYoutubeVideoIdFromUrl(String(r[lk] ?? '').trim());
       if (id) uploadFolderNames.push(id);
     }
@@ -567,7 +554,7 @@ export function ListVideoDetail({ row, indexHeaders, onBack }: ListVideoDetailPr
       const r = detail.rows[i];
       if (!r) continue;
       const status = String(r[sk] ?? '').trim();
-      if (status !== DETAIL_STATUS_VIDEO_CREATED) continue;
+      if (status !== VIDEO_STATUS.CREATED) continue;
       const url = String(r[lk] ?? '').trim();
       if (url) items.push({ url });
     }
@@ -613,11 +600,6 @@ export function ListVideoDetail({ row, indexHeaders, onBack }: ListVideoDetailPr
     <div className='space-y-6 w-full min-w-0'>
       <PageHeader
         title='Danh sách video kênh'
-        description={
-          channelFolder
-            ? `Thư mục: ${channelFolder}${detail?.fileName ? ` · File: ${detail.fileName}` : ''}`
-            : 'Thiếu ID kênh trên dòng index.'
-        }
         actions={
           <div className='flex flex-wrap items-center gap-2'>
             <AppButton
@@ -628,10 +610,10 @@ export function ListVideoDetail({ row, indexHeaders, onBack }: ListVideoDetailPr
                 !detailLayout.linkVideoKey || !detailLayout.statusKey
                   ? 'Cần cột LINK VIDEO + STATUS trong file kênh.'
                   : !indexChannelEntry
-                  ? 'Cần LOẠI VIDEO from_audio / reup_full trên dòng index.'
-                  : selectionStats.emptyStatusWithLink === 0
-                  ? 'Chọn dòng có status trống và link video hợp lệ.'
-                  : 'Tạo video cho các dòng đã chọn (status trống).'
+                    ? 'Cần LOẠI VIDEO from_audio / reup_full trên dòng index.'
+                    : selectionStats.emptyStatusWithLink === 0
+                      ? 'Chọn dòng có status trống và link video hợp lệ.'
+                      : 'Tạo video cho các dòng đã chọn (status trống).'
               }
               onClick={() => void runCreateVideoForSelection()}
             >
@@ -654,10 +636,10 @@ export function ListVideoDetail({ row, indexHeaders, onBack }: ListVideoDetailPr
                 !detailLayout.linkVideoKey || !detailLayout.statusKey
                   ? 'Cần cột LINK VIDEO + STATUS.'
                   : !indexChannelEntry
-                  ? 'Thiếu LOẠI VIDEO trên index.'
-                  : selectionStats.createdWithYoutubeId === 0
-                  ? 'Chọn dòng «Đã tạo video» có link YouTube (?v=…).'
-                  : 'Upload các video đã chọn.'
+                    ? 'Thiếu LOẠI VIDEO trên index.'
+                    : selectionStats.createdWithYoutubeId === 0
+                      ? 'Chọn dòng «Đã tạo video» có link YouTube (?v=…).'
+                      : 'Upload các video đã chọn.'
               }
               onClick={() => void runUploadForSelection()}
             >
@@ -685,8 +667,8 @@ export function ListVideoDetail({ row, indexHeaders, onBack }: ListVideoDetailPr
                 !detailLayout.linkVideoKey || !detailLayout.statusKey
                   ? 'Cần cột LINK VIDEO + STATUS.'
                   : !selectionStats.hasCreatedVideoInSelection
-                  ? 'Chọn ít nhất một dòng có status «Đã tạo video».'
-                  : 'Cập nhật meta (Gemini / thumbnail) cho các dòng đã chọn.'
+                    ? 'Chọn ít nhất một dòng có status «Đã tạo video».'
+                    : 'Cập nhật meta (Gemini / thumbnail) cho các dòng đã chọn.'
               }
               onClick={() => void runUpdateMetaForSelection()}
             >
@@ -712,15 +694,7 @@ export function ListVideoDetail({ row, indexHeaders, onBack }: ListVideoDetailPr
         }
       />
 
-      {(linkPreview || emailPreview) && (
-        <p className='text-sm wrap-break-word -mt-2' style={{ color: 'var(--text-muted)' }}>
-          {linkPreview ? <span title={linkPreview}>LINK: {linkPreview}</span> : null}
-          {linkPreview && emailPreview ? ' · ' : null}
-          {emailPreview ? <span title={emailPreview}>EMAIL: {emailPreview}</span> : null}
-        </p>
-      )}
-
-      {actionError && (
+      {/* {actionError && (
         <div
           className='rounded-xl px-3 py-2 text-sm'
           style={{
@@ -744,9 +718,9 @@ export function ListVideoDetail({ row, indexHeaders, onBack }: ListVideoDetailPr
         >
           {scheduleInfo}
         </div>
-      )}
+      )} */}
 
-      {error && (
+      {/* {error && (
         <div
           className='rounded-xl px-3 py-2 text-sm'
           style={{
@@ -757,7 +731,7 @@ export function ListVideoDetail({ row, indexHeaders, onBack }: ListVideoDetailPr
         >
           {error}
         </div>
-      )}
+      )} */}
 
       {showSearchBar ? (
         <div
@@ -843,11 +817,7 @@ export function ListVideoDetail({ row, indexHeaders, onBack }: ListVideoDetailPr
             <table className='w-full min-w-0 text-sm' style={{ borderCollapse: 'collapse', tableLayout: 'auto' }}>
               <thead className='sticky top-0 z-1'>
                 <tr style={{ background: 'var(--code-bg)' }}>
-                  <th
-                    className='w-12 px-2 py-2 text-center align-middle'
-                    style={{ borderBottom: '1px solid var(--border)' }}
-                    scope='col'
-                  >
+                  <th className='w-12 px-2 py-2 text-center align-middle' style={{ borderBottom: '1px solid var(--border)' }} scope='col'>
                     <input
                       ref={headerSelectRef}
                       type='checkbox'
@@ -873,7 +843,14 @@ export function ListVideoDetail({ row, indexHeaders, onBack }: ListVideoDetailPr
               </thead>
               <tbody>
                 {pageFilteredRows.map(({ row: r, originalIndex }) => (
-                  <tr key={originalIndex} style={{ borderBottom: '1px solid var(--border)' }}>
+                  <tr
+                    key={originalIndex}
+                    style={{ borderBottom: '1px solid var(--border)' }}
+                    className={actionsLocked ? '' : 'cursor-pointer hover:bg-black/5 dark:hover:bg-white/5'}
+                    onClick={() => {
+                      if (!actionsLocked) toggleRowSelected(originalIndex);
+                    }}
+                  >
                     <td className='px-2 py-2 align-middle text-center' onClick={e => e.stopPropagation()}>
                       <input
                         type='checkbox'

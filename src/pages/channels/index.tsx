@@ -202,7 +202,7 @@ function ChannelsPage() {
         setIndexSaving(false);
       }
     },
-    [canWriteIndex, indexHeaders, loadIndex]
+    [canWriteIndex, indexHeaders, loadIndex],
   );
 
   type IndexCreateVideoQueueEntry = {
@@ -235,7 +235,7 @@ function ChannelsPage() {
 
   const createVideoQueueFromSelection = useMemo(
     () => indexCreateVideoQueue.filter(q => indexSelectedRowIndices.has(q.draftRowIndex)),
-    [indexCreateVideoQueue, indexSelectedRowIndices]
+    [indexCreateVideoQueue, indexSelectedRowIndices],
   );
 
   /** Dòng index khớp thư mục đang xem chi tiết — cần cho Tạo video / Upload từ chi tiết. */
@@ -384,9 +384,7 @@ function ChannelsPage() {
             maxVideosPerBatch,
           });
           const extraEnv =
-            opts?.onlyLinks?.length && queue.length === 1
-              ? { ...baseEnv, MAVID_ONLY_LINKS: JSON.stringify(opts.onlyLinks) }
-              : baseEnv;
+            opts?.onlyLinks?.length && queue.length === 1 ? { ...baseEnv, MAVID_ONLY_LINKS: JSON.stringify(opts.onlyLinks) } : baseEnv;
           try {
             const res = await window.runner.runNpmScript(def.npmScript, extraEnv);
             if (res.cancelled) {
@@ -403,14 +401,14 @@ function ChannelsPage() {
           setIndexListError(
             failures.length === queue.length
               ? `Tất cả ${failures.length} kênh lỗi: ${failures.slice(0, 3).join(' ')}${failures.length > 3 ? '…' : ''}`
-              : `Một số kênh lỗi (${failures.length}/${queue.length}): ${failures.slice(0, 4).join(' ')}${failures.length > 4 ? '…' : ''}`
+              : `Một số kênh lỗi (${failures.length}/${queue.length}): ${failures.slice(0, 4).join(' ')}${failures.length > 4 ? '…' : ''}`,
           );
         }
       } finally {
         setIndexBatchVideo(null);
       }
     },
-    [indexHeaders, indexBackgrounds]
+    [indexHeaders, indexBackgrounds],
   );
 
   const detailLayout = useMemo(() => {
@@ -453,8 +451,7 @@ function ChannelsPage() {
     const rest = headers.filter(h => !skip.has(h));
     const linkVideoKey = findKey('LINK VIDEO');
     /** Cột 2 (sau checkbox): LINK VIDEO nếu có, còn lại giữ thứ tự sheet. */
-    const tableHeaders =
-      linkVideoKey && rest.includes(linkVideoKey) ? [linkVideoKey, ...rest.filter(h => h !== linkVideoKey)] : rest;
+    const tableHeaders = linkVideoKey && rest.includes(linkVideoKey) ? [linkVideoKey, ...rest.filter(h => h !== linkVideoKey)] : rest;
 
     return {
       meta,
@@ -506,7 +503,7 @@ function ChannelsPage() {
   const indexPag = useClientPagination(indexDraftRows.length);
   const pageIndexRows = useMemo(
     () => indexDraftRows.slice(indexPag.startIndex, indexPag.startIndex + indexPag.pageSize),
-    [indexDraftRows, indexPag.startIndex, indexPag.pageSize]
+    [indexDraftRows, indexPag.startIndex, indexPag.pageSize],
   );
 
   const indexPageSelectionFlags = useMemo(() => {
@@ -556,7 +553,7 @@ function ChannelsPage() {
 
   const pageDetailRows = useMemo(
     () => filteredRowsWithIndex.slice(detailStartIndex, detailStartIndex + detailPageSize),
-    [filteredRowsWithIndex, detailStartIndex, detailPageSize]
+    [filteredRowsWithIndex, detailStartIndex, detailPageSize],
   );
 
   const detailPageSelectionFlags = useMemo(() => {
@@ -625,8 +622,7 @@ function ChannelsPage() {
       }
       if (sk && lk && isDetailRowStatusEmpty(row[sk])) {
         const url = String(row[lk] ?? '').trim();
-        const okLink =
-          (url.startsWith('http://') || url.startsWith('https://')) && !url.includes('(Không có video)');
+        const okLink = (url.startsWith('http://') || url.startsWith('https://')) && !url.includes('(Không có video)');
         if (okLink) {
           emptyStatusSelectedCount += 1;
           hasEmptyStatusWithLinkInSelection = true;
@@ -689,7 +685,7 @@ function ChannelsPage() {
         setDetailUpdateMetaBusy(false);
       }
     },
-    [selectedChannel, detail?.rows, detailLayout.linkVideoKey, detailLayout.statusKey]
+    [selectedChannel, detail?.rows, detailLayout.linkVideoKey, detailLayout.statusKey],
   );
 
   async function handleSetStartFromRow(dataRowIndex: number) {
@@ -713,8 +709,8 @@ function ChannelsPage() {
   const detailTheadHeaders = detailLoading
     ? DETAIL_TABLE_LOADING_HEADERS
     : detailLayout.tableHeaders.length > 0
-    ? detailLayout.tableHeaders
-    : ['—'];
+      ? detailLayout.tableHeaders
+      : ['—'];
 
   /** Cột checkbox riêng (chỉ khi có bảng video hoặc đang load). */
   const detailShowSelectColumn = detailLoading || detailLayout.tableHeaders.length > 0;
@@ -789,7 +785,7 @@ function ChannelsPage() {
     if (skippedBusy.length > 0) {
       const uniq = [...new Set(skippedBusy)];
       setUploadScheduleInfo(
-        `Bỏ qua ${uniq.length} email đang upload trên luồng khác: ${uniq.join(', ')}. Chờ xong rồi mới chạy lại cho các email đó.`
+        `Bỏ qua ${uniq.length} email đang upload trên luồng khác: ${uniq.join(', ')}. Chờ xong rồi mới chạy lại cho các email đó.`,
       );
     }
 
@@ -837,7 +833,7 @@ function ChannelsPage() {
         if (ok > 0) parts.push(`${ok} kênh xong`);
         if (fail > 0) parts.push(`${fail} kênh lỗi`);
         setUploadScheduleInfo(
-          `${skipNote}Upload YouTube (${claimed.length} luồng song song): ${parts.join(' — ')}. Kiểm tra GPM / YouTube Studio và tab Logs.`
+          `${skipNote}Upload YouTube (${claimed.length} luồng song song): ${parts.join(' — ')}. Kiểm tra GPM / YouTube Studio và tab Logs.`,
         );
       } catch (e) {
         const msg = e instanceof Error ? e.message : String(e);
@@ -862,9 +858,7 @@ function ChannelsPage() {
       return;
     }
     if (!indexRowForDetailChannel) {
-      setDetailActionError(
-        'Không tìm thấy kênh này trong index.xlsx (hoặc thiếu LOẠI VIDEO from_audio / reup_full).'
-      );
+      setDetailActionError('Không tìm thấy kênh này trong index.xlsx (hoặc thiếu LOẠI VIDEO from_audio / reup_full).');
       return;
     }
     const onlyLinks: string[] = [];
@@ -873,11 +867,7 @@ function ChannelsPage() {
       if (!row) continue;
       if (!isDetailRowStatusEmpty(row[sk])) continue;
       const url = String(row[lk] ?? '').trim();
-      if (
-        !url ||
-        !(url.startsWith('http://') || url.startsWith('https://')) ||
-        url.includes('(Không có video)')
-      ) {
+      if (!url || !(url.startsWith('http://') || url.startsWith('https://')) || url.includes('(Không có video)')) {
         continue;
       }
       onlyLinks.push(url);
@@ -1027,7 +1017,7 @@ function ChannelsPage() {
               selectedChannel
                 ? {
                     canUpdateMeta: Boolean(
-                      detailLayout.linkVideoKey && detailLayout.statusKey && typeof window.runner?.runScript === 'function'
+                      detailLayout.linkVideoKey && detailLayout.statusKey && typeof window.runner?.runScript === 'function',
                     ),
                     updateMetaBusy: detailUpdateMetaBusy,
                     detailActionsLocked: startMarkingIndex !== null,

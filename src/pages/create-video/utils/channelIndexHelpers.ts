@@ -1,3 +1,4 @@
+import { VIDEO_MAKE_TYPE } from './../constants/index';
 import type { ChannelRow, MavidChannelConfig, MavidChannelConfigItem, ScriptId } from '@/types';
 import { PROMPTS_CREATE_THUMBNAIL_OPTIONS } from '@contents/prompts/index.js';
 import { OVERLAY_OPTIONS } from '@contents/constants/overlayOptions.js';
@@ -144,12 +145,11 @@ export function indexRowsEqual(a: ChannelRow[], b: ChannelRow[], headers: string
   return true;
 }
 
-export function resolveIndexRowVideoType(row: ChannelRow, headers: string[]): 'from_audio' | 'reup_full' | '' {
+export function resolveIndexRowVideoType(row: ChannelRow, headers: string[]) {
   const loaiKey = findIndexHeaderKey(headers, 'LOẠI VIDEO');
   const raw = loaiKey ? String(row[loaiKey] ?? '').trim() : '';
-  if (raw === 'reup_full') return 'reup_full';
-  if (raw === 'from_audio') return 'from_audio';
-  return '';
+  if (raw === VIDEO_MAKE_TYPE.FROM_AUDIO) return VIDEO_MAKE_TYPE.FROM_AUDIO;
+  return VIDEO_MAKE_TYPE.REUP_FULL;
 }
 
 /** Ô EMAIL index có thể chứa nhiều địa chỉ phân tách dấu phẩy. */
@@ -174,7 +174,7 @@ export function buildExtraEnvForIndexChannelRow(
   folder: string,
   videoType: 'from_audio' | 'reup_full',
   bgList: string[],
-  opts?: { maxVideosPerBatch?: number }
+  opts?: { maxVideosPerBatch?: number },
 ): Record<string, string> {
   const maxBatch = opts?.maxVideosPerBatch ?? 5;
 
@@ -196,7 +196,7 @@ export function buildExtraEnvForIndexChannelRow(
         minDurationMinutes: 0,
         showLogo: false,
       },
-      bgList
+      bgList,
     );
   }
   const overlayReup = videoType === 'reup_full' ? bgRaw : '';
@@ -315,7 +315,12 @@ export function findMavidChannelConfigItemByIndexEmails(cfg: MavidChannelConfig,
   for (const raw of indexEmails) {
     const want = raw.trim().toLowerCase();
     if (!want) continue;
-    const hit = list.find(it => String(it?.email ?? '').trim().toLowerCase() === want);
+    const hit = list.find(
+      it =>
+        String(it?.email ?? '')
+          .trim()
+          .toLowerCase() === want,
+    );
     if (hit) return hit;
   }
   return null;
@@ -326,7 +331,7 @@ export function findMavidChannelConfigItemByIndexEmails(cfg: MavidChannelConfig,
  */
 export function resolveMavidChannelItemForInitialMerge(
   cfg: MavidChannelConfig,
-  indexEmails: string[]
+  indexEmails: string[],
 ): MavidChannelConfigItem | MavidChannelConfig | null {
   const list = Array.isArray(cfg.channels) ? cfg.channels : [];
   if (list.length > 0) {
@@ -341,7 +346,7 @@ export function resolveMavidChannelItemForInitialMerge(
 export function applyMavidChannelItemToAddDialogInitial(
   base: ChannelAddDialogInitialFields,
   cfg: MavidChannelConfig,
-  item: MavidChannelConfigItem | MavidChannelConfig | null
+  item: MavidChannelConfigItem | MavidChannelConfig | null,
 ): ChannelAddDialogInitialFields {
   if (!item || typeof item !== 'object') return { ...base };
 
@@ -467,7 +472,7 @@ export function parseIndexPublishTimesCell(raw: unknown): string[] {
 export function channelAddDialogInitialFromIndexRow(
   row: ChannelRow,
   headers: string[],
-  mavidChannelConfig?: MavidChannelConfig | null
+  mavidChannelConfig?: MavidChannelConfig | null,
 ): ChannelAddDialogInitialFields {
   const linkKey = findIndexHeaderKey(headers, 'LINK');
   const channelUrl = linkKey ? String(row[linkKey] ?? '').trim() : '';
@@ -475,8 +480,7 @@ export function channelAddDialogInitialFromIndexRow(
   const emailKey = findIndexHeaderKey(headers, 'EMAIL');
   const email = emailKey ? String(row[emailKey] ?? '').trim() : '';
 
-  const myChannelKey =
-    findIndexHeaderKey(headers, 'KÊNH CỦA TÔI') ?? findIndexHeaderKey(headers, 'CHANNEL');
+  const myChannelKey = findIndexHeaderKey(headers, 'KÊNH CỦA TÔI') ?? findIndexHeaderKey(headers, 'CHANNEL');
   const myChannel = myChannelKey ? String(row[myChannelKey] ?? '').trim() : '';
 
   let videoType = resolveIndexRowVideoType(row, headers);
@@ -551,7 +555,7 @@ export function channelAddDialogInitialFromIndexRow(
 export function buildChannelRowFromAddForm(
   headers: string[],
   input: ChannelAddFormInput,
-  opts?: { preserveChannelFromRow?: ChannelRow | null }
+  opts?: { preserveChannelFromRow?: ChannelRow | null },
 ): { row: ChannelRow; error?: string } {
   const row: ChannelRow = {};
   for (const h of headers) row[h] = '';

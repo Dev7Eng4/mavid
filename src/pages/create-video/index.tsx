@@ -11,6 +11,12 @@ import { INDEX_FILE, TABLE_COLUMNS } from './constants';
 import { ChannelAddDialog } from '../channels/ChannelAddDialog';
 import { ListVideoDetail } from './components/ListVideoDetail';
 import { MappingChannel } from './components/MappingChannel';
+import { VideoPopup } from './components/VideoPopup';
+
+interface IPopupStatus {
+  row: ChannelRow | null;
+  status: 'edit' | 'mapping' | 'detail' | 'upload' | 'make';
+}
 
 interface Props {
   disabled?: boolean;
@@ -30,9 +36,7 @@ function CreateVideoPage({ disabled = false, runningScript, setRunningScript, ap
   const [data, setData] = useState<ChannelData | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [selectedRows, setSelectedRows] = useState<ChannelRow[]>([]);
-  const [popupStatus, setPopupStatus] = useState<{ row: ChannelRow; status: 'edit' | 'add' } | null>(null);
-  /** Trang danh sách video (full page), null = trang bảng index. */
-  const [videoListRow, setVideoListRow] = useState<ChannelRow | null>(null);
+  const [popupStatus, setPopupStatus] = useState<IPopupStatus | null>(null);
 
   const headerSelectRef = useRef<HTMLInputElement>(null);
 
@@ -41,8 +45,84 @@ function CreateVideoPage({ disabled = false, runningScript, setRunningScript, ap
   }, []);
 
   const handleOpenDetailListVideos = useCallback((row: ChannelRow) => {
-    setVideoListRow(row);
+    setPopupStatus({ row, status: 'detail' });
   }, []);
+
+  const handleOpenMakeVideo = useCallback(() => {
+    setPopupStatus({ row: null, status: 'make' });
+  }, []);
+
+  const handleOpenUploadVideo = useCallback(() => {
+    setPopupStatus({ row: null, status: 'upload' });
+  }, []);
+
+  const runCreateVideoForQueue = useCallback(
+    async (queue: IndexCreateVideoQueueEntry[], maxVideosPerBatch: number, opts?: { onlyLinks?: string[] }) => {
+      if (!window.runner?.runNpmScript) {
+        setIndexListError('Runner chưa sẵn sàng.');
+        return;
+      }
+      if (queue.length === 0) {
+        setIndexListError('Không có kênh nào đủ điều kiện: cần thư mục (cột ID hoặc CHANNEL), EMAIL.');
+        return;
+      }
+
+      const bgList = indexBackgrounds.length > 0 ? indexBackgrounds : await window.runner.listBackgrounds().catch(() => []);
+      setIndexListError(null);
+      const failures: string[] = [];
+
+      try {
+        for (let i = 0; i < queue.length; i++) {
+          const { row, folder, videoType } = queue[i];
+          setIndexBatchVideo({ current: i + 1, total: queue.length, channelLabel: folder });
+          const def = scriptDefs.find(s => s.id === (videoType === 'reup_full' ? SCRIPT_REUP_FULL : SCRIPT_FROM_AUDIO));
+          if (!def) {
+            failures.push(`${folder}: không tìm thấy script.`);
+            continue;
+          }
+
+          const baseEnv = buildExtraEnvForIndexChannelRow(row, indexHeaders, folder, videoType, bgList, {
+            maxVideosPerBatch,
+          });
+          const extraEnv =
+            opts?.onlyLinks?.length && queue.length === 1 ? { ...baseEnv, MAVID_ONLY_LINKS: JSON.stringify(opts.onlyLinks) } : baseEnv;
+          try {
+            const res = await window.runner.runNpmScript(def.npmScript, extraEnv);
+            if (res.cancelled) {
+              setIndexListError(`Đã dừng sau kênh ${folder} (${i + 1}/${queue.length}).`);
+              return;
+            }
+            if (res.code !== 0) failures.push(`${folder}: thoát mã ${res.code}.`);
+          } catch (e) {
+            failures.push(`${folder}: ${e instanceof Error ? e.message : 'lỗi'}.`);
+          }
+        }
+
+        if (failures.length > 0) {
+          setIndexListError(
+            failures.length === queue.length
+              ? `Tất cả ${failures.length} kênh lỗi: ${failures.slice(0, 3).join(' ')}${failures.length > 3 ? '…' : ''}`
+              : `Một số kênh lỗi (${failures.length}/${queue.length}): ${failures.slice(0, 4).join(' ')}${failures.length > 4 ? '…' : ''}`,
+          );
+        }
+      } finally {
+        setIndexBatchVideo(null);
+      }
+    },
+    [indexHeaders, indexBackgrounds],
+  );
+
+  const handleConfirmVideoPopup = async (videos: number) => {
+    if (popupStatus?.status === 'make') {
+      if (typeof window.runner?.minimizeApp === 'function') {
+        window.runner.minimizeApp();
+      }
+      await runCreateVideoForQueue(selectedRows, videos);
+    }
+    // console.log(payload);
+    // setPopupStatus(null);
+  };
+  // , [selectedRows, runCreateVideoForQueue]);
 
   const loadDataFromIndex = useCallback(async () => {
     if (typeof window.runner?.readChannelData !== 'function') {
@@ -64,15 +144,15 @@ function CreateVideoPage({ disabled = false, runningScript, setRunningScript, ap
   }, []);
 
   useEffect(() => {
-    if (videoListRow == null) void loadDataFromIndex();
-  }, [videoListRow, loadDataFromIndex]);
+    if (!popupStatus) void loadDataFromIndex();
+  }, [popupStatus, loadDataFromIndex]);
 
   const indexRows = useMemo(() => data?.rows ?? [], [data]);
 
   const indexPag = useClientPagination(indexRows.length);
   const pageIndexRows = useMemo(
     () => indexRows.slice(indexPag.startIndex, indexPag.startIndex + indexPag.pageSize),
-    [indexRows, indexPag.startIndex, indexPag.pageSize]
+    [indexRows, indexPag.startIndex, indexPag.pageSize],
   );
 
   const indexPageSelectionFlags = useMemo(() => {
@@ -114,16 +194,14 @@ function CreateVideoPage({ disabled = false, runningScript, setRunningScript, ap
     if (el) el.indeterminate = indexPageSelectionFlags.some && !indexPageSelectionFlags.all;
   }, [indexPageSelectionFlags.all, indexPageSelectionFlags.some]);
 
-  if (videoListRow != null) {
+  if (popupStatus?.status === 'detail' && popupStatus.row) {
     return (
       <ListVideoDetail
-        row={videoListRow}
+        row={popupStatus.row}
         indexHeaders={
-          data?.headers?.length
-            ? data.headers
-            : Array.from(new Set([...TABLE_COLUMNS.map(h => h.key), ...Object.keys(videoListRow)]))
+          data?.headers?.length ? data.headers : Array.from(new Set([...TABLE_COLUMNS.map(h => h.key), ...Object.keys(popupStatus.row)]))
         }
-        onBack={() => setVideoListRow(null)}
+        onBack={() => setPopupStatus(null)}
       />
     );
   }
@@ -134,10 +212,24 @@ function CreateVideoPage({ disabled = false, runningScript, setRunningScript, ap
         title='Tạo video'
         description=''
         actions={
-          <AppButton type='button' variant='secondary' onClick={() => void loadDataFromIndex()} disabled={isLoading}>
-            {isLoading ? <SpinnerIcon className='w-4 h-4' /> : <RefreshIcon className='w-4 h-4' />}
-            <span>{isLoading ? 'Đang tải...' : 'Tải lại'}</span>
-          </AppButton>
+          <div className='flex gap-2'>
+            <AppButton type='button' variant='secondary' onClick={() => setPopupStatus({ row: null, status: 'mapping' })}>
+              <span>Mapping</span>
+            </AppButton>
+            <AppButton type='button' variant='secondary' onClick={handleOpenMakeVideo}>
+              <span>Make Video</span>
+            </AppButton>
+            <AppButton type='button' variant='secondary' onClick={handleOpenUploadVideo}>
+              <span>Upload</span>
+            </AppButton>
+            <AppButton type='button' variant='secondary' onClick={() => setPopupStatus({ row: null, status: 'edit' })}>
+              <span>Clean</span>
+            </AppButton>
+            <AppButton type='button' variant='secondary' onClick={() => void loadDataFromIndex()} disabled={isLoading}>
+              {isLoading ? <SpinnerIcon className='w-4 h-4' /> : <RefreshIcon className='w-4 h-4' />}
+              <span>{isLoading ? 'Đang tải...' : 'Tải lại'}</span>
+            </AppButton>
+          </div>
         }
       />
 
@@ -281,14 +373,19 @@ function CreateVideoPage({ disabled = false, runningScript, setRunningScript, ap
         </div>
       </section>
 
-      {popupStatus !== null && popupStatus.row != null && (
-        <MappingChannel
-          initialRow={popupStatus.status === 'edit' ? popupStatus.row : null}
-          indexHeaders={TABLE_COLUMNS.map(h => h.key)}
-          backgroundFolders={[]}
-          indexRows={indexRows}
-          onClose={() => setPopupStatus(null)}
-        />
+      {popupStatus?.status === 'edit' ||
+        (popupStatus?.status === 'mapping' && (
+          <MappingChannel
+            initialRow={popupStatus.row}
+            indexHeaders={TABLE_COLUMNS.map(h => h.key)}
+            backgroundFolders={[]}
+            indexRows={indexRows}
+            onClose={() => setPopupStatus(null)}
+          />
+        ))}
+
+      {(popupStatus?.status === 'make' || popupStatus?.status === 'upload') && (
+        <VideoPopup type={popupStatus.status} onClose={() => setPopupStatus(null)} onConfirm={handleConfirmVideoPopup} />
       )}
     </div>
   );
