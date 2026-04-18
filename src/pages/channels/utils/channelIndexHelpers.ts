@@ -113,16 +113,17 @@ export function folderFromChannelUrl(raw: string): string | null {
   return null;
 }
 
-/** Cột tối thiểu để thêm kênh từ form (không gồm cột lịch tùy chọn). */
-export const INDEX_ADD_CHANNEL_REQUIRED_NORMS = ['LINK', 'EMAIL', 'LOẠI VIDEO', 'THỜI GIAN VIDEO', 'BACKGROUND'] as const;
+/** Cột tối thiểu để thêm kênh từ form (prop names sau mapping). */
+export const INDEX_ADD_CHANNEL_REQUIRED_PROPS = ['link', 'email', 'videoType', 'videoDuration', 'background'] as const;
 
 export function indexHeadersMissingForAddChannel(headers: string[]): string[] {
+  const set = new Set(headers);
   const missing: string[] = [];
-  if (!headers.some(h => headerNorm(h) === 'ID') && !headers.some(h => headerNorm(h) === 'CHANNEL')) {
-    missing.push('ID hoặc CHANNEL');
+  if (!set.has('id') && !set.has('channel')) {
+    missing.push('id hoặc channel');
   }
-  for (const n of INDEX_ADD_CHANNEL_REQUIRED_NORMS) {
-    if (!findIndexHeaderKey(headers, n)) missing.push(n);
+  for (const p of INDEX_ADD_CHANNEL_REQUIRED_PROPS) {
+    if (!set.has(p)) missing.push(p);
   }
   return missing;
 }
@@ -144,9 +145,8 @@ export function indexRowsEqual(a: ChannelRow[], b: ChannelRow[], headers: string
   return true;
 }
 
-export function resolveIndexRowVideoType(row: ChannelRow, headers: string[]): 'from_audio' | 'reup_full' | '' {
-  const loaiKey = findIndexHeaderKey(headers, 'LOẠI VIDEO');
-  const raw = loaiKey ? String(row[loaiKey] ?? '').trim() : '';
+export function resolveIndexRowVideoType(row: ChannelRow): 'from_audio' | 'reup_full' | '' {
+  const raw = String(row.videoType ?? '').trim();
   if (raw === 'reup_full') return 'reup_full';
   if (raw === 'from_audio') return 'from_audio';
   return '';
@@ -170,7 +170,6 @@ export function indexRowMatchesPickedEmail(row: ChannelRow, emailHeaderKey: stri
 
 export function buildExtraEnvForIndexChannelRow(
   row: ChannelRow,
-  headers: string[],
   folder: string,
   videoType: 'from_audio' | 'reup_full',
   bgList: string[],
@@ -178,11 +177,8 @@ export function buildExtraEnvForIndexChannelRow(
 ): Record<string, string> {
   const maxBatch = opts?.maxVideosPerBatch ?? 5;
 
-  const emailKey = findIndexHeaderKey(headers, 'EMAIL');
-  const email = emailKey ? String(row[emailKey] ?? '').trim() : '';
-
-  const bgKey = findIndexHeaderKey(headers, 'BACKGROUND');
-  const bgRaw = bgKey ? String(row[bgKey] ?? '').trim() : '';
+  const email = String(row.email ?? '').trim();
+  const bgRaw = String(row.background ?? '').trim();
   const background = bgRaw || defaultBackgroundFolder(bgList);
   if (videoType === 'from_audio') {
     return buildMavidEnvForVideoFromAudio(
@@ -384,24 +380,18 @@ export function parseIndexPublishTimesCell(raw: unknown): string[] {
   return out.length > 0 ? out : ['09:00'];
 }
 
-/** Điền form «Thêm/Sửa channel» từ một dòng bảng nháp. */
+/** Điền form «Thêm/Sửa channel» từ một dòng bảng nháp (row đã dùng prop names). */
 export function channelAddDialogInitialFromIndexRow(row: ChannelRow, headers: string[]): ChannelAddDialogInitialFields {
-  const linkKey = findIndexHeaderKey(headers, 'LINK');
-  const channelUrl = linkKey ? String(row[linkKey] ?? '').trim() : '';
+  const channelUrl = String(row.link ?? '').trim();
+  const email = String(row.email ?? '').trim();
+  const myChannel = String(row.myChannel ?? '').trim();
 
-  const emailKey = findIndexHeaderKey(headers, 'EMAIL');
-  const email = emailKey ? String(row[emailKey] ?? '').trim() : '';
-
-  const myChannelKey = findIndexHeaderKey(headers, 'KÊNH CỦA TÔI');
-  const myChannel = myChannelKey ? String(row[myChannelKey] ?? '').trim() : '';
-
-  let videoType = resolveIndexRowVideoType(row, headers);
+  let videoType = resolveIndexRowVideoType(row);
   if (!videoType) videoType = 'from_audio';
 
-  const durationColumnKey = findIndexHeaderKey(headers, 'THỜI GIAN VIDEO');
   let durationOption = '0_null';
-  if (durationColumnKey != null && row[durationColumnKey] != null && row[durationColumnKey] !== '') {
-    const v = String(row[durationColumnKey]);
+  if (row.videoDuration != null && row.videoDuration !== '') {
+    const v = String(row.videoDuration);
     // It might be a label from the new format, or numbers from the old format
     if (['15', '20', '30', '60'].includes(v)) {
       durationOption = '0_null'; // Or mapping for legacy? "0_null" is safest
@@ -410,13 +400,12 @@ export function channelAddDialogInitialFromIndexRow(row: ChannelRow, headers: st
     }
   }
 
-  const bgKey = findIndexHeaderKey(headers, 'BACKGROUND');
-  const bgCell = bgKey ? String(row[bgKey] ?? '').trim() : '';
+  const bgCell = String(row.background ?? '').trim();
   const overlayNames = new Set(OVERLAY_OPTIONS.map(o => String(o.NAME).trim()));
   const selectedBackground = videoType === 'reup_full' ? '' : bgCell;
   const reupOverlayOption = videoType === 'reup_full' && bgCell && overlayNames.has(bgCell) ? bgCell : defaultReupOverlayName();
 
-  const folder = channelFolderFromRow(row, headers) ?? '';
+  const folder = channelFolderFromRow(row) ?? '';
 
   const videosPerDayColumnKey = findIndexHeaderKeyAny(headers, ['SỐ VIDEO MỖI NGÀY', 'VIDEO MỖI NGÀY', 'SỐ VIDEO UPDATE MỖI NGÀY']);
   const videosPerDayPreset =
@@ -431,8 +420,6 @@ export function channelAddDialogInitialFromIndexRow(row: ChannelRow, headers: st
   while (publishTimes.length < slotCount) publishTimes.push('09:00');
   publishTimes = publishTimes.slice(0, slotCount);
 
-  const statusKey = findIndexHeaderKey(headers, 'STATUS');
-
   return {
     channelUrl,
     email,
@@ -445,7 +432,7 @@ export function channelAddDialogInitialFromIndexRow(row: ChannelRow, headers: st
     folderIdOverride: folder,
     videosPerDayPreset,
     publishTimes,
-    channelStatus: statusKey ? normalizeChannelIndexStatus(row[statusKey]) : 'INIT',
+    channelStatus: normalizeChannelIndexStatus(row.status),
   };
 }
 
@@ -466,37 +453,23 @@ export function buildChannelRowFromAddForm(
   if (!folder) {
     return {
       row,
-      error: 'Không suy ra được ID thư mục từ URL — nhập «ID thư mục (ID hoặc CHANNEL)» thủ công.',
+      error: 'Không suy ra được ID thư mục từ URL — nhập «ID thư mục» thủ công.',
     };
   }
 
-  const linkKey = findIndexHeaderKey(headers, 'LINK');
-  if (linkKey) row[linkKey] = normalizedUrl;
+  row.link = normalizedUrl;
+  row.email = input.email.trim();
+  row.myChannel = input.myChannel.trim();
+  row.videoType = input.videoType;
+  row.videoDuration = durationOptionToLabel(input.durationOption);
 
-  const emailKey = findIndexHeaderKey(headers, 'EMAIL');
-  if (emailKey) row[emailKey] = input.email.trim();
+  if (input.videoType === 'reup_full') row.background = input.overlay.trim();
+  else row.background = input.background.trim();
 
-  const myChannelKey = findIndexHeaderKey(headers, 'KÊNH CỦA TÔI');
-  if (myChannelKey) row[myChannelKey] = input.myChannel.trim();
-
-  const videoTypeColumnKey = findIndexHeaderKey(headers, 'LOẠI VIDEO');
-  if (videoTypeColumnKey) row[videoTypeColumnKey] = input.videoType;
-
-  const durationColumnKey = findIndexHeaderKey(headers, 'THỜI GIAN VIDEO');
-  if (durationColumnKey) row[durationColumnKey] = durationOptionToLabel(input.durationOption);
-
-  const bgKey = findIndexHeaderKey(headers, 'BACKGROUND');
-  if (bgKey) {
-    if (input.videoType === 'reup_full') row[bgKey] = input.overlay.trim();
-    else row[bgKey] = input.background.trim();
-  }
-
-  const idKey = headers.find(h => headerNorm(h) === 'ID');
-  if (idKey) row[idKey] = folder;
-  const chKey = headers.find(h => headerNorm(h) === 'CHANNEL');
-  if (chKey) {
-    const prev = opts?.preserveChannelFromRow ? String(opts.preserveChannelFromRow[chKey] ?? '').trim() : '';
-    row[chKey] = prev || folder;
+  row.id = folder;
+  if (headers.includes('channel')) {
+    const prev = opts?.preserveChannelFromRow ? String(opts.preserveChannelFromRow.channel ?? '').trim() : '';
+    row.channel = prev; // Giữ nguyên prev (bỏ trống nếu là dòng mới) không lưu tên channel
   }
 
   const videosPerDayColumnKey = findIndexHeaderKeyAny(headers, ['SỐ VIDEO MỖI NGÀY', 'VIDEO MỖI NGÀY', 'SỐ VIDEO UPDATE MỖI NGÀY']);
@@ -505,22 +478,16 @@ export function buildChannelRowFromAddForm(
   const publishTimesColumnKey = findIndexHeaderKeyAny(headers, ['GIỜ UPDATE', 'GIỜ UPLOAD MỖI NGÀY', 'GIỜ UPLOAD']);
   if (publishTimesColumnKey) row[publishTimesColumnKey] = input.publishTimes.join(', ');
 
-  const statusKey = findIndexHeaderKey(headers, 'STATUS');
-  if (statusKey) row[statusKey] = normalizeChannelIndexStatus(input.channelStatus);
+  row.status = normalizeChannelIndexStatus(input.channelStatus);
 
   return { row };
 }
 
-export function channelFolderFromRow(row: ChannelRow, headers: string[]): string | null {
-  const idKey = headers.find(h => headerNorm(h) === 'ID');
-
-  if (!idKey) return null;
-
-  const raw = row[idKey];
+export function channelFolderFromRow(row: ChannelRow): string | null {
+  const raw = row.id;
   if (raw != null) {
     const s = String(raw).trim();
     if (s) return s;
   }
-
   return null;
 }

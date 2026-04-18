@@ -1,9 +1,8 @@
 import { useEffect, useMemo, useRef } from 'react';
-import type { ChannelsIndexSectionProps } from './channelsIndexSection.model';
+import type { ChannelsIndexSectionProps } from '../models/channelsIndexSection.model';
 import { SpinnerIcon } from '@/components/ui/Icons';
 import { TablePaginationBar } from '@/components/ui/TablePaginationBar';
-import { findIndexHeaderKey, findIndexHeaderKeyAny } from './channelIndexHelpers';
-import { CHANNELS_INDEX_VISIBLE_COLUMNS } from './channelsIndexSection.model';
+import { CHANNELS_INDEX_VISIBLE_COLUMNS, CHANNELS_INDEX_COLUMN_LABELS } from '../models/channelsIndexSection.model';
 
 export function ChannelsIndexSection({
   indexHeaders,
@@ -17,20 +16,18 @@ export function ChannelsIndexSection({
   selectedRowIndices,
   onToggleRowSelected,
   onToggleSelectAllOnPage,
+  onOpenEditRow,
+  onOpenDetailRow,
   pageSelectAll,
   pageSelectSome,
 }: ChannelsIndexSectionProps) {
-  /** Nhãn cột cố định + khóa thực tế trên `row` (theo header file). */
+  /** Prop name = row key trực tiếp; label lấy từ CHANNELS_INDEX_COLUMN_LABELS. */
   const indexDisplayColumns = useMemo(() => {
-    const fileHeaders = indexHeaders;
-    return CHANNELS_INDEX_VISIBLE_COLUMNS.map(label => {
-      const rowKey =
-        label === 'ID'
-          ? findIndexHeaderKeyAny(fileHeaders, ['ID', 'CHANNEL'])
-          : findIndexHeaderKey(fileHeaders, label);
-      return { label, rowKey: rowKey ?? '' };
-    });
-  }, [indexHeaders]);
+    return CHANNELS_INDEX_VISIBLE_COLUMNS.map(prop => ({
+      label: CHANNELS_INDEX_COLUMN_LABELS[prop] ?? prop,
+      rowKey: prop,
+    }));
+  }, []);
   const headerSelectRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -86,6 +83,12 @@ export function ChannelsIndexSection({
                     {col.label}
                   </th>
                 ))}
+                <th
+                  className='text-center px-4 py-3 font-medium whitespace-nowrap uppercase text-base tracking-wider w-28'
+                  style={{ color: 'var(--text-muted)', borderBottom: '1px solid var(--border)' }}
+                >
+                  ACTIONS
+                </th>
               </tr>
             </thead>
 
@@ -144,12 +147,35 @@ export function ChannelsIndexSection({
                           </td>
                         );
                       })}
+                      <td
+                        className='px-4 py-3 align-top whitespace-nowrap text-center space-x-3'
+                        style={{ borderBottom: '1px solid var(--border)' }}
+                      >
+                        <button
+                          type='button'
+                          onClick={(e) => { e.stopPropagation(); onOpenEditRow(globalIndex); }}
+                          className='text-sm font-medium hover:underline transition-opacity duration-150 disabled:opacity-40 disabled:cursor-not-allowed'
+                          style={{ color: 'var(--accent)' }}
+                          disabled={indexSaving}
+                        >
+                          Sửa
+                        </button>
+                        <button
+                          type='button'
+                          onClick={(e) => { e.stopPropagation(); onOpenDetailRow(globalIndex); }}
+                          className='text-sm font-medium hover:underline transition-opacity duration-150 disabled:opacity-40 disabled:cursor-not-allowed'
+                          style={{ color: 'var(--accent)' }}
+                          disabled={indexSaving}
+                        >
+                          Chi tiết
+                        </button>
+                      </td>
                     </tr>
                   );
                 })
               ) : (
                 <tr>
-                  <td colSpan={indexDisplayColumns.length + 1} className='px-4 py-8 text-center' style={{ color: 'var(--text-muted)' }}>
+                  <td colSpan={indexDisplayColumns.length + 2} className='px-4 py-8 text-center' style={{ color: 'var(--text-muted)' }}>
                     Chưa có dữ liệu trong index. Hãy thêm channel từ Pipeline.
                   </td>
                 </tr>

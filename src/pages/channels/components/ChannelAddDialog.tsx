@@ -11,7 +11,6 @@ import {
   defaultReupOverlayName,
   defaultthumbnailPrompt,
   durationLabelToOption,
-  findIndexHeaderKey,
   INDEX_VIDEO_TYPE_VALUES,
   indexHeadersMissingForAddChannel,
   isValidPublishScheduleTime,
@@ -25,7 +24,7 @@ import {
   timeSlotCountForVideoPerDayPreset,
   type ChannelAddDialogInitialFields,
   type VideoPerDayPreset,
-} from './channelIndexHelpers';
+} from '../utils/channelIndexHelpers';
 
 function isDurationOverlap(opt1: string, opt2: string): boolean {
   if (!opt1 || !opt2) return false;
@@ -188,7 +187,7 @@ export function ChannelAddDialog({
       return;
     }
 
-    const folder = channelFolderFromRow(initialRow, indexHeaders);
+    const folder = channelFolderFromRow(initialRow);
     if (!folder || typeof window.runner?.readMavidChannelConfig !== 'function') {
       setConfigHydrated(true);
       return;
@@ -205,7 +204,7 @@ export function ChannelAddDialog({
         setForm(prev => {
           const next = { ...prev };
           const ch: any =
-            Array.isArray(cfg.channels) && cfg.channels.length > 0 ? cfg.channels.find(channel => channel.email === initialRow.EMAIL) : cfg;
+            Array.isArray(cfg.channels) && cfg.channels.length > 0 ? cfg.channels.find(channel => channel.email === initialRow.email) : cfg;
 
           if (!ch) return next;
 
@@ -267,11 +266,9 @@ export function ChannelAddDialog({
     if (!indexRows?.length) return '';
     const inputEmail = email.trim().toLowerCase();
     if (!inputEmail) return '';
-    const emailKey = findIndexHeaderKey(indexHeaders, 'EMAIL');
-    if (!emailKey) return '';
     for (const r of indexRows) {
       if (isEditMode && initialRow === r) continue;
-      const cell = String(r[emailKey] ?? '').toLowerCase();
+      const cell = String(r.email ?? '').toLowerCase();
       const existing = cell
         .split(',')
         .map(e => e.trim())
@@ -281,29 +278,26 @@ export function ChannelAddDialog({
       }
     }
     return '';
-  }, [email, indexRows, indexHeaders, isEditMode, initialRow]);
+  }, [email, indexRows, isEditMode, initialRow]);
 
   /** Duration options đã dùng cho cùng URL trong index. */
   const usedDurationOptions = useMemo(() => {
     const used = new Set<string>();
     if (!indexRows?.length) return used;
-    const linkKey = findIndexHeaderKey(indexHeaders, 'LINK');
-    const durKey = findIndexHeaderKey(indexHeaders, 'THỜI GIAN VIDEO');
-    if (!linkKey || !durKey) return used;
     const normUrlRaw = channelUrl.trim();
     const normUrl = /^https?:\/\//i.test(normUrlRaw) ? normUrlRaw : normUrlRaw ? `https://${normUrlRaw}` : '';
     if (!normUrl) return used;
     for (const r of indexRows) {
       if (isEditMode && initialRow === r) continue;
-      const rowUrlRaw = String(r[linkKey] ?? '').trim();
+      const rowUrlRaw = String(r.link ?? '').trim();
       const rowUrl = /^https?:\/\//i.test(rowUrlRaw) ? rowUrlRaw : rowUrlRaw ? `https://${rowUrlRaw}` : '';
       if (rowUrl === normUrl) {
-        const label = String(r[durKey] ?? '').trim();
+        const label = String(r.videoDuration ?? '').trim();
         if (label) used.add(durationLabelToOption(label));
       }
     }
     return used;
-  }, [channelUrl, indexRows, indexHeaders, isEditMode, initialRow]);
+  }, [channelUrl, indexRows, isEditMode, initialRow]);
 
   /** Luôn hiển thị đủ preset — cho phép chọn khoảng trùng; chỉ cảnh báo, không chặn lưu. */
   const durationMinuteOptions = CHANNEL_ADD_DURATION_SELECT_OPTIONS;
@@ -321,7 +315,7 @@ export function ChannelAddDialog({
 
   const backgroundOptions = backgroundFolders.map(bg => ({ value: bg, label: bg }));
 
-  const hasBackgroundColumn = Boolean(findIndexHeaderKey(indexHeaders, 'BACKGROUND'));
+  const hasBackgroundColumn = indexHeaders.includes('background');
   const showBackgroundField = videoType === 'from_audio' && (!isEditMode || hasBackgroundColumn);
   const showReupOverlayField = videoType === 'reup_full';
   const requireBackground = videoType === 'from_audio' && backgroundFolders.length > 0 && (!isEditMode || hasBackgroundColumn);
@@ -365,13 +359,12 @@ export function ChannelAddDialog({
       if (indexRows && indexRows.length > 0) {
         let hasDuplicateEmail = false;
         const inputEmail = email.trim().toLowerCase();
-        const emailKey = findIndexHeaderKey(indexHeaders, 'EMAIL');
 
         for (const r of indexRows) {
           if (isEditMode && initialRow === r) continue;
 
-          if (inputEmail && emailKey) {
-            const cell = String(r[emailKey] ?? '').toLowerCase();
+          if (inputEmail) {
+            const cell = String(r.email ?? '').toLowerCase();
             const existingEmails = cell
               .split(',')
               .map(e => e.trim())
@@ -397,10 +390,8 @@ export function ChannelAddDialog({
           setFormError('Cập nhật file config chỉ dùng trong app Electron.');
           return;
         }
-        const statusKey = findIndexHeaderKey(indexHeaders, 'STATUS');
-        const emailKeyForInit = findIndexHeaderKey(indexHeaders, 'EMAIL');
-        const initialStatusNorm = initialRow && statusKey ? normalizeChannelIndexStatus(initialRow[statusKey]) : ('INIT' as const);
-        const initialEmailTrim = emailKeyForInit && initialRow ? String(initialRow[emailKeyForInit] ?? '').trim() : '';
+        const initialStatusNorm = initialRow ? normalizeChannelIndexStatus(initialRow.status) : ('INIT' as const);
+        const initialEmailTrim = initialRow ? String(initialRow.email ?? '').trim() : '';
         const emailNowTrim = email.trim();
         const statusForIndex = initialStatusNorm === 'INIT' && !initialEmailTrim && emailNowTrim ? 'LIVE' : channelStatus;
 
@@ -426,7 +417,7 @@ export function ChannelAddDialog({
           setFormError(error);
           return;
         }
-        const folder = channelFolderFromRow(row, indexHeaders);
+        const folder = channelFolderFromRow(row);
         if (!folder?.trim()) {
           setFormError('Không xác định được thư mục kênh (cột ID).');
           return;

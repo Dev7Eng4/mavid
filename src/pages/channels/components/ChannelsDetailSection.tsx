@@ -2,8 +2,8 @@ import { useEffect, useRef } from 'react';
 import { CustomSelect } from '@/components/ui/CustomSelect';
 import { SpinnerIcon } from '@/components/ui/Icons';
 import { TablePaginationBar } from '@/components/ui/TablePaginationBar';
-import type { ChannelsDetailSectionProps } from './channelsDetailSectionShared';
-import { DETAIL_STATUS_FILTER_OPTIONS } from './channelsDetailSectionShared';
+import type { ChannelsDetailSectionProps } from '../models/channelsDetailSectionShared';
+import { DETAIL_STATUS_FILTER_OPTIONS } from '../models/channelsDetailSectionShared';
 
 const inputClass = 'w-full rounded-xl px-3 py-2.5 text-sm outline-none border transition-colors duration-150';
 

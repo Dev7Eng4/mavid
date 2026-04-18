@@ -16,8 +16,6 @@ export interface ChannelsPageHeaderActionsProps {
   indexSingleSelectedRowIndex: number | null;
   /** Folder kênh (ID) của dòng đơn chọn — null nếu thiếu ID. */
   indexSingleSelectedFolder: string | null;
-  onOpenEditSelectedRow: () => void;
-  onOpenDetailSelectedRow: () => void;
   /** LIVE ↔ STOPPED: nhãn nút, bật chỉ khi chọn đúng một dòng và trạng thái cho phép. */
   indexChannelStatusToggle: {
     label: string;
@@ -74,8 +72,6 @@ export function ChannelsPageHeaderActions({
   canRunIndexBatchVideo,
   indexSingleSelectedRowIndex,
   indexSingleSelectedFolder,
-  onOpenEditSelectedRow,
-  onOpenDetailSelectedRow,
   indexChannelStatusToggle,
   onChannelStatusToggle,
   uploadEligibleSelectedCount,
@@ -109,32 +105,6 @@ export function ChannelsPageHeaderActions({
               <AppButton
                 type='button'
                 variant='secondary'
-                onClick={onOpenEditSelectedRow}
-                disabled={!canEditSingleSelected}
-                title={
-                  indexSingleSelectedRowIndex == null ? 'Chọn đúng một dòng trên bảng (checkbox) để sửa kênh đó.' : 'Sửa dòng index đã chọn'
-                }
-              >
-                Sửa
-              </AppButton>
-              <AppButton
-                type='button'
-                variant='primary'
-                onClick={onOpenDetailSelectedRow}
-                disabled={!canOpenDetailSelected}
-                title={
-                  indexSingleSelectedRowIndex == null
-                    ? 'Chọn đúng một dòng trên bảng để mở chi tiết kênh.'
-                    : !indexSingleSelectedFolder?.trim()
-                    ? 'Dòng đã chọn cần có ID/CHANNEL (thư mục kênh) để mở chi tiết.'
-                    : `Mở chi tiết kênh «${indexSingleSelectedFolder}»`
-                }
-              >
-                Chi tiết
-              </AppButton>
-              <AppButton
-                type='button'
-                variant='secondary'
                 onClick={onChannelStatusToggle}
                 disabled={indexActionsLocked || !indexChannelStatusToggle.enabled}
                 title={indexChannelStatusToggle.title}
@@ -146,14 +116,16 @@ export function ChannelsPageHeaderActions({
                 variant='primary'
                 onClick={onOpenCreateVideo}
                 disabled={
-                  indexActionsLocked || indexSelectedRowCount === 0 || indexCreateVideoEligibleSelectedCount === 0 || !canRunIndexBatchVideo
+                  indexActionsLocked || indexCreateVideoEligibleSelectedCount === 0 || !canRunIndexBatchVideo
                 }
                 title={
-                  indexSelectedRowCount === 0
-                    ? 'Tick chọn ít nhất một dòng trên bảng index (cột đầu), rồi bấm Tạo video.'
-                    : indexCreateVideoEligibleSelectedCount === 0
-                    ? 'Các dòng đã chọn cần có ID/CHANNEL, EMAIL và LOẠI VIDEO (from_audio hoặc reup_full).'
-                    : `Mở hộp thoại — tạo video cho ${indexCreateVideoEligibleSelectedCount} kênh đã chọn (đủ điều kiện).`
+                  indexCreateVideoEligibleSelectedCount === 0
+                    ? indexSelectedRowCount === 0
+                      ? 'Không có kênh nào có email và đúng loại video để tạo.'
+                      : 'Các dòng đã chọn cần có ID/CHANNEL và LOẠI VIDEO (from_audio/reup_full).'
+                    : indexSelectedRowCount === 0
+                    ? `Không chọn dòng nào — tạo video cho TẤT CẢ ${indexCreateVideoEligibleSelectedCount} kênh CÓ EMAIL đầy đủ cấu hình.`
+                    : `Tạo video cho ${indexCreateVideoEligibleSelectedCount} kênh đang chọn.`
                 }
               >
                 {indexBatchVideo ? (
@@ -185,18 +157,20 @@ export function ChannelsPageHeaderActions({
             variant='primary'
             onClick={onOpenUploadVideo}
             disabled={
-              indexLoading || indexSaving || indexBatchVideo !== null || indexSelectedRowCount === 0 || uploadEligibleSelectedCount === 0
+              indexLoading || indexSaving || indexBatchVideo !== null || uploadEligibleSelectedCount === 0
             }
             title={
               indexBatchVideo !== null
                 ? 'Đang chạy tạo video — chờ xong rồi thử lại.'
-                : indexSelectedRowCount === 0
-                ? 'Tick chọn ít nhất một dòng trên bảng index, rồi bấm Upload video.'
                 : uploadEligibleSelectedCount === 0
-                ? 'Các dòng đã chọn cần có ID/CHANNEL và EMAIL để upload.'
+                ? indexSelectedRowCount === 0
+                  ? 'Không có kênh nào có email để upload.'
+                  : 'Các dòng đã chọn cần có ID/CHANNEL và BẮT BUỘC có EMAIL để upload.'
                 : youtubeUploadActiveThreads > 0
-                ? `Đang chạy ${youtubeUploadActiveThreads} luồng upload nền — vẫn có thể mở hộp thoại để thêm kênh (email đang bận sẽ bị bỏ qua).`
-                : `Mở hộp thoại — upload cho ${uploadEligibleSelectedCount} kênh đã chọn (đủ điều kiện).`
+                ? `Đang chạy ${youtubeUploadActiveThreads} luồng upload nền — vẫn có thể mở hộp thoại thêm kênh.`
+                : indexSelectedRowCount === 0
+                ? `Không chọn dòng nào — upload cho TẤT CẢ ${uploadEligibleSelectedCount} kênh CÓ EMAIL.`
+                : `Upload cho ${uploadEligibleSelectedCount} kênh đang chọn (có email).`
             }
           >
             {youtubeUploadActiveThreads > 0 ? (

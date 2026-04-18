@@ -9,6 +9,7 @@ import { mergeConstantsBaseWithUserOverlay } from '../contents/constants/mergeCo
 import { CONSTANT_EXPORT_KEYS } from '../contents/constants/constantsExportKeys.js';
 import { buildConstantsModuleBase } from '../contents/constants/constantsModuleBase.js';
 import { getAppSettingsUserJsonPath } from '../contents/constants/userConstantsPaths.js';
+import { mapIndexDataToProps, mapIndexDataToHeaders, mapPropToHeader } from '../contents/constants/indexColumnMapping.js';
 
 const VITE_DEV_SERVER_URL = process.env.VITE_DEV_SERVER_URL || 'http://localhost:5173';
 
@@ -139,8 +140,7 @@ function readPersistedErrorLogs() {
 
 function writePersistedErrorLogs(lines) {
   const p = getErrorLogFilePath();
-  const trimmed =
-    lines.length > MAX_PERSISTED_ERROR_LOG_LINES ? lines.slice(-MAX_PERSISTED_ERROR_LOG_LINES) : [...lines];
+  const trimmed = lines.length > MAX_PERSISTED_ERROR_LOG_LINES ? lines.slice(-MAX_PERSISTED_ERROR_LOG_LINES) : [...lines];
   fs.mkdirSync(path.dirname(p), { recursive: true });
   fs.writeFileSync(p, JSON.stringify({ lines: trimmed }, null, 0), 'utf8');
 }
@@ -1181,7 +1181,9 @@ ipcMain.handle('read-channel-data', async (_event, { filePath }) => {
   const st = fs.statSync(norm);
   if (st.size === 0) return { headers: [], rows: [] };
 
-  return readSpreadsheetAsChannelData(norm);
+  const raw = await readSpreadsheetAsChannelData(norm);
+  // Map Excel headers (tiếng Việt) → camelCase prop names cho frontend
+  return mapIndexDataToProps(raw);
 });
 
 /**
@@ -1199,13 +1201,18 @@ ipcMain.handle('write-channel-index', async (_event, { filePath, headers, rows }
   }
   if (!Array.isArray(rows)) throw new Error('rows không hợp lệ.');
 
+  // Reverse-map: prop names → Excel headers (tiếng Việt)
+  const mapped = mapIndexDataToHeaders({ headers, rows });
+  const excelHeaders = mapped.headers;
+  const excelRows = mapped.rows;
+
   const { default: ExcelJS } = await import('exceljs');
   const workbook = new ExcelJS.Workbook();
   const sheet = workbook.addWorksheet('Channels', { views: [{ state: 'frozen', ySplit: 1 }] });
-  sheet.addRow(headers);
+  sheet.addRow(excelHeaders);
 
-  for (const row of rows) {
-    const values = headers.map(h => {
+  for (const row of excelRows) {
+    const values = excelHeaders.map(h => {
       const v = row?.[h];
       if (v == null || v === '') return '';
       return typeof v === 'number' ? v : String(v);
@@ -1225,12 +1232,12 @@ ipcMain.handle('write-channel-index', async (_event, { filePath, headers, rows }
     'LAST UPLOAD': 30,
     STATUS: 12,
   };
-  sheet.columns = headers.map(h => ({ width: colWidths[h] ?? 20 }));
+  sheet.columns = excelHeaders.map(h => ({ width: colWidths[h] ?? 20 }));
 
-  const typeCol = headers.findIndex(h => normHeaderCell(h) === normHeaderCell('LOẠI VIDEO')) + 1;
-  const thoiGianCol = headers.findIndex(h => normHeaderCell(h) === normHeaderCell('THỜI GIAN VIDEO')) + 1;
-  const bgCol = headers.findIndex(h => normHeaderCell(h) === normHeaderCell('BACKGROUND')) + 1;
-  const statusCol = headers.findIndex(h => normHeaderCell(h) === normHeaderCell('STATUS')) + 1;
+  const typeCol = excelHeaders.findIndex(h => normHeaderCell(h) === normHeaderCell('LOẠI VIDEO')) + 1;
+  const thoiGianCol = excelHeaders.findIndex(h => normHeaderCell(h) === normHeaderCell('THỜI GIAN VIDEO')) + 1;
+  const bgCol = excelHeaders.findIndex(h => normHeaderCell(h) === normHeaderCell('BACKGROUND')) + 1;
+  const statusCol = excelHeaders.findIndex(h => normHeaderCell(h) === normHeaderCell('STATUS')) + 1;
 
   const backgroundsDir = await resolveStockBackgroundsDirFromDisk();
   let bgOptions = [];

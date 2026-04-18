@@ -225,7 +225,6 @@ async function updateIndexFile(channelData) {
     if (existingRowIndex > 0) {
       // Cập nhật row hiện có
       const row = sheet.getRow(existingRowIndex);
-      row.getCell(IDX.CHANNEL).value = name;
       row.getCell(IDX.LINK).value = link;
       row.getCell(IDX.ID).value = id;
       row.getCell(IDX.LAST_UPLOAD).value = lastUpload;
@@ -241,7 +240,7 @@ async function updateIndexFile(channelData) {
     } else {
       // Thêm row mới
       sheet.addRow([
-        name,
+        '', // Không ghi đè/lưu tên Channel vào cột này
         link,
         id,
         meta.colEmail,
