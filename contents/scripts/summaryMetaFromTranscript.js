@@ -92,7 +92,7 @@ async function main() {
     outputDir: DOWNLOADS_DIR,
     videoTitle: info.title,
   });
-  await cleanVttTranscriptsToSrt(DOWNLOADS_DIR);
+  // await cleanVttTranscriptsToSrt(DOWNLOADS_DIR);
 
   const srtPath = resolveSrtPath(DOWNLOADS_DIR, videoId);
   if (!srtPath || !fs.existsSync(srtPath)) {

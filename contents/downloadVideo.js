@@ -153,7 +153,7 @@ async function processVttTranscriptsWithGemini(
     thumbnailFlowOutputDir = null,
     generateThumbnailWithFlow = true,
     thumbnailPrompt = null,
-  }
+  },
 ) {
   const { cleanSrt } = await import('./utils/srt.util.js');
   const { updateVideoInfo } = await import('./gemini/updateContent.js');
@@ -192,7 +192,7 @@ async function processVttTranscriptsWithGemini(
               description: geminiOut.description ?? '',
               tags: geminiOut.tags ?? '',
               summary: geminiOut.summary ?? '',
-            })
+            }),
           );
           console.log('✅ Đã gửi title/description/tags/summary (Gemini) qua callback.');
         } catch (cbErr) {
@@ -213,7 +213,7 @@ async function processVttTranscriptsWithGemini(
             let promptFn = PROMPTS_CREATE_THUMBNAIL[thumbnailPrompt];
             if (!promptFn) {
               console.warn(
-                `[thumbnail-flow] thumbnailPrompt "${thumbnailPrompt}" không hợp lệ hoặc thiếu, dùng fallback ja2CHFromOldThumbnail`
+                `[thumbnail-flow] thumbnailPrompt "${thumbnailPrompt}" không hợp lệ hoặc thiếu, dùng fallback ja2CHFromOldThumbnail`,
               );
               promptFn = PROMPTS_CREATE_THUMBNAIL.ja2CHFromOldThumbnail;
             }
@@ -286,21 +286,22 @@ async function finalizeDownloadedTranscript(url, downloadResult, options = {}) {
   console.log('🚀 ~ finalizeDownloadedTranscript ~ needsGeminiTranscriptUpdate:', needsGeminiTranscriptUpdate);
 
   if (targetFormat === 'vtt') {
-    if (vttOnlyClean) {
-      await cleanVttTranscriptsToSrt(outputDir);
-    } else {
-      await processVttTranscriptsWithGemini(url, outputDir, {
-        updateTranscript: needsGeminiTranscriptUpdate,
-        videoTitle,
-        description,
-        tags,
-        callback,
-        language: transcriptLang,
-        thumbnailFlowOutputDir,
-        generateThumbnailWithFlow,
-        thumbnailPrompt,
-      });
-    }
+    await cleanVttTranscriptsToSrt(outputDir);
+    // if (vttOnlyClean) {
+    //   await cleanVttTranscriptsToSrt(outputDir);
+    // } else {
+    //   await processVttTranscriptsWithGemini(url, outputDir, {
+    //     updateTranscript: needsGeminiTranscriptUpdate,
+    //     videoTitle,
+    //     description,
+    //     tags,
+    //     callback,
+    //     language: transcriptLang,
+    //     thumbnailFlowOutputDir,
+    //     generateThumbnailWithFlow,
+    //     thumbnailPrompt,
+    //   });
+    // }
   }
 }
 
@@ -403,13 +404,17 @@ async function downloadSingleVideo(url, options = {}) {
     thumbnailChannelRoot = null,
     generateThumbnailWithFlow = true,
     thumbnailPrompt = null,
+    outputDir = DEFAULT_OUTPUT_DIR,
   } = options;
-  if (!fs.existsSync(DEFAULT_OUTPUT_DIR)) {
-    fs.mkdirSync(DEFAULT_OUTPUT_DIR, { recursive: true });
+
+  const actualOutputDir = outputDir;
+
+  if (!fs.existsSync(actualOutputDir)) {
+    fs.mkdirSync(actualOutputDir, { recursive: true });
   } else {
-    const entries = fs.readdirSync(DEFAULT_OUTPUT_DIR, { withFileTypes: true });
+    const entries = fs.readdirSync(actualOutputDir, { withFileTypes: true });
     for (const entry of entries) {
-      const fullPath = path.join(DEFAULT_OUTPUT_DIR, entry.name);
+      const fullPath = path.join(actualOutputDir, entry.name);
       if (entry.isFile()) {
         fs.unlinkSync(fullPath);
       } else {
@@ -428,11 +433,11 @@ async function downloadSingleVideo(url, options = {}) {
       fs.mkdirSync(thumbnailFlowOutputDir, { recursive: true });
     }
 
-    await downloadThumbnail(url, { outputDir: DEFAULT_OUTPUT_DIR });
+    await downloadThumbnail(url, { outputDir: actualOutputDir });
 
     // [OPT-2] Song song hóa download video + transcript (transcript tải subtitle riêng, không cần file video local)
     const transcriptOptions = {
-      outputDir: DEFAULT_OUTPUT_DIR,
+      outputDir: actualOutputDir,
       videoTitle: result.title,
     };
 
@@ -452,7 +457,7 @@ async function downloadSingleVideo(url, options = {}) {
 
     if (mode === MAKE_VIDEO_MODE.FROM_AUDIO) {
       // FROM_AUDIO: tuần tự (transcript cần updateTranscript = true, phụ thuộc tiến trình)
-      await downloadAudio(url, { outputDir: DEFAULT_OUTPUT_DIR });
+      await downloadAudio(url, { outputDir: actualOutputDir });
       try {
         await downloadAndFinalizeTranscript();
       } catch (err) {
@@ -462,7 +467,7 @@ async function downloadSingleVideo(url, options = {}) {
       // REUP_FULL: song song hóa → tiết kiệm ~5-10 phút
       console.log('[OPT-2] Song song: download video + transcript/Gemini/thumbnail...');
       const [videoResult, transcriptResult] = await Promise.allSettled([
-        downloadVideo(url, { outputDir: DEFAULT_OUTPUT_DIR }),
+        downloadVideo(url, { outputDir: actualOutputDir }),
         downloadAndFinalizeTranscript().catch(err => {
           console.warn('Không tải được transcript:', err.message);
         }),
@@ -473,7 +478,7 @@ async function downloadSingleVideo(url, options = {}) {
     }
 
     const videoExt = /\.(mp4|mkv|mov|webm|avi)$/i;
-    const mediaFiles = fs.readdirSync(DEFAULT_OUTPUT_DIR).filter(f => videoExt.test(f));
+    const mediaFiles = fs.readdirSync(actualOutputDir).filter(f => videoExt.test(f));
     const videoId = result.metadata?.id;
     if (mediaFiles.length > 0) {
       let pick = mediaFiles[0];
@@ -481,7 +486,7 @@ async function downloadSingleVideo(url, options = {}) {
         const byId = mediaFiles.find(f => f.includes(videoId));
         if (byId) pick = byId;
       }
-      result.filePath = path.join(DEFAULT_OUTPUT_DIR, pick);
+      result.filePath = path.join(actualOutputDir, pick);
     }
 
     return result;
