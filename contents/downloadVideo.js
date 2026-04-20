@@ -153,7 +153,7 @@ async function processVttTranscriptsWithGemini(
     thumbnailFlowOutputDir = null,
     generateThumbnailWithFlow = true,
     thumbnailPrompt = null,
-  },
+  }
 ) {
   const { cleanSrt } = await import('./utils/srt.util.js');
   const { updateVideoInfo } = await import('./gemini/updateContent.js');
@@ -192,7 +192,7 @@ async function processVttTranscriptsWithGemini(
               description: geminiOut.description ?? '',
               tags: geminiOut.tags ?? '',
               summary: geminiOut.summary ?? '',
-            }),
+            })
           );
           console.log('✅ Đã gửi title/description/tags/summary (Gemini) qua callback.');
         } catch (cbErr) {
@@ -213,7 +213,7 @@ async function processVttTranscriptsWithGemini(
             let promptFn = PROMPTS_CREATE_THUMBNAIL[thumbnailPrompt];
             if (!promptFn) {
               console.warn(
-                `[thumbnail-flow] thumbnailPrompt "${thumbnailPrompt}" không hợp lệ hoặc thiếu, dùng fallback ja2CHFromOldThumbnail`,
+                `[thumbnail-flow] thumbnailPrompt "${thumbnailPrompt}" không hợp lệ hoặc thiếu, dùng fallback ja2CHFromOldThumbnail`
               );
               promptFn = PROMPTS_CREATE_THUMBNAIL.ja2CHFromOldThumbnail;
             }
@@ -286,22 +286,22 @@ async function finalizeDownloadedTranscript(url, downloadResult, options = {}) {
   console.log('🚀 ~ finalizeDownloadedTranscript ~ needsGeminiTranscriptUpdate:', needsGeminiTranscriptUpdate);
 
   if (targetFormat === 'vtt') {
-    await cleanVttTranscriptsToSrt(outputDir);
-    // if (vttOnlyClean) {
-    //   await cleanVttTranscriptsToSrt(outputDir);
-    // } else {
-    //   await processVttTranscriptsWithGemini(url, outputDir, {
-    //     updateTranscript: needsGeminiTranscriptUpdate,
-    //     videoTitle,
-    //     description,
-    //     tags,
-    //     callback,
-    //     language: transcriptLang,
-    //     thumbnailFlowOutputDir,
-    //     generateThumbnailWithFlow,
-    //     thumbnailPrompt,
-    //   });
-    // }
+    // await cleanVttTranscriptsToSrt(outputDir);
+    if (vttOnlyClean) {
+      await cleanVttTranscriptsToSrt(outputDir);
+    } else {
+      await processVttTranscriptsWithGemini(url, outputDir, {
+        updateTranscript: needsGeminiTranscriptUpdate,
+        videoTitle,
+        description,
+        tags,
+        callback,
+        language: transcriptLang,
+        thumbnailFlowOutputDir,
+        generateThumbnailWithFlow,
+        thumbnailPrompt,
+      });
+    }
   }
 }
 

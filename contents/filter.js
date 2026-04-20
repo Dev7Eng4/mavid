@@ -3,7 +3,16 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const DOWNLOADS_DIR = path.join(__dirname, '..', 'downloads');
+const PROJECT_ROOT = path.join(__dirname, '..');
+const DOWNLOADS_DIR = path.join(PROJECT_ROOT, 'downloads');
+const inputData = [
+  {
+    rawStart: '00:19:00.000',
+    rawEnd: '00:19:10.000',
+    // Ví dụ một câu dài ngoẵng không hề có dấu câu
+    text: '昨日友達と一緒に東京駅の近くにある美味しいラーメン屋に行って特製豚骨ラーメンを食べたんだけど本当に美味しかった',
+  },
+];
 
 function timeToMs(timeStr) {
   const [hours, minutes, seconds] = timeStr.split(':');
@@ -131,9 +140,32 @@ function processSubtitles(subtitles) {
   return result;
 }
 
-function cleanSrt(vttPath) {
-  console.log('🔄 Đang clean subtitle...');
-  let text = fs.readFileSync(vttPath, 'utf8').replace(/\r/g, '');
+/** Đường dẫn luôn tính từ gốc repo (không phụ thuộc cwd). Chỉ tên file → thư mục downloads. */
+function resolveVttPath(input) {
+  if (input == null || String(input).trim() === '') {
+    throw new TypeError('resolveVttPath: cần chuỗi đường dẫn (hoặc gọi filter() không đối số để quét downloads)');
+  }
+  if (path.isAbsolute(input)) return path.normalize(input);
+  const rel = String(input).replace(/^[/\\]+/, '');
+  if (!/[\\/]/.test(rel)) {
+    return path.join(DOWNLOADS_DIR, rel);
+  }
+  return path.join(PROJECT_ROOT, rel);
+}
+
+/** Mọi file .vtt trong downloads, mới nhất trước (mtime). */
+function listVttInDownloads() {
+  if (!fs.existsSync(DOWNLOADS_DIR)) return [];
+  return fs
+    .readdirSync(DOWNLOADS_DIR)
+    .filter(name => /\.vtt$/i.test(name))
+    .map(name => path.join(DOWNLOADS_DIR, name))
+    .sort((a, b) => fs.statSync(b).mtimeMs - fs.statSync(a).mtimeMs);
+}
+
+function filterFile(resolved) {
+  console.log('🔄 Đang clean subtitle...', resolved);
+  let text = fs.readFileSync(resolved, 'utf8').replace(/\r/g, '');
 
   // Bỏ header + timestamp + thẻ HTML
   text = text
@@ -144,20 +176,26 @@ function cleanSrt(vttPath) {
     .replace(/\[.*?\]/g, '') // bỏ [nhạc], [vỗ tay] v.v.
     .replace(/&[a-z]+;/g, '')
     .trim();
-  // console.log('🚀 ~ cleanSrt ~ text:', text);
+
+  const filteredTextPath = resolved.replace(/\.vtt$/i, '.filtered.txt');
+  fs.writeFileSync(filteredTextPath, text, 'utf-8');
+  console.log('📝 Đã ghi text sau filter:', filteredTextPath);
 
   // Chia thành khối (mỗi khối phụ đề)
   const blocks = text
     .split(/\n{2,}/)
     .map(b => b.trim())
     .filter(Boolean);
-  // console.log('🚀 ~ cleanSrt ~ blocks:', blocks);
+
+  const blocksPath = resolved.replace(/\.vtt$/i, '.blocks.json');
+  fs.writeFileSync(blocksPath, JSON.stringify(blocks, null, 2), 'utf-8');
+  console.log('📝 Đã ghi blocks:', blocksPath);
 
   let cleanedBlocks = [];
   let prevLines = [];
+  let index = 1;
 
   for (const block of blocks) {
-    // Tách timestamp + text
     const [timeLine, ...lines] = block
       .split('\n')
       .map(l => l.trim())
@@ -171,6 +209,7 @@ function cleanSrt(vttPath) {
 
     const newLines = lines.filter(line => !prevLines.includes(line));
 
+    // Nếu có câu mới, tạo block chuẩn mới
     if (newLines.length > 0) {
       const cleanedText = newLines.join('\n');
       if (cleanedBlocks.length > 0) {
@@ -185,146 +224,101 @@ function cleanSrt(vttPath) {
 
   const finalBlocks = processSubtitles(cleanedBlocks);
 
-  const srt = finalBlocks
-    .map((b, i, arr) => {
-      const normalize = t => t.replace(/\./g, ',');
+  const cleanedBlocksPath = resolved.replace(/\.vtt$/i, '.cleaned-blocks.json');
+  fs.writeFileSync(cleanedBlocksPath, JSON.stringify(finalBlocks, null, 2), 'utf-8');
+  console.log('📝 Đã ghi cleanedBlocks:', cleanedBlocksPath);
 
-      const start = normalize(b.rawStart);
-      const end = normalize(b.rawEnd);
+  // const cleaned = [];
+  // let prevLine = '';
+  // const strBreak = '<break>';
 
-      return `${i + 1}\n${start} --> ${end}\n${b.text}\n`;
-    })
-    .join('\n');
+  // for (const block of blocks) {
+  //   // Tách timestamp + text
+  //   const [timeLine, ...lines] = block
+  //     .split('\n')
+  //     .map(l => l.trim())
+  //     .filter(Boolean);
+  //   if (!timeLine || !timeLine.includes('-->')) continue;
 
-  const srtPath = vttPath.replace(/\.vtt$/i, '.srt');
-  fs.writeFileSync(srtPath, srt, 'utf-8');
-  console.log('✅ Clean subtitle xong:', srtPath);
+  //   const subtitleText = lines
+  //     .join(' ')
+  //     .replace(/<\d{2}:\d{2}:\d{2}\.\d{3}>/g, '')
+  //     .replace(/<\/?c[^>]*>/g, '')
+  //     .replace(/\s+/g, ' ')
+  //     .trim();
+
+  //   const parts = timeLine.split('-->').map(p => p.trim());
+  //   const rawStart = parts[0];
+  //   const rawEnd = parts[1];
+
+  //   const lastLine = lines[lines.length - 1];
+
+  //   if (!prevLine) {
+  //     cleaned.push({ rawStart, rawEnd, text: subtitleText });
+  //     prevLine = subtitleText;
+  //     continue;
+  //   }
+
+  //   if (/<\d{2}:\d{2}:\d{2}\.\d{3}>/.test(lastLine) || /<\/?c[^>]*>/.test(lastLine)) {
+  //     cleaned.push({
+  //       rawStart,
+  //       rawEnd,
+  //       text: lastLine
+  //         .replace(/<\d{2}:\d{2}:\d{2}\.\d{3}>/g, '')
+  //         .replace(/<\/?c[^>]*>/g, '')
+  //         .trim(),
+  //     });
+  //     prevLine = subtitleText;
+  //     continue;
+  //   }
+
+  //   // Bỏ qua nếu lặp
+  //   // if (!prevLine || prevLine.split(strBreak)[0] !== lines[0]) {
+  //   if (!prevLine.includes(subtitleText) && !subtitleText.includes(prevLine)) {
+  //     cleaned.push({ rawStart, rawEnd, text: subtitleText });
+  //     prevLine = subtitleText;
+  //   }
+
+  //   cleaned[cleaned.length - 1].rawEnd = rawEnd;
+  // }
+
+  // const srt = cleaned
+  //   .map((b, i, arr) => {
+  //     const normalize = t => t.replace(/\./g, ',');
+
+  //     const start = normalize(b.rawStart);
+  //     const end = normalize(b.rawEnd);
+
+  //     return `${i + 1}\n${start} --> ${end}\n${b.text}\n`;
+  //   })
+  //   .join('\n');
+
+  // const srtPath = resolved.replace(/\.vtt$/i, '.srt');
+  // fs.writeFileSync(srtPath, srt, 'utf-8');
+  // console.log('✅ Clean subtitle xong:', srtPath);
 }
 
 /**
- * Trích xuất phần text thuần từ nội dung SRT (bỏ số thứ tự cue và timeline).
- * Input: chuỗi SRT (có thể là 1 chunk nhiều block cách nhau bằng dòng trống).
- * Output: chuỗi chỉ chứa các dòng thoại, mỗi block cách nhau 1 dòng trống.
+ * Không truyền đường dẫn → tự tìm mọi file .vtt trong downloads (xử lý từng file).
+ * Có đường dẫn → chỉ file đó.
  */
-export function srtToPlainText(srtContent) {
-  if (!srtContent) return '';
-  const timelineRe = /^\d{2}:\d{2}:\d{2}[.,]\d{3}\s*-->\s*\d{2}:\d{2}:\d{2}[.,]\d{3}/;
+function filter(vttPath) {
+  const paths = vttPath == null || String(vttPath).trim() === '' ? listVttInDownloads() : [resolveVttPath(vttPath)];
 
-  return srtContent
-    .split(/\n\n+/)
-    .map(block => {
-      const lines = block
-        .split('\n')
-        .map(l => l.trim())
-        .filter(Boolean);
-      const textLines = lines.filter(line => {
-        if (/^\d+$/.test(line)) return false;
-        if (timelineRe.test(line)) return false;
-        return true;
-      });
-      return textLines.join('\n');
-    })
-    .filter(Boolean)
-    .join('\n\n');
-}
-
-const SRT_TIMELINE_LINE_RE = /^\d{2}:\d{2}:\d{2}[.,]\d{3}\s*-->\s*\d{2}:\d{2}:\d{2}[.,]\d{3}/;
-
-/**
- * Kiểm tra SRT sau merge: số thứ tự cue (dòng đầu mỗi block) phải liên tục 1..N, không thiếu, không trùng.
- * Chỉ tính các block có dòng 1 là số nguyên dương và dòng 2 khớp timeline SRT.
- *
- * @param {string} srtContent
- * @returns {{ ok: boolean, cueCount: number, maxIndex: number, missing: number[], duplicateIndices: number[], invalidBlockCount: number }}
- */
-export function checkSrtMergedCueIndexSequence(srtContent) {
-  const empty = {
-    ok: false,
-    cueCount: 0,
-    maxIndex: 0,
-    missing: [],
-    duplicateIndices: [],
-    invalidBlockCount: 0,
-  };
-
-  const raw = String(srtContent ?? '').replace(/\r/g, '');
-  const blocks = raw
-    .split(/\n\n+/)
-    .map(b => b.trim())
-    .filter(Boolean);
-
-  let invalidBlockCount = 0;
-  const indices = [];
-
-  for (const block of blocks) {
-    const lines = block
-      .split('\n')
-      .map(l => l.trim())
-      .filter(Boolean);
-    if (lines.length < 3) {
-      invalidBlockCount++;
-      continue;
-    }
-    const idxLine = lines[0];
-    const timeLine = lines[1];
-    if (!/^\d+$/.test(idxLine) || !SRT_TIMELINE_LINE_RE.test(timeLine)) {
-      invalidBlockCount++;
-      continue;
-    }
-    indices.push(parseInt(idxLine, 10));
-  }
-
-  if (indices.length === 0) {
-    return { ...empty, invalidBlockCount };
-  }
-
-  const maxIndex = Math.max(...indices);
-  const seen = new Map();
-  for (const n of indices) {
-    seen.set(n, (seen.get(n) || 0) + 1);
-  }
-
-  const missing = [];
-  for (let i = 1; i <= maxIndex; i++) {
-    if (!seen.has(i)) missing.push(i);
-  }
-
-  const duplicateIndices = [];
-  for (const [k, count] of seen) {
-    if (count > 1) duplicateIndices.push(k);
-  }
-  duplicateIndices.sort((a, b) => a - b);
-
-  const cueCount = indices.length;
-  const ok = missing.length === 0 && duplicateIndices.length === 0 && maxIndex === cueCount;
-
-  return {
-    ok,
-    cueCount,
-    maxIndex,
-    missing,
-    duplicateIndices,
-    invalidBlockCount,
-  };
-}
-
-/**
- * Đọc folder downloads, lấy file VTT và làm sạch → xuất SRT
- */
-export default async function runCleanSrt() {
-  if (!fs.existsSync(DOWNLOADS_DIR)) {
-    console.error('Không tìm thấy thư mục downloads/');
+  if (paths.length === 0) {
+    console.error(`Không có file .vtt trong: ${DOWNLOADS_DIR}`);
+    process.exitCode = 1;
     return;
   }
 
-  const vttFiles = fs.readdirSync(DOWNLOADS_DIR).filter(f => f.endsWith('.vtt'));
-  if (vttFiles.length === 0) {
-    console.error('Không tìm thấy file .vtt trong downloads/');
-    return;
+  for (const resolved of paths) {
+    filterFile(resolved);
   }
-
-  const vttPath = path.join(DOWNLOADS_DIR, vttFiles[0]);
-  cleanSrt(vttPath);
 }
 
-export { cleanSrt };
+function cleanRollingSrt(srtContent) {
+  // Tách file thành các block dựa trên các khoảng trắng/xuống dòng liên tiếp
+  const blocks = srtContent.trim().split(/\r?\n\s*\r?\n/);
+}
+
+filter();

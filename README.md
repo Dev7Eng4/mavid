@@ -15,3 +15,7 @@ update thêm, có thể chọn video bắt đầu tạo hoặc bắt đầu uplo
 - thay đổi pitch cao độ: FFmpeg: asetrate=44100\*1.05,atempo=1/1.05 (Tăng pitch nhưng giữ nguyên tốc độ).
 - Equalizer (Bộ cân bằng): Tăng dải Bass để giọng đọc có độ dày và ấm (giống các radio host chuyên nghiệp).
   -Chèn khoảng lặng (Pauses): Đây là kỹ thuật quan trọng nhất của storytelling. Hãy chèn những khoảng lặng 1-2 giây sau những câu nói gây sốc để người xem kịp "thấm".
+
+# upload video
+
+phần schedule phải scroll lên trk khi select

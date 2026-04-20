@@ -156,16 +156,14 @@ export function ChannelsPageHeaderActions({
             type='button'
             variant='primary'
             onClick={onOpenUploadVideo}
-            disabled={
-              indexLoading || indexSaving || indexBatchVideo !== null || uploadEligibleSelectedCount === 0
-            }
+            disabled={indexLoading || indexSaving || uploadEligibleSelectedCount === 0}
             title={
-              indexBatchVideo !== null
-                ? 'Đang chạy tạo video — chờ xong rồi thử lại.'
-                : uploadEligibleSelectedCount === 0
+              uploadEligibleSelectedCount === 0
                 ? indexSelectedRowCount === 0
                   ? 'Không có kênh nào có email để upload.'
                   : 'Các dòng đã chọn cần có ID/CHANNEL và BẮT BUỘC có EMAIL để upload.'
+                : indexBatchVideo !== null
+                ? 'Có thể upload song song khi đang tạo video — chọn kênh và xác nhận trong hộp thoại.'
                 : youtubeUploadActiveThreads > 0
                 ? `Đang chạy ${youtubeUploadActiveThreads} luồng upload nền — vẫn có thể mở hộp thoại thêm kênh.`
                 : indexSelectedRowCount === 0
@@ -238,7 +236,6 @@ export function ChannelsPageHeaderActions({
             disabled={
               !detailBulkVideo.canUploadVideo ||
               detailBulkVideo.actionsLocked ||
-              detailBulkVideo.createVideoBusy ||
               detailBulkVideo.detailUploadPrepBusy ||
               refreshBusy
             }

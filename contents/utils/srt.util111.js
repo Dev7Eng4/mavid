@@ -5,132 +5,6 @@ import { fileURLToPath } from 'url';
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const DOWNLOADS_DIR = path.join(__dirname, '..', 'downloads');
 
-function timeToMs(timeStr) {
-  const [hours, minutes, seconds] = timeStr.split(':');
-  const [sec, ms] = seconds.split('.');
-  return (+hours * 3600 + +minutes * 60 + +sec) * 1000 + +ms;
-}
-
-function msToTime(duration) {
-  let milliseconds = Math.floor(duration % 1000)
-    .toString()
-    .padStart(3, '0');
-  let seconds = Math.floor((duration / 1000) % 60)
-    .toString()
-    .padStart(2, '0');
-  let minutes = Math.floor((duration / (1000 * 60)) % 60)
-    .toString()
-    .padStart(2, '0');
-  let hours = Math.floor((duration / (1000 * 60 * 60)) % 24)
-    .toString()
-    .padStart(2, '0');
-  return `${hours}:${minutes}:${seconds}.${milliseconds}`;
-}
-
-// Hàm mới: Ép tách các câu không có dấu mà vẫn quá dài
-function forceSplit(str, maxLength, finalArray) {
-  if (str.length <= maxLength) {
-    if (str) finalArray.push(str);
-    return;
-  }
-
-  // Ưu tiên tìm trợ từ từ vị trí thứ 15 đến maxLength để ngắt cho tự nhiên
-  const singleParticles = ['は', 'が', 'に', 'で', 'を', 'て'];
-  let splitIndex = -1;
-
-  for (let i = maxLength - 1; i >= 15; i--) {
-    // Check cụm 2 chữ trước
-    if (i > 0 && (str.substring(i - 1, i + 1) === 'ので' || str.substring(i - 1, i + 1) === 'から')) {
-      splitIndex = i + 1;
-      break;
-    }
-    // Check trợ từ 1 chữ
-    if (singleParticles.includes(str[i])) {
-      splitIndex = i + 1; // Ngắt ngay SAU trợ từ
-      break;
-    }
-  }
-
-  // Nếu câu không hề có trợ từ nào, bắt buộc cắt ở giữa hoặc ở giới hạn maxLength
-  if (splitIndex === -1) {
-    splitIndex = Math.min(Math.floor(str.length / 2), maxLength);
-  }
-
-  finalArray.push(str.slice(0, splitIndex));
-  forceSplit(str.slice(splitIndex), maxLength, finalArray); // Đệ quy xử lý nốt phần còn lại
-}
-
-function splitJapaneseText(text) {
-  const MAX_LEN = 35;
-  let finalChunks = [];
-
-  // 1. Tách theo dấu câu lớn
-  let chunks = text.match(/[^。？！]+[。？！]?/g) || [text];
-
-  chunks.forEach(chunk => {
-    chunk = chunk.trim();
-    if (!chunk) return;
-
-    if (chunk.length > MAX_LEN) {
-      // 2. Nếu có dấu phẩy, tách bằng dấu phẩy trước
-      if (chunk.includes('、')) {
-        let subChunks = chunk.match(/[^、]+[、]?/g) || [chunk];
-        subChunks.forEach(sub => {
-          // 3. Sau khi tách dấu phẩy mà vẫn dài, đưa vào hàm ép tách
-          forceSplit(sub.trim(), MAX_LEN, finalChunks);
-        });
-      } else {
-        // 3. Không có cả dấu phẩy, đưa trực tiếp vào hàm ép tách
-        forceSplit(chunk, MAX_LEN, finalChunks);
-      }
-    } else {
-      finalChunks.push(chunk);
-    }
-  });
-
-  return finalChunks;
-}
-
-function processSubtitles(subtitles) {
-  const result = [];
-  const MAX_LENGTH_PER_SCREEN = 35;
-
-  subtitles.forEach(sub => {
-    const textToSplit = sub.text.replace(/\n/g, '');
-
-    if (textToSplit.length <= MAX_LENGTH_PER_SCREEN) {
-      result.push({ rawStart: sub.rawStart, rawEnd: sub.rawEnd, text: textToSplit });
-      return;
-    }
-
-    const startMs = timeToMs(sub.rawStart);
-    const endMs = timeToMs(sub.rawEnd);
-    const totalDuration = endMs - startMs;
-
-    const textChunks = splitJapaneseText(textToSplit);
-    const totalChars = textChunks.reduce((acc, chunk) => acc + chunk.length, 0);
-
-    let currentStartMs = startMs;
-
-    textChunks.forEach((chunk, index) => {
-      const chunkDuration = Math.floor((chunk.length / totalChars) * totalDuration);
-      let currentEndMs = currentStartMs + chunkDuration;
-
-      if (index === textChunks.length - 1) currentEndMs = endMs;
-
-      result.push({
-        rawStart: msToTime(currentStartMs),
-        rawEnd: msToTime(currentEndMs),
-        text: chunk,
-      });
-
-      currentStartMs = currentEndMs;
-    });
-  });
-
-  return result;
-}
-
 function cleanSrt(vttPath) {
   console.log('🔄 Đang clean subtitle...');
   let text = fs.readFileSync(vttPath, 'utf8').replace(/\r/g, '');
@@ -139,8 +13,8 @@ function cleanSrt(vttPath) {
   text = text
     .replace(/^WEBVTT[\s\S]*?\n\n/, '')
     .replace(/align:start position:\d+%/g, '')
-    .replace(/<\d{2}:\d{2}:\d{2}\.\d{3}>/g, '')
-    .replace(/<\/?c[^>]*>/g, '')
+    // .replace(/<\d{2}:\d{2}:\d{2}\.\d{3}>/g, '')
+    // .replace(/<\/?c[^>]*>/g, '')
     .replace(/\[.*?\]/g, '') // bỏ [nhạc], [vỗ tay] v.v.
     .replace(/&[a-z]+;/g, '')
     .trim();
@@ -153,8 +27,9 @@ function cleanSrt(vttPath) {
     .filter(Boolean);
   // console.log('🚀 ~ cleanSrt ~ blocks:', blocks);
 
-  let cleanedBlocks = [];
-  let prevLines = [];
+  const cleaned = [];
+  let prevLine = '';
+  const strBreak = '<break>';
 
   for (const block of blocks) {
     // Tách timestamp + text
@@ -162,30 +37,51 @@ function cleanSrt(vttPath) {
       .split('\n')
       .map(l => l.trim())
       .filter(Boolean);
+    if (!timeLine || !timeLine.includes('-->')) continue;
 
-    if (!timeLine || !timeLine.includes('-->') || lines.join(' ').trim() === '') continue;
+    const subtitleText = lines
+      .join(' ')
+      .replace(/<\d{2}:\d{2}:\d{2}\.\d{3}>/g, '')
+      .replace(/<\/?c[^>]*>/g, '')
+      .replace(/\s+/g, ' ')
+      .trim();
 
     const parts = timeLine.split('-->').map(p => p.trim());
     const rawStart = parts[0];
     const rawEnd = parts[1];
 
-    const newLines = lines.filter(line => !prevLines.includes(line));
+    const lastLine = lines[lines.length - 1];
 
-    if (newLines.length > 0) {
-      const cleanedText = newLines.join('\n');
-      if (cleanedBlocks.length > 0) {
-        cleanedBlocks[cleanedBlocks.length - 1].rawEnd = rawStart;
-      }
-      cleanedBlocks.push({ rawStart, rawEnd, text: cleanedText });
-      index++;
+    if (!prevLine) {
+      cleaned.push({ rawStart, rawEnd, text: subtitleText });
+      prevLine = subtitleText;
+      continue;
     }
 
-    prevLines = lines;
+    if (/<\d{2}:\d{2}:\d{2}\.\d{3}>/.test(lastLine) || /<\/?c[^>]*>/.test(lastLine)) {
+      cleaned.push({
+        rawStart,
+        rawEnd,
+        text: lastLine
+          .replace(/<\d{2}:\d{2}:\d{2}\.\d{3}>/g, '')
+          .replace(/<\/?c[^>]*>/g, '')
+          .trim(),
+      });
+      prevLine = subtitleText;
+      continue;
+    }
+
+    // Bỏ qua nếu lặp
+    // if (!prevLine || prevLine.split(strBreak)[0] !== lines[0]) {
+    if (!prevLine.includes(subtitleText) && !subtitleText.includes(prevLine)) {
+      cleaned.push({ rawStart, rawEnd, text: subtitleText });
+      prevLine = subtitleText;
+    }
+
+    cleaned[cleaned.length - 1].rawEnd = rawEnd;
   }
 
-  const finalBlocks = processSubtitles(cleanedBlocks);
-
-  const srt = finalBlocks
+  const srt = cleaned
     .map((b, i, arr) => {
       const normalize = t => t.replace(/\./g, ',');
 

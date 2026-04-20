@@ -34,6 +34,8 @@ const SUBTITLE_FONT_DIR = path.join(ROOT, 'assets', 'fonts');
 // ==========================================
 const CUSTOM_SUBTITLE_FONT_SIZE = 90;
 const CUSTOM_SUBTITLE_LINE_GAP_PX = 0; // Khoảng cách pixel cộng thêm giữa các dòng (0 là mặc định sát nhau)
+/** Khoảng cách từ cạnh dưới khung hình tới đáy hộp phụ đề (và vùng chữ). */
+const SUBTITLE_MARGIN_BOTTOM_PX = 40;
 // ==========================================
 const STOCK_VIDEO_HFLIP_PROBABILITY = 0.3;
 
@@ -370,9 +372,9 @@ function convertSrtToAss(srtPath, assPath) {
   // H_box bằng 1/3 chiều cao video
   const subtitleBoxHeight = Math.floor(STOCK_VIDEO.CANVAS_H / 3);
 
-  // Tính tâm của hộp văn bản (nằm ở 1/3 góc dưới) để đặt \pos canh giữa tuyệt đối
+  // Tính tâm của hộp văn bản (1/3 dưới + margin đáy) để đặt \pos canh giữa tuyệt đối
   const boxMidX = Math.round(STOCK_VIDEO.CANVAS_W / 2);
-  const boxMidY = Math.round(STOCK_VIDEO.CANVAS_H - subtitleBoxHeight / 2);
+  const boxMidY = Math.round(STOCK_VIDEO.CANVAS_H - SUBTITLE_MARGIN_BOTTOM_PX - subtitleBoxHeight / 2);
 
   const marginV = 0; // Margin không còn tác dụng vì sẽ dùng \pos tuyệt đối cho mỗi dòng
 
@@ -611,7 +613,7 @@ async function processOne(bgNameArg, options = {}) {
       const subPathEscaped = escapePathForFfmpegSubtitles(tempSubPath);
       const fontsDirEscaped = escapePathForFfmpegSubtitles(SUBTITLE_FONT_DIR);
       const subtitleBoxHeight = Math.floor(STOCK_VIDEO.CANVAS_H / 3);
-      const drawboxFilter = `drawbox=x=0:y=ih-h:w=iw:h=${subtitleBoxHeight}:color=black@${SUBTITLE.BOX_OPACITY}:t=fill`;
+      const drawboxFilter = `drawbox=x=0:y=ih-h-${SUBTITLE_MARGIN_BOTTOM_PX}:w=iw:h=${subtitleBoxHeight}:color=black@${SUBTITLE.BOX_OPACITY}:t=fill`;
       const subFilter = fs.existsSync(SUBTITLE_FONT_FILE)
         ? `subtitles='${subPathEscaped}:fontsdir=${fontsDirEscaped}'`
         : `subtitles='${subPathEscaped}'`;

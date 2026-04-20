@@ -364,14 +364,14 @@ export async function chooseVisibility(page, ctx) {
 
   if (slot?.date && slot?.time) {
     await clickElement(page, YOUTUBE_SELECTOR.btnChooseSchedule);
-    await delay(200, 200);
+    await delay(500, 200);
     await clickElement(page, YOUTUBE_SELECTOR.btnSelectDate);
-    await delay(200, 300);
+    await delay(500, 300);
     await clickElement(page, YOUTUBE_SELECTOR.inputDate);
     await clearContent(page);
     await delay(500, 200);
     await page.keyboard.insertText(slot.date);
-    await delay(200, 300);
+    await delay(500, 300);
     await page.keyboard.press('Enter');
     await page.keyboard.press('Escape');
 

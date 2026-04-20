@@ -18,7 +18,7 @@ export const GEMINI_CONFIG = {
 };
 
 export const GEMINI_CHUNK_SIZE = {
-  UPDATE_TRANSCRIPT: 200,
+  UPDATE_TRANSCRIPT: 100,
   SUMMARY_CONTENT: 500,
 };
 

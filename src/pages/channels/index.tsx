@@ -1034,7 +1034,7 @@ function ChannelsPage() {
             detailBulkVideo={
               selectedChannel && !detailLoading && detailLayout.tableHeaders.length > 0
                 ? {
-                    actionsLocked: startMarkingIndex !== null || Boolean(indexBatchVideo) || indexLoading,
+                    actionsLocked: startMarkingIndex !== null || indexLoading,
                     createVideoBusy: Boolean(indexBatchVideo),
                     detailUploadPrepBusy,
                     emptyStatusSelectedCount: detailMetaSelectionStats.emptyStatusSelectedCount,
