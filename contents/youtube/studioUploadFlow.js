@@ -9,6 +9,7 @@ import {
   clickElement,
   delay,
   getRandomNumber,
+  humanScroll,
   isVisible,
   pollUntilAnyLocatorVisible,
   scrollUntilVisible,
@@ -274,7 +275,7 @@ export async function addRelatedVideo(page, _isNeedAddRelatedVideo = false, mp4P
       timeout: 3000,
     });
     await delay(300, 200);
-    await clickElement(page, YOUTUBE_SELECTOR.btnChooseTemplate);
+    await clickElement(page, YOUTUBE_SELECTOR.btnSpecificTemplate);
   } catch {
     showErrorLogs(`Không tìm thấy box choose template`);
   }
@@ -361,6 +362,16 @@ export async function chooseVisibility(page, ctx) {
   console.log('STEP 4: Choose Visibility');
 
   const slot = ctx?.slot;
+
+  const boxUpload = await page.locator(YOUTUBE_SELECTOR.boxUpload).boundingBox();
+  if (boxUpload) {
+    await page.mouse.move(
+      boxUpload.x + boxUpload.width / 2 + (Math.random() * 20 - 10),
+      boxUpload.y + boxUpload.height / 2 + (Math.random() * 20 - 10)
+    );
+  }
+
+  await humanScroll(page, 80);
 
   if (slot?.date && slot?.time) {
     await clickElement(page, YOUTUBE_SELECTOR.btnChooseSchedule);
