@@ -3,7 +3,7 @@
  */
 import { GEMINI_CONFIG, GEMINI_CHUNK_SIZE } from '../constants/index.js';
 import { loadPromptByLanguage } from '../prompts/index.js';
-import { checkSrtMergedCueIndexSequence } from '../utils/srt.util.js';
+import { checkSrtMergedCueIndexSequence, renumberSrtCueIndices } from '../utils/srt.util.js';
 import { openGeminiPage, sendPromptToGemini } from './browser.util.js';
 import { getSrtDurationInMinutes } from './srtTiming.util.js';
 
@@ -20,7 +20,7 @@ async function processChunkOnPage(page, chunk, index, totalChunks, prompts) {
 
   await openGeminiPage(page);
 
-  const result = await sendPromptToGemini(page, prompt);
+  const result = await sendUpdateTranscriptChunkWithRetry(page, prompt, index, totalChunks);
 
   return { index, result };
 }
@@ -33,6 +33,49 @@ function stripSrtCodeFence(text) {
     .replace(/\n?```\s*$/i, '')
     .trim();
   return t;
+}
+
+/**
+ * Gửi một chunk transcript, thử lại khi lỗi hoặc khi phản hồi rỗng sau khi bỏ fence.
+ * @param {import('playwright').Page} page
+ * @param {string} prompt
+ * @param {number} chunkIndex
+ * @param {number} totalChunks
+ */
+async function sendUpdateTranscriptChunkWithRetry(page, prompt, chunkIndex, totalChunks) {
+  const maxAttempts = Math.max(1, GEMINI_CONFIG.UPDATE_TRANSCRIPT_CHUNK_MAX_ATTEMPTS);
+  const baseDelayMs = Math.max(0, GEMINI_CONFIG.UPDATE_TRANSCRIPT_CHUNK_RETRY_BASE_DELAY_MS);
+  let lastRaw = '';
+
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    try {
+      lastRaw = await sendPromptToGemini(page, prompt);
+      if (stripSrtCodeFence(lastRaw)) return lastRaw;
+      if (attempt < maxAttempts) {
+        const waitMs = baseDelayMs * attempt;
+        console.warn(
+          `[update-transcript] Chunk ${chunkIndex + 1}/${totalChunks} — lần ${attempt}/${maxAttempts}: phản hồi rỗng; chờ ${waitMs}ms rồi thử lại.`,
+        );
+        await page.waitForTimeout(waitMs);
+      }
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      if (attempt < maxAttempts) {
+        const waitMs = baseDelayMs * attempt;
+        console.warn(
+          `[update-transcript] Chunk ${chunkIndex + 1}/${totalChunks} — lần ${attempt}/${maxAttempts} lỗi: ${msg}; chờ ${waitMs}ms rồi thử lại.`,
+        );
+        await page.waitForTimeout(waitMs);
+      } else {
+        console.warn(
+          `[update-transcript] Chunk ${chunkIndex + 1}/${totalChunks} — thất bại sau ${maxAttempts} lần: ${msg}`,
+        );
+        return '';
+      }
+    }
+  }
+
+  return lastRaw;
 }
 
 /**
@@ -70,7 +113,7 @@ export async function internalUpdateTranscript(context, page, rawSrtContent, opt
     for (let i = 0; i < totalChunks; i++) {
       const chunk = chunks[i];
       const prompt = prompts.promptUpdateTranscript(chunk);
-      const result = await sendPromptToGemini(page, prompt);
+      const result = await sendUpdateTranscriptChunkWithRetry(page, prompt, i, totalChunks);
       finalResults[i] = result;
       if (i < totalChunks - 1) await page.waitForTimeout(2000);
     }
@@ -89,18 +132,33 @@ export async function internalUpdateTranscript(context, page, rawSrtContent, opt
       for (let i = batchStart; i < batchEnd; i++) {
         batchPromises.push(processChunkOnPage(pages[i - batchStart], chunks[i], i, totalChunks, prompts));
       }
-      const batchResults = await Promise.all(batchPromises);
-      for (const res of batchResults) finalResults[res.index] = res.result;
+      const batchSettled = await Promise.allSettled(batchPromises);
+      for (let j = 0; j < batchSettled.length; j++) {
+        const chunkIndex = batchStart + j;
+        const s = batchSettled[j];
+        if (s.status === 'fulfilled') {
+          finalResults[chunkIndex] = s.value.result;
+        } else {
+          const reason = s.reason instanceof Error ? s.reason.message : String(s.reason);
+          console.warn(
+            `[update-transcript] Chunk ${chunkIndex + 1}/${totalChunks} lỗi không bắt được trong tab (batch): ${reason}`,
+          );
+          finalResults[chunkIndex] = '';
+        }
+      }
     }
     for (let i = 1; i < pages.length; i++) await pages[i].close();
   }
 
+  // Ghép theo từng chunk: Gemini OK → dùng bản đã chỉnh; lỗi/rỗng → giữ `chunks[i]` (vd. a1,b1,c,d1 nếu chỉ c lỗi).
   const mergedParts = [];
   for (let i = 0; i < totalChunks; i++) {
-    const cleaned = stripSrtCodeFence(finalResults[i]);
+    const raw = finalResults[i];
+    const cleaned = stripSrtCodeFence(raw);
     mergedParts.push(cleaned || chunks[i]);
   }
-  const mergedSrt = mergedParts.join('\n\n').trim();
+  let mergedSrt = mergedParts.join('\n\n').trim();
+  mergedSrt = renumberSrtCueIndices(mergedSrt);
 
   const indexCheck = checkSrtMergedCueIndexSequence(mergedSrt);
   if (!indexCheck.ok) {

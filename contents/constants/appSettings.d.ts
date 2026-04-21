@@ -7,6 +7,8 @@ export declare const flowSettings: {
 export declare const GEMINI_CONFIG: {
   URL: string;
   MAX_CONCURRENT: number;
+  UPDATE_TRANSCRIPT_CHUNK_MAX_ATTEMPTS: number;
+  UPDATE_TRANSCRIPT_CHUNK_RETRY_BASE_DELAY_MS: number;
 };
 
 export declare const GEMINI_CHUNK_SIZE: {

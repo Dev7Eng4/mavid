@@ -314,6 +314,44 @@ export function SettingsPage({ disabled }: Props) {
                   style={inputStyle}
                 />
               </Field>
+              <Field label='UPDATE TRANSCRIPT: SỐ LẦN THỬ / CHUNK'>
+                <input
+                  type='number'
+                  min={1}
+                  value={model.GEMINI_CONFIG.UPDATE_TRANSCRIPT_CHUNK_MAX_ATTEMPTS}
+                  disabled={!canEdit}
+                  onChange={e =>
+                    patch('GEMINI_CONFIG', {
+                      ...model.GEMINI_CONFIG,
+                      UPDATE_TRANSCRIPT_CHUNK_MAX_ATTEMPTS: toNum(
+                        e.target.value,
+                        model.GEMINI_CONFIG.UPDATE_TRANSCRIPT_CHUNK_MAX_ATTEMPTS,
+                      ),
+                    })
+                  }
+                  className='w-full rounded-xl px-3 py-2 text-sm outline-none'
+                  style={inputStyle}
+                />
+              </Field>
+              <Field label='UPDATE TRANSCRIPT: CHỜ CƠ BẢN GIỮA LẦN THỬ (MS)'>
+                <input
+                  type='number'
+                  min={0}
+                  value={model.GEMINI_CONFIG.UPDATE_TRANSCRIPT_CHUNK_RETRY_BASE_DELAY_MS}
+                  disabled={!canEdit}
+                  onChange={e =>
+                    patch('GEMINI_CONFIG', {
+                      ...model.GEMINI_CONFIG,
+                      UPDATE_TRANSCRIPT_CHUNK_RETRY_BASE_DELAY_MS: toNum(
+                        e.target.value,
+                        model.GEMINI_CONFIG.UPDATE_TRANSCRIPT_CHUNK_RETRY_BASE_DELAY_MS,
+                      ),
+                    })
+                  }
+                  className='w-full rounded-xl px-3 py-2 text-sm outline-none'
+                  style={inputStyle}
+                />
+              </Field>
               <Field label='CHUNK: UPDATE_TRANSCRIPT'>
                 <input
                   type='number'

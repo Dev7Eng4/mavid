@@ -62,7 +62,12 @@ export interface AppStats {
 
 export interface ConstantsUiModel {
   flowSettings: { FLOW_URL: string; FLOW_PROJECT_ID: string };
-  GEMINI_CONFIG: { URL: string; MAX_CONCURRENT: number };
+  GEMINI_CONFIG: {
+    URL: string;
+    MAX_CONCURRENT: number;
+    UPDATE_TRANSCRIPT_CHUNK_MAX_ATTEMPTS: number;
+    UPDATE_TRANSCRIPT_CHUNK_RETRY_BASE_DELAY_MS: number;
+  };
   GEMINI_CHUNK_SIZE: { UPDATE_TRANSCRIPT: number; SUMMARY_CONTENT: number };
   LANGUAGES_NEED_UPDATE_TRANSCRIPT: string[];
   META_DATA: { NICHE: string; TITLE: string; DESCRIPTION: string; TAGS: string };

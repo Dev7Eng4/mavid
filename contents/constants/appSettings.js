@@ -15,6 +15,10 @@ export const flowSettings = {
 export const GEMINI_CONFIG = {
   URL: 'https://gemini.google.com/app',
   MAX_CONCURRENT: 3,
+  /** Số lần thử tối đa mỗi chunk khi chỉnh transcript (lỗi hoặc phản hồi rỗng). */
+  UPDATE_TRANSCRIPT_CHUNK_MAX_ATTEMPTS: 3,
+  /** Độ trễ nền (ms); lần thử k chờ k × giá trị này (tuyến tính). */
+  UPDATE_TRANSCRIPT_CHUNK_RETRY_BASE_DELAY_MS: 3000,
 };
 
 export const GEMINI_CHUNK_SIZE = {

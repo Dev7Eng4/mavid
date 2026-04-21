@@ -19,6 +19,8 @@ export const flowSettings: {
 export const GEMINI_CONFIG: {
   URL: string;
   MAX_CONCURRENT: number;
+  UPDATE_TRANSCRIPT_CHUNK_MAX_ATTEMPTS: number;
+  UPDATE_TRANSCRIPT_CHUNK_RETRY_BASE_DELAY_MS: number;
 };
 
 export const GEMINI_CHUNK_SIZE: {

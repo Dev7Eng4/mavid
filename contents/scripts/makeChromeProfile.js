@@ -30,7 +30,7 @@ function getProfileDir(profileNum) {
  * @param {number}  [options.profile=1] - Số profile (1, 2, 3, ...)
  * @param {boolean} [options.headless=false] - Chạy ẩn browser
  * @param {string}  [options.windowPosition='-2000,-2000'] - Vị trí cửa sổ (mặc định ngoài màn hình)
- * @param {boolean} [options.visible=true] - true = hiển thị bình thường, false = ẩn ngoài màn hình
+ * @param {boolean} [options.visible=true] - true = hiển thị bình thường (maximized), false = ẩn ngoài màn hình
  * @returns {Promise<{context: import('playwright').BrowserContext, page: import('playwright').Page}>}
  */
 export async function openChromeProfile(options = {}) {
@@ -46,6 +46,8 @@ export async function openChromeProfile(options = {}) {
   if (!visible) {
     args.push('--start-minimized');
     args.push(`--window-position=${windowPosition || '-2000,-2000'}`);
+  } else {
+    args.push('--start-maximized');
   }
 
   console.log(`Đang mở Chrome với profile${profile} (${profileDir})`);

@@ -309,6 +309,45 @@ export function checkSrtMergedCueIndexSequence(srtContent) {
 }
 
 /**
+ * Đánh lại số thứ tự cue (dòng đầu mỗi block) thành 1..N theo thứ tự xuất hiện.
+ * Block không đủ chuẩn SRT (số + timeline + thoại) được giữ nguyên.
+ *
+ * @param {string} srtContent
+ * @returns {string}
+ */
+export function renumberSrtCueIndices(srtContent) {
+  const raw = String(srtContent ?? '').replace(/\r/g, '');
+  const blocks = raw
+    .split(/\n\n+/)
+    .map(b => b.trim())
+    .filter(Boolean);
+
+  let seq = 0;
+  const out = [];
+
+  for (const block of blocks) {
+    const lines = block
+      .split('\n')
+      .map(l => l.trim())
+      .filter(Boolean);
+    if (lines.length < 3) {
+      out.push(block);
+      continue;
+    }
+    const idxLine = lines[0];
+    const timeLine = lines[1];
+    if (!/^\d+$/.test(idxLine) || !SRT_TIMELINE_LINE_RE.test(timeLine)) {
+      out.push(block);
+      continue;
+    }
+    seq += 1;
+    out.push([String(seq), timeLine, ...lines.slice(2)].join('\n'));
+  }
+
+  return out.join('\n\n').trim();
+}
+
+/**
  * Đọc folder downloads, lấy file VTT và làm sạch → xuất SRT
  */
 export default async function runCleanSrt() {
