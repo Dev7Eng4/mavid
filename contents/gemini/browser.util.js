@@ -5,54 +5,107 @@ import { GEMINI_CONFIG } from '../constants/index.js';
 import { clearContent, clickElement, getRandomNumber } from '../utils/dom.util.js';
 import { GEMINI_SELECTOR } from './selectors.js';
 
+// export async function waitForGeminiResponse(page, timeoutMs = 120000) {
+//   await page.waitForSelector('.model-response-text, .response-content, .message-content', {
+//     timeout: timeoutMs,
+//   });
+
+//   const startTime = Date.now();
+//   while (Date.now() - startTime < timeoutMs) {
+//     const isStreaming = await page.evaluate(() => {
+//       const stopBtn = document.querySelector('button[aria-label="Stop response"], mat-icon[data-mat-icon-name="stop_circle"]');
+//       if (stopBtn) {
+//         const rect = stopBtn.getBoundingClientRect();
+//         return rect.width > 0 && rect.height > 0;
+//       }
+//       return false;
+//     });
+
+//     if (!isStreaming) break;
+//     await page.waitForTimeout(1000);
+//   }
+
+//   await page.waitForTimeout(2000);
+// }
+
 export async function waitForGeminiResponse(page, timeoutMs = 120000) {
-  await page.waitForSelector('.model-response-text, .response-content, .message-content', {
-    timeout: timeoutMs,
-  });
+  // 1. Lấy phần tử chứa câu trả lời cuối cùng (mới nhất)
+  const responseLocator = page.locator('.model-response-text, .response-content, .message-content').last();
+
+  // Đợi phần tử bắt đầu xuất hiện
+  await responseLocator.waitFor({ state: 'visible', timeout: timeoutMs });
+
+  let previousLength = -1;
+  let stableTime = 0;
+  const checkInterval = 1000; // Mỗi 1 giây kiểm tra 1 lần
+  const requiredStableTime = 4000; // Cần 3 giây text không đổi để xác nhận là đã xong
 
   const startTime = Date.now();
+
   while (Date.now() - startTime < timeoutMs) {
-    const isStreaming = await page.evaluate(() => {
-      const stopBtn = document.querySelector('button[aria-label="Stop response"], mat-icon[data-mat-icon-name="stop_circle"]');
-      if (stopBtn) {
-        const rect = stopBtn.getBoundingClientRect();
-        return rect.width > 0 && rect.height > 0;
+    // Chỉ lấy text ra đọc, hoàn toàn thụ động
+    const currentText = await responseLocator.innerText();
+    const currentLength = currentText.length;
+
+    // Nếu độ dài text lớn hơn 0 và không đổi so với lần check trước
+    if (currentLength === previousLength && currentLength > 0) {
+      stableTime += checkInterval;
+      if (stableTime >= requiredStableTime) {
+        break; // Thoát vòng lặp, Gemini đã gõ xong
       }
-      return false;
-    });
+    } else {
+      // Nếu text có thay đổi (đang gõ), reset lại bộ đếm thời gian
+      stableTime = 0;
+      previousLength = currentLength;
+    }
 
-    if (!isStreaming) break;
-    await page.waitForTimeout(1000);
+    await page.waitForTimeout(checkInterval);
   }
-
-  await page.waitForTimeout(2000);
 }
 
 export async function extractGeminiResponse(page) {
-  await page.waitForTimeout(1500);
+  // await page.waitForTimeout(1500);
+  const responseLocator = page
+    .locator('.model-response-text, .response-content, .message-content, div[data-message-author-role="model"]')
+    .last();
+  await responseLocator.waitFor({ state: 'attached', timeout: 5000 });
 
-  return page.evaluate(() => {
-    const responses = Array.from(
-      document.querySelectorAll('.model-response-text, .response-content, .message-content, div[data-message-author-role="model"]'),
-    );
+  const specificCodeLocator = responseLocator.locator('code[data-test-id="code-content"]');
+  if ((await specificCodeLocator.count()) > 0) {
+    return (await specificCodeLocator.last().innerText()).trim();
+  }
 
-    if (responses.length === 0) return '';
+  // 3. Fallback: Tìm thẻ code bất kỳ
+  const anyCodeLocator = responseLocator.locator('code');
+  if ((await anyCodeLocator.count()) > 0) {
+    return (await anyCodeLocator.last().innerText()).trim();
+  }
 
-    const lastResponse = responses[responses.length - 1];
+  // 4. Fallback cuối cùng: Lấy toàn bộ text
+  return (await responseLocator.innerText()).trim();
 
-    const codeBlocks = lastResponse.querySelectorAll('code[data-test-id="code-content"]');
+  // return page.evaluate(() => {
+  //   const responses = Array.from(
+  //     document.querySelectorAll('.model-response-text, .response-content, .message-content, div[data-message-author-role="model"]')
+  //   );
 
-    if (codeBlocks.length > 0) {
-      return (codeBlocks[codeBlocks.length - 1].innerText || codeBlocks[codeBlocks.length - 1].textContent || '').trim();
-    }
+  //   if (responses.length === 0) return '';
 
-    const anyCode = lastResponse.querySelectorAll('code');
-    if (anyCode.length > 0) {
-      return (anyCode[anyCode.length - 1].innerText || anyCode[anyCode.length - 1].textContent || '').trim();
-    }
+  //   const lastResponse = responses[responses.length - 1];
 
-    return (lastResponse.innerText || lastResponse.textContent || '').trim();
-  });
+  //   const codeBlocks = lastResponse.querySelectorAll('code[data-test-id="code-content"]');
+
+  //   if (codeBlocks.length > 0) {
+  //     return (codeBlocks[codeBlocks.length - 1].innerText || codeBlocks[codeBlocks.length - 1].textContent || '').trim();
+  //   }
+
+  //   const anyCode = lastResponse.querySelectorAll('code');
+  //   if (anyCode.length > 0) {
+  //     return (anyCode[anyCode.length - 1].innerText || anyCode[anyCode.length - 1].textContent || '').trim();
+  //   }
+
+  //   return (lastResponse.innerText || lastResponse.textContent || '').trim();
+  // });
 }
 
 export async function chooseThinkingMode(page) {

@@ -352,6 +352,24 @@ export function SettingsPage({ disabled }: Props) {
                   style={inputStyle}
                 />
               </Field>
+              <Field label='UPDATE TRANSCRIPT: DỊCH TIMELINE SRT SAU STEP2 (MS, ±)'>
+                <input
+                  type='number'
+                  value={model.GEMINI_CONFIG.UPDATE_TRANSCRIPT_SRT_TIME_SHIFT_MS}
+                  disabled={!canEdit}
+                  onChange={e =>
+                    patch('GEMINI_CONFIG', {
+                      ...model.GEMINI_CONFIG,
+                      UPDATE_TRANSCRIPT_SRT_TIME_SHIFT_MS: toNum(
+                        e.target.value,
+                        model.GEMINI_CONFIG.UPDATE_TRANSCRIPT_SRT_TIME_SHIFT_MS,
+                      ),
+                    })
+                  }
+                  className='w-full rounded-xl px-3 py-2 text-sm outline-none'
+                  style={inputStyle}
+                />
+              </Field>
               <Field label='CHUNK: UPDATE_TRANSCRIPT'>
                 <input
                   type='number'
@@ -361,6 +379,44 @@ export function SettingsPage({ disabled }: Props) {
                     patch('GEMINI_CHUNK_SIZE', {
                       ...model.GEMINI_CHUNK_SIZE,
                       UPDATE_TRANSCRIPT: toNum(e.target.value, model.GEMINI_CHUNK_SIZE.UPDATE_TRANSCRIPT),
+                    })
+                  }
+                  className='w-full rounded-xl px-3 py-2 text-sm outline-none'
+                  style={inputStyle}
+                />
+              </Field>
+              <Field label='CHUNK: TRANSCRIPT STEP2 (cue/window)'>
+                <input
+                  type='number'
+                  min={1}
+                  value={model.GEMINI_CHUNK_SIZE.UPDATE_TRANSCRIPT_STEP2_CHUNK}
+                  disabled={!canEdit}
+                  onChange={e =>
+                    patch('GEMINI_CHUNK_SIZE', {
+                      ...model.GEMINI_CHUNK_SIZE,
+                      UPDATE_TRANSCRIPT_STEP2_CHUNK: toNum(
+                        e.target.value,
+                        model.GEMINI_CHUNK_SIZE.UPDATE_TRANSCRIPT_STEP2_CHUNK,
+                      ),
+                    })
+                  }
+                  className='w-full rounded-xl px-3 py-2 text-sm outline-none'
+                  style={inputStyle}
+                />
+              </Field>
+              <Field label='CHUNK: TRANSCRIPT STEP2 OVERLAP (context)'>
+                <input
+                  type='number'
+                  min={0}
+                  value={model.GEMINI_CHUNK_SIZE.UPDATE_TRANSCRIPT_STEP2_OVERLAP}
+                  disabled={!canEdit}
+                  onChange={e =>
+                    patch('GEMINI_CHUNK_SIZE', {
+                      ...model.GEMINI_CHUNK_SIZE,
+                      UPDATE_TRANSCRIPT_STEP2_OVERLAP: toNum(
+                        e.target.value,
+                        model.GEMINI_CHUNK_SIZE.UPDATE_TRANSCRIPT_STEP2_OVERLAP,
+                      ),
                     })
                   }
                   className='w-full rounded-xl px-3 py-2 text-sm outline-none'

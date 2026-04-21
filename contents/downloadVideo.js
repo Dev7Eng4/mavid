@@ -169,6 +169,11 @@ async function processVttTranscriptsWithGemini(
     const srtPath = vttPath.replace(/\.vtt$/i, '.srt');
     if (!fs.existsSync(srtPath)) continue;
 
+    /** Bản sau clean VTT, trước khi Gemini ghi đè `*.srt` (đuôi `.srt.cleaned` để không bị `getSubtitleFile` chọn nhầm). */
+    const cleanBackupPath = `${srtPath}.cleaned`;
+    fs.copyFileSync(srtPath, cleanBackupPath);
+    console.log(`Đã lưu bản SRT sau clean (trước Gemini): ${path.basename(cleanBackupPath)}`);
+
     const content = fs.readFileSync(srtPath, 'utf8');
     console.log(`Bắt đầu update nội dung SRT bằng Gemini trong cùng một phiên xử lý...`);
     let finalSrt = content;

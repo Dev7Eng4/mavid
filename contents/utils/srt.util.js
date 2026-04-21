@@ -5,10 +5,29 @@ import { fileURLToPath } from 'url';
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const DOWNLOADS_DIR = path.join(__dirname, '..', 'downloads');
 
+/**
+ * Parse timestamp SRT/VTT (hỗ trợ dấu phẩy hoặc chấm cho phần ms).
+ * @param {string} timeStr
+ * @returns {number}
+ */
+export function srtTimestampToMs(timeStr) {
+  const s = String(timeStr ?? '')
+    .trim()
+    .replace(',', '.');
+  const parts = s.split(':');
+  if (parts.length !== 3) return NaN;
+  const h = parseInt(parts[0], 10);
+  const m = parseInt(parts[1], 10);
+  const secPart = parts[2];
+  const [secStr, frac = '0'] = secPart.split('.');
+  const sec = parseInt(secStr, 10);
+  const ms = parseInt(String(frac).padEnd(3, '0').slice(0, 3), 10);
+  if ([h, m, sec, ms].some(n => Number.isNaN(n))) return NaN;
+  return ((h * 60 + m) * 60 + sec) * 1000 + ms;
+}
+
 function timeToMs(timeStr) {
-  const [hours, minutes, seconds] = timeStr.split(':');
-  const [sec, ms] = seconds.split('.');
-  return (+hours * 3600 + +minutes * 60 + +sec) * 1000 + +ms;
+  return srtTimestampToMs(timeStr);
 }
 
 function msToTime(duration) {
@@ -177,7 +196,6 @@ function cleanSrt(vttPath) {
         cleanedBlocks[cleanedBlocks.length - 1].rawEnd = rawStart;
       }
       cleanedBlocks.push({ rawStart, rawEnd, text: cleanedText });
-      index++;
     }
 
     prevLines = lines;
@@ -345,6 +363,123 @@ export function renumberSrtCueIndices(srtContent) {
   }
 
   return out.join('\n\n').trim();
+}
+
+/**
+ * Parse SRT thành mảng cue { id, start, end, text }.
+ * @param {string} rawSrtContent
+ * @returns {{ id: string, start: string, end: string, text: string }[]}
+ */
+export function parseAndCleanSRT(rawSrtContent) {
+  const raw = String(rawSrtContent ?? '').replace(/\r/g, '').trim();
+  if (!raw) return [];
+
+  const blocks = raw.split(/\n\s*\n/);
+  const parsedData = [];
+
+  for (const block of blocks) {
+    const lines = block.split('\n');
+
+    if (lines.length < 3) continue;
+
+    const id = lines[0].trim();
+    const timeStr = lines[1].trim();
+
+    if (!/^\d+$/.test(id)) continue;
+
+    const rawText = lines
+      .slice(2)
+      .map(l => l.trimEnd())
+      .join('\n')
+      .trim();
+
+    const timeParts = timeStr.split(/\s*-->\s*/);
+    if (timeParts.length !== 2) continue;
+
+    parsedData.push({
+      id,
+      start: timeParts[0].trim(),
+      end: timeParts[1].trim(),
+      text: rawText,
+    });
+  }
+
+  return parsedData;
+}
+
+/**
+ * Giai đoạn 1 → LLM: "[ID: X] Text\n[ID: Y] Text"
+ * @param {{ id: string, text: string }[]} parsedJsonArray
+ */
+export function formatDataForLLM(parsedJsonArray) {
+  return parsedJsonArray.map(item => `[ID: ${item.id}] ${item.text}`).join('\n');
+}
+
+/** Chuẩn hóa dấu thập phân thời gian SRT (dấu phẩy cho ms). */
+function normalizeSrtTimestamp(ts) {
+  return String(ts ?? '')
+    .trim()
+    .replace('.', ',');
+}
+
+/**
+ * Millisecond → chuỗi thời gian SRT (ms sau dấu phẩy).
+ * @param {number} ms
+ */
+export function msToSrtTimestamp(ms) {
+  let t = Math.max(0, Math.floor(Number(ms)));
+  const milliseconds = (t % 1000).toString().padStart(3, '0');
+  const seconds = Math.floor((t / 1000) % 60)
+    .toString()
+    .padStart(2, '0');
+  const minutes = Math.floor((t / (1000 * 60)) % 60)
+    .toString()
+    .padStart(2, '0');
+  const hours = Math.floor((t / (1000 * 60 * 60)) % 24)
+    .toString()
+    .padStart(2, '0');
+  return `${hours}:${minutes}:${seconds},${milliseconds}`;
+}
+
+/**
+ * Dịch một mốc thời gian SRT theo delta (ms). Không âm (clamp 0).
+ * @param {string} ts
+ * @param {number} deltaMs
+ */
+export function shiftSrtTimeString(ts, deltaMs) {
+  const base = srtTimestampToMs(ts);
+  if (Number.isNaN(base)) return String(ts ?? '').trim();
+  return msToSrtTimestamp(base + deltaMs);
+}
+
+/**
+ * Áp dụng cùng delta cho mọi block sau Step2 (chỉnh lệch ASR vs audio).
+ * @param {{ startTime: string, endTime: string, text: string }[]} blocks
+ * @param {number} deltaMs
+ */
+export function shiftMergedBlocksTimes(blocks, deltaMs) {
+  if (!blocks || blocks.length === 0 || !deltaMs) return blocks || [];
+  return blocks.map(b => ({
+    ...b,
+    startTime: shiftSrtTimeString(b.startTime, deltaMs),
+    endTime: shiftSrtTimeString(b.endTime, deltaMs),
+  }));
+}
+
+/**
+ * @param {{ startTime: string, endTime: string, text: string }[]} blocks
+ * @returns {string}
+ */
+export function mergedBlocksToSrt(blocks) {
+  if (!blocks || blocks.length === 0) return '';
+  return blocks
+    .map((b, i) => {
+      const start = normalizeSrtTimestamp(b.startTime);
+      const end = normalizeSrtTimestamp(b.endTime);
+      return `${i + 1}\n${start} --> ${end}\n${b.text}`;
+    })
+    .join('\n\n')
+    .trim();
 }
 
 /**

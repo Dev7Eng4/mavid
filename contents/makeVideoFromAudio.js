@@ -172,7 +172,7 @@ function getAudioFile(dir = DOWNLOADS_DIR) {
 }
 
 /**
- * Tìm file phụ đề trong downloads: bất kỳ .srt hoặc .vtt nào.
+ * Tìm file phụ đề trong downloads: bất kỳ .srt hoặc .vtt nào (không dùng `*.srt.cleaned` — bản lưu trước Gemini).
  * Có nhiều file cùng loại → chọn tên sắp xếp alphabet; có cả .srt và .vtt → ưu tiên .srt.
  */
 function getSubtitleFile(dir = DOWNLOADS_DIR) {
@@ -184,11 +184,45 @@ function getSubtitleFile(dir = DOWNLOADS_DIR) {
   return pick ? path.join(dir, pick) : null;
 }
 
+/**
+ * Thư mục `downloads/job_<timestamp>_*` có mtime mới nhất (batch download), hoặc null.
+ */
+function getLatestJobDownloadsDir() {
+  if (!fs.existsSync(DOWNLOADS_DIR)) return null;
+  const entries = fs
+    .readdirSync(DOWNLOADS_DIR)
+    .filter(name => /^job_\d+_/i.test(name))
+    .map(name => {
+      const full = path.join(DOWNLOADS_DIR, name);
+      try {
+        return { full, mtimeMs: fs.statSync(full).mtimeMs };
+      } catch {
+        return null;
+      }
+    })
+    .filter(Boolean);
+  entries.sort((a, b) => b.mtimeMs - a.mtimeMs);
+  return entries.length ? entries[0].full : null;
+}
+
 function getSubtitleFormatLabel(filePath) {
   const ext = path.extname(filePath).toLowerCase();
   if (ext === '.srt') return 'SRT';
   if (ext === '.vtt') return 'VTT';
   return ext.slice(1).toUpperCase() || '?';
+}
+
+/**
+ * Phụ đề kiểu Nhật: không hộp nền, chữ cyan/viền đen dày. Ưu tiên `videoLanguage`; không có thì nhận diện `.ja.srt` / `.ja.vtt`.
+ * @param {string|null} subtitlePath
+ * @param {string} [videoLanguage] - vd. `ja`, `ko` (từ transcript / cấu hình)
+ */
+function resolveJapaneseSubtitleStyle(subtitlePath, videoLanguage) {
+  const raw = videoLanguage != null && String(videoLanguage).trim() ? String(videoLanguage).trim().toLowerCase() : '';
+  if (raw === 'ja' || raw === 'jp') return true;
+  if (raw && raw !== 'ja' && raw !== 'jp') return false;
+  if (!subtitlePath) return false;
+  return /\.ja\.(srt|vtt)$/i.test(path.basename(subtitlePath));
 }
 
 /**
@@ -251,13 +285,13 @@ function getStockVideos(backgroundsDir) {
   if (files.length === 0) {
     throw new Error(`Không có video trong ${backgroundsDir}`);
   }
-  
+
   const usage = getStockUsage();
   const folderName = path.basename(backgroundsDir);
-  
+
   // Trộn trước để những clip cùng số lần dùng xuất hiện ngẫu nhiên không bị trùng pattern
   const shuffled = shuffleArray(files);
-  
+
   // Sort theo số lần dùng tăng dần (ít dùng lên đỉnh)
   shuffled.sort((a, b) => {
     const keyA = `${folderName}/${a}`;
@@ -297,19 +331,20 @@ async function buildStockSegmentPlan(videoPaths, requiredXfadeOutputSec) {
     const xfadeLen = n <= 1 ? accumulated : accumulated - (n - 1) * fadeEst;
     if (xfadeLen >= requiredXfadeOutputSec) break;
   }
-  
+
   // Trộn video segments theo yêu cầu: "thứ tự video stock ghép lại thành video cũng sắp random"
   return shuffleArray(segments);
 }
 
-const ffmpegSpawnAsync = (args) => new Promise((resolve, reject) => {
-  const child = spawn('ffmpeg', args, { stdio: 'inherit', shell: false });
-  child.on('close', code => {
-    if (code !== 0) reject(new Error(`ffmpeg exited with code ${code}`));
-    else resolve();
+const ffmpegSpawnAsync = args =>
+  new Promise((resolve, reject) => {
+    const child = spawn('ffmpeg', args, { stdio: 'inherit', shell: false });
+    child.on('close', code => {
+      if (code !== 0) reject(new Error(`ffmpeg exited with code ${code}`));
+      else resolve();
+    });
+    child.on('error', err => reject(err));
   });
-  child.on('error', err => reject(err));
-});
 
 /** Parse SRT time "HH:MM:SS,mmm" → tổng milliseconds */
 function srtTimeToMs(h, m, s, ms) {
@@ -357,17 +392,24 @@ function escapePathForFfmpegSubtitles(p) {
 }
 
 /**
- * Chuyển SRT sang định dạng file ASS với cấu hình Style: Box nền Mờ, dễ đọc.
+ * Chuyển SRT sang định dạng file ASS với cấu hình Style: Box nền Mờ, dễ đọc (mặc định); JA: chữ cyan nhạt + viền đen dày (không dùng drawbox — bỏ ở bước ffmpeg).
  * @param {string} srtPath - Đường dẫn file SRT đầu vào
  * @param {string} assPath - Nơi lưu file ASS đầu ra
+ * @param {boolean} [japaneseStyle=false]
  */
-function convertSrtToAss(srtPath, assPath) {
+function convertSrtToAss(srtPath, assPath, japaneseStyle = false) {
   const content = fs.readFileSync(srtPath, 'utf8');
   const cues = content.split(/\n\n+/).filter(Boolean);
 
   const fontName = fs.existsSync(SUBTITLE_FONT_FILE) ? SUBTITLE_FONT_ASS_NAME : 'Arial';
-  const outlinePx = +(CUSTOM_SUBTITLE_FONT_SIZE * 0.06).toFixed(2);
-  const shadowPx = 1.5;
+  /** Viền đen: JA dày hơn; các ngôn ngữ khác ~6% cỡ chữ */
+  const outlinePx = japaneseStyle ? 8.5 : +(CUSTOM_SUBTITLE_FONT_SIZE * 0.06).toFixed(2);
+  const shadowPx = japaneseStyle ? 0.5 : 1.5;
+  /** ASS &HAABBGGRR — cyan / xanh ngọc nhạt (RGB ~180,240,255) */
+  const primaryColour = japaneseStyle ? '&H00FFF0B4' : '&H00FFFFFF';
+  const secondaryColour = '&H000000FF';
+  const outlineColour = '&H00000000';
+  const backColour = '&H00000000';
 
   // H_box bằng 1/3 chiều cao video
   const subtitleBoxHeight = Math.floor(STOCK_VIDEO.CANVAS_H / 3);
@@ -386,7 +428,7 @@ WrapStyle: 1
 
 [V4+ Styles]
 Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
-Style: Default,${fontName},${CUSTOM_SUBTITLE_FONT_SIZE},&H00FFFFFF,&H000000FF,&H00000000,&H00000000,-1,0,0,0,100,100,${SUBTITLE.CHAR_SPACING},0,1,${outlinePx},${shadowPx},8,${SUBTITLE.PADDING_HORIZONTAL},${SUBTITLE.PADDING_HORIZONTAL},${marginV},1
+Style: Default,${fontName},${CUSTOM_SUBTITLE_FONT_SIZE},${primaryColour},${secondaryColour},${outlineColour},${backColour},-1,0,0,0,100,100,${SUBTITLE.CHAR_SPACING},0,1,${outlinePx},${shadowPx},8,${SUBTITLE.PADDING_HORIZONTAL},${SUBTITLE.PADDING_HORIZONTAL},${marginV},1
 
 [Events]
 Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
@@ -473,6 +515,7 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
  * @param {number} [options.stockVideoCount] - Số clip stock; 0 / undefined → getDynamicStockVideoCount
  * @param {string|null} [options.logoPath] - File logo (đã resolve); null → không vẽ logo
  * @param {string} [options.downloadsDir] - Thư mục chứa thư mục download của riêng video này
+ * @param {string} [options.videoLanguage] - Ngôn ngữ video/transcript (`ja` → phụ đề không hộp, chữ cyan viền đen). Mặc định suy từ tên file `.ja.srt`/`.ja.vtt`.
  */
 async function processOne(bgNameArg, options = {}) {
   const {
@@ -486,6 +529,7 @@ async function processOne(bgNameArg, options = {}) {
     stockVideoCount: stockCountOpt,
     logoPath: logoPathOpt,
     downloadsDir = DOWNLOADS_DIR,
+    videoLanguage,
   } = options;
   const speed = speedIn != null && Number.isFinite(Number(speedIn)) && Number(speedIn) > 0 ? Number(speedIn) : resolveAudioSpeed({});
   const stockBgRoot = resolveStockBackgroundsDir();
@@ -503,7 +547,7 @@ async function processOne(bgNameArg, options = {}) {
   }
   if (!fs.existsSync(backgroundsDir)) {
     throw new Error(
-      `Không tìm thấy folder stock "${backgroundName}" trong ${stockBgRoot}/ — kiểm tra Settings (VIDEO_STORAGE_ROOT) và tạo thư mục con tương ứng.`,
+      `Không tìm thấy folder stock "${backgroundName}" trong ${stockBgRoot}/ — kiểm tra Settings (VIDEO_STORAGE_ROOT) và tạo thư mục con tương ứng.`
     );
   }
 
@@ -518,8 +562,8 @@ async function processOne(bgNameArg, options = {}) {
   const audioDurationAfterTempo = originalAudioDuration / speed;
   console.log(
     `Thời lượng audio gốc: ${originalAudioDuration.toFixed(1)}s, sau atempo (SPEED=${speed}): ${formatClockDuration(
-      audioDurationAfterTempo,
-    )} (${audioDurationAfterTempo.toFixed(1)}s)`,
+      audioDurationAfterTempo
+    )} (${audioDurationAfterTempo.toFixed(1)}s)`
   );
 
   // 2. Lấy toàn bộ video stock
@@ -528,6 +572,7 @@ async function processOne(bgNameArg, options = {}) {
 
   // 3. Xử lý phụ đề (scale timestamps nếu SPEED != 1)
   let subtitlePath = getSubtitleFile(downloadsDir);
+  const useJaSubtitleStyle = resolveJapaneseSubtitleStyle(subtitlePath, videoLanguage);
   let scaledSrtPath = null;
   if (subtitlePath && speed !== 1) {
     scaledSrtPath = path.join(OUTPUT_DIR, 'temp_scaled_sub' + path.extname(subtitlePath));
@@ -545,11 +590,9 @@ async function processOne(bgNameArg, options = {}) {
 
   const stockRenderTarget = audioDurationAfterTempo + STOCK_VIDEO.RENDER_EXTRA_SEC;
   const stockSegments = await buildStockSegmentPlan(videoPaths, stockRenderTarget);
-  
-  console.log(
-    `Đang dựng video Single-Pass Pipeline (${stockSegments.length} clip stock, encode: ${GPU_INFO.encoderLabel})...`
-  );
-  
+
+  console.log(`Đang dựng video Single-Pass Pipeline (${stockSegments.length} clip stock, encode: ${GPU_INFO.encoderLabel})...`);
+
   updateStockUsage(stockSegments, backgroundsDir);
 
   const logoPathForMerge = logoPathOpt != null && String(logoPathOpt).trim() && fs.existsSync(logoPathOpt) ? logoPathOpt : null;
@@ -558,7 +601,7 @@ async function processOne(bgNameArg, options = {}) {
   // --- BUILD GRAPH ---
   const mergeArgs = ['-y'];
   let inputIdx = 0;
-  
+
   // Videos: 0 to N-1
   for (const s of stockSegments) {
     if (stockSegments.length === 1 && s.duration < stockRenderTarget - 0.01) {
@@ -568,7 +611,7 @@ async function processOne(bgNameArg, options = {}) {
     }
     inputIdx++;
   }
-  
+
   // Audio
   const audioIndex = inputIdx++;
   mergeArgs.push('-i', audioPath);
@@ -576,79 +619,93 @@ async function processOne(bgNameArg, options = {}) {
   // Logo
   let logoIndex = -1;
   if (hasLogo) {
-      logoIndex = inputIdx++;
-      mergeArgs.push('-i', logoPathForMerge);
+    logoIndex = inputIdx++;
+    mergeArgs.push('-i', logoPathForMerge);
   }
 
   const filterParts = [];
-  
+
   // Audio graph
   filterParts.push(`[${audioIndex}:a]atempo=${speed}[aout]`);
 
   // Video Background graph
   let vBgLabel = 'vout_bg';
   if (stockSegments.length === 1) {
-      filterParts.push(stockNormalizeFilterChain(`0:v`, vBgLabel, stockSegments[0].slowmoFactor, stockSegments[0].isFlip));
+    filterParts.push(stockNormalizeFilterChain(`0:v`, vBgLabel, stockSegments[0].slowmoFactor, stockSegments[0].isFlip));
   } else {
-      const minDur = Math.min(...stockSegments.map(s => s.duration));
-      const fade = Math.max(0.15, Math.min(STOCK_VIDEO.CROSSFADE_SEC, minDur * 0.45));
-      for (let i = 0; i < stockSegments.length; i++) {
-        filterParts.push(stockNormalizeFilterChain(`${i}:v`, `s${i}`, stockSegments[i].slowmoFactor, stockSegments[i].isFlip));
-      }
-      let accLen = stockSegments[0].duration;
-      let cur = 's0';
-      for (let i = 1; i < stockSegments.length; i++) {
-        const offset = accLen - fade;
-        const outTag = i === stockSegments.length - 1 ? vBgLabel : `xf${i}`;
-        filterParts.push(`[${cur}][s${i}]xfade=transition=fade:duration=${fade.toFixed(4)}:offset=${offset.toFixed(4)}[${outTag}]`);
-        cur = outTag;
-        accLen += stockSegments[i].duration - fade;
-      }
+    const minDur = Math.min(...stockSegments.map(s => s.duration));
+    const fade = Math.max(0.15, Math.min(STOCK_VIDEO.CROSSFADE_SEC, minDur * 0.45));
+    for (let i = 0; i < stockSegments.length; i++) {
+      filterParts.push(stockNormalizeFilterChain(`${i}:v`, `s${i}`, stockSegments[i].slowmoFactor, stockSegments[i].isFlip));
+    }
+    let accLen = stockSegments[0].duration;
+    let cur = 's0';
+    for (let i = 1; i < stockSegments.length; i++) {
+      const offset = accLen - fade;
+      const outTag = i === stockSegments.length - 1 ? vBgLabel : `xf${i}`;
+      filterParts.push(`[${cur}][s${i}]xfade=transition=fade:duration=${fade.toFixed(4)}:offset=${offset.toFixed(4)}[${outTag}]`);
+      cur = outTag;
+      accLen += stockSegments[i].duration - fade;
+    }
   }
 
   // Drawbox + Subtitles Graph
   let currentVLabel = vBgLabel;
   if (subtitlePath) {
-      convertSrtToAss(subtitlePath, tempSubPath);
-      const subPathEscaped = escapePathForFfmpegSubtitles(tempSubPath);
-      const fontsDirEscaped = escapePathForFfmpegSubtitles(SUBTITLE_FONT_DIR);
-      const subtitleBoxHeight = Math.floor(STOCK_VIDEO.CANVAS_H / 3);
-      const drawboxFilter = `drawbox=x=0:y=ih-h-${SUBTITLE_MARGIN_BOTTOM_PX}:w=iw:h=${subtitleBoxHeight}:color=black@${SUBTITLE.BOX_OPACITY}:t=fill`;
-      const subFilter = fs.existsSync(SUBTITLE_FONT_FILE)
-        ? `subtitles='${subPathEscaped}:fontsdir=${fontsDirEscaped}'`
-        : `subtitles='${subPathEscaped}'`;
-        
-      filterParts.push(`[${currentVLabel}]null[vpadded]`);
+    convertSrtToAss(subtitlePath, tempSubPath, useJaSubtitleStyle);
+    const subPathEscaped = escapePathForFfmpegSubtitles(tempSubPath);
+    const fontsDirEscaped = escapePathForFfmpegSubtitles(SUBTITLE_FONT_DIR);
+    const subtitleBoxHeight = Math.floor(STOCK_VIDEO.CANVAS_H / 3);
+    const drawboxFilter = `drawbox=x=0:y=ih-h-${SUBTITLE_MARGIN_BOTTOM_PX}:w=iw:h=${subtitleBoxHeight}:color=black@${SUBTITLE.BOX_OPACITY}:t=fill`;
+    const subFilter = fs.existsSync(SUBTITLE_FONT_FILE)
+      ? `subtitles='${subPathEscaped}:fontsdir=${fontsDirEscaped}'`
+      : `subtitles='${subPathEscaped}'`;
+
+    filterParts.push(`[${currentVLabel}]null[vpadded]`);
+    if (useJaSubtitleStyle) {
+      filterParts.push(`[vpadded]${subFilter}[v_subbed]`);
+      console.log('Phụ đề (JA): không hộp nền — chữ cyan / viền đen dày.');
+    } else {
       filterParts.push(`[vpadded]${drawboxFilter}[v1b]`);
       filterParts.push(`[v1b]${subFilter}[v_subbed]`);
-      currentVLabel = 'v_subbed';
+    }
+    currentVLabel = 'v_subbed';
   } else {
-      filterParts.push(`[${currentVLabel}]null[vpadded]`);
-      currentVLabel = 'vpadded';
+    filterParts.push(`[${currentVLabel}]null[vpadded]`);
+    currentVLabel = 'vpadded';
   }
 
   // Logo Graph
   if (hasLogo) {
-      const r = Math.floor(LOGO.SIZE / 2);
-      const geqExpr = `if(lte(hypot(X-W/2,Y-H/2),${r}),255,0)`;
-      filterParts.push(`[${logoIndex}:v]scale=${LOGO.SIZE}:${LOGO.SIZE}:flags=fast_bilinear,format=rgba,geq=r='r(X,Y)':g='g(X,Y)':b='b(X,Y)':a='${geqExpr}'[logo]`);
-      filterParts.push(`[${currentVLabel}][logo]overlay=main_w-overlay_w-${LOGO.MARGIN_RIGHT}:${LOGO.MARGIN_TOP}[vout_final]`);
-      currentVLabel = 'vout_final';
+    const r = Math.floor(LOGO.SIZE / 2);
+    const geqExpr = `if(lte(hypot(X-W/2,Y-H/2),${r}),255,0)`;
+    filterParts.push(
+      `[${logoIndex}:v]scale=${LOGO.SIZE}:${LOGO.SIZE}:flags=fast_bilinear,format=rgba,geq=r='r(X,Y)':g='g(X,Y)':b='b(X,Y)':a='${geqExpr}'[logo]`
+    );
+    filterParts.push(`[${currentVLabel}][logo]overlay=main_w-overlay_w-${LOGO.MARGIN_RIGHT}:${LOGO.MARGIN_TOP}[vout_final]`);
+    currentVLabel = 'vout_final';
   } else {
-      filterParts.push(`[${currentVLabel}]copy[vout_final]`);
+    filterParts.push(`[${currentVLabel}]copy[vout_final]`);
   }
 
   const fullGraph = filterParts.join(';');
   fs.writeFileSync(filterScriptPath, fullGraph, 'utf-8');
 
   mergeArgs.push(
-      '-filter_complex_script', filterScriptPath,
-      '-map', '[vout_final]',
-      '-map', '[aout]',
-      ...GPU_INFO.videoEncodeArgs,
-      '-c:a', 'aac', '-b:a', '128k',
-      '-t', String(audioDurationAfterTempo),
-      outputPath
+    '-filter_complex_script',
+    filterScriptPath,
+    '-map',
+    '[vout_final]',
+    '-map',
+    '[aout]',
+    ...GPU_INFO.videoEncodeArgs,
+    '-c:a',
+    'aac',
+    '-b:a',
+    '128k',
+    '-t',
+    String(audioDurationAfterTempo),
+    outputPath
   );
 
   console.log(`Đang merge nội dung Single-Pass Pipeline...`);
@@ -672,7 +729,7 @@ async function processOne(bgNameArg, options = {}) {
     // Thumbnail YouTube, Flow và file Transcript (SRT/VTT)
     if (fs.existsSync(downloadsDir)) {
       const downloadFiles = fs.readdirSync(downloadsDir);
-      
+
       // Thumbnail
       const thumbFile = downloadFiles.find(f => /\.(jpg|jpeg|png|webp)$/i.test(f));
       if (thumbFile) {
@@ -682,8 +739,8 @@ async function processOne(bgNameArg, options = {}) {
         console.log(`>>> Đã copy thumbnail YouTube: ${thumbDestPath}`);
       }
 
-      // Transcript (Subtitle)
-      const transcriptFiles = downloadFiles.filter(f => /\.(srt|vtt)$/i.test(f));
+      // Transcript (Subtitle): .srt/.vtt và bản `*.srt.cleaned` (sau clean VTT, trước Gemini)
+      const transcriptFiles = downloadFiles.filter(f => /\.(srt|vtt)$/i.test(f) || /\.srt\.cleaned$/i.test(f));
       for (const transcript of transcriptFiles) {
         const trDestPath = path.join(perVideoDir, transcript);
         fs.copyFileSync(path.join(downloadsDir, transcript), trDestPath);
@@ -716,6 +773,65 @@ async function processOne(bgNameArg, options = {}) {
     fs.writeFileSync(metaPath, JSON.stringify(metaPayload, null, 2), 'utf8');
     console.log(`>>> Đã lưu metadata: ${metaPath}`);
   }
+}
+
+/**
+ * Test nhanh: tạo video từ audio + phụ đề đã có trong một thư mục — không download, không Gemini, không pipeline transcript.
+ * Audio: file đầu tiên theo alphabet trong `downloadsDir` (mp3/m4a/wav/aac). Phụ đề: `getSubtitleFile` (ưu tiên .srt).
+ *
+ * @param {object} [options]
+ * @param {string} [options.downloadsDir] - Folder chứa audio + .srt/.vtt. Mặc định: `job_*` mới nhất trong `downloads/`, không có thì `downloads/`.
+ * @param {boolean} [options.preferLatestJobFolder=true] - Khi không truyền `downloadsDir`: ưu tiên thư mục job mới nhất.
+ * @param {string} [options.stockFolder] - Tên folder trong MaVidMedia/backgrounds (mặc định giống batch: env / cat).
+ * @param {number} [options.audioSpeed] - atempo; không set → random như `processOne`.
+ * @param {number} [options.stockVideoCount]
+ * @param {boolean} [options.showLogo]
+ * @param {string} [options.channel] - Dùng khi resolve logo (kèm showLogo).
+ * @param {string} [options.logoSearchDir] - Thư mục fallback khi resolve logo (mặc định: parent của `downloadsDir`).
+ * @param {string|null} [options.logoPath] - Logo tường minh (ưu tiên hơn resolve từ channel).
+ * @param {string} [options.perVideoDir] - Nếu set: copy video + transcript + video-meta tương tự batch. Nếu không: chỉ file trong `outputs/`.
+ * @param {string} [options.title] - Tiêu đề cho tên file output / metadata.
+ * @param {string} [options.description]
+ * @param {string|string[]} [options.tags]
+ * @param {string} [options.videoLanguage] - `ja` để ép style phụ đề Nhật (nếu không suy ra từ tên file).
+ * @returns {Promise<{ downloadsDir: string, ok: true }>}
+ */
+export async function testMakeVideoFromDownloads(options = {}) {
+  let downloadsDir = options.downloadsDir;
+  if (!downloadsDir) {
+    downloadsDir = options.preferLatestJobFolder !== false ? getLatestJobDownloadsDir() || DOWNLOADS_DIR : DOWNLOADS_DIR;
+  }
+  downloadsDir = path.resolve(downloadsDir);
+
+  const stockFolder = resolveDefaultStockFolder(options);
+  const wantLogo = shouldShowLogo(options);
+  const explicitLogo = options.logoPath != null && String(options.logoPath).trim() && fs.existsSync(options.logoPath);
+  const runLogoPath = explicitLogo
+    ? options.logoPath
+    : wantLogo
+    ? resolveLogoFromChannelFolder(options, options.logoSearchDir || path.dirname(downloadsDir))
+    : null;
+  if (wantLogo && runLogoPath) {
+    console.log(`[logo] ${runLogoPath}`);
+  } else if (wantLogo && !runLogoPath) {
+    console.warn('[logo] showLogo bật nhưng không có ảnh logo hợp lệ.');
+  }
+
+  await processOne(stockFolder, {
+    downloadsDir,
+    logoPath: runLogoPath,
+    audioSpeed: options.audioSpeed,
+    stockVideoCount: options.stockVideoCount,
+    perVideoDir: options.perVideoDir,
+    originalTitle: options.title,
+    description: options.description || '',
+    tags: options.tags || '',
+    url: undefined,
+    geminiByUrl: undefined,
+    videoLanguage: options.videoLanguage,
+  });
+
+  return { downloadsDir, ok: true };
 }
 
 const CHANNELS_ROOT = resolveChannelsDir();
@@ -851,7 +967,7 @@ async function main(options = {}) {
     const { url } = items[itemIndex];
     // Tạo folder download độc lập cho luồng tải đang chạy
     const isolatedDownloadsDir = path.join(ROOT, 'downloads', `job_${Date.now()}_${itemIndex}`);
-    
+
     return downloadSingleVideo(url, {
       mode: MAKE_VIDEO_MODE.FROM_AUDIO,
       thumbnailChannelRoot: destFolder,
@@ -867,10 +983,12 @@ async function main(options = {}) {
         };
         console.log('Đã nhận title/description/tags/summary từ Gemini (sẽ ghi video-meta.json sau khi render).');
       },
-    }).then(result => ({ result, isolatedDownloadsDir })).catch(err => {
-      console.error(`Lỗi tải video ${url}:`, err.message);
-      return { result: null, isolatedDownloadsDir };
-    });
+    })
+      .then(result => ({ result, isolatedDownloadsDir }))
+      .catch(err => {
+        console.error(`Lỗi tải video ${url}:`, err.message);
+        return { result: null, isolatedDownloadsDir };
+      });
   }
 
   if (items.length > 0) {
@@ -885,7 +1003,9 @@ async function main(options = {}) {
     const dlResult = await nextDownloadPromise;
 
     if (i + 1 < items.length) {
-      console.log(`\n>>> [Pipeline] Bắt đầu tải trước video [${i + 2}/${items.length}] trong lúc đang render video [${i + 1}/${items.length}]...`);
+      console.log(
+        `\n>>> [Pipeline] Bắt đầu tải trước video [${i + 2}/${items.length}] trong lúc đang render video [${i + 1}/${items.length}]...`
+      );
       nextDownloadPromise = startDownload(i + 1);
     } else {
       nextDownloadPromise = null;

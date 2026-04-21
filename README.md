@@ -19,3 +19,16 @@ update thêm, có thể chọn video bắt đầu tạo hoặc bắt đầu uplo
 # upload video
 
 phần schedule phải scroll lên trk khi select
+
+# trong detail khi click tạo thì không cần check 60 phút hay không
+
+5
+
+SUBTITLE LENGTH CONSTRAINT:
+
+- Each subtitle line should be SHORT and readable.
+- Prefer:
+  - 15–40 Japanese characters per line (soft limit)
+- HARD RULE:
+  - Do NOT exceed ~50 characters unless absolutely necessary.
+- If a sentence is long → split into multiple logical subtitle lines.
