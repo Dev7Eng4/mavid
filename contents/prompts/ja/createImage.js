@@ -1,64 +1,3 @@
-export const createPromptToCreateThumbnailFromImage = (title, summary) => `
-Use the provided reference image strictly as the base image.
-
-INPUT CONTENT:
-Title: ${title}
-Summary: ${summary}
-
-GOAL:
-Make minimal edits to the existing thumbnail to better match the story.
-
-CRITICAL PRESERVATION (HIGHEST PRIORITY):
-- Keep ALL characters exactly as they are.
-- DO NOT remove any character.
-- DO NOT add new characters.
-- DO NOT change the number of people.
-- Keep original positions of all characters.
-- Keep the original composition and layout unchanged.
-
-IDENTITY LOCK:
-- Each character must remain exactly the same person.
-- Do NOT change face shape, hairstyle, or identity.
-- Do NOT redraw or replace any character.
-
-ALLOWED EDITS (ONLY SMALL ADJUSTMENTS):
-- Slightly adjust facial expressions (eyes, eyebrows, mouth)
-- Add minor emotional effects (tears, sweat, anger marks)
-- Slight color adjustments (lighting, contrast, tint)
-- Enhance mood using overlays (red tone, dark shadows, glow)
-- Slight emphasis (zoom-in feeling, but do not crop out characters)
-
-STRICTLY FORBIDDEN:
-- Removing or replacing characters
-- Changing composition or layout
-- Changing camera angle
-- Redrawing the entire image
-- Creating a new scene
-
-TEXT:
-- Add or update short Japanese 2ch-style text based on title and summary
-- Keep it short (1–2 lines), dramatic and emotional
-- Place text without covering important character faces
-
-STYLE:
-- Preserve original art style exactly
-- Only enhance contrast and emotional impact
-
-SAFETY:
-- No real people
-- No copyrighted characters
-- No explicit or violent content
-
-IMPORTANT:
-This is a MINOR EDIT task, not a full redesign.
-Preserve 90–95% of the original image.
-
-OUTPUT:
-- Same thumbnail with subtle emotional enhancements
-- All characters intact
-- Stronger emotional clarity
-`;
-
 export const createPromptToCreateThumbnailOnlyTextFromImage = (title, summary) => `
 Use the provided reference image as the base.
 
@@ -228,4 +167,84 @@ A high-CTR Japanese-style YouTube thumbnail that:
 - keeps EXACT SAME characters from the reference image
 - reflects the story from title + summary
 - maximizes curiosity and emotional impact
+`;
+
+export const promptToCreateThumbnailSukatto = (title, summary) => `
+You are an expert Japanese YouTube thumbnail designer specializing in the "Sukatto" (cathartic revenge) and "2ch/5ch Story" niche. Your goal is to maximize CTR by creating high-tension, emotional, and text-heavy visuals.
+
+Your task is to CREATE A NEW THUMBNAIL by editing the provided reference image.
+
+INPUT:
+- Reference Image: (Attached)
+- Title: ${title}
+- Summary: ${summary}
+
+--------------------------------------------------
+CORE RULE (HIGHEST PRIORITY):
+You MUST PRESERVE the EXACT SAME CHARACTERS from the reference image.
+- Keep identical face identity, facial structure, hairstyle, hair color, and outfit.
+- DO NOT change the 2D Anime/Manga art style.
+- Consistency is key: the characters must be recognizable as the same people from the video series.
+
+--------------------------------------------------
+ANTI-DRIFT CONSTRAINTS:
+- Image-to-image transformation strength: LOW (95–100% visual similarity).
+- Do NOT add new main characters.
+- Do NOT crop out the dramatic facial expressions.
+
+--------------------------------------------------
+AUTO CONTENT UNDERSTANDING (SUKATTO SPECIALIZED):
+- Analyze the Title + Summary to detect the "Zamaa" (Payback) or "Shuraba" (Conflict) moment.
+- Identify the Villain (Antagonist) and the Hero (Protagonist).
+- Focus the thumbnail on the peak moment of "Truth Revealed" or "Divine Punishment."
+
+--------------------------------------------------
+EMOTION DESIGN (THE "FACE FAULT" STYLE):
+- The Villain: Exaggerated "Kao-gei" (facial performance). Eyes wide with terror, heavy sweating (manga style), mouth agape in shock. Use dark eye-shadowing to represent despair.
+- The Protagonist: Cold, smug, or a satisfied smirk (Niyari). Sharp, confident eyes looking directly at the villain or the viewer.
+- Use Manga symbols: Vein marks (anger), tear drops (despair), or glowing eyes (power).
+
+--------------------------------------------------
+COMPOSITION (SPLIT-SCREEN DYNAMICS):
+- Use a "Split Composition" (Diagonal or Vertical).
+- Side A (Despair): The villain's face in a dark, blue/purple tinted close-up.
+- Side B (Victory): The protagonist's face or upper body in a bright, high-contrast spotlight.
+- Background: Use "Speed Lines" or "Focus Lines" radiating from the center to create urgency.
+
+--------------------------------------------------
+JAPANESE THUMBNAIL STYLE:
+- Typography: Bold, "Gothic" or "Display" fonts with 2-3 layers of thick strokes (Outline).
+- Zabuton: Place text on high-contrast color blocks (Red, Black, or Yellow).
+- Add Japanese Text (Choose the most fitting for CTR):
+  - 「絶望の瞬間」 (Moment of Despair)
+  - 「自業自得ｗ」 (You get what you deserve lol)
+  - 「衝撃の結末」 (Shocking ending)
+  - 「復讐開始」 (Revenge begins)
+  - 「サヨナラ…」 (Goodbye...)
+- Use Japanese symbols: 【 】, ！, ？, ｗ
+
+--------------------------------------------------
+VISUAL IMPACT:
+- Color Palette: 
+  - Red/Yellow = High energy / Warning / Success.
+  - Black/Dark Purple = Evil / Betrayal / Sadness.
+- Lighting: Dramatic rim lighting to make characters "pop" from the background.
+- Props: Include symbolic items mentioned in the summary (e.g., Divorce papers, Smartphone with a secret message, a pile of cash, or a Tower Mansion silhouette).
+
+--------------------------------------------------
+QUALITY:
+- Ultra-sharp 2D Anime rendering.
+- High saturation and contrast for mobile readability.
+- Clear focal point on the eyes and mouth of characters.
+
+--------------------------------------------------
+NEGATIVE CONSTRAINTS:
+- No realistic/3D shift.
+- No identity drift (must be the same characters).
+- No unreadable or thin text.
+- No calm or subtle expressions; must be EXTREME.
+
+--------------------------------------------------
+OUTPUT:
+A high-CTR Japanese "Sukatto" style thumbnail that captures the exact moment the villain realizes they have lost, using aggressive Japanese typography and character-driven storytelling.
 `;

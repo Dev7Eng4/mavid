@@ -8,9 +8,11 @@ import {
   checkSrtMergedCueIndexSequence,
   formatDataForLLM,
   mergedBlocksToSrt,
+  msToSrtTimestamp,
   parseAndCleanSRT,
   renumberSrtCueIndices,
   shiftMergedBlocksTimes,
+  srtTimestampToMs,
 } from '../utils/srt.util.js';
 import { openGeminiPage, sendPromptToGemini } from './browser.util.js';
 import { getSrtDurationInMinutes } from './srtTiming.util.js';
@@ -55,8 +57,9 @@ function createSlidingWindows(jsonSubtitles, chunkSize = 30, overlapSize = 5) {
 }
 
 /**
- * Ghép kết quả AI vào Timestamp gốc.
- * Trùng khoảng (ví dụ `[41-41]` rồi `[41-42]`): dòng sau ghi đè text cho từng id, rồi gom các cue liên tiếp cùng nội dung thành một block.
+ * Ghép kết quả AI vào timestamp: mỗi dòng hợp lệ `[a-b] text` / `[n] text` thành một block.
+ * Thời gian phân bổ từ start(cue đầu) tới end(cue cuối) của `targetSubs` theo tỷ lệ độ dài ký tự từng dòng
+ * (tránh gán câu dài vào ranh ASR rất ngắn, ví dụ số/âm tách riêng).
  * @param {{ id: string, start: string, end: string, text: string }[]} originalSubtitles
  * @param {string} aiResponse
  * @returns {{ startTime: string, endTime: string, text: string }[]}
@@ -67,41 +70,55 @@ function mergeAIResponseToSubtitles(originalSubtitles, aiResponse) {
     .map(l => l.trim())
     .filter(Boolean);
 
-  /** @type {Map<number, string>} */
-  const idToText = new Map();
-
+  /** @type {{ a: number, b: number, text: string }[]} */
+  const segments = [];
   for (const line of lines) {
     const parsed = parseStep2BracketLine(line);
     if (!parsed) continue;
-    const { a, b, rest } = parsed;
-    for (let id = a; id <= b; id++) {
-      idToText.set(id, rest);
-    }
+    segments.push({ a: parsed.a, b: parsed.b, text: parsed.rest });
   }
 
+  if (segments.length === 0) {
+    return [];
+  }
+
+  if (!originalSubtitles.length) {
+    return [];
+  }
+
+  const tStart = srtTimestampToMs(originalSubtitles[0].start);
+  const tEnd = srtTimestampToMs(originalSubtitles[originalSubtitles.length - 1].end);
+  if (Number.isNaN(tStart) || Number.isNaN(tEnd) || tEnd < tStart) {
+    return [];
+  }
+
+  const D = tEnd - tStart;
+  const W = segments.reduce((acc, s) => acc + s.text.length, 0);
+
   const mergedSubtitles = [];
-  const n = originalSubtitles.length;
-  let i = 0;
-  while (i < n) {
-    const startId = parseInt(originalSubtitles[i].id, 10);
-    const text = idToText.get(startId);
-    if (text === undefined) {
-      console.warn(`[Cảnh báo] Thiếu text cho cue ID: ${startId}`);
-      return [];
+  let currentStartMs = tStart;
+  for (let i = 0; i < segments.length; i++) {
+    const { text } = segments[i];
+    let currentEndMs;
+    if (W > 0) {
+      const chunkDuration = Math.floor((text.length / W) * D);
+      currentEndMs = currentStartMs + chunkDuration;
+      if (i === segments.length - 1) {
+        currentEndMs = tEnd;
+      }
+    } else {
+      if (i === segments.length - 1) {
+        currentEndMs = tEnd;
+      } else {
+        currentEndMs = currentStartMs + Math.floor(D / segments.length);
+      }
     }
-    let j = i;
-    const t = text;
-    while (j + 1 < n && idToText.get(parseInt(originalSubtitles[j + 1].id, 10)) === t) {
-      j++;
-    }
-    const startSub = originalSubtitles[i];
-    const endSub = originalSubtitles[j];
     mergedSubtitles.push({
-      startTime: startSub.start,
-      endTime: endSub.end,
-      text: t,
+      startTime: msToSrtTimestamp(currentStartMs),
+      endTime: msToSrtTimestamp(currentEndMs),
+      text,
     });
-    i = j + 1;
+    currentStartMs = currentEndMs;
   }
 
   return mergedSubtitles;

@@ -1,9 +1,5 @@
 import { DEFAULT_PROMPT_LANG } from '../constants/defaultPromptLang.js';
-import {
-  createPromptToCreateThumbnailFromImage,
-  createPromptToCreateThumbnailOnlyTextFromImage,
-  promptToCreateThumbnail,
-} from './ja/createImage.js';
+import { createPromptToCreateThumbnailOnlyTextFromImage, promptToCreateThumbnail } from './ja/createImage.js';
 
 export const PROMPTS_CREATE_THUMBNAIL = {
   ja2CHOnlyText: createPromptToCreateThumbnailOnlyTextFromImage,
