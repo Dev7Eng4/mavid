@@ -243,7 +243,7 @@ export function srtToPlainText(srtContent) {
       return textLines.join('\n');
     })
     .filter(Boolean)
-    .join('\n\n');
+    .join('\n');
 }
 
 const SRT_TIMELINE_LINE_RE = /^\d{2}:\d{2}:\d{2}[.,]\d{3}\s*-->\s*\d{2}:\d{2}:\d{2}[.,]\d{3}/;
