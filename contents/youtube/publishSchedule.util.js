@@ -13,14 +13,15 @@ function parseVideosPerDayPreset(raw) {
     .replace(/\u2013/g, '-');
   if (s === '1-2') return '1-2';
   const n = parseInt(s, 10);
-  if (n === 3) return '3';
-  if (n === 2) return '2';
+  if (Number.isFinite(n) && n >= 1 && n <= 24) {
+    return String(n);
+  }
   return '1';
 }
 
 /**
- * Preset `1-2` → 3 ô giờ trong form; `1`/`2`/`3` → số suất tương ứng mỗi ngày.
- * @param {'1' | '2' | '3' | '1-2'} preset
+ * Preset `1-2` → 3 ô giờ trong form; `"1"`…`"24"` → số suất tương ứng mỗi ngày.
+ * @param {string} preset
  */
 function timeSlotCountForPreset(preset) {
   return preset === '1-2' ? 3 : Number(preset);
@@ -94,9 +95,9 @@ function isWeekend(d) {
 /**
  * Các mốc giờ trong một ngày (local), đã sắp xếp tăng dần.
  * Preset `1-2`: ngày thường chỉ suất 0; cuối tuần suất 1 và 2.
- * Preset `1`/`2`/`3`: mỗi ngày dùng lần lượt 1…N suất từ `timesHHmm`.
+ * Preset số (`"1"`…`"24"`, không gồm `1-2`): mỗi ngày dùng lần lượt 1…N suất từ `timesHHmm`.
  * @param {Date} calendarDay — bất kỳ mốc trong ngày
- * @param {'1' | '2' | '3' | '1-2'} preset
+ * @param {string} preset — `"1-2"` | `"1"`…`"24"`
  * @param {string[]} timesHHmm — đã chuẩn hóa đủ số ô theo preset
  */
 function slotTimesForCalendarDay(calendarDay, preset, timesHHmm) {
@@ -144,7 +145,7 @@ function slotTimesForCalendarDay(calendarDay, preset, timesHHmm) {
 /**
  * Tìm mốc publish local đầu tiên sau `cursor` (không bao gồm cursor).
  * @param {Date} cursor
- * @param {'1' | '2' | '3' | '1-2'} preset
+ * @param {string} preset
  * @param {string[]} timesHHmm
  */
 function nextPublishAfter(cursor, preset, timesHHmm) {
@@ -191,7 +192,7 @@ function toMmDdYyyy(d) {
  * @param {string} params.email
  * @param {number} params.uploadCount — số video cần mốc publish
  * @returns {{
- *   settings: ReturnType<typeof pickPublishFieldsFromChannelRow> & { preset: '1' | '2' | '3' | '1-2', publishTimesNormalized: string[] },
+ *   settings: ReturnType<typeof pickPublishFieldsFromChannelRow> & { preset: string, publishTimesNormalized: string[] },
  *   schedule: Array<{ date: string, time: string, iso: string }> — `date` dạng MM/DD/YYYY
  * }}
  */

@@ -22,6 +22,7 @@ export const YOUTUBE_SELECTOR = {
   tagsInput: '#tags-container input',
   btnNextToRelatedStep: '#next-button button',
   btnAddVideoRelated: '#endscreens-button button',
+  btnSpecificTemplate: '#cards-row .ytve-endscreen-template-picker[aria-label="1 video, 1 subscribe"]',
   btnChooseTemplate: '#cards-row > div:nth-of-type(1) .template-preview',
   boxChooseTemplate: 'ytve-endscreen-template-picker',
   boxEditDetailEndScreen: 'ytve-endscreen-editor-options-panel',

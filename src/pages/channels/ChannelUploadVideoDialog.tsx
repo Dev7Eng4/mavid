@@ -1,89 +1,12 @@
 import { useCallback, useEffect, useState } from 'react';
-import type { GpmProfileRow } from '@/types';
-import { gpmApi } from '@/services';
 import { AppButton } from '@/components/ui/AppButton';
-
-function pickStr(obj: Record<string, unknown>, keys: string[]): string {
-  for (const k of keys) {
-    const v = obj[k];
-    if (v != null && String(v).trim() !== '') return String(v);
-  }
-  return '';
-}
-
-function mapGpmApiProfileRow(row: unknown): GpmProfileRow | null {
-  if (!row || typeof row !== 'object') return null;
-  const o = row as Record<string, unknown>;
-  return {
-    id: pickStr(o, ['id', 'Id', 'ID']),
-    name: pickStr(o, ['name', 'Name']),
-    profilePath: pickStr(o, ['profile_path', 'ProfilePath', 'profilePath']),
-  };
-}
-
-/** Response list profiles GPM (có pagination ở root). */
-type GpmListProfilesEnvelope = {
-  data?: unknown;
-  pagination?: { total_page?: number; page?: number; page_size?: number; total?: number };
-};
-
-/** Dùng chung cho dialog Upload và nút upload từ màn chi tiết kênh. */
-export async function fetchAllGpmProfileRows(): Promise<GpmProfileRow[]> {
-  const rows: GpmProfileRow[] = [];
-  let page = 1;
-  let totalPage = 1;
-  const perPage = 100;
-  do {
-    const res = await gpmApi.listProfiles({ page, per_page: perPage });
-    const env = res as unknown as GpmListProfilesEnvelope;
-    const list = Array.isArray(env.data) ? env.data : [];
-    for (const item of list) {
-      const m = mapGpmApiProfileRow(item);
-      if (m?.id?.trim()) rows.push(m);
-    }
-    const tp = env.pagination?.total_page;
-    totalPage = tp != null && Number.isFinite(Number(tp)) && Number(tp) >= 1 ? Math.floor(Number(tp)) : 1;
-    page += 1;
-  } while (page <= totalPage);
-  return rows;
-}
-
-export function resolveGpmProfileIdByEmail(profiles: GpmProfileRow[], email: string): string | null {
-  const norm = email.trim().toLowerCase();
-  if (!norm) return null;
-  const hit = profiles.find(p => p.name.trim().toLowerCase() === norm);
-  return hit?.id?.trim() || null;
-}
-
-export interface ChannelUploadVideoPayload {
-  /** Một kênh cụ thể (thư mục MaVidMedia/channels/…). */
-  channelFolder: string;
-  /** Email kênh (index / config) — script upload dùng để lấy lịch publish. */
-  email: string;
-  /** `null` = mọi thư mục con đủ .mp4 + thumbnail ảnh (theo thứ tự từ Excel khi không truyền uploadFolderNames). */
-  totalVideos: number | null;
-  /** GPM profile id — suy ra từ email trong mavid-channel-config.json khớp `name` profile. */
-  gpmProfileId: string;
-  /** Chỉ upload các thư mục con (tên = video ID YouTube), đúng thứ tự — dùng từ màn chi tiết kênh. */
-  uploadFolderNames?: string[];
-}
-
-export interface ChannelItem {
-  folder: string;
-  emails: string[];
-}
-
-export interface ChannelUploadVideoDialogProps {
-  /** Kênh đủ điều kiện trong phần đã chọn (ID + EMAIL). */
-  channels: ChannelItem[];
-  /** Số dòng đã tick trên bảng. */
-  selectedRowCount: number;
-  /** Số luồng upload đang chạy nền (từ parent). */
-  activeBackgroundUploadThreads?: number;
-  onClose: () => void;
-  /** Gọi khi đã có payloads hợp lệ; parent tự chạy upload nền (không cần await). */
-  onConfirm: (payloads: ChannelUploadVideoPayload[]) => void;
-}
+import {
+  fetchAllGpmProfileRows,
+  MAX_CONCURRENT_YOUTUBE_UPLOAD_CHANNELS,
+  resolveGpmProfileIdByEmail,
+  type ChannelUploadVideoDialogProps,
+  type ChannelUploadVideoPayload,
+} from './channelUploadVideoHelpers';
 
 function clampInt(n: number, min: number, max: number): number {
   if (!Number.isFinite(n)) return min;
@@ -186,7 +109,8 @@ export function ChannelUploadVideoDialog({
               {eligibleCount > 0 ? (
                 <>
                   {' '}
-                  Sẽ upload cho <strong>{eligibleCount}</strong> kênh có ID và EMAIL.
+                  Sẽ xếp hàng upload cho <strong>{eligibleCount}</strong> kênh có ID và EMAIL (tối đa{' '}
+                  <strong>{MAX_CONCURRENT_YOUTUBE_UPLOAD_CHANNELS}</strong> kênh chạy song song — kênh xong sẽ tự lấy kênh tiếp theo).
                 </>
               ) : (
                 <> Chưa có kênh đủ điều kiện.</>

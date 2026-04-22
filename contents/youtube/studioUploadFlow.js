@@ -9,6 +9,7 @@ import {
   clickElement,
   delay,
   getRandomNumber,
+  humanScroll,
   isVisible,
   pollUntilAnyLocatorVisible,
   scrollUntilVisible,
@@ -30,7 +31,7 @@ function getVideoDurationSeconds(mp4Path) {
     const out = execFileSync(
       'ffprobe',
       ['-v', 'error', '-show_entries', 'format=duration', '-of', 'default=noprint_wrappers=1:nokey=1', mp4Path],
-      { encoding: 'utf-8' }
+      { encoding: 'utf-8' },
     ).trim();
     const n = parseFloat(out);
     return Number.isFinite(n) && n > 0 ? n : null;
@@ -104,6 +105,8 @@ export async function openYoutubeUpload(page, mp4Path) {
   }
 
   await delay(1000, 800);
+
+  await page.keyboard.press('F11');
 
   await clickElement(page, YOUTUBE_SELECTOR.btnCreate);
   await delay(500, 300);
@@ -203,7 +206,7 @@ export async function fillVideoDetails(page, videoFolderPath, showErrorLogs) {
   if (boxUpload) {
     await page.mouse.move(
       boxUpload.x + boxUpload.width / 2 + (Math.random() * 20 - 10),
-      boxUpload.y + boxUpload.height / 2 + (Math.random() * 20 - 10)
+      boxUpload.y + boxUpload.height / 2 + (Math.random() * 20 - 10),
     );
   }
 
@@ -274,27 +277,27 @@ export async function addRelatedVideo(page, _isNeedAddRelatedVideo = false, mp4P
       timeout: 3000,
     });
     await delay(300, 200);
-    await clickElement(page, YOUTUBE_SELECTOR.btnChooseTemplate);
+    await clickElement(page, YOUTUBE_SELECTOR.btnSpecificTemplate);
   } catch {
     showErrorLogs(`Không tìm thấy box choose template`);
   }
 
   await delay(200, 300);
 
-  if (_isNeedAddRelatedVideo) {
-    await clickElement(page, YOUTUBE_SELECTOR.btnSelectElement);
-    await clickElement(page, YOUTUBE_SELECTOR.btnSelectVideo);
+  // if (_isNeedAddRelatedVideo) {
+  await clickElement(page, YOUTUBE_SELECTOR.btnSelectElement);
+  await clickElement(page, YOUTUBE_SELECTOR.btnSelectVideo);
 
-    try {
-      await page.waitForSelector(YOUTUBE_SELECTOR.boxChooseSpecificVideo, {
-        state: 'attached',
-        timeout: 3000,
-      });
-      await clickElement(page, YOUTUBE_SELECTOR.btnCloseChooseSpecificVideo);
-    } catch {
-      showErrorLogs(`Không tìm thấy box choose specific video`);
-    }
-  }
+  //   try {
+  //     await page.waitForSelector(YOUTUBE_SELECTOR.boxChooseSpecificVideo, {
+  //       state: 'attached',
+  //       timeout: 3000,
+  //     });
+  //     await clickElement(page, YOUTUBE_SELECTOR.btnCloseChooseSpecificVideo);
+  //   } catch {
+  //     showErrorLogs(`Không tìm thấy box choose specific video`);
+  //   }
+  // }
 
   await delay(300, 500);
 
@@ -306,7 +309,7 @@ export async function addRelatedVideo(page, _isNeedAddRelatedVideo = false, mp4P
       const elementsTimeline = page.locator(YOUTUBE_SELECTOR.elementTimeline);
 
       try {
-        for (let i = 0; i < 4; i++) {
+        for (let i = 0; i < 3; i++) {
           const ele = elementsTimeline.nth(i);
 
           if (ele) {
@@ -362,16 +365,26 @@ export async function chooseVisibility(page, ctx) {
 
   const slot = ctx?.slot;
 
+  const boxUpload = await page.locator(YOUTUBE_SELECTOR.boxUpload).boundingBox();
+  if (boxUpload) {
+    await page.mouse.move(
+      boxUpload.x + boxUpload.width / 2 + (Math.random() * 20 - 10),
+      boxUpload.y + boxUpload.height / 2 + (Math.random() * 20 - 10),
+    );
+  }
+
+  await humanScroll(page, 80);
+
   if (slot?.date && slot?.time) {
     await clickElement(page, YOUTUBE_SELECTOR.btnChooseSchedule);
-    await delay(200, 200);
+    await delay(500, 200);
     await clickElement(page, YOUTUBE_SELECTOR.btnSelectDate);
-    await delay(200, 300);
+    await delay(500, 300);
     await clickElement(page, YOUTUBE_SELECTOR.inputDate);
     await clearContent(page);
     await delay(500, 200);
     await page.keyboard.insertText(slot.date);
-    await delay(200, 300);
+    await delay(500, 300);
     await page.keyboard.press('Enter');
     await page.keyboard.press('Escape');
 

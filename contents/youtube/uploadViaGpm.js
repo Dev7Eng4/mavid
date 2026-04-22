@@ -16,7 +16,7 @@ import { connectPlaywrightToGpmProfile, closeProfile } from '../scripts/openGpmP
 import { syncChannelAfterYoutubeUpload } from './uploadAfterSync.js';
 import { moveSuccessfulUploadFoldersToVideosArchive } from './moveUploadedFoldersToVideosArchive.js';
 import { getYoutubePublishPlan } from './publishSchedule.util.js';
-import { assignPublishSlotsByVideoDuration } from './publishScheduleByDuration.util.js';
+import { assignPublishSlotsByVideoDuration, pickChronologicallyLatestSlot } from './publishScheduleByDuration.util.js';
 import { apiRootForPlaywright, listUploadJobs } from './uploadJobs.util.js';
 import { assertSafeChannelFolder } from './channelFolder.util.js';
 import { resolveChannelsDir } from '../utils/channelsStoragePath.js';
@@ -128,8 +128,11 @@ export default async function main(raw = {}) {
 
     /** Thư mục video đã chạy xong toàn bộ bước upload + schedule (theo thứ tự jobs). */
     const successfulFolderNames = [];
-    /** Mốc schedule (getYoutubePublishPlan) của video upload thành công cuối cùng — ghi `latestUpload*` trong mavid-channel-config. */
-    let latestSuccessfulScheduleSlot = /** @type {{ date: string, time: string, iso?: string } | null} */ (null);
+    /**
+     * Mốc schedule theo từng job thành công — sau `assignPublishSlotsByVideoDuration` thứ tự thời gian publish
+     * có thể không trùng thứ tự upload; `latestUpload*` phải lấy mốc muộn nhất (không phải slot của video nộp cuối).
+     */
+    const successfulScheduleSlots = [];
 
     for (let i = 0; i < jobs.length; i++) {
       const { folderName, folderPath, mp4Path } = jobs[i];
@@ -152,7 +155,9 @@ export default async function main(raw = {}) {
         baselineUploadedVideosFromConfig++;
         successfulFolderNames.push(folderName);
         const slot = publishSchedule?.[i];
-        latestSuccessfulScheduleSlot = slot && String(slot.date || '').trim() && String(slot.time || '').trim() ? slot : null;
+        if (slot && String(slot.date || '').trim() && String(slot.time || '').trim()) {
+          successfulScheduleSlots.push(slot);
+        }
       } catch (e) {
         console.warn('[upload]', e instanceof Error ? e.message : e);
       }
@@ -161,6 +166,8 @@ export default async function main(raw = {}) {
         await delay(2500 + Math.random() * 1500);
       }
     }
+
+    const latestSuccessfulScheduleSlot = pickChronologicallyLatestSlot(successfulScheduleSlots);
 
     await syncChannelAfterYoutubeUpload({
       channelFolder,

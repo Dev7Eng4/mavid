@@ -27,7 +27,7 @@ export async function moveToTopLeft(
     minDelay: 8,
     maxDelay: 20,
     overshoot: true,
-  }
+  },
 ) {
   const { steps = 60, minDelay = 8, maxDelay = 20, overshoot = true } = options;
 
@@ -45,7 +45,7 @@ export async function moveToTopLeft(
         window.__mouseX = e.clientX;
         window.__mouseY = e.clientY;
       },
-      { once: false }
+      { once: false },
     );
   });
 
@@ -131,7 +131,7 @@ export const selectElement = (page, selector) => {
   return page.locator(selector).first();
 };
 
-async function humanScroll(page, distance) {
+export async function humanScroll(page, distance) {
   // Người thật không cuộn 1 cú wheel = 300px
   // Họ lăn nhiều tick nhỏ liên tiếp, tốc độ không đều
   const tickSize = 80 + Math.random() * 40; // ~80-120px mỗi tick

@@ -472,7 +472,7 @@ function resolveChannelFolderNameFromResult(url, result) {
  * @param {string} options.formMeta.videoType - from_audio | reup_full
  * @param {number} options.formMeta.durationMinutes
  * @param {string} options.formMeta.background
- * @param {string} options.formMeta.videosPerDayPreset - "1" | "2" | "3" | "1-2"
+ * @param {string} options.formMeta.videosPerDayPreset - "1"…"24" | "1-2"
  * @param {string[]} options.formMeta.publishTimes
  * @param {string} [options.formMeta.folderIdOverride] - tên thư mục (ID kênh), tùy chọn
  */
