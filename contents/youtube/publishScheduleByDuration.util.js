@@ -21,10 +21,10 @@ function parseHHmm(raw) {
 
 /**
  * Parse `slot.date` MM/DD/YYYY + `slot.time` HH:mm → Date local.
- * @param {{ date: string, time: string }} slot
+ * @param {{ date: string, time: string, iso?: string }} slot
  * @returns {Date | null}
  */
-function scheduleSlotToLocalDate(slot) {
+export function scheduleSlotToLocalDate(slot) {
   const ds = String(slot?.date ?? '').trim();
   const m = ds.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
   if (!m) return null;
@@ -131,4 +131,41 @@ export function assignPublishSlotsByVideoDuration(jobs, schedule) {
 
   if (out.some(s => s == null)) return schedule;
   return /** @type {typeof schedule} */ (out);
+}
+
+/**
+ * Mốc publish muộn nhất (theo thời gian thực) trong danh sách — dùng khi lịch đã bị gán lại theo độ dài video
+ * (không còn trùng thứ tự upload A, B, C).
+ *
+ * @param {Array<{ date?: string, time?: string, iso?: string } | null | undefined>} slots
+ * @returns {{ date: string, time: string, iso?: string } | null}
+ */
+export function pickChronologicallyLatestSlot(slots) {
+  if (!Array.isArray(slots) || slots.length === 0) return null;
+  /** @type {{ date: string, time: string, iso?: string } | null} */
+  let best = null;
+  let bestMs = -Infinity;
+  for (const s of slots) {
+    if (!s || typeof s !== 'object') continue;
+    const iso = String(s.iso ?? '').trim();
+    let ms = NaN;
+    if (iso) {
+      const d = new Date(iso);
+      ms = d.getTime();
+    } else {
+      const d = scheduleSlotToLocalDate(
+        /** @type {{ date: string, time: string }} */ (s)
+      );
+      ms = d ? d.getTime() : NaN;
+    }
+    if (!Number.isFinite(ms)) continue;
+    if (ms > bestMs) {
+      bestMs = ms;
+      best = /** @type {{ date: string, time: string, iso?: string }} */ (s);
+    }
+  }
+  if (!best) return null;
+  const dateOk = String(best.date ?? '').trim();
+  const timeOk = String(best.time ?? '').trim();
+  return dateOk && timeOk ? best : null;
 }

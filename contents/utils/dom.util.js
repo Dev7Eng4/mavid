@@ -27,7 +27,7 @@ export async function moveToTopLeft(
     minDelay: 8,
     maxDelay: 20,
     overshoot: true,
-  }
+  },
 ) {
   const { steps = 60, minDelay = 8, maxDelay = 20, overshoot = true } = options;
 
@@ -45,7 +45,7 @@ export async function moveToTopLeft(
         window.__mouseX = e.clientX;
         window.__mouseY = e.clientY;
       },
-      { once: false }
+      { once: false },
     );
   });
 

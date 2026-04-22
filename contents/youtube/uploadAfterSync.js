@@ -8,6 +8,7 @@ import fs from 'fs';
 import path from 'path';
 import { resolveChannelsDir } from '../utils/channelsStoragePath.js';
 import { readMavidChannelConfigFile } from './channelConfig.util.js';
+import { pickChronologicallyLatestSlot } from './publishScheduleByDuration.util.js';
 
 export const MAVID_CHANNEL_CONFIG_FILENAME = 'mavid-channel-config.json';
 
@@ -194,8 +195,8 @@ function resolveLatestScheduleSlotForConfig(p) {
     return isNonEmptyScheduleSlot(s) ? /** @type {{ date: string, time: string }} */ (s) : null;
   }
   const arr = Array.isArray(p.publishSchedule) ? p.publishSchedule : [];
-  const last = arr.length > 0 ? arr[arr.length - 1] : null;
-  return isNonEmptyScheduleSlot(last) ? /** @type {{ date: string, time: string }} */ (last) : null;
+  const best = pickChronologicallyLatestSlot(arr);
+  return isNonEmptyScheduleSlot(best) ? /** @type {{ date: string, time: string }} */ (best) : null;
 }
 
 /** @param {string} url @param {string} folderName */

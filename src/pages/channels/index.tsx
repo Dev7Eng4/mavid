@@ -6,11 +6,7 @@ import { useClientPagination } from '@/hooks/useClientPagination';
 import { PageHeader } from '@/components/ui/PageHeader';
 import { ChannelAddDialog } from './components/ChannelAddDialog';
 import { ChannelCreateVideoDialog } from './components/ChannelCreateVideoDialog';
-import {
-  ChannelUploadVideoDialog,
-  type ChannelUploadVideoPayload,
-  type ChannelItem,
-} from './components/ChannelUploadVideoDialog';
+import { ChannelUploadVideoDialog } from './components/ChannelUploadVideoDialog';
 import { fetchAllGpmProfileRows, resolveGpmProfileIdByEmail } from './utils/gpmProfileHelpers';
 import { ChannelsDetailSection } from './components/ChannelsDetailSection';
 import { DETAIL_TABLE_LOADING_HEADERS } from './models/channelsDetailSectionShared';
@@ -29,6 +25,11 @@ import {
   SCRIPT_FROM_AUDIO,
   SCRIPT_REUP_FULL,
 } from './utils/channelIndexHelpers';
+import {
+  MAX_CONCURRENT_YOUTUBE_UPLOAD_CHANNELS,
+  type ChannelItem,
+  type ChannelUploadVideoPayload,
+} from './channelUploadVideoHelpers';
 
 const INDEX_FILE = 'channels/index.xlsx';
 
@@ -80,7 +81,7 @@ function ChannelsPage() {
   const [createVideoOpen, setCreateVideoOpen] = useState(false);
   const [uploadScheduleInfo, setUploadScheduleInfo] = useState<string | null>(null);
   const [addChannelOpen, setAddChannelOpen] = useState(false);
-  const [addChannelInfo, setAddChannelInfo] = useState<string | null>(null);
+  const [_addChannelInfo, setAddChannelInfo] = useState<string | null>(null);
   const [googleDriveSyncInfo, setGoogleDriveSyncInfo] = useState<string | null>(null);
 
   const loadIndex = useCallback(async () => {
@@ -200,7 +201,7 @@ function ChannelsPage() {
         setIndexSaving(false);
       }
     },
-    [canWriteIndex, indexHeaders, loadIndex],
+    [canWriteIndex, indexHeaders, loadIndex]
   );
 
   type IndexCreateVideoQueueEntry = {
@@ -405,14 +406,14 @@ function ChannelsPage() {
           setIndexListError(
             failures.length === queue.length
               ? `Tất cả ${failures.length} kênh lỗi: ${failures.slice(0, 3).join(' ')}${failures.length > 3 ? '…' : ''}`
-              : `Một số kênh lỗi (${failures.length}/${queue.length}): ${failures.slice(0, 4).join(' ')}${failures.length > 4 ? '…' : ''}`,
+              : `Một số kênh lỗi (${failures.length}/${queue.length}): ${failures.slice(0, 4).join(' ')}${failures.length > 4 ? '…' : ''}`
           );
         }
       } finally {
         setIndexBatchVideo(null);
       }
     },
-    [indexBackgrounds],
+    [indexBackgrounds]
   );
 
   const detailLayout = useMemo(() => {
@@ -507,7 +508,7 @@ function ChannelsPage() {
   const indexPag = useClientPagination(indexDraftRows.length);
   const pageIndexRows = useMemo(
     () => indexDraftRows.slice(indexPag.startIndex, indexPag.startIndex + indexPag.pageSize),
-    [indexDraftRows, indexPag.startIndex, indexPag.pageSize],
+    [indexDraftRows, indexPag.startIndex, indexPag.pageSize]
   );
 
   const indexPageSelectionFlags = useMemo(() => {
@@ -557,7 +558,7 @@ function ChannelsPage() {
 
   const pageDetailRows = useMemo(
     () => filteredRowsWithIndex.slice(detailStartIndex, detailStartIndex + detailPageSize),
-    [filteredRowsWithIndex, detailStartIndex, detailPageSize],
+    [filteredRowsWithIndex, detailStartIndex, detailPageSize]
   );
 
   const detailPageSelectionFlags = useMemo(() => {
@@ -689,7 +690,7 @@ function ChannelsPage() {
         setDetailUpdateMetaBusy(false);
       }
     },
-    [selectedChannel, detail?.rows, detailLayout.linkVideoKey, detailLayout.statusKey],
+    [selectedChannel, detail?.rows, detailLayout.linkVideoKey, detailLayout.statusKey]
   );
 
   async function handleSetStartFromRow(dataRowIndex: number) {
@@ -713,8 +714,8 @@ function ChannelsPage() {
   const detailTheadHeaders = detailLoading
     ? DETAIL_TABLE_LOADING_HEADERS
     : detailLayout.tableHeaders.length > 0
-      ? detailLayout.tableHeaders
-      : ['—'];
+    ? detailLayout.tableHeaders
+    : ['—'];
 
   /** Cột checkbox riêng (chỉ khi có bảng video hoặc đang load). */
   const detailShowSelectColumn = detailLoading || detailLayout.tableHeaders.length > 0;
@@ -737,11 +738,10 @@ function ChannelsPage() {
   /** Kênh có ID + EMAIL trong các dòng đã tick hoặc tất cả dòng nếu không tick (popup Upload video). */
   const uploadChannelsFromSelection = useMemo((): ChannelItem[] => {
     const map = new Map<string, Set<string>>();
-    
+
     // Nếu không chọn dòng nào, lấy toàn bộ dòng có email
-    const activeIndices = indexSelectedRowIndices.size > 0 
-      ? Array.from(indexSelectedRowIndices)
-      : Array.from({ length: indexDraftRows.length }, (_, i) => i);
+    const activeIndices =
+      indexSelectedRowIndices.size > 0 ? Array.from(indexSelectedRowIndices) : Array.from({ length: indexDraftRows.length }, (_, i) => i);
 
     for (const idx of activeIndices) {
       const row = indexDraftRows[idx];
@@ -793,7 +793,7 @@ function ChannelsPage() {
     if (skippedBusy.length > 0) {
       const uniq = [...new Set(skippedBusy)];
       setUploadScheduleInfo(
-        `Bỏ qua ${uniq.length} email đang upload trên luồng khác: ${uniq.join(', ')}. Chờ xong rồi mới chạy lại cho các email đó.`,
+        `Bỏ qua ${uniq.length} email đang upload trên luồng khác: ${uniq.join(', ')}. Chờ xong rồi mới chạy lại cho các email đó.`
       );
     }
 
@@ -807,41 +807,54 @@ function ChannelsPage() {
     if (skippedBusy.length === 0) {
       setUploadScheduleInfo(null);
     }
-    setYoutubeUploadActiveThreads(n => n + claimed.length);
 
     const skipNote = skippedBusy.length > 0 ? `Đã bỏ qua email đang bận: ${[...new Set(skippedBusy)].join(', ')}. ` : '';
 
     void (async () => {
-      const tasks = claimed.map(p => {
+      const queue = [...claimed];
+      const poolSize = Math.max(1, Math.min(MAX_CONCURRENT_YOUTUBE_UPLOAD_CHANNELS, queue.length));
+
+      let ok = 0;
+      let fail = 0;
+
+      async function runOne(p: ChannelUploadVideoPayload) {
         const k = normalizeYoutubeUploadEmailKey(p.email);
-        return window.runner
-          .runScript('uploadYoutubeViaGpm', {
+        setYoutubeUploadActiveThreads(c => c + 1);
+        try {
+          await window.runner!.runScript('uploadYoutubeViaGpm', {
             gpmProfileId: p.gpmProfileId,
             channelFolder: p.channelFolder,
             email: p.email,
             maxUploads: p.totalVideos,
             gpmApiBase: gpmApi.getBaseUrl(),
             ...(p.uploadFolderNames?.length ? { uploadFolderNames: p.uploadFolderNames } : {}),
-          })
-          .finally(() => {
-            uploadingYoutubeEmailsRef.current.delete(k);
-            setYoutubeUploadActiveThreads(c => Math.max(0, c - 1));
           });
-      });
+          ok += 1;
+        } catch {
+          fail += 1;
+        } finally {
+          uploadingYoutubeEmailsRef.current.delete(k);
+          setYoutubeUploadActiveThreads(c => Math.max(0, c - 1));
+        }
+      }
+
+      async function worker() {
+        while (queue.length) {
+          const p = queue.shift();
+          if (!p) break;
+          await runOne(p);
+        }
+      }
 
       try {
-        const settled = await Promise.allSettled(tasks);
-        let ok = 0;
-        let fail = 0;
-        for (const r of settled) {
-          if (r.status === 'fulfilled') ok += 1;
-          else fail += 1;
-        }
+        await Promise.all(Array.from({ length: poolSize }, () => worker()));
         const parts: string[] = [];
         if (ok > 0) parts.push(`${ok} kênh xong`);
         if (fail > 0) parts.push(`${fail} kênh lỗi`);
         setUploadScheduleInfo(
-          `${skipNote}Upload YouTube (${claimed.length} luồng song song): ${parts.join(' — ')}. Kiểm tra GPM / YouTube Studio và tab Logs.`,
+          `${skipNote}Upload YouTube (${claimed.length} kênh, tối đa ${MAX_CONCURRENT_YOUTUBE_UPLOAD_CHANNELS} song song): ${parts.join(
+            ' — '
+          )}. Kiểm tra GPM / YouTube Studio và tab Logs.`
         );
       } catch (e) {
         const msg = e instanceof Error ? e.message : String(e);
@@ -1021,7 +1034,7 @@ function ChannelsPage() {
               selectedChannel
                 ? {
                     canUpdateMeta: Boolean(
-                      detailLayout.linkVideoKey && detailLayout.statusKey && typeof window.runner?.runScript === 'function',
+                      detailLayout.linkVideoKey && detailLayout.statusKey && typeof window.runner?.runScript === 'function'
                     ),
                     updateMetaBusy: detailUpdateMetaBusy,
                     detailActionsLocked: startMarkingIndex !== null,

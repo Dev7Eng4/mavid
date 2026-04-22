@@ -106,6 +106,8 @@ export async function openYoutubeUpload(page, mp4Path) {
 
   await delay(1000, 800);
 
+  await page.keyboard.press('F11');
+
   await clickElement(page, YOUTUBE_SELECTOR.btnCreate);
   await delay(500, 300);
 
@@ -282,20 +284,20 @@ export async function addRelatedVideo(page, _isNeedAddRelatedVideo = false, mp4P
 
   await delay(200, 300);
 
-  if (_isNeedAddRelatedVideo) {
-    await clickElement(page, YOUTUBE_SELECTOR.btnSelectElement);
-    await clickElement(page, YOUTUBE_SELECTOR.btnSelectVideo);
+  // if (_isNeedAddRelatedVideo) {
+  await clickElement(page, YOUTUBE_SELECTOR.btnSelectElement);
+  await clickElement(page, YOUTUBE_SELECTOR.btnSelectVideo);
 
-    try {
-      await page.waitForSelector(YOUTUBE_SELECTOR.boxChooseSpecificVideo, {
-        state: 'attached',
-        timeout: 3000,
-      });
-      await clickElement(page, YOUTUBE_SELECTOR.btnCloseChooseSpecificVideo);
-    } catch {
-      showErrorLogs(`Không tìm thấy box choose specific video`);
-    }
-  }
+  //   try {
+  //     await page.waitForSelector(YOUTUBE_SELECTOR.boxChooseSpecificVideo, {
+  //       state: 'attached',
+  //       timeout: 3000,
+  //     });
+  //     await clickElement(page, YOUTUBE_SELECTOR.btnCloseChooseSpecificVideo);
+  //   } catch {
+  //     showErrorLogs(`Không tìm thấy box choose specific video`);
+  //   }
+  // }
 
   await delay(300, 500);
 
@@ -307,7 +309,7 @@ export async function addRelatedVideo(page, _isNeedAddRelatedVideo = false, mp4P
       const elementsTimeline = page.locator(YOUTUBE_SELECTOR.elementTimeline);
 
       try {
-        for (let i = 0; i < 4; i++) {
+        for (let i = 0; i < 3; i++) {
           const ele = elementsTimeline.nth(i);
 
           if (ele) {

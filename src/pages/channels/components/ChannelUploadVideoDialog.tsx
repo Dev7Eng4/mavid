@@ -1,36 +1,12 @@
 import { useCallback, useEffect, useState } from 'react';
-import { fetchAllGpmProfileRows, resolveGpmProfileIdByEmail } from '../utils/gpmProfileHelpers';
 import { AppButton } from '@/components/ui/AppButton';
-
-export interface ChannelUploadVideoPayload {
-  /** Một kênh cụ thể (thư mục MaVidMedia/channels/…). */
-  channelFolder: string;
-  /** Email kênh (index / config) — script upload dùng để lấy lịch publish. */
-  email: string;
-  /** `null` = mọi thư mục con đủ .mp4 + thumbnail ảnh (theo thứ tự từ Excel khi không truyền uploadFolderNames). */
-  totalVideos: number | null;
-  /** GPM profile id — suy ra từ email trong mavid-channel-config.json khớp `name` profile. */
-  gpmProfileId: string;
-  /** Chỉ upload các thư mục con (tên = video ID YouTube), đúng thứ tự — dùng từ màn chi tiết kênh. */
-  uploadFolderNames?: string[];
-}
-
-export interface ChannelItem {
-  folder: string;
-  emails: string[];
-}
-
-export interface ChannelUploadVideoDialogProps {
-  /** Kênh đủ điều kiện trong phần đã chọn (ID + EMAIL). */
-  channels: ChannelItem[];
-  /** Số dòng đã tick trên bảng. */
-  selectedRowCount: number;
-  /** Số luồng upload đang chạy nền (từ parent). */
-  activeBackgroundUploadThreads?: number;
-  onClose: () => void;
-  /** Gọi khi đã có payloads hợp lệ; parent tự chạy upload nền (không cần await). */
-  onConfirm: (payloads: ChannelUploadVideoPayload[]) => void;
-}
+import {
+  fetchAllGpmProfileRows,
+  MAX_CONCURRENT_YOUTUBE_UPLOAD_CHANNELS,
+  resolveGpmProfileIdByEmail,
+  type ChannelUploadVideoDialogProps,
+  type ChannelUploadVideoPayload,
+} from '../channelUploadVideoHelpers';
 
 function clampInt(n: number, min: number, max: number): number {
   if (!Number.isFinite(n)) return min;
@@ -133,7 +109,8 @@ export function ChannelUploadVideoDialog({
               {eligibleCount > 0 ? (
                 <>
                   {' '}
-                  Sẽ upload cho <strong>{eligibleCount}</strong> kênh có ID và EMAIL.
+                  Sẽ xếp hàng upload cho <strong>{eligibleCount}</strong> kênh có ID và EMAIL (tối đa{' '}
+                  <strong>{MAX_CONCURRENT_YOUTUBE_UPLOAD_CHANNELS}</strong> kênh chạy song song — kênh xong sẽ tự lấy kênh tiếp theo).
                 </>
               ) : (
                 <> Chưa có kênh đủ điều kiện.</>

@@ -205,7 +205,7 @@ export function buildExtraEnvForIndexChannelRow(
 }
 
 /** Lựa chọn «số video update mỗi ngày» trong form; `1-2` = 1 suất ngày thường + 2 suất cuối tuần. */
-export type VideoPerDayPreset = '1' | '2' | '3' | '1-2';
+export type VideoPerDayPreset = '1' | '2' | '3' | '4' | '5' | '1-2';
 
 export function parseVideoPerDayCell(raw: unknown): VideoPerDayPreset {
   const s = String(raw ?? '')
@@ -213,6 +213,8 @@ export function parseVideoPerDayCell(raw: unknown): VideoPerDayPreset {
     .replace(/\u2013/g, '-');
   if (s === '1-2') return '1-2';
   const n = parseInt(s, 10);
+  if (n === 5) return '5';
+  if (n === 4) return '4';
   if (n === 3) return '3';
   if (n === 2) return '2';
   return '1';
