@@ -1,6 +1,7 @@
 /**
  * Đồng bộ dữ liệu sau khi upload YouTube thành công (GPM / script upload):
  * - `mavid-channel-config.json`: uploadedVideos, latestUploadDate, latestUploadTime (theo email hoặc `channels[]` chỉ có 1 phần tử).
+ *   Có thể gọi từng bước: `successfulFolderNames` 1 phần tử + `latestScheduleSlot` mốc vừa xong → tăng +1 và ghi mốc mới ngay.
  * - Excel/CSV kênh: cột STATUS cho các dòng khớp LINK VIDEO ↔ thư mục video.
  */
 

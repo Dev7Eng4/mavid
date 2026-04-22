@@ -110,7 +110,8 @@ export function ChannelUploadVideoDialog({
                 <>
                   {' '}
                   Sẽ xếp hàng upload cho <strong>{eligibleCount}</strong> kênh có ID và EMAIL (tối đa{' '}
-                  <strong>{MAX_CONCURRENT_YOUTUBE_UPLOAD_CHANNELS}</strong> kênh chạy song song — kênh xong sẽ tự lấy kênh tiếp theo).
+                  <strong>{MAX_CONCURRENT_YOUTUBE_UPLOAD_CHANNELS}</strong>                   kênh chạy song song — vừa kết thúc upload nền một
+                  kênh là tới lượt kênh kế, không cần chờ 15 phút tắt Chrome/GPM của kênh trước).
                 </>
               ) : (
                 <> Chưa có kênh đủ điều kiện.</>
@@ -147,7 +148,8 @@ export function ChannelUploadVideoDialog({
               }}
             />
             <p className='text-xs mt-1.5' style={{ color: 'var(--text-muted)' }}>
-              Để trống = lần lượt mọi thư mục con đủ .mp4 và thumbnail ảnh, theo thứ tự từ Excel (status Đã tạo video).
+              Để trống = mọi thư mục con đủ .mp4 và thumbnail, theo thứ tự từ Excel. Mốc lịch từ channel-config: upload theo thứ tự giờ
+              đăng sớm → muộn; mỗi video xong sẽ cập nhật ngày/giờ upload mới nhất và bộ đếm số bài đã đăng trong mavid-channel-config ngay.
             </p>
           </div>
 

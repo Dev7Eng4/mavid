@@ -1,6 +1,7 @@
 /**
  * Upload tuần tự file .mp4 lên YouTube qua trình duyệt profile GPM (API Local + CDP).
  * Mỗi thư mục con trong `MaVidMedia/channels/{channelFolder}/` có ít nhất một .mp4 và một ảnh thumbnail (.png/.jpg/.jpeg) → một lần upload.
+ * Sau khi upload + archive: promise trả về ngay; chờ 15 phút rồi gọi GPM `close` + tắt Playwright chạy nền (không chặn hàng đợi upload nhiều kênh).
  *
  * @param {object} params
  * @param {string} params.gpmProfileId — id profile GPM (UUID)
@@ -16,13 +17,28 @@ import { connectPlaywrightToGpmProfile, closeProfile } from '../scripts/openGpmP
 import { syncChannelAfterYoutubeUpload } from './uploadAfterSync.js';
 import { moveSuccessfulUploadFoldersToVideosArchive } from './moveUploadedFoldersToVideosArchive.js';
 import { getYoutubePublishPlan } from './publishSchedule.util.js';
-import { assignPublishSlotsByVideoDuration, pickChronologicallyLatestSlot } from './publishScheduleByDuration.util.js';
+import { scheduleSlotToLocalDate } from './publishScheduleByDuration.util.js';
 import { apiRootForPlaywright, listUploadJobs } from './uploadJobs.util.js';
 import { assertSafeChannelFolder } from './channelFolder.util.js';
 import { resolveChannelsDir } from '../utils/channelsStoragePath.js';
 import { openYoutubeUpload, selectFile, fillVideoDetails, addRelatedVideo, chooseVisibility } from './studioUploadFlow.js';
 import { logToLogsPage } from '../utils/logToLogsPage.util.js';
 import { resolveGpmProfileIdByEmail } from '../utils/gpm.util.js';
+
+/**
+ * Mốc publish → ms (dùng sắp thứ tự upload: sớm → muộn). Ưu tiên `iso` nếu có.
+ * @param {{ date?: string, time?: string, iso?: string } | null | undefined} s
+ */
+function scheduleSlotToUnixMs(s) {
+  if (!s || typeof s !== 'object') return Number.MAX_SAFE_INTEGER;
+  const iso = String(s.iso ?? '').trim();
+  if (iso) {
+    const t = new Date(iso).getTime();
+    if (Number.isFinite(t)) return t;
+  }
+  const d = scheduleSlotToLocalDate(/** @type {{ date: string, time: string, iso?: string }} */ (s));
+  return d ? d.getTime() : Number.MAX_SAFE_INTEGER;
+}
 
 /**
  * Email kênh trong `mavid-channel-config.json` → `getYoutubePublishPlan` (ngày/giờ public) ở bước Schedule.
@@ -93,10 +109,8 @@ export default async function main(raw = {}) {
         email: scheduleEmail,
         uploadCount: jobs.length,
       });
-      publishSchedule = assignPublishSlotsByVideoDuration(jobs, schedule);
-      if (publishSchedule !== schedule) {
-        console.log('[upload] Đã gán lịch publish theo độ dài video (ngắn → ban ngày, dài → buổi tối).');
-      }
+      /** Thứ tự slot trùng thứ tự upload: video 1 → mốc 1, video 2 → mốc 2, … (từ publishTimes + preset trong config). */
+      publishSchedule = schedule;
       baselineUploadedVideosFromConfig = Number.isFinite(Number(settings?.uploadedVideos))
         ? Math.max(0, Math.floor(Number(settings.uploadedVideos)))
         : 0;
@@ -107,6 +121,16 @@ export default async function main(raw = {}) {
   } else {
     console.warn('[upload] Thiếu email — không tính lịch publish, chỉ bấm Schedule.');
   }
+
+  /** Cặp (job, slot) theo cùng chỉ số, rồi sắp theo mốc publish tăng dần (gần → xa). */
+  const uploadQueue = (() => {
+    const pairs = jobs.map((job, idx) => ({
+      job,
+      slot: publishSchedule && publishSchedule[idx] != null ? publishSchedule[idx] : null,
+    }));
+    if (!publishSchedule || publishSchedule.length !== jobs.length) return pairs;
+    return [...pairs].sort((a, b) => scheduleSlotToUnixMs(a.slot) - scheduleSlotToUnixMs(b.slot));
+  })();
 
   const gpmOpts = { apiBase };
 
@@ -126,17 +150,15 @@ export default async function main(raw = {}) {
     let page = connected.page;
     profileIdToStop = String(connected.gpm?.profileId || gpmProfileId).trim() || gpmProfileId;
 
-    /** Thư mục video đã chạy xong toàn bộ bước upload + schedule (theo thứ tự jobs). */
+    /** Thư mục video đã chạy xong toàn bộ bước upload + schedule (thứ tự giống thứ tự upload theo mốc giờ). */
     const successfulFolderNames = [];
-    /**
-     * Mốc schedule theo từng job thành công — sau `assignPublishSlotsByVideoDuration` thứ tự thời gian publish
-     * có thể không trùng thứ tự upload; `latestUpload*` phải lấy mốc muộn nhất (không phải slot của video nộp cuối).
-     */
-    const successfulScheduleSlots = [];
 
-    for (let i = 0; i < jobs.length; i++) {
-      const { folderName, folderPath, mp4Path } = jobs[i];
-      console.log(`[upload] (${i + 1}/${jobs.length}) Thư mục «${folderName}» → ${path.basename(mp4Path)}`);
+    for (let i = 0; i < uploadQueue.length; i++) {
+      const { job, slot } = uploadQueue[i];
+      const { folderName, folderPath, mp4Path } = job;
+      console.log(
+        `[upload] (${i + 1}/${uploadQueue.length}) Thư mục «${folderName}» → ${path.basename(mp4Path)} (mốc: ${slot?.date ?? '—'} ${slot?.time ?? ''})`
+      );
 
       try {
         if (i === 0) {
@@ -148,34 +170,36 @@ export default async function main(raw = {}) {
         await fillVideoDetails(page, folderPath, showErrorLogs);
         await addRelatedVideo(page, baselineUploadedVideosFromConfig === 2, mp4Path, showErrorLogs);
         await chooseVisibility(page, {
-          slot: publishSchedule?.[i] ?? null,
+          slot: slot ?? null,
           jobIndex: i,
           totalJobs: jobs.length,
         });
         baselineUploadedVideosFromConfig++;
         successfulFolderNames.push(folderName);
-        const slot = publishSchedule?.[i];
-        if (slot && String(slot.date || '').trim() && String(slot.time || '').trim()) {
-          successfulScheduleSlots.push(slot);
+
+        const forLatest =
+          slot && String(slot.date ?? '').trim() && String(slot.time ?? '').trim() ? slot : null;
+        try {
+          await syncChannelAfterYoutubeUpload({
+            channelFolder,
+            email: scheduleEmail,
+            successfulFolderNames: [folderName],
+            latestScheduleSlot: forLatest,
+          });
+        } catch (syncErr) {
+          console.warn('[upload] syncChannelAfterYoutubeUpload sau 1 video:', syncErr instanceof Error ? syncErr.message : syncErr);
         }
       } catch (e) {
-        console.warn('[upload]', e instanceof Error ? e.message : e);
+        const msg = e instanceof Error ? e.message : String(e);
+        console.warn('[upload]', msg);
+        showErrorLogs(`Dừng batch — lỗi ở video ${i + 1}/${uploadQueue.length} («${folderName}»): ${msg}`);
+        break;
       }
 
-      if (i < jobs.length - 1) {
+      if (i < uploadQueue.length - 1) {
         await delay(2500 + Math.random() * 1500);
       }
     }
-
-    const latestSuccessfulScheduleSlot = pickChronologicallyLatestSlot(successfulScheduleSlots);
-
-    await syncChannelAfterYoutubeUpload({
-      channelFolder,
-      email: scheduleEmail,
-      successfulFolderNames,
-      publishSchedule,
-      latestScheduleSlot: latestSuccessfulScheduleSlot,
-    });
 
     const videosArchive = moveSuccessfulUploadFoldersToVideosArchive({
       channelFolder,
@@ -192,34 +216,72 @@ export default async function main(raw = {}) {
       videosArchive,
     };
   } finally {
-    if (profileIdToStop && delayBeforeGpmClose) {
-      logToLogsPage(
-        `[upload] Đã xong — chờ ${GPM_CLOSE_DELAY_MS / 60000} phút rồi mới đóng trình duyệt GPM (profile ${profileIdToStop}).`,
-        'info'
-      );
-      await delay(GPM_CLOSE_DELAY_MS);
-    }
-    /* Chrome do GPM mở: bắt buộc GPM Local API `profiles/close/{id}` (cùng `gpmApi.closeProfile`), sau đó mới ngắt CDP. */
-    if (profileIdToStop) {
+    if (!profileIdToStop) {
+      /* chưa kết nối GPM */
+    } else if (delayBeforeGpmClose) {
+      /**
+       * Không chặn `return` tới `run-script` (Electron) — hàng đợi nhiều kênh song song
+       * cần resolve ngay khi upload + archive xong; chờ 15p + đóng profile chạy nền.
+       */
+      const pid = String(profileIdToStop).trim();
+      const api = gpmOpts.apiBase;
+      const ctx = context;
+      const brw = browser;
+      const delayMs = GPM_CLOSE_DELAY_MS;
+      void (async () => {
+        try {
+          logToLogsPage(
+            `[upload] Đã xong — chờ ${delayMs / 60000} phút (nền) rồi mới đóng trình duyệt GPM (profile ${pid}).`,
+            'info'
+          );
+          await delay(delayMs);
+        } catch (e) {
+          console.warn('[upload] Chờ trước khi đóng GPM:', e instanceof Error ? e.message : e);
+        }
+        try {
+          await closeProfile(pid, { apiBase: api });
+          console.log(`[upload] GPM API closeProfile — ${pid}`);
+        } catch (e) {
+          console.warn('[upload] closeProfile:', e instanceof Error ? e.message : e);
+        }
+        if (ctx) {
+          try {
+            await ctx.close();
+          } catch {
+            /* ignore */
+          }
+        }
+        if (brw) {
+          try {
+            await brw.close();
+          } catch {
+            /* ignore */
+          }
+        }
+      })().catch(e => {
+        console.warn('[upload] Tác vụ nền đóng GPM:', e instanceof Error ? e.message : e);
+      });
+    } else {
+      /* Lỗi trước khi bật delay — đóng nhanh, không chặn tụ lại nhiều 15p nền */
       try {
-        await closeProfile(profileIdToStop, { apiBase: gpmOpts.apiBase });
+        await closeProfile(String(profileIdToStop).trim(), { apiBase: gpmOpts.apiBase });
         console.log(`[upload] GPM API closeProfile — ${profileIdToStop}`);
       } catch (e) {
         console.warn('[upload] closeProfile:', e instanceof Error ? e.message : e);
       }
-    }
-    if (context) {
-      try {
-        await context.close();
-      } catch {
-        /* ignore */
+      if (context) {
+        try {
+          await context.close();
+        } catch {
+          /* ignore */
+        }
       }
-    }
-    if (browser) {
-      try {
-        await browser.close();
-      } catch {
-        /* ignore */
+      if (browser) {
+        try {
+          await browser.close();
+        } catch {
+          /* ignore */
+        }
       }
     }
   }

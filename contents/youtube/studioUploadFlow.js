@@ -356,7 +356,8 @@ export async function addRelatedVideo(page, _isNeedAddRelatedVideo = false, mp4P
 }
 
 /**
- * Chọn «Lên lịch» (Schedule); nếu có `slot` (từ `getYoutubePublishPlan`) thì điền ngày/giờ.
+ * Chọn «Lên lịch» (Schedule); nếu có `slot` (từ kế hoạch publish) thì điền ngày/giờ.
+ * Caller sắp hàng upload theo mốc giờ tăng dần; mỗi lần gọi truyền `slot` ứng với video hiện tại.
  * @param {import('playwright').Page} page
  * @param {{ slot?: { date: string, time: string, iso?: string } | null, jobIndex: number, totalJobs: number }} ctx — `slot.date` MM/DD/YYYY
  */
