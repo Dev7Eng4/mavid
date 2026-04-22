@@ -32,7 +32,8 @@ export function buildMavidEnvForVideoFromAudio(config: VideoFromAudioConfig, ava
     MAVID_AUDIO_SPEED: String(config.audioSpeed),
     MAVID_SHOW_LOGO: config.showLogo ? '1' : '0',
     MAVID_MAX_VIDEOS_PER_BATCH: String(maxVideosPerBatch),
+    /** 0 = tắt lọc tối thiểu; không gửi key thì createBatchVideo mặc định 18 phút. */
+    MAVID_MIN_DURATION_MINUTES: minDur > 0 ? String(minDur) : '0',
   };
-  if (minDur > 0) env.MAVID_MIN_DURATION_MINUTES = String(minDur);
   return env;
 }

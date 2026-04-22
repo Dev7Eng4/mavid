@@ -9,13 +9,24 @@ const CHANNELS_DIR = resolveChannelsDir();
 const MAVID_CHANNEL_CONFIG_FILENAME = 'mavid-channel-config.json';
 
 /**
- * Phút tối thiểu (độ dài video trong Excel) — 0 = không lọc.
- * Env: MAVID_MIN_DURATION_MINUTES
+ * Mặc định: chỉ chọn video có độ dài (cột DURATION) lớn hơn N phút (giây > N×60).
+ * Ghi đè: `props.minDurationMinutes` hoặc env `MAVID_MIN_DURATION_MINUTES`; `0` = tắt lọc tối thiểu.
+ */
+export const MIN_VIDEO_DURATION_MINUTES = 18;
+
+/**
+ * Phút tối thiểu (suy ra ngưỡng lọc dưới) — 0 = không lọc theo tối thiểu.
+ * Không ghi đè: dùng {@link MIN_VIDEO_DURATION_MINUTES}.
+ * Env: MAVID_MIN_DURATION_MINUTES (0 = tắt lọc tối thiểu)
  */
 function resolveMinDurationMinutes(props = {}) {
   const raw = props.minDurationMinutes ?? process.env.MAVID_MIN_DURATION_MINUTES;
+  if (raw === undefined || raw === null || String(raw).trim() === '') {
+    return MIN_VIDEO_DURATION_MINUTES;
+  }
   const n = Number(raw);
-  if (!Number.isFinite(n) || n <= 0) return 0;
+  if (!Number.isFinite(n) || n < 0) return MIN_VIDEO_DURATION_MINUTES;
+  if (n === 0) return 0;
   return Math.min(10080, Math.floor(n));
 }
 
@@ -75,7 +86,7 @@ async function resolveGpmProfileIdByEmail(email) {
 }
 
 /**
- * @param {{ minDurationMinutes?: number; maxDurationMinutes?: number }} options — giá trị đã resolve (0 = tắt)
+ * @param {{ minDurationMinutes?: number; maxDurationMinutes?: number }} options — giá trị đã resolve (0 = tắt min)
  * @returns {{ hasMin: boolean; hasMax: boolean; minSec: number; maxSec: number; needsColumn: boolean }}
  */
 function resolveDurationFilterBounds(options = {}) {
@@ -103,7 +114,8 @@ function durationWithinFilter(sec, bounds) {
   const { hasMin, hasMax, minSec, maxSec } = bounds;
   if (!hasMin && !hasMax) return true;
   if (sec == null) return false;
-  if (hasMin && sec < minSec) return false;
+  /* Min: dài hơn N phút tức sec > N×60 (trùng đúng hết N phút thì loại) */
+  if (hasMin && sec <= minSec) return false;
   if (hasMax && sec > maxSec) return false;
   return true;
 }
@@ -599,7 +611,7 @@ function buildMakeVideoFromAudioOptions(props, channelFolderName) {
  * @param {boolean} [props.showLogo] — (from_audio) true: ảnh đầu tiên trong MaVidMedia/channels/{channel}
  * @param {string} [props.overlay] — (reup_full) tên preset OVERLAY_OPTIONS
  * @param {string|number} [props.videoCropPercent] — (reup_full) VIDEO_CROP_PERCENT
- * @param {number} [props.minDurationMinutes] — chỉ xử lý video có độ dài (cột DURATION) ≥ N phút; 0 = không lọc; env MAVID_MIN_DURATION_MINUTES
+ * @param {number} [props.minDurationMinutes] — chỉ xử lý video có độ dài (cột DURATION) lớn hơn N phút; 0 = không lọc; mặc định {@link MIN_VIDEO_DURATION_MINUTES}; env MAVID_MIN_DURATION_MINUTES
  * @param {number} [props.maxDurationMinutes] — chỉ xử lý video có độ dài (cột DURATION) ≤ N phút; 0 = không lọc; env MAVID_MAX_DURATION_MINUTES
  * @param {number} [props.maxVideosPerBatch] — tối đa N video mỗi lượt; env MAVID_MAX_VIDEOS_PER_BATCH; 0/không set = không giới hạn
  */
@@ -752,7 +764,7 @@ async function main(props = {}) {
   }
   if (minDurationMinutes > 0 || maxDurationMinutes > 0) {
     const parts = [];
-    if (minDurationMinutes > 0) parts.push(`≥ ${minDurationMinutes} phút`);
+    if (minDurationMinutes > 0) parts.push(`dài hơn ${minDurationMinutes} phút`);
     if (maxDurationMinutes > 0) parts.push(`≤ ${maxDurationMinutes} phút`);
     console.log(`[MaVid] Lọc độ dài: ${parts.join(' và ')} (cột DURATION).`);
   }
@@ -760,7 +772,7 @@ async function main(props = {}) {
     const filtered = minDurationMinutes > 0 || maxDurationMinutes > 0;
     throw new Error(
       filtered
-        ? `Không có link video nào thỏa điều kiện độ dài (${minDurationMinutes > 0 ? `tối thiểu ${minDurationMinutes} phút` : ''}${
+        ? `Không có link video nào thỏa điều kiện độ dài (${minDurationMinutes > 0 ? `lớn hơn ${minDurationMinutes} phút` : ''}${
             minDurationMinutes > 0 && maxDurationMinutes > 0 ? ', ' : ''
           }${maxDurationMinutes > 0 ? `tối đa ${maxDurationMinutes} phút` : ''}) trong CSV/Excel.`
         : 'Không có link video nào trong CSV/Excel.',
