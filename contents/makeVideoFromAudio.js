@@ -23,6 +23,7 @@ import { convertAudioFile } from './convertAudio.js';
 import { GPU_INFO } from './utils/hardware.util.js';
 import { unlinkProgressSidecarForSpreadsheet } from './syncProgressToSpreadsheet.js';
 
+const DEFAULT_STOCK_FOLDER = 'nature';
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.join(__dirname, '..');
 const DOWNLOADS_DIR = path.join(ROOT, 'downloads');
@@ -32,8 +33,9 @@ const SUBTITLE_FONT_DIR = path.join(ROOT, 'assets', 'fonts');
 // ==========================================
 // THIẾT LẬP PHỤ ĐỀ (Dễ dàng thay đổi)
 // ==========================================
-const CUSTOM_SUBTITLE_FONT_SIZE = 90;
+const CUSTOM_SUBTITLE_FONT_SIZE = 90; // Giảm để hiển thị ~20 ký tự CJK/dòng (90 → 13 ký tự, 58 → 20 ký tự)
 const CUSTOM_SUBTITLE_LINE_GAP_PX = 0; // Khoảng cách pixel cộng thêm giữa các dòng (0 là mặc định sát nhau)
+const CUSTOM_SUBTITLE_PADDING_HORIZONTAL = 0; // Khoảng cách pixel từ text ra mép trái/phải video
 /** Khoảng cách từ cạnh dưới khung hình tới đáy hộp phụ đề (và vùng chữ). */
 const SUBTITLE_MARGIN_BOTTOM_PX = 40;
 // ==========================================
@@ -370,7 +372,7 @@ function msToSrtTime(totalMs) {
  * @param {number} speed - Tốc độ (vd: 0.91)
  */
 function scaleSrtTimestamps(srtPath, outputSrtPath, speed) {
-  const content = fs.readFileSync(srtPath, 'utf8');
+  const content = fs.readFileSync(srtPath, 'utf8').replace(/\r/g, '');
   // Hệ số scale: duration_new = duration_old / speed
   // → timestamp_new = timestamp_old / speed
   const factor = 1 / speed;
@@ -398,7 +400,7 @@ function escapePathForFfmpegSubtitles(p) {
  * @param {boolean} [japaneseStyle=false]
  */
 function convertSrtToAss(srtPath, assPath, japaneseStyle = false) {
-  const content = fs.readFileSync(srtPath, 'utf8');
+  const content = fs.readFileSync(srtPath, 'utf8').replace(/\r/g, '');
   const cues = content.split(/\n\n+/).filter(Boolean);
 
   const fontName = fs.existsSync(SUBTITLE_FONT_FILE) ? SUBTITLE_FONT_ASS_NAME : 'Arial';
@@ -414,12 +416,11 @@ function convertSrtToAss(srtPath, assPath, japaneseStyle = false) {
   // H_box bằng 1/3 chiều cao video
   const subtitleBoxHeight = Math.floor(STOCK_VIDEO.CANVAS_H / 3);
 
-  // Tính tâm của hộp văn bản (1/3 dưới + margin đáy) để đặt \pos canh giữa tuyệt đối
-  const boxMidX = Math.round(STOCK_VIDEO.CANVAS_W / 2);
+  // Tâm Y của hộp phụ đề — dùng để tính MarginV cho từng dialogue event
   const boxMidY = Math.round(STOCK_VIDEO.CANVAS_H - SUBTITLE_MARGIN_BOTTOM_PX - subtitleBoxHeight / 2);
 
-  const marginV = 0; // Margin không còn tác dụng vì sẽ dùng \pos tuyệt đối cho mỗi dòng
-
+  // Alignment=2 (bottom-center): MarginL/MarginR thực sự kiểm soát khoảng cách trái/phải;
+  // MarginV trong Style = 0 vì sẽ override per-event để căn giữa dọc trong hộp subtitle.
   const header = `[Script Info]
 ScriptType: v4.00+
 PlayResX: ${STOCK_VIDEO.CANVAS_W}
@@ -428,7 +429,7 @@ WrapStyle: 1
 
 [V4+ Styles]
 Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
-Style: Default,${fontName},${CUSTOM_SUBTITLE_FONT_SIZE},${primaryColour},${secondaryColour},${outlineColour},${backColour},-1,0,0,0,100,100,${SUBTITLE.CHAR_SPACING},0,1,${outlinePx},${shadowPx},8,${SUBTITLE.PADDING_HORIZONTAL},${SUBTITLE.PADDING_HORIZONTAL},${marginV},1
+Style: Default,${fontName},${CUSTOM_SUBTITLE_FONT_SIZE},${primaryColour},${secondaryColour},${outlineColour},${backColour},-1,0,0,0,100,100,${SUBTITLE.CHAR_SPACING},0,1,${outlinePx},${shadowPx},2,${CUSTOM_SUBTITLE_PADDING_HORIZONTAL},${CUSTOM_SUBTITLE_PADDING_HORIZONTAL},0,1
 
 [Events]
 Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
@@ -440,7 +441,7 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
       .split('\n')
       .map(l => l.trim())
       .filter(Boolean);
-    const timeRe = /(\d{2}):(\d{2}):(\d{2}),(\d{3}) \-\-> (\d{2}):(\d{2}):(\d{2}),(\d{3})/;
+    const timeRe = /(\d{2}):(\d{2}):(\d{2}),(\d{3}) \-\-\> (\d{2}):(\d{2}):(\d{2}),(\d{3})/;
     let timeLineIdx = -1;
     let match = null;
 
@@ -468,8 +469,8 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
     const textLines = lines.slice(timeLineIdx + 1);
 
     // Tính toán số lượng kí tự tối đa trên 1 dòng để tự động quấn dòng (Word Wrap Programmatic cho chữ CJK)
-    const cw = STOCK_VIDEO.CANVAS_W - SUBTITLE.PADDING_HORIZONTAL * 2;
-    const cSize = CUSTOM_SUBTITLE_FONT_SIZE + SUBTITLE.CHAR_SPACING;
+    const cw = STOCK_VIDEO.CANVAS_W - CUSTOM_SUBTITLE_PADDING_HORIZONTAL * 2;
+    const cSize = CUSTOM_SUBTITLE_FONT_SIZE - SUBTITLE.CHAR_SPACING * 5;
     const maxCharsPerLine = Math.max(1, Math.floor(cw / cSize));
 
     const wrappedLines = [];
@@ -492,10 +493,13 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
 
     const baseText = wrappedLines.join(lineBreakStr);
 
-    // Ép vị trí tuyệt đối vào trung tâm màn hình của hộp phụ đề (Alignment=5)
-    const text = `{\\an5\\pos(${boxMidX},${boxMidY})}` + baseText;
+    // Tính MarginV per-event để căn giữa dọc trong hộp subtitle (Alignment=2: đáy text = CANVAS_H - marginV)
+    const numLines = wrappedLines.length;
+    const totalTextH = numLines * CUSTOM_SUBTITLE_FONT_SIZE + Math.max(0, numLines - 1) * CUSTOM_SUBTITLE_LINE_GAP_PX;
+    // textBottom = boxMidY + totalTextH/2; marginV = CANVAS_H - textBottom
+    const eventMarginV = Math.max(0, Math.round(STOCK_VIDEO.CANVAS_H - boxMidY - totalTextH / 2));
 
-    events += `Dialogue: 0,${start},${end},Default,,0,0,0,,${text}\n`;
+    events += `Dialogue: 0,${start},${end},Default,,0,0,${eventMarginV},,${baseText}\n`;
   }
 
   fs.writeFileSync(assPath, header + events, 'utf-8');
@@ -533,12 +537,12 @@ async function processOne(bgNameArg, options = {}) {
   } = options;
   const speed = speedIn != null && Number.isFinite(Number(speedIn)) && Number(speedIn) > 0 ? Number(speedIn) : resolveAudioSpeed({});
   const stockBgRoot = resolveStockBackgroundsDir();
-  let backgroundName = bgNameArg || 'cat';
+  let backgroundName = bgNameArg || DEFAULT_STOCK_FOLDER;
   let backgroundsDir = path.join(stockBgRoot, backgroundName);
 
   if (!fs.existsSync(backgroundsDir)) {
-    console.warn(`Không tìm thấy folder backgrounds/${backgroundName}/ (MaVidMedia/backgrounds), thử "cat"`);
-    backgroundName = 'cat';
+    console.warn(`Không tìm thấy folder backgrounds/${backgroundName}/ (MaVidMedia/backgrounds), thử "nature"`);
+    backgroundName = DEFAULT_STOCK_FOLDER;
     backgroundsDir = path.join(stockBgRoot, backgroundName);
   }
 
@@ -547,7 +551,7 @@ async function processOne(bgNameArg, options = {}) {
   }
   if (!fs.existsSync(backgroundsDir)) {
     throw new Error(
-      `Không tìm thấy folder stock "${backgroundName}" trong ${stockBgRoot}/ — kiểm tra Settings (VIDEO_STORAGE_ROOT) và tạo thư mục con tương ứng.`
+      `Không tìm thấy folder stock "${backgroundName}" trong ${stockBgRoot}/ — kiểm tra Settings (VIDEO_STORAGE_ROOT) và tạo thư mục con tương ứng.`,
     );
   }
 
@@ -562,8 +566,8 @@ async function processOne(bgNameArg, options = {}) {
   const audioDurationAfterTempo = originalAudioDuration / speed;
   console.log(
     `Thời lượng audio gốc: ${originalAudioDuration.toFixed(1)}s, sau atempo (SPEED=${speed}): ${formatClockDuration(
-      audioDurationAfterTempo
-    )} (${audioDurationAfterTempo.toFixed(1)}s)`
+      audioDurationAfterTempo,
+    )} (${audioDurationAfterTempo.toFixed(1)}s)`,
   );
 
   // 2. Lấy toàn bộ video stock
@@ -680,7 +684,7 @@ async function processOne(bgNameArg, options = {}) {
     const r = Math.floor(LOGO.SIZE / 2);
     const geqExpr = `if(lte(hypot(X-W/2,Y-H/2),${r}),255,0)`;
     filterParts.push(
-      `[${logoIndex}:v]scale=${LOGO.SIZE}:${LOGO.SIZE}:flags=fast_bilinear,format=rgba,geq=r='r(X,Y)':g='g(X,Y)':b='b(X,Y)':a='${geqExpr}'[logo]`
+      `[${logoIndex}:v]scale=${LOGO.SIZE}:${LOGO.SIZE}:flags=fast_bilinear,format=rgba,geq=r='r(X,Y)':g='g(X,Y)':b='b(X,Y)':a='${geqExpr}'[logo]`,
     );
     filterParts.push(`[${currentVLabel}][logo]overlay=main_w-overlay_w-${LOGO.MARGIN_RIGHT}:${LOGO.MARGIN_TOP}[vout_final]`);
     currentVLabel = 'vout_final';
@@ -705,7 +709,7 @@ async function processOne(bgNameArg, options = {}) {
     '128k',
     '-t',
     String(audioDurationAfterTempo),
-    outputPath
+    outputPath,
   );
 
   console.log(`Đang merge nội dung Single-Pass Pipeline...`);
@@ -809,8 +813,8 @@ export async function testMakeVideoFromDownloads(options = {}) {
   const runLogoPath = explicitLogo
     ? options.logoPath
     : wantLogo
-    ? resolveLogoFromChannelFolder(options, options.logoSearchDir || path.dirname(downloadsDir))
-    : null;
+      ? resolveLogoFromChannelFolder(options, options.logoSearchDir || path.dirname(downloadsDir))
+      : null;
   if (wantLogo && runLogoPath) {
     console.log(`[logo] ${runLogoPath}`);
   } else if (wantLogo && !runLogoPath) {
@@ -865,7 +869,7 @@ function resolveDefaultStockFolder(mainOptions) {
   if (o != null && String(o).trim()) return String(o).trim();
   const env = process.env.MAVID_BACKGROUND;
   if (env != null && String(env).trim()) return String(env).trim();
-  return 'cat';
+  return DEFAULT_STOCK_FOLDER;
 }
 
 /** Trả về số cố định hoặc undefined (để processOne + env quyết định / dynamic). */
@@ -1004,7 +1008,7 @@ async function main(options = {}) {
 
     if (i + 1 < items.length) {
       console.log(
-        `\n>>> [Pipeline] Bắt đầu tải trước video [${i + 2}/${items.length}] trong lúc đang render video [${i + 1}/${items.length}]...`
+        `\n>>> [Pipeline] Bắt đầu tải trước video [${i + 2}/${items.length}] trong lúc đang render video [${i + 1}/${items.length}]...`,
       );
       nextDownloadPromise = startDownload(i + 1);
     } else {

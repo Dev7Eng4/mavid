@@ -413,6 +413,14 @@ STRICT RULES (MUST FOLLOW)
   - Multiple sentences are quoted
   - Line becomes too long
 
+SUBTITLE LENGTH CONSTRAINT:
+- Each subtitle line should be SHORT and readable.
+- Prefer:
+  - 15–30 Japanese characters per line (soft limit)
+- HARD RULE:
+  - Do NOT exceed ~35 characters unless absolutely necessary.
+- If a sentence is long → split into multiple logical subtitle lines.
+
 6. NATURAL BREAKING:
 - Split lines at natural pauses:
   - punctuation (、。！？)
