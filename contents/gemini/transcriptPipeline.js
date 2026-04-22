@@ -58,8 +58,7 @@ function createSlidingWindows(jsonSubtitles, chunkSize = 30, overlapSize = 5) {
 
 /**
  * Ghép kết quả AI vào timestamp: mỗi dòng hợp lệ `[a-b] text` / `[n] text` thành một block.
- * Thời gian phân bổ từ start(cue đầu) tới end(cue cuối) của `targetSubs` theo tỷ lệ độ dài ký tự từng dòng
- * (tránh gán câu dài vào ranh ASR rất ngắn, ví dụ số/âm tách riêng).
+ * Thời gian = `start` của cue id `a` và `end` của cue id `b` trong `originalSubtitles` (khớp ASR).
  * @param {{ id: string, start: string, end: string, text: string }[]} originalSubtitles
  * @param {string} aiResponse
  * @returns {{ startTime: string, endTime: string, text: string }[]}
@@ -86,39 +85,31 @@ function mergeAIResponseToSubtitles(originalSubtitles, aiResponse) {
     return [];
   }
 
-  const tStart = srtTimestampToMs(originalSubtitles[0].start);
-  const tEnd = srtTimestampToMs(originalSubtitles[originalSubtitles.length - 1].end);
-  if (Number.isNaN(tStart) || Number.isNaN(tEnd) || tEnd < tStart) {
-    return [];
+  /** @type {Map<number, { id: string, start: string, end: string, text: string }>} */
+  const byId = new Map();
+  for (const sub of originalSubtitles) {
+    const n = parseInt(sub.id, 10);
+    if (!Number.isFinite(n)) continue;
+    byId.set(n, sub);
   }
 
-  const D = tEnd - tStart;
-  const W = segments.reduce((acc, s) => acc + s.text.length, 0);
-
   const mergedSubtitles = [];
-  let currentStartMs = tStart;
-  for (let i = 0; i < segments.length; i++) {
-    const { text } = segments[i];
-    let currentEndMs;
-    if (W > 0) {
-      const chunkDuration = Math.floor((text.length / W) * D);
-      currentEndMs = currentStartMs + chunkDuration;
-      if (i === segments.length - 1) {
-        currentEndMs = tEnd;
-      }
-    } else {
-      if (i === segments.length - 1) {
-        currentEndMs = tEnd;
-      } else {
-        currentEndMs = currentStartMs + Math.floor(D / segments.length);
-      }
+  for (const { a, b, text } of segments) {
+    const first = byId.get(a);
+    const last = byId.get(b);
+    if (!first || !last) {
+      return [];
+    }
+    const startMs = srtTimestampToMs(first.start);
+    const endMs = srtTimestampToMs(last.end);
+    if (Number.isNaN(startMs) || Number.isNaN(endMs) || endMs < startMs) {
+      return [];
     }
     mergedSubtitles.push({
-      startTime: msToSrtTimestamp(currentStartMs),
-      endTime: msToSrtTimestamp(currentEndMs),
+      startTime: msToSrtTimestamp(startMs),
+      endTime: msToSrtTimestamp(endMs),
       text,
     });
-    currentStartMs = currentEndMs;
   }
 
   return mergedSubtitles;
