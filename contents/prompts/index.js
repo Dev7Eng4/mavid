@@ -4,7 +4,9 @@ import { createPromptToCreateThumbnailOnlyTextFromImage, promptToCreateThumbnail
 export const PROMPTS_CREATE_THUMBNAIL = {
   ja2CHOnlyText: createPromptToCreateThumbnailOnlyTextFromImage,
   ja2CHFromOldThumbnail: promptToCreateThumbnail,
-  // ja2CHNewImage: createPromptToCreateThumbnailNewImage,
+  jaLoveStory: promptToCreateThumbnailLoveStory,
+  jaSukattoFullText: promptToCreateThumbnailSukattoFullText,
+  jaSukattoImage: promptToCreateThumbnailSukattoImage,
 };
 
 export const PROMPTS_NEED_IMAGE = ['ja2CHFromOldThumbnail'];
@@ -12,6 +14,18 @@ export const PROMPTS_NEED_IMAGE = ['ja2CHFromOldThumbnail'];
 export const PROMPTS_CREATE_THUMBNAIL_OPTIONS = [
   { label: 'Japan 2CH Từ thumbnail cũ', value: 'ja2CHFromOldThumbnail' },
   { label: 'Japan 2CH Chỉ text', value: 'ja2CHOnlyText' },
+  {
+    label: '[JAPAN] Love Story',
+    value: 'jaLoveStory',
+  },
+  {
+    label: '[JAPAN] Sukatto Full Text',
+    value: 'jaSukattoFullText',
+  },
+  {
+    label: '[JAPAN] Sukatto Image',
+    value: 'jaSukattoImage',
+  },
   // { label: '2CH New Image', value: 'ja2CHNewImage' },
 ];
 
