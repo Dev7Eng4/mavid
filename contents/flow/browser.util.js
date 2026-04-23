@@ -80,7 +80,7 @@ export async function generateImageWithFlow(prompt, pathSave, exportName, settin
 
       if (thumbFile) {
         console.log('🔄 Đang click button attach...');
-        await clickElement(page, FLOW_SELECTOR.btnAttach, true);
+        await clickElement(page, FLOW_SELECTOR.btnAttach);
 
         await delay(2000);
 
@@ -99,7 +99,7 @@ export async function generateImageWithFlow(prompt, pathSave, exportName, settin
             return btn && !btn.disabled;
           },
           FLOW_SELECTOR.btnCreateHaveImage,
-          { timeout: 60000 }
+          { timeout: 60000 },
         );
         console.log('✅ Nút đã sẵn sàng!');
 
@@ -135,7 +135,7 @@ export async function generateImageWithFlow(prompt, pathSave, exportName, settin
           }
           return false;
         },
-        { timeout: 3 * 60 * 1000 }
+        { timeout: 3 * 60 * 1000 },
       ),
     ]);
 
