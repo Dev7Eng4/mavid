@@ -1,6 +1,7 @@
 /**
  * Gửi nội dung SRT tới Gemini qua Playwright, nhận kết quả text đã xử lý.
- * Kết hợp tuần tự (dưới ~30 phút) và song song (từ ~30 phút trở lên) cho transcript.
+ * - Transcript: mở Chrome profile riêng (2,3,4 hoặc 2,3,4,5,6) – KHÔNG dùng profile 1.
+ * - Meta (title, desc, tags): dùng profile 1.
  */
 
 import { openChromeProfile } from '../scripts/makeChromeProfile.js';
@@ -9,9 +10,10 @@ import { internalUpdateTranscript } from './transcriptPipeline.js';
 
 /**
  * Standalone xử lý Meta (title, description, tags, summary).
+ * Dùng profile 1.
  */
 export async function updateVideoMeta(options = {}) {
-  const { context, page } = await openChromeProfile({ visible: true });
+  const { context, page } = await openChromeProfile({ profile: 1, visible: true });
   try {
     return await internalUpdateVideoMeta(page, options);
   } finally {
@@ -21,46 +23,41 @@ export async function updateVideoMeta(options = {}) {
 
 /**
  * Standalone chỉnh transcript SRT.
+ * Tự mở profile riêng (2,3,4 hoặc 2,3,4,5,6) bên trong internalUpdateTranscript.
  */
 export async function updateTranscript(rawSrtContent, options = {}) {
-  const { context, page } = await openChromeProfile({ visible: true });
-  try {
-    return await internalUpdateTranscript(context, page, rawSrtContent, options);
-  } finally {
-    await context.close();
-  }
+  return await internalUpdateTranscript(rawSrtContent, options);
 }
 
 /**
- * Transcript (tùy chọn) + metadata; sau transcript mở tab mới cho meta.
+ * Transcript (tùy chọn) + metadata.
+ * - Transcript: tự mở profile riêng (2–4 hoặc 2–6) bên trong internalUpdateTranscript.
+ * - Meta: mở profile 1.
  * @param {string} rawSrtContent
  * @param {{ updateTranscript?: boolean, language?: string }} [options]
  */
 export async function updateVideoInfo(rawSrtContent, options = {}) {
   const { updateTranscript = true } = options;
 
-  console.log('Đang mở Chrome để xử lý...');
-  const { context, page } = await openChromeProfile({ visible: true });
+  let srtOut = rawSrtContent;
+
+  // === Transcript: mở profile riêng (không dùng profile 1) ===
+  if (updateTranscript) {
+    console.log('Đang xử lý transcript (mở Chrome profile riêng)...');
+    srtOut = await internalUpdateTranscript(rawSrtContent, options);
+    console.log('Đã xong transcript.');
+  }
+
+  // === Meta: dùng profile 1 ===
+  console.log('Đang mở Chrome profile 1 để xử lý metadata (title/description/tags)...');
+  const { context, page } = await openChromeProfile({ profile: 1, visible: true });
 
   try {
-    let srtOut = rawSrtContent;
-    let targetPage = page;
-
-    if (updateTranscript) {
-      srtOut = await internalUpdateTranscript(context, page, rawSrtContent, options);
-      console.log('Đã xong transcript, mở tab mới cho metadata (title/description/tags)...');
-      targetPage = await context.newPage();
-    }
-
-    try {
-      const meta = await internalUpdateVideoMeta(targetPage, {
-        ...options,
-        srtContent: srtOut,
-      });
-      return { srt: srtOut, ...meta };
-    } finally {
-      if (targetPage !== page) await targetPage.close().catch(() => {});
-    }
+    const meta = await internalUpdateVideoMeta(page, {
+      ...options,
+      srtContent: srtOut,
+    });
+    return { srt: srtOut, ...meta };
   } finally {
     await context.close();
   }

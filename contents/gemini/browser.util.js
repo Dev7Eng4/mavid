@@ -131,10 +131,12 @@ export async function sendPromptToGemini(page, prompt) {
   return result;
 }
 
-export async function openGeminiPage(page) {
+export async function openGeminiPage(page, thinkingMode = false) {
   await page.goto(GEMINI_CONFIG.URL, { waitUntil: 'domcontentloaded', timeout: 30000 });
 
   await page.waitForTimeout(getRandomNumber(1000));
 
-  await chooseThinkingMode(page);
+  if (thinkingMode) {
+    await chooseThinkingMode(page);
+  }
 }
