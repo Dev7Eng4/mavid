@@ -373,6 +373,61 @@ ipcMain.handle('write-input-file', async (_event, { content }) => {
   return { ok: true };
 });
 
+// --------------- Nhóm (màn hình Group — `MaVidMedia/channels/group.json`) ---------------
+// resolveChannelsDirFromDisk() — định nghĩa ở dưới (function hoisted).
+
+const GROUP_JSON_BASENAME = 'group.json';
+
+function parseMavidGroupsJson(raw) {
+  const j = JSON.parse(raw);
+  const items = Array.isArray(j.items) ? j.items : [];
+  return {
+    items: items
+      .filter(x => x && typeof x === 'object')
+      .map(x => ({
+        id: String(x.id ?? '').trim(),
+        name: String(x.name ?? '').trim(),
+      }))
+      .filter(x => x.id),
+  };
+}
+
+function readMavidGroupsFile(absPath) {
+  try {
+    if (!fs.existsSync(absPath) || !fs.statSync(absPath).isFile()) {
+      return { items: [] };
+    }
+    const raw = fs.readFileSync(absPath, 'utf8');
+    return parseMavidGroupsJson(raw);
+  } catch {
+    return { items: [] };
+  }
+}
+
+ipcMain.handle('get-mavid-groups', async () => {
+  const channelsDir = await resolveChannelsDirFromDisk();
+  return readMavidGroupsFile(path.join(channelsDir, GROUP_JSON_BASENAME));
+});
+
+ipcMain.handle('set-mavid-groups', async (_event, { items }) => {
+  if (!Array.isArray(items)) throw new Error('items không hợp lệ.');
+  const seen = new Set();
+  const norm = [];
+  for (const it of items) {
+    if (!it || typeof it !== 'object') continue;
+    const id = String(it.id ?? '').trim();
+    const name = String(it.name ?? '').trim();
+    if (!id || seen.has(id)) continue;
+    seen.add(id);
+    norm.push({ id, name });
+  }
+  const channelsDir = await resolveChannelsDirFromDisk();
+  fs.mkdirSync(channelsDir, { recursive: true });
+  const absPath = path.join(channelsDir, GROUP_JSON_BASENAME);
+  fs.writeFileSync(absPath, JSON.stringify({ version: 1, items: norm }, null, 2), 'utf8');
+  return { ok: true };
+});
+
 // --------------- GPM: thư mục dữ liệu + đọc SQLite Profiles ---------------
 
 let sqlJsPromise = null;
@@ -1231,6 +1286,7 @@ ipcMain.handle('write-channel-index', async (_event, { filePath, headers, rows }
     BACKGROUND: 22,
     'LAST UPLOAD': 30,
     STATUS: 12,
+    Group: 28,
   };
   sheet.columns = excelHeaders.map(h => ({ width: colWidths[h] ?? 20 }));
 

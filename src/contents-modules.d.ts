@@ -18,7 +18,20 @@ declare module '@contents/constants/index.js' {
 }
 
 declare module '@contents/prompts/index.js' {
-  /** Key = id style lưu trong channel; value = hàm tạo prompt. */
-  export const PROMPTS_CREATE_THUMBNAIL: Record<string, (...args: unknown[]) => string>;
   export const PROMPTS_CREATE_THUMBNAIL_OPTIONS: readonly { label: string; value: string }[];
+  export const PROMPTS_NEED_IMAGE: readonly string[];
+  /** Key cũ (config) → tên export trong createImage */
+  export const THUMBNAIL_PROMPT_KEY_ALIASES: Readonly<Record<string, string>>;
+  export function resolveThumbnailPromptBuilder(
+    prompts: Record<string, unknown>,
+    styleKey: string | null | undefined
+  ): {
+    build: (title: string, summary: string) => string;
+    isNeedImage: boolean;
+    usedStyleKey: string;
+    didFallback: boolean;
+  };
+  export function loadPromptByLanguage(
+    language: string | null | undefined
+  ): Promise<Record<string, unknown>>;
 }

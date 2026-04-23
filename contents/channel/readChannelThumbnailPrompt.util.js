@@ -8,18 +8,18 @@ const CONFIG_NAME = 'mavid-channel-config.json';
 
 /**
  * @param {string} channelDir — MaVidMedia/channels/{folderId}
- * @returns {string} key trong PROMPTS_CREATE_THUMBNAIL
+ * @returns {string} Tên hàm style (khớp export trong `createImage.js` của từng ngôn ngữ), hoặc chuỗi rỗng = tự động (`resolveThumbnailPromptBuilder`)
  */
 export function readThumbnailPromptKeyFromChannelDir(channelDir) {
   const p = path.join(channelDir, CONFIG_NAME);
-  if (!fs.existsSync(p)) return 'ja2CHFromOldThumbnail';
+  if (!fs.existsSync(p)) return '';
   try {
     const cfg = JSON.parse(fs.readFileSync(p, 'utf8'));
     const list = Array.isArray(cfg.channels) ? cfg.channels : [];
     const first = list[0];
     const key = first && typeof first.thumbnailPrompt === 'string' ? first.thumbnailPrompt.trim() : '';
-    return key || 'ja2CHFromOldThumbnail';
+    return key || '';
   } catch {
-    return 'ja2CHFromOldThumbnail';
+    return '';
   }
 }

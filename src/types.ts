@@ -1,4 +1,4 @@
-export type Page = 'pipeline' | 'create-video' | 'settings' | 'channels' | 'analyst' | 'gpm' | 'logs';
+export type Page = 'pipeline' | 'create-video' | 'settings' | 'channels' | 'groups' | 'analyst' | 'gpm' | 'logs';
 
 export type ScriptId =
   | 'tao-chrome-profile'
@@ -132,6 +132,12 @@ export interface GpmProfileRow {
   profilePath: string;
 }
 
+/** Nhóm lưu trong `MaVidMedia/channels/group.json`. */
+export interface MavidGroupRow {
+  id: string;
+  name: string;
+}
+
 export interface LoadGpmProfilesResult {
   ok: boolean;
   path: string | null;
@@ -238,6 +244,9 @@ export interface AddChannelFromFormParams {
   formMeta: {
     channels: {
       email: string;
+      myChannel?: string;
+      /** ID nhóm trong `group.json`. */
+      groupId?: string;
       videoType: 'from_audio' | 'reup_full';
       durationMinuteFrom: number;
       durationMinuteTo: number | null;
@@ -357,6 +366,8 @@ declare global {
       appendPersistedErrorLog: (line: string) => Promise<{ ok: boolean }>;
       clearPersistedErrorLogs: () => Promise<{ ok: boolean }>;
       minimizeApp: () => Promise<{ ok: boolean }>;
+      getMavidGroups: () => Promise<{ items: MavidGroupRow[] }>;
+      setMavidGroups: (payload: { items: MavidGroupRow[] }) => Promise<{ ok: boolean }>;
     };
   }
 }

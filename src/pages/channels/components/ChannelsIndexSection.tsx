@@ -5,12 +5,14 @@ import { TablePaginationBar } from '@/components/ui/TablePaginationBar';
 import { CHANNELS_INDEX_VISIBLE_COLUMNS, CHANNELS_INDEX_COLUMN_LABELS } from '../models/channelsIndexSection.model';
 
 export function ChannelsIndexSection({
-  indexHeaders,
+  indexHeaders: _indexHeaders,
   indexListError,
   indexLoading,
   indexSaving,
   indexDraftRows,
   pageIndexRows,
+  pageIndexGlobalIndices,
+  indexFilteredCount,
   indexPag,
   indexColCount,
   selectedRowIndices,
@@ -20,6 +22,7 @@ export function ChannelsIndexSection({
   onOpenDetailRow,
   pageSelectAll,
   pageSelectSome,
+  groupNameById = {},
 }: ChannelsIndexSectionProps) {
   /** Prop name = row key trực tiếp; label lấy từ CHANNELS_INDEX_COLUMN_LABELS. */
   const indexDisplayColumns = useMemo(() => {
@@ -102,9 +105,15 @@ export function ChannelsIndexSection({
                     </div>
                   </td>
                 </tr>
+              ) : indexDraftRows.length > 0 && indexFilteredCount === 0 ? (
+                <tr>
+                  <td colSpan={indexColCount} className='px-4 py-8 text-center' style={{ color: 'var(--text-muted)' }}>
+                    Không có dòng nào khớp bộ lọc (email / nhóm).
+                  </td>
+                </tr>
               ) : indexDraftRows.length > 0 ? (
                 pageIndexRows.map((row, i) => {
-                  const globalIndex = indexPag.startIndex + i;
+                  const globalIndex = pageIndexGlobalIndices[i] ?? indexPag.startIndex + i;
                   return (
                     <tr
                       key={globalIndex}
@@ -136,14 +145,28 @@ export function ChannelsIndexSection({
                       </td>
                       {indexDisplayColumns.map((col, colIdx) => {
                         const cell = col.rowKey ? row[col.rowKey] : '';
+                        const raw = String(cell ?? '').trim();
+                        const isGroupCol = col.rowKey === 'mavidGroupId';
+                        const displayText = (() => {
+                          if (!isGroupCol) return String(cell ?? '');
+                          if (!raw) return '';
+                          const name = groupNameById[raw];
+                          return name?.trim() ? name.trim() : raw;
+                        })();
+                        const titleText = (() => {
+                          if (!isGroupCol) return String(cell ?? '');
+                          if (!raw) return '';
+                          const name = groupNameById[raw]?.trim();
+                          return name ? `${name} (${raw})` : raw;
+                        })();
                         return (
                           <td
                             key={`idx-c-${colIdx}-${col.label}`}
                             className='px-4 py-3 align-top wrap-break-word min-w-0'
                             style={{ color: 'var(--text-h)' }}
-                            title={String(cell ?? '')}
+                            title={titleText}
                           >
-                            {String(cell ?? '')}
+                            {displayText}
                           </td>
                         );
                       })}
@@ -183,12 +206,12 @@ export function ChannelsIndexSection({
             </tbody>
           </table>
         </div>
-        {!indexLoading && indexDraftRows.length > 0 ? (
+        {!indexLoading && indexDraftRows.length > 0 && indexFilteredCount > 0 ? (
           <TablePaginationBar
             page={indexPag.page}
             totalPages={indexPag.totalPages}
             onPageChange={indexPag.setPage}
-            totalItems={indexDraftRows.length}
+            totalItems={indexFilteredCount}
             pageSize={indexPag.pageSize}
           />
         ) : null}

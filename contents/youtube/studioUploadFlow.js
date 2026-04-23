@@ -374,7 +374,7 @@ export async function chooseVisibility(page, ctx) {
     );
   }
 
-  await humanScroll(page, 80);
+  await humanScroll(page, 140);
 
   if (slot?.date && slot?.time) {
     await clickElement(page, YOUTUBE_SELECTOR.btnChooseSchedule);

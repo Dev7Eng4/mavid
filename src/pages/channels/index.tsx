@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import type { ChannelData, ChannelFolderDataResult, ChannelRow } from '@/types';
+import type { ChannelData, ChannelFolderDataResult, ChannelRow, MavidGroupRow } from '@/types';
 import { scriptDefs } from '@/types';
 import { MAX_VIDEOS_PREPARE_AHEAD } from '@contents/constants/appSettings.js';
 import { useClientPagination } from '@/hooks/useClientPagination';
+import { CustomSelect } from '@/components/ui/CustomSelect';
 import { PageHeader } from '@/components/ui/PageHeader';
 import { ChannelAddDialog } from './components/ChannelAddDialog';
 import { ChannelCreateVideoDialog } from './components/ChannelCreateVideoDialog';
@@ -25,13 +26,12 @@ import {
   SCRIPT_FROM_AUDIO,
   SCRIPT_REUP_FULL,
 } from './utils/channelIndexHelpers';
-import {
-  MAX_CONCURRENT_YOUTUBE_UPLOAD_CHANNELS,
-  type ChannelItem,
-  type ChannelUploadVideoPayload,
-} from './channelUploadVideoHelpers';
+import { MAX_CONCURRENT_YOUTUBE_UPLOAD_CHANNELS, type ChannelItem, type ChannelUploadVideoPayload } from './channelUploadVideoHelpers';
 
 const INDEX_FILE = 'channels/index.xlsx';
+
+const indexListFilterInputClass =
+  'w-full rounded-xl px-3 py-2.5 text-sm outline-none border transition-colors duration-150';
 
 /** Khớp cột STATUS trong file chi tiết kênh (khi đã tạo file video). */
 const DETAIL_STATUS_VIDEO_CREATED = 'Đã tạo video';
@@ -83,6 +83,37 @@ function ChannelsPage() {
   const [addChannelOpen, setAddChannelOpen] = useState(false);
   const [_addChannelInfo, setAddChannelInfo] = useState<string | null>(null);
   const [googleDriveSyncInfo, setGoogleDriveSyncInfo] = useState<string | null>(null);
+  const [mavidGroupRows, setMavidGroupRows] = useState<MavidGroupRow[]>([]);
+  /** Lọc danh sách kênh (bảng index): email + nhóm. */
+  const [indexListEmailFilter, setIndexListEmailFilter] = useState('');
+  const [indexListGroupFilter, setIndexListGroupFilter] = useState('__all__');
+
+  const groupNameById = useMemo(() => {
+    const m: Record<string, string> = {};
+    for (const g of mavidGroupRows) {
+      const id = String(g.id ?? '').trim();
+      if (id) m[id] = String(g.name ?? '').trim();
+    }
+    return m;
+  }, [mavidGroupRows]);
+
+  const indexGroupFilterOptions = useMemo(() => {
+    const base: { value: string; label: string }[] = [
+      { value: '__all__', label: 'Tất cả' },
+      { value: '__empty__', label: '— (chưa gán nhóm)' },
+    ];
+    const seen = new Set(base.map(b => b.value));
+    for (const g of mavidGroupRows) {
+      const id = String(g.id ?? '').trim();
+      if (!id || seen.has(id)) continue;
+      seen.add(id);
+      base.push({
+        value: id,
+        label: (g.name?.trim() ? g.name.trim() : id) as string,
+      });
+    }
+    return base;
+  }, [mavidGroupRows]);
 
   const loadIndex = useCallback(async () => {
     setIndexLoading(true);
@@ -100,6 +131,12 @@ function ChannelsPage() {
       setIndexEditRowIndex(null);
     } finally {
       setIndexLoading(false);
+    }
+    try {
+      const r = await window.runner?.getMavidGroups?.();
+      setMavidGroupRows(Array.isArray(r?.items) ? r.items : []);
+    } catch {
+      setMavidGroupRows([]);
     }
   }, []);
 
@@ -505,21 +542,53 @@ function ChannelsPage() {
     detailStatusFilter,
   ]);
 
-  const indexPag = useClientPagination(indexDraftRows.length);
+  const indexFilteredIndices = useMemo(() => {
+    const emailQ = indexListEmailFilter.trim().toLowerCase();
+    const groupF = indexListGroupFilter;
+    const out: number[] = [];
+    for (let i = 0; i < indexDraftRows.length; i++) {
+      const row = indexDraftRows[i];
+      if (emailQ) {
+        const e = String(row.email ?? '').toLowerCase();
+        if (!e.includes(emailQ)) continue;
+      }
+      if (groupF !== '__all__') {
+        const gid = String(row.mavidGroupId ?? '').trim();
+        if (groupF === '__empty__') {
+          if (gid) continue;
+        } else if (gid !== groupF) continue;
+      }
+      out.push(i);
+    }
+    return out;
+  }, [indexDraftRows, indexListEmailFilter, indexListGroupFilter]);
+
+  const {
+    page: indexPage,
+    setPage: setIndexPage,
+    startIndex: indexStartIndex,
+    totalPages: indexTotalPages,
+    pageSize: indexPageSize,
+  } = useClientPagination(indexFilteredIndices.length);
+  useEffect(() => {
+    setIndexPage(1);
+  }, [indexListEmailFilter, indexListGroupFilter, setIndexPage]);
+
+  const pageIndexGlobalIndices = useMemo(
+    () => indexFilteredIndices.slice(indexStartIndex, indexStartIndex + indexPageSize),
+    [indexFilteredIndices, indexStartIndex, indexPageSize]
+  );
   const pageIndexRows = useMemo(
-    () => indexDraftRows.slice(indexPag.startIndex, indexPag.startIndex + indexPag.pageSize),
-    [indexDraftRows, indexPag.startIndex, indexPag.pageSize]
+    () => pageIndexGlobalIndices.map(i => indexDraftRows[i]),
+    [indexDraftRows, pageIndexGlobalIndices]
   );
 
   const indexPageSelectionFlags = useMemo(() => {
-    const start = indexPag.startIndex;
-    const end = Math.min(start + indexPag.pageSize, indexDraftRows.length);
-    const onPage: number[] = [];
-    for (let i = start; i < end; i++) onPage.push(i);
+    const onPage = pageIndexGlobalIndices;
     const all = onPage.length > 0 && onPage.every(i => indexSelectedRowIndices.has(i));
     const some = onPage.some(i => indexSelectedRowIndices.has(i));
     return { all, some };
-  }, [indexPag.startIndex, indexPag.pageSize, indexDraftRows.length, indexSelectedRowIndices]);
+  }, [pageIndexGlobalIndices, indexSelectedRowIndices]);
 
   const toggleIndexRowSelected = useCallback((globalIndex: number) => {
     setIndexSelectedRowIndices(prev => {
@@ -531,10 +600,7 @@ function ChannelsPage() {
   }, []);
 
   const toggleIndexSelectAllOnPage = useCallback(() => {
-    const start = indexPag.startIndex;
-    const end = Math.min(start + indexPag.pageSize, indexDraftRows.length);
-    const onPage: number[] = [];
-    for (let i = start; i < end; i++) onPage.push(i);
+    const onPage = pageIndexGlobalIndices;
     setIndexSelectedRowIndices(prev => {
       const next = new Set(prev);
       const allSelected = onPage.length > 0 && onPage.every(i => next.has(i));
@@ -542,7 +608,7 @@ function ChannelsPage() {
       else onPage.forEach(i => next.add(i));
       return next;
     });
-  }, [indexPag.startIndex, indexPag.pageSize, indexDraftRows.length]);
+  }, [pageIndexGlobalIndices]);
 
   const {
     page: detailPageNum,
@@ -1112,6 +1178,49 @@ function ChannelsPage() {
 
       {!selectedChannel ? (
         <>
+          {!indexLoading && indexDraftRows.length > 0 ? (
+            <div
+              className='rounded-2xl p-4 w-full min-w-0 space-y-3'
+              style={{ background: 'var(--card-bg)', border: '1px solid var(--border)' }}
+            >
+              <div className='text-sm font-medium uppercase tracking-wider' style={{ color: 'var(--text-muted)' }}>
+                Tìm & lọc
+              </div>
+              <div className='grid grid-cols-1 md:grid-cols-2 gap-4 items-end'>
+                <label className='block min-w-0'>
+                  <span className='block text-sm mb-2' style={{ color: 'var(--text-h)' }}>
+                    Email
+                  </span>
+                  <input
+                    type='search'
+                    value={indexListEmailFilter}
+                    onChange={e => setIndexListEmailFilter(e.target.value)}
+                    placeholder='Tìm trong email kênh…'
+                    autoComplete='off'
+                    className={indexListFilterInputClass}
+                    style={{
+                      background: 'var(--code-bg)',
+                      color: 'var(--text-h)',
+                      borderColor: 'var(--border)',
+                    }}
+                  />
+                </label>
+                <div className='min-w-0'>
+                  <div className='text-sm mb-2' style={{ color: 'var(--text-h)' }}>
+                    Nhóm
+                  </div>
+                  <CustomSelect
+                    value={indexListGroupFilter}
+                    options={indexGroupFilterOptions}
+                    onChange={setIndexListGroupFilter}
+                    placeholder='Nhóm'
+                    menuZIndex={100}
+                  />
+                </div>
+              </div>
+            </div>
+          ) : null}
+
           <ChannelsIndexSection
             indexHeaders={indexHeaders}
             indexListError={indexListError}
@@ -1119,12 +1228,15 @@ function ChannelsPage() {
             indexSaving={indexSaving}
             indexDraftRows={indexDraftRows}
             pageIndexRows={pageIndexRows}
+            pageIndexGlobalIndices={pageIndexGlobalIndices}
+            indexFilteredCount={indexFilteredIndices.length}
+            groupNameById={groupNameById}
             indexPag={{
-              page: indexPag.page,
-              totalPages: indexPag.totalPages,
-              setPage: indexPag.setPage,
-              pageSize: indexPag.pageSize,
-              startIndex: indexPag.startIndex,
+              page: indexPage,
+              totalPages: indexTotalPages,
+              setPage: setIndexPage,
+              pageSize: indexPageSize,
+              startIndex: indexStartIndex,
             }}
             indexColCount={indexColCount}
             selectedRowIndices={indexSelectedRowIndices}
@@ -1154,7 +1266,8 @@ function ChannelsPage() {
                 if (indexEditRowIndex === null) return;
                 const idx = indexEditRowIndex;
                 const nextRows = indexDraftRows.map((r, i) => (i === idx ? { ...r, ...row } : r));
-                await persistIndexRows(nextRows);
+                const headersForSave = indexHeaders.includes('mavidGroupId') ? indexHeaders : [...indexHeaders, 'mavidGroupId'];
+                await persistIndexRows(nextRows, headersForSave);
               }}
             />
           )}

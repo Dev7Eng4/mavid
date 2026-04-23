@@ -14,6 +14,7 @@
  * BACKGROUND             →  background
  * LAST UPLOAD            →  lastUpload
  * STATUS                 →  status
+ * Group (tùy tệp: GROUP ID cũ) →  mavidGroupId
  */
 
 /** Excel header (UPPER) → camelCase prop name. */
@@ -28,6 +29,9 @@ export const INDEX_HEADER_TO_PROP = {
   BACKGROUND: 'background',
   'LAST UPLOAD': 'lastUpload',
   STATUS: 'status',
+  /** File mới: cột cuối; `GROUP ID` = file cũ vẫn đọc được. */
+  'GROUP ID': 'mavidGroupId',
+  Group: 'mavidGroupId',
 };
 
 /** camelCase prop name → Excel header (viết hoa / tiếng Việt gốc). */

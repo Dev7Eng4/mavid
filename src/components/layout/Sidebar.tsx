@@ -1,11 +1,12 @@
 import type { Page } from '../../types';
-import { PlayIcon, VideoIcon, SettingsIcon, ListIcon, TerminalIcon, FilmIcon, GpmIcon, ChartBarsIcon } from '../ui/Icons';
+import { PlayIcon, VideoIcon, SettingsIcon, ListIcon, GroupIcon, TerminalIcon, FilmIcon, GpmIcon, ChartBarsIcon } from '../ui/Icons';
 import type { ReactNode } from 'react';
 
 const NAV_ITEMS: { id: Page; label: string; icon: ReactNode }[] = [
   { id: 'pipeline', label: 'Pipeline', icon: <PlayIcon className='w-[18px] h-[18px]' /> },
   { id: 'create-video', label: 'Tạo video', icon: <FilmIcon className='w-[18px] h-[18px]' /> },
   { id: 'channels', label: 'Channels', icon: <ListIcon className='w-[18px] h-[18px]' /> },
+  { id: 'groups', label: 'Group', icon: <GroupIcon className='w-[18px] h-[18px]' /> },
   { id: 'analyst', label: 'Analyst', icon: <ChartBarsIcon className='w-[18px] h-[18px]' /> },
   { id: 'gpm', label: 'GPM', icon: <GpmIcon className='w-[18px] h-[18px]' /> },
   { id: 'settings', label: 'Settings', icon: <SettingsIcon className='w-[18px] h-[18px]' /> },

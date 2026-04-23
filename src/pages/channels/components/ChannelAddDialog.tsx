@@ -1,6 +1,6 @@
 import { PROMPTS_CREATE_THUMBNAIL_OPTIONS } from '@contents/prompts/index.js';
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import type { ChannelRow } from '@/types';
+import type { ChannelRow, MavidGroupRow } from '@/types';
 import { AppButton } from '@/components/ui/AppButton';
 import { CustomSelect } from '@/components/ui/CustomSelect';
 import {
@@ -54,6 +54,7 @@ const ADD_FORM_DEFAULT: ChannelAddDialogInitialFields = {
   channelUrl: '',
   email: '',
   myChannel: '',
+  mavidGroupId: '',
   videoType: 'reup_full',
   durationOption: '0_null',
   selectedBackground: '',
@@ -82,6 +83,8 @@ export interface ChannelAddSavePayload {
     email: string;
     /** Cột index «KÊNH CỦA TÔI» + lưu trong mavid-channel-config. */
     myChannel?: string;
+    /** ID nhóm trong `MaVidMedia/channels/group.json`. */
+    groupId?: string;
     videoType: 'from_audio' | 'reup_full';
     durationMinuteFrom: number;
     durationMinuteTo: number | null;
@@ -130,6 +133,7 @@ export function ChannelAddDialog({
     channelUrl,
     email,
     myChannel,
+    mavidGroupId,
     videoType,
     durationOption,
     selectedBackground,
@@ -151,6 +155,36 @@ export function ChannelAddDialog({
   }, [backgroundFolders, selectedBackground]);
 
   const reupOverlayOptionsList = useMemo(() => reupOverlaySelectOptions(), []);
+
+  const [mavidGroupRows, setMavidGroupRows] = useState<MavidGroupRow[]>([]);
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      try {
+        const r = await window.runner?.getMavidGroups?.();
+        if (!cancelled) setMavidGroupRows(Array.isArray(r?.items) ? r.items : []);
+      } catch {
+        if (!cancelled) setMavidGroupRows([]);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const groupSelectOptions = useMemo(() => {
+    const fromFile = mavidGroupRows.map(g => ({
+      value: g.id,
+      label: (g.name?.trim() ? g.name.trim() : g.id) as string,
+    }));
+    const ids = new Set(fromFile.map(o => o.value));
+    const out = [...fromFile];
+    if (mavidGroupId.trim() && !ids.has(mavidGroupId.trim())) {
+      out.unshift({ value: mavidGroupId.trim(), label: `${mavidGroupId.trim()} (đã lưu)` });
+    }
+    return [{ value: '', label: '—' }, ...out];
+  }, [mavidGroupRows, mavidGroupId]);
+
   const thumbnailPromptOptionsList = useMemo(
     () =>
       PROMPTS_CREATE_THUMBNAIL_OPTIONS.map(o => ({
@@ -403,6 +437,7 @@ export function ChannelAddDialog({
             channelUrl,
             email,
             myChannel,
+            mavidGroupId: mavidGroupId.trim(),
             videoType: videoType as 'from_audio' | 'reup_full',
             durationOption,
             background: videoType === 'from_audio' ? resolvedBackground.trim() : '',
@@ -484,6 +519,7 @@ export function ChannelAddDialog({
             {
               email: email.trim(),
               myChannel: myChannel.trim(),
+              ...(mavidGroupId.trim() ? { groupId: mavidGroupId.trim() } : {}),
               videoType: videoType as 'from_audio' | 'reup_full',
               durationMinuteFrom: from,
               durationMinuteTo: to,
@@ -507,6 +543,7 @@ export function ChannelAddDialog({
     durationOption,
     email,
     myChannel,
+    mavidGroupId,
     folderIdOverride,
     requireBackground,
     requireReupOverlay,
@@ -631,6 +668,19 @@ export function ChannelAddDialog({
                 color: 'var(--text-h)',
                 borderColor: 'var(--border)',
               }}
+            />
+          </div>
+
+          <div className='mb-4'>
+            <div className='block text-sm font-medium mb-2' style={{ color: 'var(--text-h)' }}>
+              Nhóm
+            </div>
+            <CustomSelect
+              value={mavidGroupId}
+              options={groupSelectOptions}
+              onChange={v => setForm(f => ({ ...f, mavidGroupId: v }))}
+              placeholder='Chọn nhóm'
+              menuZIndex={100}
             />
           </div>
 

@@ -9,6 +9,7 @@ export const CHANNELS_INDEX_VISIBLE_COLUMNS = [
   'id',
   'link',
   'email',
+  'mavidGroupId',
   'lastUpload',
   'status',
 ] as const;
@@ -18,6 +19,7 @@ export const CHANNELS_INDEX_COLUMN_LABELS: Record<string, string> = {
   id: 'ID',
   link: 'LINK',
   email: 'EMAIL',
+  mavidGroupId: 'NHÓM',
   lastUpload: 'LAST UPLOAD',
   status: 'STATUS',
 };
@@ -40,7 +42,15 @@ export interface ChannelsIndexSectionProps {
   indexLoading: boolean;
   indexSaving: boolean;
   indexDraftRows: ChannelRow[];
+  /** Một trang: các dòng hiển thị (sau lọc + slice). */
   pageIndexRows: ChannelRow[];
+  /**
+   * Cùng độ dài `pageIndexRows` — chỉ số 0-based trong `indexDraftRows` (dòng thật trong file index).
+   * Cần khi bảng dùng lọc email/nhóm (checkbox / Sửa / Chi tiết theo dòng gốc).
+   */
+  pageIndexGlobalIndices: number[];
+  /** Số dòng thỏa bộ lọc (0 nếu không dòng nào khớp). */
+  indexFilteredCount: number;
   indexPag: ChannelsIndexPagination;
   /** colSpan ô trống / loading — checkbox + cột dữ liệu. */
   indexColCount: number;
@@ -56,4 +66,6 @@ export interface ChannelsIndexSectionProps {
   pageSelectAll: boolean;
   /** Checkbox header: indeterminate — chỉ một phần dòng trên trang được chọn. */
   pageSelectSome: boolean;
+  /** Map id nhóm (cột Group / mavidGroupId) → tên hiển thị từ group.json. */
+  groupNameById?: Readonly<Record<string, string>>;
 }

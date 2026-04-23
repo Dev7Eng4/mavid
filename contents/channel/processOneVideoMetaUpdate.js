@@ -8,7 +8,7 @@ import { downloadTranscript, finalizeDownloadedTranscript } from '../downloadVid
 import { readVideoMetaFile, writeVideoMetaFile, geminiMetaFieldsIncomplete, mergeGeminiIntoVideoMeta } from './videoMetaFile.util.js';
 import { hasRasterThumbnailInFolder } from './videoFolderThumbnail.util.js';
 import { extractYoutubeVideoId } from './youtubeUrl.util.js';
-import { loadPromptByLanguage, PROMPTS_CREATE_THUMBNAIL, PROMPTS_NEED_IMAGE } from '../prompts/index.js';
+import { loadPromptByLanguage, resolveThumbnailPromptBuilder } from '../prompts/index.js';
 import { runCreateThumbnailFlow } from '../flow/runCreateThumbnail.js';
 import { FLOW_DOWNLOADS_DIR } from '../flow/paths.util.js';
 import { optimizeFlowThumbnailJpegIfLarge } from '../flow/thumbnailOptimize.util.js';
@@ -128,18 +128,13 @@ export async function processOneVideoMetaUpdate({ videoDir, url, thumbnailPrompt
         }
 
         console.log('[update-meta] Chưa có thumbnail .png/.jpg/.jpeg → chạy Flow...');
-        let promptFn = PROMPTS_CREATE_THUMBNAIL[thumbnailPromptKey];
-        if (!promptFn) {
-          console.warn(`[update-meta] thumbnailPrompt "${thumbnailPromptKey}" không hợp lệ — dùng ja2CHFromOldThumbnail`);
-          promptFn = PROMPTS_CREATE_THUMBNAIL.ja2CHFromOldThumbnail;
-        }
-        // const isNeedImage = PROMPTS_NEED_IMAGE.includes(thumbnailPromptKey);
+        const { build, isNeedImage } = resolveThumbnailPromptBuilder(prompts, thumbnailPromptKey);
         try {
           await runCreateThumbnailFlow({
-            prompt: promptFn(titleG, summaryG),
+            prompt: build(titleG, summaryG),
             pathSave: videoDir,
             exportName: 'flow-thumbnail',
-            isNeedImage: true,
+            isNeedImage,
           });
           const flowThumbPath = path.join(videoDir, 'flow-thumbnail.jpg');
           await optimizeFlowThumbnailJpegIfLarge(flowThumbPath);

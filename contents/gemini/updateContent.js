@@ -17,7 +17,7 @@ export async function updateVideoMeta(options = {}) {
   try {
     return await internalUpdateVideoMeta(page, options);
   } finally {
-    await context.close();
+    // await context.close();
   }
 }
 

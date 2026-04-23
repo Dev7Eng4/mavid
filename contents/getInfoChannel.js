@@ -30,9 +30,10 @@ const INDEX_HEADERS = [
   'BACKGROUND',
   'LAST UPLOAD',
   'STATUS',
+  'Group',
 ];
 
-/** Chỉ số cột 1-based (khớp INDEX_HEADERS). */
+/** Chỉ số cột 1-based (khớp INDEX_HEADERS). Cột cuối = ID nhóm (group.json). */
 const IDX = {
   CHANNEL: 1,
   LINK: 2,
@@ -44,6 +45,7 @@ const IDX = {
   BACKGROUND: 8,
   LAST_UPLOAD: 9,
   STATUS: 10,
+  GROUP: 11,
 };
 
 /**
@@ -147,6 +149,7 @@ function resolveIndexMetaColumns(channelData) {
       colLoai: '',
       colThoiGian: '',
       colBg: '',
+      colGroup: '',
       /** Dòng mới (CLI): mặc định INIT — cập nhật dòng cũ không có khóa `email` thì không ghi cột STATUS. */
       colStatus: 'INIT',
     };
@@ -157,12 +160,13 @@ function resolveIndexMetaColumns(channelData) {
   const dm = channelData.durationMinutes;
   const colThoiGian = dm === '' || dm == null ? '' : String(dm);
   const colBg = String(channelData.background ?? '').trim();
+  const colGroup = String(channelData.groupId ?? '').trim();
   const rawSt = String(channelData.channelStatus ?? '')
     .trim()
     .toUpperCase();
   const colStatus =
     rawSt === 'INIT' || rawSt === 'LIVE' || rawSt === 'STOPPED' ? rawSt : colEmail ? 'LIVE' : 'INIT';
-  return { colEmail, colMyChannel, colLoai, colThoiGian, colBg, colStatus };
+  return { colEmail, colMyChannel, colLoai, colThoiGian, colBg, colGroup, colStatus };
 }
 
 /**
@@ -235,6 +239,7 @@ async function updateIndexFile(channelData) {
         row.getCell(IDX.THOI_GIAN).value = meta.colThoiGian;
         row.getCell(IDX.BACKGROUND).value = meta.colBg;
         row.getCell(IDX.STATUS).value = meta.colStatus;
+        row.getCell(IDX.GROUP).value = meta.colGroup;
       }
       console.log(`Đã cập nhật channel "${name}" trong index.xlsx`);
     } else {
@@ -250,6 +255,7 @@ async function updateIndexFile(channelData) {
         meta.colBg,
         lastUpload,
         meta.colStatus,
+        meta.colGroup,
       ]);
       console.log(`Đã thêm channel "${name}" vào index.xlsx`);
     }
@@ -269,6 +275,7 @@ async function updateIndexFile(channelData) {
       meta.colBg,
       lastUpload,
       meta.colStatus,
+      meta.colGroup,
     ]);
 
     sheet.columns = [
@@ -282,6 +289,7 @@ async function updateIndexFile(channelData) {
       { width: 22 }, // BACKGROUND
       { width: 30 }, // LAST UPLOAD
       { width: 12 }, // STATUS
+      { width: 28 }, // Group
     ];
 
     console.log(`Đã tạo file index.xlsx và thêm channel "${name}"`);
@@ -611,13 +619,16 @@ export async function addChannelFromForm(options = {}) {
     }
   }
 
-  const newChannelsConfig = channelsConfig.map(ch => ({
-    ...ch,
-    lastUpload: lastUpload || '',
-    uploadedVideos: 0,
-    latestUploadDate,
-    latestUploadTime: '00:00',
-  }));
+  const newChannelsConfig = channelsConfig.map(ch => {
+    const { groupId: _dropGroup, ...chRest } = ch;
+    return {
+      ...chRest,
+      lastUpload: lastUpload || '',
+      uploadedVideos: 0,
+      latestUploadDate,
+      latestUploadTime: '00:00',
+    };
+  });
 
   if (config) {
     if (!Array.isArray(config.channels)) config.channels = [];
@@ -666,6 +677,7 @@ export async function addChannelFromForm(options = {}) {
     lastUpload,
     email: seedEmail,
     myChannel: String(channelItem.myChannel ?? '').trim(),
+    groupId: String(channelItem.groupId ?? '').trim(),
     videoType: channelItem.videoType,
     durationMinutes: durationLabel,
     background:

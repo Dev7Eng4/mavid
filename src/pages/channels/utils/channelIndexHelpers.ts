@@ -239,6 +239,8 @@ export interface ChannelAddFormInput {
   email: string;
   /** Cột index «KÊNH CỦA TÔI» (sau EMAIL). */
   myChannel: string;
+  /** Cột index cuối «Group». */
+  mavidGroupId: string;
   videoType: 'from_audio' | 'reup_full';
   durationOption: string;
   /** from_audio — tên folder trong MaVidMedia/backgrounds */
@@ -260,6 +262,8 @@ export interface ChannelAddDialogInitialFields {
   channelUrl: string;
   email: string;
   myChannel: string;
+  /** ID nhóm (group.json); rỗng = không gán. */
+  mavidGroupId: string;
   videoType: string;
   /** Chuỗi cấu hình duration (vd. "0_30"). */
   durationOption: string;
@@ -387,6 +391,7 @@ export function channelAddDialogInitialFromIndexRow(row: ChannelRow, headers: st
   const channelUrl = String(row.link ?? '').trim();
   const email = String(row.email ?? '').trim();
   const myChannel = String(row.myChannel ?? '').trim();
+  const mavidGroupId = String(row.mavidGroupId ?? '').trim();
 
   let videoType = resolveIndexRowVideoType(row);
   if (!videoType) videoType = 'from_audio';
@@ -426,6 +431,7 @@ export function channelAddDialogInitialFromIndexRow(row: ChannelRow, headers: st
     channelUrl,
     email,
     myChannel,
+    mavidGroupId,
     videoType,
     durationOption,
     selectedBackground,
@@ -462,6 +468,7 @@ export function buildChannelRowFromAddForm(
   row.link = normalizedUrl;
   row.email = input.email.trim();
   row.myChannel = input.myChannel.trim();
+  row.mavidGroupId = input.mavidGroupId.trim();
   row.videoType = input.videoType;
   row.videoDuration = durationOptionToLabel(input.durationOption);
 

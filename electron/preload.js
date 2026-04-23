@@ -52,4 +52,6 @@ contextBridge.exposeInMainWorld('runner', {
   appendPersistedErrorLog: line => ipcRenderer.invoke('append-persisted-error-log', { line }),
   clearPersistedErrorLogs: () => ipcRenderer.invoke('clear-persisted-error-logs'),
   minimizeApp: () => ipcRenderer.invoke('minimize-app'),
+  getMavidGroups: () => ipcRenderer.invoke('get-mavid-groups'),
+  setMavidGroups: payload => ipcRenderer.invoke('set-mavid-groups', payload),
 });

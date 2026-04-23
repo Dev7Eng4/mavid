@@ -11,7 +11,7 @@ import { detectVideoLang, getLanguageOptions } from './utils/detectLanguage.util
 
 import { MAKE_VIDEO_MODE, LANGUAGES_NEED_UPDATE_TRANSCRIPT } from './constants/index.js';
 import { optimizeFlowThumbnailJpegIfLarge } from './flow/thumbnailOptimize.util.js';
-import { loadPromptByLanguage } from './prompts/index.js';
+import { loadPromptByLanguage, resolveThumbnailPromptBuilder } from './prompts/index.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const DEFAULT_OUTPUT_DIR = path.join(__dirname, '..', 'downloads');
@@ -157,7 +157,6 @@ async function processVttTranscriptsWithGemini(
 ) {
   const { cleanSrt } = await import('./utils/srt.util.js');
   const { updateVideoInfo } = await import('./gemini/updateContent.js');
-  const { PROMPTS_CREATE_THUMBNAIL, PROMPTS_NEED_IMAGE } = await import('./prompts/index.js');
 
   const vttFiles = fs.readdirSync(outputDir).filter(f => f.endsWith('.vtt'));
   console.log('🚀 ~ processVttTranscriptsWithGemini ~ vttFiles:', vttFiles);
@@ -214,19 +213,9 @@ async function processVttTranscriptsWithGemini(
             const { runCreateThumbnailFlow } = await import('./flow/runCreateThumbnail.js');
 
             const prompts = await loadPromptByLanguage(language);
-
-            let promptFn = PROMPTS_CREATE_THUMBNAIL[thumbnailPrompt];
-            if (!promptFn) {
-              console.warn(
-                `[thumbnail-flow] thumbnailPrompt "${thumbnailPrompt}" không hợp lệ hoặc thiếu, dùng fallback ja2CHFromOldThumbnail`
-              );
-              promptFn = PROMPTS_CREATE_THUMBNAIL.ja2CHFromOldThumbnail;
-            }
-
-            const isNeedImage = PROMPTS_NEED_IMAGE.includes(thumbnailPrompt);
-
+            const { build, isNeedImage } = resolveThumbnailPromptBuilder(prompts, thumbnailPrompt);
             await runCreateThumbnailFlow({
-              prompt: prompts.promptToCreateThumbnail(titleG, summaryG),
+              prompt: build(titleG, summaryG),
               pathSave: thumbnailFlowOutputDir,
               exportName: 'flow-thumbnail',
               isNeedImage,
