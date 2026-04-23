@@ -1,14 +1,11 @@
 /**
- * Pipeline Gemini: clean VTT → parse thành objects → gửi [id] text cho AI fix →
+ * Pipeline Gemini: parse SRT (đã clean, vd. sau cleanSrt) → gửi [id] text cho AI fix →
  * map kết quả AI về objects → merge lại SRT.
  * < 30 phút: tối đa 3 Chrome profile (2,3,4). >= 30 phút: tối đa 5 Chrome profile (2,3,4,5,6).
  */
 import { GEMINI_CONFIG, GEMINI_CHUNK_SIZE } from '../constants/index.js';
 import { loadPromptByLanguage } from '../prompts/index.js';
 import { openChromeProfile } from '../scripts/makeChromeProfile.js';
-import {
-  cleanSrtContent,
-} from '../utils/srt.util.js';
 import { openGeminiPage, sendPromptToGemini } from './browser.util.js';
 import { getSrtDurationInMinutes } from './srtTiming.util.js';
 
@@ -207,19 +204,11 @@ export async function internalUpdateTranscript(rawSrtContent, options = {}) {
       ? rawSrtContent.join('\n\n')
       : String(rawSrtContent ?? '');
 
-  // Bước 1: Clean VTT → SRT
-  console.log('[update-transcript] Bước 1: Clean VTT...');
-  const cleanedSrt = cleanSrtContent(srtString);
-  if (!cleanedSrt.trim()) {
-    console.warn('[update-transcript] cleanSrtContent không có nội dung, trả về nội dung gốc.');
-    return srtString.trim();
-  }
-  console.log('[update-transcript] Clean VTT xong.');
-
-  // Bước 2: Parse SRT → mảng objects { id, timeline, text }
+  const cleanedSrt = srtString.trim();
   const allObjects = parseSrtToObjects(cleanedSrt);
+
   if (allObjects.length === 0) {
-    console.warn('[update-transcript] Parse SRT không có cue, trả về SRT đã clean.');
+    console.warn('[update-transcript] Không parse được cue SRT (cần SRT đã clean, vd. sau cleanSrt), trả về nội dung gốc.');
     return cleanedSrt;
   }
   console.log(`[update-transcript] Parsed ${allObjects.length} cue.`);
