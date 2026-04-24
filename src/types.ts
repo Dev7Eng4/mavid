@@ -191,6 +191,7 @@ export interface VideoReupFullConfig {
 
 export interface VideoFromAudioConfig {
   channel: string;
+  email?: string;
   background: string;
   /** Mặc định `stock` (popup Pipeline). Tab Tạo video có thể chọn `auto`. */
   backgroundSource?: VideoFromAudioBackgroundSource;

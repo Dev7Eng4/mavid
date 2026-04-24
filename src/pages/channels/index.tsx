@@ -1312,12 +1312,17 @@ function ChannelsPage() {
         <ChannelCreateVideoDialog
           selectedRowCount={indexSelectedRowIndices.size}
           eligibleQueueLength={createVideoQueueFromSelection.length}
+          targetChannelFolder={createVideoQueueFromSelection.length === 1 ? createVideoQueueFromSelection[0].folder : undefined}
           onClose={() => setCreateVideoOpen(false)}
-          onConfirm={async ({ maxVideosPerBatch }) => {
+          onConfirm={async ({ maxVideosPerBatch, selectedEmail }) => {
             if (typeof window.runner?.minimizeApp === 'function') {
               window.runner.minimizeApp();
             }
-            await runCreateVideoForQueue(createVideoQueueFromSelection, maxVideosPerBatch);
+            let queue = createVideoQueueFromSelection;
+            if (selectedEmail && queue.length === 1) {
+              queue = [{ ...queue[0], email: selectedEmail }];
+            }
+            await runCreateVideoForQueue(queue, maxVideosPerBatch);
           }}
         />
       ) : null}

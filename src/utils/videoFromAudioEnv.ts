@@ -35,5 +35,8 @@ export function buildMavidEnvForVideoFromAudio(config: VideoFromAudioConfig, ava
     /** 0 = tắt lọc tối thiểu; không gửi key thì createBatchVideo mặc định 18 phút. */
     MAVID_MIN_DURATION_MINUTES: minDur > 0 ? String(minDur) : '0',
   };
+  if (config.email) {
+    env.MAVID_EMAIL = config.email;
+  }
   return env;
 }

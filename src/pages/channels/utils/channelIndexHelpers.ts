@@ -184,6 +184,7 @@ export function buildExtraEnvForIndexChannelRow(
     return buildMavidEnvForVideoFromAudio(
       {
         channel: folder,
+        email,
         background,
         backgroundSource: 'stock',
         stockVideoCount: 0,

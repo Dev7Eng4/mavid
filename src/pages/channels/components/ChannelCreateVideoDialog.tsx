@@ -4,6 +4,7 @@ import { AppButton } from '@/components/ui/AppButton';
 
 export interface ChannelCreateVideoConfirmPayload {
   maxVideosPerBatch: number;
+  selectedEmail?: string;
 }
 
 export interface ChannelCreateVideoDialogProps {
@@ -13,6 +14,7 @@ export interface ChannelCreateVideoDialogProps {
   selectedRowCount: number;
   /** Số dòng đã chọn đủ điều kiện chạy script (ID, EMAIL, LOẠI VIDEO). */
   eligibleQueueLength: number;
+  targetChannelFolder?: string;
 }
 
 function clampInt(n: number, min: number, max: number): number {
@@ -22,10 +24,13 @@ function clampInt(n: number, min: number, max: number): number {
 
 const MAX_VIDEOS_CAP = 100;
 
-export function ChannelCreateVideoDialog({ onClose, onConfirm, selectedRowCount, eligibleQueueLength }: ChannelCreateVideoDialogProps) {
+export function ChannelCreateVideoDialog({ onClose, onConfirm, selectedRowCount, eligibleQueueLength, targetChannelFolder }: ChannelCreateVideoDialogProps) {
   const [maxVideosInput, setMaxVideosInput] = useState<number | null>(MAX_VIDEOS_PREPARE_AHEAD);
   const [formError, setFormError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [configEmails, setConfigEmails] = useState<{ email: string; label: string }[]>([]);
+  const [selectedEmail, setSelectedEmail] = useState<string>('');
+
   const mountedRef = useRef(true);
   useEffect(() => {
     mountedRef.current = true;
@@ -33,6 +38,26 @@ export function ChannelCreateVideoDialog({ onClose, onConfirm, selectedRowCount,
       mountedRef.current = false;
     };
   }, []);
+
+  useEffect(() => {
+    if (!targetChannelFolder) {
+      setConfigEmails([]);
+      return;
+    }
+    window.runner?.readMavidChannelConfig?.(targetChannelFolder).then(cfg => {
+      if (mountedRef.current && cfg?.channels && cfg.channels.length > 1) {
+        const emails = cfg.channels.map(c => {
+          const e = c.email || '';
+          const from = c.durationMinuteFrom != null ? c.durationMinuteFrom : '';
+          const to = c.durationMinuteTo != null ? c.durationMinuteTo : '∞';
+          const dur = from !== '' ? ` (${from} - ${to} phút)` : '';
+          return { email: e, label: `${e}${dur}` };
+        }).filter(e => e.email.trim() !== '');
+        setConfigEmails(emails);
+        if (emails.length > 0) setSelectedEmail(emails[0].email);
+      }
+    }).catch(console.error);
+  }, [targetChannelFolder]);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -54,13 +79,13 @@ export function ChannelCreateVideoDialog({ onClose, onConfirm, selectedRowCount,
     setBusy(true);
     onClose();
     try {
-      await onConfirm({ maxVideosPerBatch });
+      await onConfirm({ maxVideosPerBatch, selectedEmail: configEmails.length > 1 ? selectedEmail : undefined });
     } catch (e) {
       console.error(e);
     } finally {
       if (mountedRef.current) setBusy(false);
     }
-  }, [eligibleQueueLength, maxVideosInput, onClose, onConfirm]);
+  }, [eligibleQueueLength, maxVideosInput, onClose, onConfirm, configEmails.length, selectedEmail]);
 
   const skippedCount = Math.max(0, selectedRowCount - eligibleQueueLength);
   const canSubmit = eligibleQueueLength > 0;
@@ -135,6 +160,33 @@ export function ChannelCreateVideoDialog({ onClose, onConfirm, selectedRowCount,
               }}
             />
           </div>
+
+          {configEmails.length > 1 ? (
+            <div className='min-w-0 mt-2'>
+              <label className='block text-sm font-medium mb-2' style={{ color: 'var(--text-h)' }} htmlFor='create-email'>
+                Chọn Email cấu hình
+              </label>
+              <select
+                id='create-email'
+                value={selectedEmail}
+                disabled={busy}
+                onChange={e => setSelectedEmail(e.target.value)}
+                className='w-full rounded-xl px-3 py-2.5 text-base outline-none border transition-colors duration-150'
+                style={{
+                  background: 'var(--code-bg)',
+                  color: 'var(--text-h)',
+                  borderColor: 'var(--border)',
+                }}
+              >
+                {configEmails.map(c => (
+                  <option key={c.email} value={c.email}>
+                    {c.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+          ) : null}
+
 
           {formError ? (
             <p className='text-sm' style={{ color: '#fecaca' }}>
