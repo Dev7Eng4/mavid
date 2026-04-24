@@ -63,7 +63,7 @@ function resolveMaxVideosPerBatch(props = {}) {
 async function resolveGpmProfileIdByEmail(email) {
   if (!email || !email.trim()) return null;
   const normEmail = email.trim().toLowerCase();
-  const apiBase = process.env.GPM_API_BASE || 'http://127.0.0.1:19995';
+  const apiBase = process.env.GPM_API_BASE || 'http://localhost:9495';
   const url = apiBase.replace(/\/+$/, '') + '/api/v3/profiles?per_page=500';
 
   try {

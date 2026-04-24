@@ -37,12 +37,23 @@ export async function fetchAllGpmProfileRows(): Promise<GpmProfileRow[]> {
   do {
     const res = await gpmApi.listProfiles({ page, per_page: perPage });
     const env = res as unknown as GpmListProfilesEnvelope;
-    const list = Array.isArray(env.data) ? env.data : [];
+    
+    let list: unknown[] = [];
+    if (Array.isArray(env.data)) {
+      list = env.data;
+    } else if (env.data && typeof env.data === 'object' && Array.isArray((env.data as any).data)) {
+      list = (env.data as any).data;
+    }
+
     for (const item of list) {
       const m = mapGpmApiProfileRow(item);
       if (m?.id?.trim()) rows.push(m);
     }
-    const tp = env.pagination?.total_page;
+    
+    let tp = env.pagination?.total_page;
+    if (tp == null && env.data && typeof env.data === 'object' && 'last_page' in env.data) {
+      tp = (env.data as any).last_page;
+    }
     totalPage = tp != null && Number.isFinite(Number(tp)) && Number(tp) >= 1 ? Math.floor(Number(tp)) : 1;
     page += 1;
   } while (page <= totalPage);

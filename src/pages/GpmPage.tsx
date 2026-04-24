@@ -56,7 +56,9 @@ export function GpmPage() {
     try {
       const res = await gpmApi.listProfiles(GPM_PROFILES_LIST_QUERY);
       const raw = res.data;
-      const list = Array.isArray(raw) ? raw : [];
+      const list = (typeof raw === 'object' && raw !== null && Array.isArray((raw as any).data)) 
+        ? (raw as any).data 
+        : (Array.isArray(raw) ? raw : []);
       const rows: GpmProfileRow[] = [];
       for (const item of list) {
         const m = mapGpmApiProfileRow(item);

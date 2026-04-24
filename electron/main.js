@@ -10,13 +10,14 @@ import { CONSTANT_EXPORT_KEYS } from '../contents/constants/constantsExportKeys.
 import { buildConstantsModuleBase } from '../contents/constants/constantsModuleBase.js';
 import { getAppSettingsUserJsonPath } from '../contents/constants/userConstantsPaths.js';
 import { mapIndexDataToProps, mapIndexDataToHeaders, mapPropToHeader } from '../contents/constants/indexColumnMapping.js';
+import { GPM_API_DEFAULT_ORIGIN } from '../contents/constants/gpmApi.js';
 
 const VITE_DEV_SERVER_URL = process.env.VITE_DEV_SERVER_URL || 'http://localhost:5173';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const ROOT = path.join(__dirname, '..');
-const GPM_API_V3_ROOT = (process.env.GPM_API_BASE || 'http://127.0.0.1:19995/api/v3').replace(/\/$/, '');
+const GPM_API_V3_ROOT = (process.env.GPM_API_BASE || GPM_API_DEFAULT_ORIGIN).replace(/\/$/, '');
 const CONSTANTS_DIR = path.join(ROOT, 'contents', 'constants');
 const CONSTANTS_INDEX_FILE = path.join(CONSTANTS_DIR, 'index.js');
 const MAVID_CHANNEL_CONFIG_FILENAME = 'mavid-channel-config.json';

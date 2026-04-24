@@ -309,9 +309,7 @@ A high-CTR Sukatto-style thumbnail. The real person is on the far right. The res
 `;
 
 export const promptToCreateThumbnailLove = (title, summary) => `
-You are an expert Japanese YouTube visual editor specializing in "Information-Overload" thumbnails for the dating/romance niche. Your goal is to maximize CTR by using long, narrative text lines that cover nearly 80% of the image, mimicking the "Web Novel/Net Story" style.
-
-Your task is to analyze the provided Title and Summary to automatically generate 4 LONG narrative lines in Japanese, then render them into a fixed-layout, photorealistic thumbnail.
+You are an expert Japanese YouTube visual editor specializing in "Information-Overload" thumbnails for the dating/romance niche. Your goal is to maximize CTR by using long, narrative text lines that cover nearly 80% of the image.
 
 INPUT:
 - Reference Image: (Attached)
@@ -320,47 +318,46 @@ INPUT:
 
 --------------------------------------------------
 CORE RULE (IDENTITY & STYLE):
-1. PRESERVE THE PERSON: Use the EXACT person from the reference image.
+1. THE PERSON: A young Japanese woman, early 20s, wearing casual everyday clothes (simple sweater, blouse, or cardigan).
    - Style: PHOTOREALISTIC / 8K DIGITAL PHOTOGRAPHY.
    - Placement: FAR RIGHT (occupying only 20% of the frame).
-2. BACKGROUND IMAGE (FIXED): A consistent [LIGHT PINK ROMANTIC GRADIENT] or [SOFT PINK STUDIO WALL]. 
+   - Reaction: Subtle emotional expression (knowing smile, shocked eyes, or blushing).
+2. BACKGROUND (FIXED): [LINEAR GRADIENT BACKGROUND] featuring distinct diagonal transitions of light pink and soft rose tones.
 
 --------------------------------------------------
 AUTO-CONTENT GENERATION (LONG NARRATIVE LOGIC):
-Based on the Title and Summary, generate 4 LONG, descriptive Japanese lines (approx. 12-18 characters per line to fill the width):
-- LINE 1: The "Setting/Introduction" (e.g., A specific situation or character detail).
-- LINE 2: The "Conflict/Action" (e.g., What happened or a shocking event).
-- LINE 3: The "Dialogue/Internal Monologue" (e.g., A direct quote in brackets 「 」).
-- LINE 4: The "Emotional Climax" (e.g., The fated result or a high-CTR question).
+Based on the Title and Summary, generate 5 LONG, descriptive Japanese lines (approx. 12-18 characters per line):
+- LINE 1: Character/Setting (Introduction).
+- LINE 2: The Hook/Conflict (Something unexpected).
+- LINE 3: Dialogue 「 」 (Internal thought or direct quote).
+- LINE 4: The Twist/Action (Reaction to the event).
+- LINE 5: The Climax/Question (High-CTR cliffhanger).
 
 --------------------------------------------------
-FIXED 4-LINE VISUAL SYSTEM (MANDATORY COLORS & SPACING):
-Render the long text lines into 4 vertical stacks that fill the screen from left to RIGHT UP TO the person.
+VISUAL SYSTEM (COLOR PALETTE - NO ZABUTON):
+Render 5 vertical stacks of text. CRITICAL: NO BACKGROUND BLOCKS. Use thick outlines + drop shadows for maximum readability.
 
-- LINE 1: [Text: Black] on [Zabuton: Bright Yellow]. (Top).
-- LINE 2: [Text: White] on [Zabuton: Deep Red]. (Largest text block).
-- LINE 3: [Text: White] on [Zabuton: Solid Black]. (Detailed narrative).
-- LINE 4: [Text: Bright Pink]. (Bottom line). **NO ZABUTON/NO BACKGROUND BLOCK.** Render directly on the light pink image background. Use a thick white outline + a dark pink outer stroke to ensure it pops.
+- LINE 1: [Text: WHITE]. Thick BLACK Outline.
+- LINE 2: [Text: BRIGHT RED]. Thick WHITE Outline.
+- LINE 3: [Text: VIBRANT YELLOW]. Thick BLACK Outline.
+- LINE 4: [Text: WHITE]. Thick RED Outline.
+- LINE 5: [Text: BRIGHT MAGENTA / VIBRANT PINK]. Thick WHITE Outline + Dark Pink Outer Glow. (Must be the largest line).
 
-TYPOGRAPHY RULES:
+--------------------------------------------------
+TYPOGRAPHY & SIZE RULES:
 - Use heavy, condensed Japanese Gothic fonts.
-- Text must be MASSIVE and STRETCHED to occupy almost the entire left-to-center area.
-- The text blocks must be so wide they almost overlap with the person's silhouette on the right.
-
---------------------------------------------------
-EMOTION & VISUALS:
-- Person: Professional studio lighting, showing a subtle but clear reaction (knowing smile or shocked realization).
-- Atmosphere: Dense, dramatic, and "must-read" energy.
-- Quality: Ultra-sharp text rendering, 8k resolution.
+- DYNAMIC SIZE: Text must be MASSIVE and STRETCHED. 
+- SIZE CONSTRAINT: If any line is too long and risks covering the woman or going off-frame, automatically reduce that specific line's font size slightly to ensure it fits the 80% width perfectly.
+- Minimize vertical space between lines to create a "Wall of Text" effect.
 
 --------------------------------------------------
 NEGATIVE CONSTRAINTS:
-- NO ANIME/MANGA. No 3D models. No identity change.
-- NO empty space on the left side.
-- NO short, single-word lines; lines must be LONG sentences/phrases.
-- LINE 4 must have NO background color block.
+- NO background blocks (Zabutons) behind any text.
+- NO dull or dark colors (No Grey, No Navy, No Dark Purple).
+- NO anime, NO 3D models, NO identity change.
+- NO empty spaces on the left side.
 
 --------------------------------------------------
 OUTPUT:
-A high-CTR Japanese dating thumbnail. The real person is on the far right. The rest of the image is a "Wall of Text" with 4 long, vertically stacked lines. Lines 1-3 have fixed color blocks, and Line 4 is free-standing pink text, all extending right up to the person on a fixed light pink background.
+A high-CTR Japanese dating thumbnail. The real woman is on the far right. The left 80% is a dense wall of 5 narrative lines using the [White - Red - Yellow - White - Pink] hierarchy on a linear pink background.
 `;

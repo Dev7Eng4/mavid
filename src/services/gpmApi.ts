@@ -5,7 +5,9 @@
  * @see https://docs.gpmloginapp.com/api-document/mo-profile
  */
 
-export const GPM_API_V3_DEFAULT_BASE = 'http://127.0.0.1:19995/api/v3';
+import { GPM_API_DEFAULT_ORIGIN, GPM_API_VERSION } from '../../contents/constants/gpmApi.js';
+
+export const GPM_API_V3_DEFAULT_BASE = GPM_API_DEFAULT_ORIGIN;
 
 export class GpmApiError extends Error {
   readonly status: number;
@@ -26,7 +28,8 @@ export interface GpmApiEnvelope<T = unknown> {
 }
 
 export interface GpmStartProfileData {
-  remote_debugging_address: string;
+  remote_debugging_address?: string;
+  remote_debugging_port?: number;
   profile_id?: string;
 }
 
@@ -176,10 +179,11 @@ export function createGpmApiClient(options: GpmApiClientOptions = {}) {
       return requestJson<GpmStartProfileData>(p);
     },
 
-    /** GET `profiles/close/{id}` — đóng profile trong GPM. */
+    /** Đóng profile trong GPM. */
     closeProfile(profileId: string) {
       const id = encodeURIComponent(profileId);
-      return requestJson<unknown>(`profiles/close/${id}`);
+      const endpoint = GPM_API_VERSION === 'V2' ? 'stop' : 'close';
+      return requestJson<unknown>(`profiles/${endpoint}/${id}`);
     },
   };
 }
