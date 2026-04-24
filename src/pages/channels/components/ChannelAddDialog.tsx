@@ -239,8 +239,16 @@ export function ChannelAddDialog({
 
         setForm(prev => {
           const next = { ...prev };
-          const ch: any =
-            Array.isArray(cfg.channels) && cfg.channels.length > 0 ? cfg.channels.find(channel => channel.email === initialRow.email) : cfg;
+          const list = Array.isArray(cfg.channels) ? cfg.channels : [];
+          let ch: any = null;
+          if (list.length > 0) {
+            const want = String(initialRow.email ?? '').trim().toLowerCase();
+            ch = list.find((row: { email?: string }) => String(row?.email ?? '').trim() === String(initialRow.email ?? '').trim());
+            if (!ch && want) {
+              ch = list.find((row: { email?: string }) => String(row?.email ?? '').trim().toLowerCase() === want);
+            }
+            if (!ch && list.length === 1) ch = list[0];
+          }
 
           if (!ch) return next;
 
@@ -465,6 +473,7 @@ export function ChannelAddDialog({
           await onAdd(row);
           await window.runner.writeMavidChannelConfig({
             channelFolder: folder.trim(),
+            mergeFromPreviousEmail: String(initialRow?.email ?? '').trim() || undefined,
             patch: {
               channels: [
                 {

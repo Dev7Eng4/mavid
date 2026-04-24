@@ -22,12 +22,7 @@ function clampInt(n: number, min: number, max: number): number {
 
 const MAX_VIDEOS_CAP = 100;
 
-export function ChannelCreateVideoDialog({
-  onClose,
-  onConfirm,
-  selectedRowCount,
-  eligibleQueueLength,
-}: ChannelCreateVideoDialogProps) {
+export function ChannelCreateVideoDialog({ onClose, onConfirm, selectedRowCount, eligibleQueueLength }: ChannelCreateVideoDialogProps) {
   const [maxVideosInput, setMaxVideosInput] = useState<number | null>(MAX_VIDEOS_PREPARE_AHEAD);
   const [formError, setFormError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -53,8 +48,7 @@ export function ChannelCreateVideoDialog({
       return;
     }
 
-    const maxVideosPerBatch =
-      maxVideosInput == null ? MAX_SCHEDULED_DAYS : clampInt(maxVideosInput, 1, MAX_VIDEOS_CAP);
+    const maxVideosPerBatch = maxVideosInput == null ? MAX_SCHEDULED_DAYS : clampInt(maxVideosInput, 1, MAX_VIDEOS_CAP);
 
     setFormError(null);
     setBusy(true);

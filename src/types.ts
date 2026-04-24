@@ -334,6 +334,8 @@ declare global {
       readMavidChannelConfig: (channelFolder: string) => Promise<MavidChannelConfig | null>;
       writeMavidChannelConfig: (payload: {
         channelFolder: string;
+        /** Email dòng trước khi sửa — dùng để merge với bản cũ khi index/config lệch hoặc đổi email. */
+        mergeFromPreviousEmail?: string;
         patch: Pick<MavidChannelConfig, 'channels'>;
       }) => Promise<{ ok: boolean }>;
       setChannelFolderStartFromRow: (channelFolder: string, dataRowIndex: number) => Promise<{ ok: boolean; fileName?: string }>;

@@ -231,8 +231,8 @@ ipcMain.handle('run-npm-script', async (_event, { npmScript, extraEnv }) => {
   if (!npmScript || typeof npmScript !== 'string') throw new Error('npmScript không hợp lệ.');
   if (!ALLOWED_NPM_SCRIPTS.has(npmScript)) throw new Error(`Script không được phép: ${npmScript}`);
   if (npmJobRunning) throw new Error('Đang có job npm chạy. Vui lòng chờ kết thúc.');
-  // Không chặn theo `activeRunScriptCount`: upload YouTube (`run-script`) có thể chạy nền lâu;
-  // người dùng vẫn cần chạy `npm run` tạo video / batch khác trên kênh khác.
+  // Một job `npm run` tại một thời điểm (`npmJobRunning`). `run-script` (vd. upload YouTube) không bị chặn
+  // khi npm đang chạy — cho phép tạo video và upload song song; tránh trùng profile GPM nếu hai luồng cùng email.
 
   npmJobRunning = true;
   npmRunUserCancelled = false;
@@ -333,7 +333,6 @@ const SCRIPT_MAP = {
 ipcMain.handle('run-script', async (_event, { script, params = {} }) => {
   if (!script || typeof script !== 'string') throw new Error('script không hợp lệ.');
   if (!SCRIPT_MAP[script]) throw new Error(`Script không được phép: ${script}`);
-  if (npmJobRunning) throw new Error('Đang chạy npm script. Vui lòng chờ kết thúc.');
 
   activeRunScriptCount += 1;
   beginRunScriptConsoleCapture();
@@ -1393,7 +1392,48 @@ ipcMain.handle('read-mavid-channel-config', async (_event, { channelFolder }) =>
  * Ghi merge `patch` vào `MaVidMedia/channels/{channelFolder}/mavid-channel-config.json`.
  * Chỉ cập nhật các khóa được phép (setup từ form); giữ nguyên channelUrl, youtube, createdAt, …
  */
-ipcMain.handle('write-mavid-channel-config', async (_event, { channelFolder, patch }) => {
+/**
+ * @param {string | undefined} e
+ * @returns {string}
+ */
+function _normMavidChannelEmail(e) {
+  return String(e ?? '')
+    .trim()
+    .toLowerCase();
+}
+
+/**
+ * Cập nhật một dòng `channels[]` từ form: hợp nhất sâu với bản cũ (groupId, lastUpload, …) và không
+ * thay toàn bộ mảng bằng một phần tử.
+ * @param {object | null} oldCh
+ * @param {object} patchCh
+ * @param {object} baseRoot
+ */
+function _mergeMavidConfigChannelRow(oldCh, patchCh, baseRoot) {
+  const a = oldCh && typeof oldCh === 'object' ? oldCh : {};
+  const b = patchCh && typeof patchCh === 'object' ? patchCh : {};
+  const merged = { ...a, ...b };
+  if (!_normMavidChannelEmail(merged.email) && _normMavidChannelEmail(a.email)) {
+    merged.email = String(a.email).trim();
+  }
+  const uploadTrackingKeys = ['lastUpload', 'uploadedVideos', 'latestUploadDate', 'latestUploadTime'];
+  for (const key of uploadTrackingKeys) {
+    if (b[key] === undefined) {
+      if (a[key] !== undefined) {
+        merged[key] = a[key];
+      } else if (baseRoot[key] !== undefined) {
+        merged[key] = baseRoot[key];
+      } else {
+        if (key === 'uploadedVideos') merged[key] = 0;
+        else if (key === 'latestUploadTime') merged[key] = '00:00';
+        else merged[key] = '';
+      }
+    }
+  }
+  return merged;
+}
+
+ipcMain.handle('write-mavid-channel-config', async (_event, { channelFolder, patch, mergeFromPreviousEmail }) => {
   const channelsDir = await resolveChannelsDirFromDisk();
   const safe = assertSafeChannelFolderName(channelFolder);
   const dir = path.join(channelsDir, safe);
@@ -1437,30 +1477,38 @@ ipcMain.handle('write-mavid-channel-config', async (_event, { channelFolder, pat
       if (ch.publishTimes != null && !Array.isArray(ch.publishTimes)) throw new Error('publishTimes phải là mảng.');
     }
 
-    // Preserve upload tracking fields from old channels (match by email) or from root-level (backward compat)
-    const oldChannels = Array.isArray(base.channels) ? base.channels : [];
-    const uploadTrackingKeys = ['lastUpload', 'uploadedVideos', 'latestUploadDate', 'latestUploadTime'];
-    clean.channels = clean.channels.map(ch => {
-      const email = (ch.email || '').trim().toLowerCase();
-      const oldCh = email ? oldChannels.find(o => (o.email || '').trim().toLowerCase() === email) : null;
-      const merged = { ...ch };
-      for (const key of uploadTrackingKeys) {
-        if (merged[key] === undefined) {
-          // Try old channel first, then root-level fallback
-          if (oldCh && oldCh[key] !== undefined) {
-            merged[key] = oldCh[key];
-          } else if (base[key] !== undefined) {
-            merged[key] = base[key];
-          } else {
-            // Default values
-            if (key === 'uploadedVideos') merged[key] = 0;
-            else if (key === 'latestUploadTime') merged[key] = '00:00';
-            else merged[key] = '';
-          }
-        }
+    const oldList = Array.isArray(base.channels) ? [...base.channels] : [];
+    const prevNorm =
+      typeof mergeFromPreviousEmail === 'string' && _normMavidChannelEmail(mergeFromPreviousEmail)
+        ? _normMavidChannelEmail(mergeFromPreviousEmail)
+        : null;
+    const newList = [...oldList];
+
+    const findIndexForPatch = patchCh => {
+      const pNorm = _normMavidChannelEmail(patchCh && patchCh.email);
+      if (pNorm) {
+        const byNew = newList.findIndex(o => _normMavidChannelEmail(o && o.email) === pNorm);
+        if (byNew >= 0) return byNew;
       }
-      return merged;
-    });
+      if (prevNorm) {
+        const byPrev = newList.findIndex(o => _normMavidChannelEmail(o && o.email) === prevNorm);
+        if (byPrev >= 0) return byPrev;
+      }
+      if (!pNorm && newList.length === 1) {
+        return 0;
+      }
+      return -1;
+    };
+
+    for (const ch of clean.channels) {
+      const idx = findIndexForPatch(ch);
+      if (idx >= 0) {
+        newList[idx] = _mergeMavidConfigChannelRow(newList[idx], ch, base);
+      } else {
+        newList.push(_mergeMavidConfigChannelRow(null, ch, base));
+      }
+    }
+    clean.channels = newList;
   }
 
   const next = { ...base, ...clean };
