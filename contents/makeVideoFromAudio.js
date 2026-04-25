@@ -4,7 +4,7 @@
  * - N video stock từ MaVidMedia/backgrounds/<tên> (VIDEO_STORAGE_ROOT trong settings; N = STOCK_VIDEO_COUNT, cat, dog, ...)
  * - Bước 1: chỉnh tempo audio (ffmpeg atempo; nhỏ hơn 1 = chậm hơn → thời lượng dài hơn)
  * - Độ dài video = độ dài audio (sau khi chỉnh tốc độ), loop video nếu không đủ
- * - (Tuỳ chọn) Lớp video overlay từ `MaVidMedia/backgrounds/overlay/`: 1 file (tên sắp A–Z), chậm gấp đôi (setpts×2), zoom ~20% (scale 1.2 rồi crop giữa), opacity 50%, lặp vô hạn; ưu tiên pre-bake 1 vòng tới `overlay/.cache` rồi trộn
+ * - (Tuỳ chọn) Lớp video overlay từ `MaVidMedia/backgrounds/overlay/`: 1 file (tên sắp A–Z), chậm ×3 (setpts×3), zoom ~20% (scale 1.2, crop 1280×720 căn ngang giữa — cạnh dưới khung trùng đáy nguồn), opacity 70%, lặp vô hạn; ưu tiên pre-bake 1 vòng tới `overlay/.cache` rồi trộn
  * - Phụ đề: copy file .srt/.vtt từ downloads/ — nếu SPEED ≠ 1 sẽ tự động scale timestamps; ASS dùng NotoSansJP-Black (viền ~6% cỡ chữ + bóng nhẹ)
  * - Ghép stock: crossfade (xfade) giữa các clip — clip cũ mờ dần, clip mới sáng dần; encode nền stock dùng cùng encoder với bước merge (NVENC/AMF/QSV/libx264 theo hardware.util)
  * - Chỉ batch: đọc CSV/Excel, tải từng link rồi xử lý
@@ -42,13 +42,13 @@ const SUBTITLE_MARGIN_BOTTOM_PX = 40;
 // ==========================================
 const STOCK_VIDEO_HFLIP_PROBABILITY = 0.3;
 
-/** Tên thư mục con cạnh `backgrounds/<stock>/`: `backgrounds/overlay/`. Nếu có file video, trộm lên nền stock. */
+/** Tên thư mục con cạnh `backgrounds/<stock>/`: `backgrounds/overlay/`. Nếu có file video, trộn lên nền stock. */
 const STOCK_OVERLAY_DIR = 'overlay';
-/** Nhân `PTS` (2 = phát chậm một nửa / thời lượng 1 lần phát dài gấp đôi). */
-const STOCK_OVERLAY_PTS_MULT = 2;
-/** Zoom quanh tâm: scale 1.2 theo cả trục rồi crop về `CANVAS_W×CANVAS_H`. */
+/** Nhân `PTS` (3 = một lần phát gấp 3 thời lượng, tốc độ ~1/3). */
+const STOCK_OVERLAY_PTS_MULT = 3;
+/** Scale 1.2 (≈ zoom 20%) rồi `crop` về `CANVAS` — cạnh dưới lớp cắt trùng đáy nguồn (lấy vùng phía dưới). */
 const STOCK_OVERLAY_ZOOM = 1.2;
-const STOCK_OVERLAY_OPACITY = 0.5;
+const STOCK_OVERLAY_OPACITY = 0.7;
 
 /** Face name trong TTF — khớp NotoSansJP-Black.ttf (libass + ffmpeg `fontsdir`). */
 const SUBTITLE_FONT_ASS_NAME = 'Noto Sans JP Black';
@@ -128,7 +128,19 @@ function pickFirstOverlayVideo(overlayDir) {
 }
 
 /**
- * Một lần xử lý: setpts×2, zoom+ crop, alpha — ProRes 4444 yuva (giống mẫu `makeVideoFromFull`).
+ * Sau `setpts`, scale → crop `CANVAS_W×H`: canh ngang giữa, cạnh dưới khung lấy từ đáy nguồn (`y=ih-oh`).
+ * @returns {string} Chuỗi bộ lọc (dùng nối sau dấu phẩy, không bắt đầu bằng `,`)
+ */
+function stockOverlayScaleCropAlphaSubchain() {
+  const w = STOCK_VIDEO.CANVAS_W;
+  const h = STOCK_VIDEO.CANVAS_H;
+  const z = STOCK_OVERLAY_ZOOM;
+  const a = STOCK_OVERLAY_OPACITY;
+  return `scale=w='iw*${z}':h='ih*${z}',crop=${w}:${h}:(iw-ow)/2:ih-oh,format=yuva420p,colorchannelmixer=aa=${a}`;
+}
+
+/**
+ * Một lần xử lý: setpts×N, zoom + crop từ đáy, alpha — ProRes 4444 yuva (giống mẫu `makeVideoFromFull`).
  * @param {string} sourcePath
  * @param {string} cacheDir
  * @returns {Promise<string|null>} Đường dẫn file cache hoặc `null` nếu thất bại
@@ -139,7 +151,7 @@ async function getPrebakedStockOverlayVideo(sourcePath, cacheDir) {
   const st = fs.statSync(sourcePath);
   const zTag = Math.round(STOCK_OVERLAY_ZOOM * 100);
   const aTag = Math.round(STOCK_OVERLAY_OPACITY * 100);
-  const cacheKey = `ov_${path.parse(sourcePath).name}_${w}x${h}_s${STOCK_OVERLAY_PTS_MULT}_z${zTag}_a${aTag}_${st.mtimeMs}.mov`;
+  const cacheKey = `ov_${path.parse(sourcePath).name}_${w}x${h}_s${STOCK_OVERLAY_PTS_MULT}_z${zTag}_a${aTag}_bot_${st.mtimeMs}.mov`;
   const cachePath = path.join(cacheDir, cacheKey);
   if (fs.existsSync(cachePath)) {
     console.log(`[overlay] Dùng cache: ${path.basename(cachePath)}`);
@@ -148,9 +160,7 @@ async function getPrebakedStockOverlayVideo(sourcePath, cacheDir) {
   if (!fs.existsSync(cacheDir)) {
     fs.mkdirSync(cacheDir, { recursive: true });
   }
-  const z = STOCK_OVERLAY_ZOOM;
-  const a = STOCK_OVERLAY_OPACITY;
-  const vf = `setpts=${STOCK_OVERLAY_PTS_MULT}*PTS,scale=w='iw*${z}':h='ih*${z}',crop=${w}:${h}:(iw-ow)/2:(ih-oh)/2,format=yuva420p,colorchannelmixer=aa=${a}`;
+  const vf = `setpts=${STOCK_OVERLAY_PTS_MULT}*PTS,${stockOverlayScaleCropAlphaSubchain()}`;
   const cmd = `ffmpeg -hide_banner -loglevel error -y -i "${sourcePath}" -vf "${vf}" -c:v prores_ks -profile:v 4444 -pix_fmt yuva444p10le "${cachePath}"`;
   try {
     await execAsync(cmd, { maxBuffer: 32 * 1024 * 1024 });
@@ -747,13 +757,10 @@ async function processOne(bgNameArg, options = {}) {
         `[${overlayIndex}:v]fps=${STOCK_VIDEO.FPS},settb=tb=1/90000,setsar=1[ovlay]`,
       );
     } else {
-      const w = STOCK_VIDEO.CANVAS_W;
-      const h = STOCK_VIDEO.CANVAS_H;
-      const z = STOCK_OVERLAY_ZOOM;
-      const a = STOCK_OVERLAY_OPACITY;
       const pm = STOCK_OVERLAY_PTS_MULT;
+      const chain = stockOverlayScaleCropAlphaSubchain();
       filterParts.push(
-        `[${overlayIndex}:v]setpts=${pm}*PTS,scale=w='iw*${z}':h='ih*${z}',crop=${w}:${h}:(iw-ow)/2:(ih-oh)/2,format=yuva420p,colorchannelmixer=aa=${a},fps=${f},settb=tb=1/90000,setsar=1[ovlay]`,
+        `[${overlayIndex}:v]setpts=${pm}*PTS,${chain},fps=${STOCK_VIDEO.FPS},settb=tb=1/90000,setsar=1[ovlay]`,
       );
     }
     filterParts.push(`[${currentVLabel}][ovlay]overlay=0:0[v_plated]`);
