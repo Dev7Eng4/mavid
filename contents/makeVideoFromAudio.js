@@ -4,7 +4,8 @@
  * - N video stock từ MaVidMedia/backgrounds/<tên> (VIDEO_STORAGE_ROOT trong settings; N = STOCK_VIDEO_COUNT, cat, dog, ...)
  * - Bước 1: chỉnh tempo audio (ffmpeg atempo; nhỏ hơn 1 = chậm hơn → thời lượng dài hơn)
  * - Độ dài video = độ dài audio (sau khi chỉnh tốc độ), loop video nếu không đủ
- * - (Tuỳ chọn) Lớp video overlay từ `MaVidMedia/backgrounds/overlay/`: 1 file (tên sắp A–Z), chậm ×3 (setpts×3), zoom ~20% (scale 1.2, crop 1280×720 căn ngang giữa — cạnh dưới khung trùng đáy nguồn), opacity 70%, lặp vô hạn; ưu tiên pre-bake 1 vòng tới `overlay/.cache` rồi trộn
+ * - (Tuỳ chọn) Lớp video overlay từ `MaVidMedia/backgrounds/overlay/`: 1 file (tên sắp A–Z), chậm ×3 (setpts×3), zoom ~20% (scale 1.2, crop 1280×720 — cạnh dưới), opacity 80%, lặp vô hạn; ưu tiên pre-bake 1 vòng tới `overlay/.cache` rồi trộn
+ * - (Tuỳ chọn) Video “bar chart” từ `assets/chart/`: 1 file (A–Z), scale góc phải trên (`main_w-overlay_w-m`), `stream_loop` theo hết thời lượng; vẽ trước layer logo nếu có (logo vẫn nằm trên cùng)
  * - Phụ đề: copy file .srt/.vtt từ downloads/ — nếu SPEED ≠ 1 sẽ tự động scale timestamps; ASS dùng NotoSansJP-Black (viền ~6% cỡ chữ + bóng nhẹ)
  * - Ghép stock: crossfade (xfade) giữa các clip — clip cũ mờ dần, clip mới sáng dần; encode nền stock dùng cùng encoder với bước merge (NVENC/AMF/QSV/libx264 theo hardware.util)
  * - Chỉ batch: đọc CSV/Excel, tải từng link rồi xử lý
@@ -29,6 +30,7 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.join(__dirname, '..');
 const DOWNLOADS_DIR = path.join(ROOT, 'downloads');
 const OUTPUT_DIR = path.join(ROOT, 'outputs');
+const ASSET_CHART_DIR = path.join(ROOT, 'assets', 'chart');
 const SUBTITLE_FONT_FILE = path.join(ROOT, 'assets', 'fonts', 'NotoSansJP-Black.ttf');
 const SUBTITLE_FONT_DIR = path.join(ROOT, 'assets', 'fonts');
 // ==========================================
@@ -48,7 +50,11 @@ const STOCK_OVERLAY_DIR = 'overlay';
 const STOCK_OVERLAY_PTS_MULT = 3;
 /** Scale 1.2 (≈ zoom 20%) rồi `crop` về `CANVAS` — cạnh dưới lớp cắt trùng đáy nguồn (lấy vùng phía dưới). */
 const STOCK_OVERLAY_ZOOM = 1.2;
-const STOCK_OVERLAY_OPACITY = 0.7;
+const STOCK_OVERLAY_OPACITY = 0.8;
+/** Rộng tối đa (px) khi thu chart đặt góc phải trên. */
+const CHART_CORNER_MAX_WIDTH = 400;
+const CHART_MARGIN_TOP = 20;
+const CHART_MARGIN_RIGHT = 20;
 
 /** Face name trong TTF — khớp NotoSansJP-Black.ttf (libass + ffmpeg `fontsdir`). */
 const SUBTITLE_FONT_ASS_NAME = 'Noto Sans JP Black';
@@ -124,6 +130,21 @@ function getOverlayVideoFiles(overlayDir) {
 /** File đầu tiên (A–Z) hoặc `null` */
 function pickFirstOverlayVideo(overlayDir) {
   const v = getOverlayVideoFiles(overlayDir);
+  return v[0] || null;
+}
+
+/**
+ * Cùng quy tắc lọc video như `getOverlayVideoFiles`, từ `assets/chart/`.
+ * @param {string} [dir=ASSET_CHART_DIR]
+ * @returns {string[]}
+ */
+function getChartVideoFiles(dir = ASSET_CHART_DIR) {
+  return getOverlayVideoFiles(dir);
+}
+
+/** File đầu tiên trong `assets/chart` hoặc `null` */
+function pickFirstChartVideo() {
+  const v = getChartVideoFiles(ASSET_CHART_DIR);
   return v[0] || null;
 }
 
@@ -692,6 +713,12 @@ async function processOne(bgNameArg, options = {}) {
     }
   }
 
+  const chartSourcePath = pickFirstChartVideo();
+  const hasChart = Boolean(chartSourcePath);
+  if (fs.existsSync(ASSET_CHART_DIR) && getChartVideoFiles(ASSET_CHART_DIR).length === 0) {
+    console.log('[chart] Thư mục assets/chart/ trống — bỏ qua lớp bar chart góc phải trên.');
+  }
+
   // --- BUILD GRAPH ---
   const mergeArgs = ['-y'];
   let inputIdx = 0;
@@ -717,6 +744,15 @@ async function processOne(bgNameArg, options = {}) {
 
   const audioIndex = inputIdx++;
   mergeArgs.push('-i', audioPath);
+
+  let chartIndex = -1;
+  if (hasChart) {
+    chartIndex = inputIdx++;
+    mergeArgs.push('-stream_loop', '-1', '-i', chartSourcePath);
+    console.log(
+      `[chart] Góc phải trên: ${path.basename(chartSourcePath)} (max ${CHART_CORNER_MAX_WIDTH}px rộng, lặp theo hết video)`,
+    );
+  }
 
   let logoIndex = -1;
   if (hasLogo) {
@@ -790,6 +826,21 @@ async function processOne(bgNameArg, options = {}) {
   } else {
     filterParts.push(`[${currentVLabel}]null[vpadded]`);
     currentVLabel = 'vpadded';
+  }
+
+  // Bar chart (assets/chart) — góc phải trên, trước logo
+  if (hasChart && chartIndex >= 0) {
+    const wCap = CHART_CORNER_MAX_WIDTH;
+    const mr = CHART_MARGIN_RIGHT;
+    const mt = CHART_MARGIN_TOP;
+    const f = STOCK_VIDEO.FPS;
+    filterParts.push(
+      `[${chartIndex}:v]scale=${wCap}:-2:flags=fast_bilinear,format=yuv420p,fps=${f},settb=tb=1/90000,setsar=1[chartvid]`,
+    );
+    filterParts.push(
+      `[${currentVLabel}][chartvid]overlay=main_w-overlay_w-${mr}:${mt}[v_charted]`,
+    );
+    currentVLabel = 'v_charted';
   }
 
   // Logo Graph
