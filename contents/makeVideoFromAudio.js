@@ -4,6 +4,7 @@
  * - N video stock từ MaVidMedia/backgrounds/<tên> (VIDEO_STORAGE_ROOT trong settings; N = STOCK_VIDEO_COUNT, cat, dog, ...)
  * - Bước 1: chỉnh tempo audio (ffmpeg atempo; nhỏ hơn 1 = chậm hơn → thời lượng dài hơn)
  * - Độ dài video = độ dài audio (sau khi chỉnh tốc độ), loop video nếu không đủ
+ * - (Tuỳ chọn) Lớp video overlay từ `MaVidMedia/backgrounds/overlay/`: 1 file (tên sắp A–Z), chậm gấp đôi (setpts×2), zoom ~20% (scale 1.2 rồi crop giữa), opacity 50%, lặp vô hạn; ưu tiên pre-bake 1 vòng tới `overlay/.cache` rồi trộn
  * - Phụ đề: copy file .srt/.vtt từ downloads/ — nếu SPEED ≠ 1 sẽ tự động scale timestamps; ASS dùng NotoSansJP-Black (viền ~6% cỡ chữ + bóng nhẹ)
  * - Ghép stock: crossfade (xfade) giữa các clip — clip cũ mờ dần, clip mới sáng dần; encode nền stock dùng cùng encoder với bước merge (NVENC/AMF/QSV/libx264 theo hardware.util)
  * - Chỉ batch: đọc CSV/Excel, tải từng link rồi xử lý
@@ -40,6 +41,14 @@ const CUSTOM_SUBTITLE_PADDING_HORIZONTAL = 0; // Khoảng cách pixel từ text 
 const SUBTITLE_MARGIN_BOTTOM_PX = 40;
 // ==========================================
 const STOCK_VIDEO_HFLIP_PROBABILITY = 0.3;
+
+/** Tên thư mục con cạnh `backgrounds/<stock>/`: `backgrounds/overlay/`. Nếu có file video, trộm lên nền stock. */
+const STOCK_OVERLAY_DIR = 'overlay';
+/** Nhân `PTS` (2 = phát chậm một nửa / thời lượng 1 lần phát dài gấp đôi). */
+const STOCK_OVERLAY_PTS_MULT = 2;
+/** Zoom quanh tâm: scale 1.2 theo cả trục rồi crop về `CANVAS_W×CANVAS_H`. */
+const STOCK_OVERLAY_ZOOM = 1.2;
+const STOCK_OVERLAY_OPACITY = 0.5;
 
 /** Face name trong TTF — khớp NotoSansJP-Black.ttf (libass + ffmpeg `fontsdir`). */
 const SUBTITLE_FONT_ASS_NAME = 'Noto Sans JP Black';
@@ -96,6 +105,61 @@ function getImageFilesFromDir(dir) {
     .filter(f => /\.(png|jpe?g|gif|webp)$/i.test(f))
     .sort((a, b) => a.localeCompare(b))
     .map(f => path.join(dir, f));
+}
+
+/**
+ * Video overlay trong `backgrounds/overlay/` (không quét sâu thư mục con, trừ tệp ở gốc).
+ * @param {string} overlayDir
+ * @returns {string[]}
+ */
+function getOverlayVideoFiles(overlayDir) {
+  if (!overlayDir || !fs.existsSync(overlayDir)) return [];
+  return fs
+    .readdirSync(overlayDir)
+    .filter(f => /\.(mp4|mov|mkv|webm)$/i.test(f) && !f.startsWith('.'))
+    .sort((a, b) => a.localeCompare(b))
+    .map(f => path.join(overlayDir, f));
+}
+
+/** File đầu tiên (A–Z) hoặc `null` */
+function pickFirstOverlayVideo(overlayDir) {
+  const v = getOverlayVideoFiles(overlayDir);
+  return v[0] || null;
+}
+
+/**
+ * Một lần xử lý: setpts×2, zoom+ crop, alpha — ProRes 4444 yuva (giống mẫu `makeVideoFromFull`).
+ * @param {string} sourcePath
+ * @param {string} cacheDir
+ * @returns {Promise<string|null>} Đường dẫn file cache hoặc `null` nếu thất bại
+ */
+async function getPrebakedStockOverlayVideo(sourcePath, cacheDir) {
+  const w = STOCK_VIDEO.CANVAS_W;
+  const h = STOCK_VIDEO.CANVAS_H;
+  const st = fs.statSync(sourcePath);
+  const zTag = Math.round(STOCK_OVERLAY_ZOOM * 100);
+  const aTag = Math.round(STOCK_OVERLAY_OPACITY * 100);
+  const cacheKey = `ov_${path.parse(sourcePath).name}_${w}x${h}_s${STOCK_OVERLAY_PTS_MULT}_z${zTag}_a${aTag}_${st.mtimeMs}.mov`;
+  const cachePath = path.join(cacheDir, cacheKey);
+  if (fs.existsSync(cachePath)) {
+    console.log(`[overlay] Dùng cache: ${path.basename(cachePath)}`);
+    return cachePath;
+  }
+  if (!fs.existsSync(cacheDir)) {
+    fs.mkdirSync(cacheDir, { recursive: true });
+  }
+  const z = STOCK_OVERLAY_ZOOM;
+  const a = STOCK_OVERLAY_OPACITY;
+  const vf = `setpts=${STOCK_OVERLAY_PTS_MULT}*PTS,scale=w='iw*${z}':h='ih*${z}',crop=${w}:${h}:(iw-ow)/2:(ih-oh)/2,format=yuva420p,colorchannelmixer=aa=${a}`;
+  const cmd = `ffmpeg -hide_banner -loglevel error -y -i "${sourcePath}" -vf "${vf}" -c:v prores_ks -profile:v 4444 -pix_fmt yuva444p10le "${cachePath}"`;
+  try {
+    await execAsync(cmd, { maxBuffer: 32 * 1024 * 1024 });
+  } catch (e) {
+    console.warn('[overlay] Pre-cache thất bại, dùng bước trộn single-pass với bản gốc:', e.message);
+    return null;
+  }
+  console.log(`[overlay] Đã tạo cache: ${path.basename(cachePath)}`);
+  return cachePath;
 }
 
 /** Cache kết quả ffprobe (theo mtime+size) để tránh spawn lặp khi lập kế hoạch nhiều clip stock */
@@ -602,6 +666,22 @@ async function processOne(bgNameArg, options = {}) {
   const logoPathForMerge = logoPathOpt != null && String(logoPathOpt).trim() && fs.existsSync(logoPathOpt) ? logoPathOpt : null;
   const hasLogo = Boolean(logoPathForMerge);
 
+  const stockOverlayDir = path.join(stockBgRoot, STOCK_OVERLAY_DIR);
+  const stockOverlaySourcePath = pickFirstOverlayVideo(stockOverlayDir);
+  const hasStockOverlay = Boolean(stockOverlaySourcePath);
+  let usePrebakedOverlay = false;
+  /** Khi `hasStockOverlay` — bản gốc hoặc file cache. */
+  let pathForOverlayInput = null;
+  if (hasStockOverlay) {
+    const prebaked = await getPrebakedStockOverlayVideo(stockOverlaySourcePath, path.join(stockOverlayDir, '.cache'));
+    usePrebakedOverlay = Boolean(prebaked);
+    pathForOverlayInput = prebaked || stockOverlaySourcePath;
+  } else {
+    if (fs.existsSync(stockOverlayDir) && getOverlayVideoFiles(stockOverlayDir).length === 0) {
+      console.log(`[overlay] Có thư mục ${STOCK_OVERLAY_DIR}/ nhưng không có file video (mp4/mov/mkv/webm) — bỏ qua lớp overlay.`);
+    }
+  }
+
   // --- BUILD GRAPH ---
   const mergeArgs = ['-y'];
   let inputIdx = 0;
@@ -616,11 +696,18 @@ async function processOne(bgNameArg, options = {}) {
     inputIdx++;
   }
 
-  // Audio
+  let overlayIndex = -1;
+  if (hasStockOverlay && pathForOverlayInput) {
+    overlayIndex = inputIdx++;
+    mergeArgs.push('-stream_loop', '-1', '-i', pathForOverlayInput);
+    console.log(
+      `[overlay] Lớp phủ: ${path.basename(stockOverlaySourcePath)} (merge: ${usePrebakedOverlay ? 'cache ProRes' : 'single-pass trên bản gốc'})`,
+    );
+  }
+
   const audioIndex = inputIdx++;
   mergeArgs.push('-i', audioPath);
 
-  // Logo
   let logoIndex = -1;
   if (hasLogo) {
     logoIndex = inputIdx++;
@@ -653,8 +740,27 @@ async function processOne(bgNameArg, options = {}) {
     }
   }
 
-  // Drawbox + Subtitles Graph
   let currentVLabel = vBgLabel;
+  if (hasStockOverlay && overlayIndex >= 0) {
+    if (usePrebakedOverlay) {
+      filterParts.push(
+        `[${overlayIndex}:v]fps=${STOCK_VIDEO.FPS},settb=tb=1/90000,setsar=1[ovlay]`,
+      );
+    } else {
+      const w = STOCK_VIDEO.CANVAS_W;
+      const h = STOCK_VIDEO.CANVAS_H;
+      const z = STOCK_OVERLAY_ZOOM;
+      const a = STOCK_OVERLAY_OPACITY;
+      const pm = STOCK_OVERLAY_PTS_MULT;
+      filterParts.push(
+        `[${overlayIndex}:v]setpts=${pm}*PTS,scale=w='iw*${z}':h='ih*${z}',crop=${w}:${h}:(iw-ow)/2:(ih-oh)/2,format=yuva420p,colorchannelmixer=aa=${a},fps=${f},settb=tb=1/90000,setsar=1[ovlay]`,
+      );
+    }
+    filterParts.push(`[${currentVLabel}][ovlay]overlay=0:0[v_plated]`);
+    currentVLabel = 'v_plated';
+  }
+
+  // Drawbox + Subtitles Graph
   if (subtitlePath) {
     convertSrtToAss(subtitlePath, tempSubPath, useJaSubtitleStyle);
     const subPathEscaped = escapePathForFfmpegSubtitles(tempSubPath);
