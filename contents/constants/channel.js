@@ -1,4 +1,4 @@
-export const MIN_DURATION_VIDEO = 480;
+export const MIN_DURATION_VIDEO = 1080;
 
 export const CHANNEL_COLUMNS = ['LINK VIDEO', 'VIEWS', 'DURATION', 'STATUS'];
 

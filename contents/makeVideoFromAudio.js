@@ -4,7 +4,7 @@
  * - N video stock từ MaVidMedia/backgrounds/<tên> (VIDEO_STORAGE_ROOT trong settings; N = STOCK_VIDEO_COUNT, cat, dog, ...)
  * - Bước 1: chỉnh tempo audio (ffmpeg atempo; nhỏ hơn 1 = chậm hơn → thời lượng dài hơn)
  * - Độ dài video = độ dài audio (sau khi chỉnh tốc độ), loop video nếu không đủ
- * - (Tuỳ chọn) Lớp video overlay từ `MaVidMedia/backgrounds/overlay/`: 1 file (tên sắp A–Z), chậm ×3 (setpts×3), zoom ~20% (scale 1.2, crop 1280×720 — cạnh dưới), opacity 80%, lặp vô hạn; ưu tiên pre-bake 1 vòng tới `overlay/.cache` rồi trộn
+ * - (Tuỳ chọn) Lớp video overlay từ `MaVidMedia/backgrounds/overlay/`: 1 file (tên sắp A–Z), chậm ×3 (setpts×3), zoom ~20% (scale 1.2, crop 1280×720 — cạnh dưới), opacity 70%, lặp vô hạn; ưu tiên pre-bake 1 vòng tới `overlay/.cache` rồi trộn
  * - (Tuỳ chọn) Video “bar chart” từ `assets/chart/`: 1 file (A–Z), scale góc phải trên (`main_w-overlay_w-m`), `stream_loop` theo hết thời lượng; vẽ trước layer logo nếu có (logo vẫn nằm trên cùng)
  * - Phụ đề: copy file .srt/.vtt từ downloads/ — nếu SPEED ≠ 1 sẽ tự động scale timestamps; ASS dùng NotoSansJP-Black (viền ~6% cỡ chữ + bóng nhẹ)
  * - Ghép stock: crossfade (xfade) giữa các clip — clip cũ mờ dần, clip mới sáng dần; encode nền stock dùng cùng encoder với bước merge (NVENC/AMF/QSV/libx264 theo hardware.util)
@@ -49,8 +49,8 @@ const STOCK_OVERLAY_DIR = 'overlay';
 /** Nhân `PTS` (3 = một lần phát gấp 3 thời lượng, tốc độ ~1/3). */
 const STOCK_OVERLAY_PTS_MULT = 3;
 /** Scale 1.2 (≈ zoom 20%) rồi `crop` về `CANVAS` — cạnh dưới lớp cắt trùng đáy nguồn (lấy vùng phía dưới). */
-const STOCK_OVERLAY_ZOOM = 1.2;
-const STOCK_OVERLAY_OPACITY = 0.8;
+const STOCK_OVERLAY_ZOOM = 1.4;
+const STOCK_OVERLAY_OPACITY = 0.5;
 /** Rộng tối đa (px) khi thu chart đặt góc phải trên. */
 const CHART_CORNER_MAX_WIDTH = 400;
 const CHART_MARGIN_TOP = 20;
@@ -749,9 +749,7 @@ async function processOne(bgNameArg, options = {}) {
   if (hasChart) {
     chartIndex = inputIdx++;
     mergeArgs.push('-stream_loop', '-1', '-i', chartSourcePath);
-    console.log(
-      `[chart] Góc phải trên: ${path.basename(chartSourcePath)} (max ${CHART_CORNER_MAX_WIDTH}px rộng, lặp theo hết video)`,
-    );
+    console.log(`[chart] Góc phải trên: ${path.basename(chartSourcePath)} (max ${CHART_CORNER_MAX_WIDTH}px rộng, lặp theo hết video)`);
   }
 
   let logoIndex = -1;
@@ -789,15 +787,11 @@ async function processOne(bgNameArg, options = {}) {
   let currentVLabel = vBgLabel;
   if (hasStockOverlay && overlayIndex >= 0) {
     if (usePrebakedOverlay) {
-      filterParts.push(
-        `[${overlayIndex}:v]fps=${STOCK_VIDEO.FPS},settb=tb=1/90000,setsar=1[ovlay]`,
-      );
+      filterParts.push(`[${overlayIndex}:v]fps=${STOCK_VIDEO.FPS},settb=tb=1/90000,setsar=1[ovlay]`);
     } else {
       const pm = STOCK_OVERLAY_PTS_MULT;
       const chain = stockOverlayScaleCropAlphaSubchain();
-      filterParts.push(
-        `[${overlayIndex}:v]setpts=${pm}*PTS,${chain},fps=${STOCK_VIDEO.FPS},settb=tb=1/90000,setsar=1[ovlay]`,
-      );
+      filterParts.push(`[${overlayIndex}:v]setpts=${pm}*PTS,${chain},fps=${STOCK_VIDEO.FPS},settb=tb=1/90000,setsar=1[ovlay]`);
     }
     filterParts.push(`[${currentVLabel}][ovlay]overlay=0:0[v_plated]`);
     currentVLabel = 'v_plated';
@@ -809,18 +803,20 @@ async function processOne(bgNameArg, options = {}) {
     const subPathEscaped = escapePathForFfmpegSubtitles(tempSubPath);
     const fontsDirEscaped = escapePathForFfmpegSubtitles(SUBTITLE_FONT_DIR);
     const subtitleBoxHeight = Math.floor(STOCK_VIDEO.CANVAS_H / 3);
-    const drawboxFilter = `drawbox=x=0:y=ih-h-${SUBTITLE_MARGIN_BOTTOM_PX}:w=iw:h=${subtitleBoxHeight}:color=black@${SUBTITLE.BOX_OPACITY}:t=fill`;
+    const boxY = STOCK_VIDEO.CANVAS_H - subtitleBoxHeight - SUBTITLE_MARGIN_BOTTOM_PX;
+    const drawboxFilter = `drawbox=x=0:y=${boxY}:w=iw:h=${subtitleBoxHeight}:color=black@${SUBTITLE.BOX_OPACITY}:t=fill`;
     const subFilter = fs.existsSync(SUBTITLE_FONT_FILE)
       ? `subtitles='${subPathEscaped}:fontsdir=${fontsDirEscaped}'`
       : `subtitles='${subPathEscaped}'`;
 
-    filterParts.push(`[${currentVLabel}]null[vpadded]`);
+    filterParts.push(`[${currentVLabel}]${drawboxFilter},split[v_base][v_for_sub]`);
+    filterParts.push(`[v_for_sub]${subFilter},crop=iw:${subtitleBoxHeight}:0:${boxY}[v_sub_clipped]`);
+    filterParts.push(`[v_base][v_sub_clipped]overlay=0:${boxY}[v_subbed]`);
+
     if (useJaSubtitleStyle) {
-      filterParts.push(`[vpadded]${subFilter}[v_subbed]`);
-      console.log('Phụ đề (JA): không hộp nền — chữ cyan / viền đen dày.');
+      console.log('Phụ đề (JA): Chữ cyan / viền đen dày, có hộp nền (đã giới hạn vùng hiển thị).');
     } else {
-      filterParts.push(`[vpadded]${drawboxFilter}[v1b]`);
-      filterParts.push(`[v1b]${subFilter}[v_subbed]`);
+      console.log('Phụ đề: Có hộp nền (đã giới hạn vùng hiển thị).');
     }
     currentVLabel = 'v_subbed';
   } else {
@@ -828,18 +824,19 @@ async function processOne(bgNameArg, options = {}) {
     currentVLabel = 'vpadded';
   }
 
-  // Bar chart (assets/chart) — góc phải trên, trước logo
+  // Bar chart (assets/chart) — ngay mép trên background subtitle, phía bên phải
   if (hasChart && chartIndex >= 0) {
     const wCap = CHART_CORNER_MAX_WIDTH;
     const mr = CHART_MARGIN_RIGHT;
-    const mt = CHART_MARGIN_TOP;
+    // Tọa độ Y của mép trên hộp phụ đề
+    const h_box = Math.floor(STOCK_VIDEO.CANVAS_H / 3);
+    const boxY = STOCK_VIDEO.CANVAS_H - h_box - SUBTITLE_MARGIN_BOTTOM_PX;
     const f = STOCK_VIDEO.FPS;
+
     filterParts.push(
-      `[${chartIndex}:v]scale=${wCap}:-2:flags=fast_bilinear,format=yuv420p,fps=${f},settb=tb=1/90000,setsar=1[chartvid]`,
+      `[${chartIndex}:v]scale=${wCap}:-2:flags=fast_bilinear,colorkey=0x000000:0.1:0.1,format=yuva420p,fps=${f},settb=tb=1/90000,setsar=1[chartvid]`,
     );
-    filterParts.push(
-      `[${currentVLabel}][chartvid]overlay=main_w-overlay_w-${mr}:${mt}[v_charted]`,
-    );
+    filterParts.push(`[${currentVLabel}][chartvid]overlay=main_w-overlay_w-${mr}:${boxY}-overlay_h[v_charted]`);
     currentVLabel = 'v_charted';
   }
 
