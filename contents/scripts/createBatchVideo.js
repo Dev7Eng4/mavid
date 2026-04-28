@@ -576,6 +576,12 @@ function mergeChannelConfigIntoProps(baseProps, item) {
   if (emailEmpty && item.email != null && String(item.email).trim() !== '') {
     o.email = String(item.email).trim();
   }
+
+  const optionEmpty = o.option == null || String(o.option).trim() === '';
+  const itemOption = item.videoOption || item.option;
+  if (optionEmpty && itemOption != null && String(itemOption).trim() !== '') {
+    o.option = String(itemOption).trim();
+  }
   return o;
 }
 
@@ -590,6 +596,12 @@ function buildMakeVideoFromAudioOptions(props, channelFolderName) {
   }
   if (props.stockFolder != null && String(props.stockFolder).trim() !== '') {
     o.stockFolder = String(props.stockFolder).trim();
+  }
+  if (props.overlay != null && String(props.overlay).trim() !== '') {
+    o.overlay = String(props.overlay).trim();
+  }
+  if (props.option != null && String(props.option).trim() !== '') {
+    o.option = String(props.option).trim();
   }
   if (props.showLogo === true) o.showLogo = true;
   else if (props.showLogo === false) o.showLogo = false;
@@ -790,7 +802,7 @@ async function main(props = {}) {
   let result;
   try {
     if (videoType === MAKE_VIDEO_MODE.FROM_AUDIO) {
-      const { default: makeVideoFromAudio } = await import('../makeVideoFromAudio.js');
+      const { default: makeVideoFromAudio } = await import('../makeFromAudio/index.js');
       result = await makeVideoFromAudio({
         inputFile,
         items,

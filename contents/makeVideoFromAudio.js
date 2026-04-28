@@ -501,12 +501,12 @@ function convertSrtToAss(srtPath, assPath, japaneseStyle = false) {
   const fontName = fs.existsSync(SUBTITLE_FONT_FILE) ? SUBTITLE_FONT_ASS_NAME : 'Arial';
   /** Viền đen: JA dày hơn; các ngôn ngữ khác ~6% cỡ chữ */
   const outlinePx = japaneseStyle ? 8.5 : +(CUSTOM_SUBTITLE_FONT_SIZE * 0.06).toFixed(2);
-  const shadowPx = japaneseStyle ? 0.5 : 1.5;
-  /** ASS &HAABBGGRR — cyan / xanh ngọc nhạt (RGB ~180,240,255) */
-  const primaryColour = japaneseStyle ? '&H00FFF0B4' : '&H00FFFFFF';
+  const glowPx = outlinePx + 8; // Độ dày cho lớp glow phía dưới viền đen
+  /** ASS &HAABBGGRR */
+  const primaryColour = '&H00FFFFFF'; // Màu trắng
   const secondaryColour = '&H000000FF';
-  const outlineColour = '&H00000000';
-  const backColour = '&H00000000';
+  const outlineColour = '&H00000000'; // Stroke đen
+  const glowColour = '&H00C8FF00'; // Bóng xanh ngọc phát sáng #00FFC8
 
   // H_box bằng 1/3 chiều cao video
   const subtitleBoxHeight = Math.floor(STOCK_VIDEO.CANVAS_H / 3);
@@ -524,7 +524,8 @@ WrapStyle: 1
 
 [V4+ Styles]
 Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
-Style: Default,${fontName},${CUSTOM_SUBTITLE_FONT_SIZE},${primaryColour},${secondaryColour},${outlineColour},${backColour},-1,0,0,0,100,100,${SUBTITLE.CHAR_SPACING},0,1,${outlinePx},${shadowPx},2,${CUSTOM_SUBTITLE_PADDING_HORIZONTAL},${CUSTOM_SUBTITLE_PADDING_HORIZONTAL},0,1
+Style: Glow,${fontName},${CUSTOM_SUBTITLE_FONT_SIZE},${glowColour},${secondaryColour},${glowColour},&H00000000,-1,0,0,0,100,100,${SUBTITLE.CHAR_SPACING},0,1,${glowPx},0,2,${CUSTOM_SUBTITLE_PADDING_HORIZONTAL},${CUSTOM_SUBTITLE_PADDING_HORIZONTAL},0,1
+Style: Default,${fontName},${CUSTOM_SUBTITLE_FONT_SIZE},${primaryColour},${secondaryColour},${outlineColour},&H00000000,-1,0,0,0,100,100,${SUBTITLE.CHAR_SPACING},0,1,${outlinePx},0,2,${CUSTOM_SUBTITLE_PADDING_HORIZONTAL},${CUSTOM_SUBTITLE_PADDING_HORIZONTAL},0,1
 
 [Events]
 Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
@@ -594,7 +595,10 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
     // textBottom = boxMidY + totalTextH/2; marginV = CANVAS_H - textBottom
     const eventMarginV = Math.max(0, Math.round(STOCK_VIDEO.CANVAS_H - boxMidY - totalTextH / 2));
 
-    events += `Dialogue: 0,${start},${end},Default,,0,0,${eventMarginV},,${baseText}\n`;
+    // Lớp 0: Dùng Style Glow kết hợp tag \blur để làm nhoè tạo hiệu ứng phát sáng mềm
+    events += `Dialogue: 0,${start},${end},Glow,,0,0,${eventMarginV},,{\\blur10}${baseText}\n`;
+    // Lớp 1: Chữ trắng viền đen sắc nét đè lên trên
+    events += `Dialogue: 1,${start},${end},Default,,0,0,${eventMarginV},,${baseText}\n`;
   }
 
   fs.writeFileSync(assPath, header + events, 'utf-8');

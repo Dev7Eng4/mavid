@@ -35,3 +35,7 @@ declare module '@contents/prompts/index.js' {
     language: string | null | undefined
   ): Promise<Record<string, unknown>>;
 }
+
+declare module '@contents/makeFromAudio/constant.js' {
+  export const OPTIONS_CONTENT: readonly { label: string; value: string }[];
+}

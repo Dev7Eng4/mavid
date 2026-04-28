@@ -482,6 +482,9 @@ async function downloadSingleVideo(url, options = {}) {
       }
       result.filePath = path.join(actualOutputDir, pick);
     }
+    
+    // Đính kèm các cấu hình mở rộng (như overlay - stock/image option) vào result
+    if (options.overlay) result.overlay = options.overlay;
 
     return result;
   } catch (err) {

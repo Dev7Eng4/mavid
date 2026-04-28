@@ -1,4 +1,5 @@
 import { PROMPTS_CREATE_THUMBNAIL_OPTIONS } from '@contents/prompts/index.js';
+import { OPTIONS_CONTENT } from '@contents/makeFromAudio/constant.js';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { ChannelRow, MavidGroupRow } from '@/types';
 import { AppButton } from '@/components/ui/AppButton';
@@ -154,7 +155,10 @@ export function ChannelAddDialog({
     return backgroundFolders[0] ?? '';
   }, [backgroundFolders, selectedBackground]);
 
-  const reupOverlayOptionsList = useMemo(() => reupOverlaySelectOptions(), []);
+  const reupOverlayOptionsList = useMemo(() => {
+    if (videoType === 'from_audio') return OPTIONS_CONTENT;
+    return reupOverlaySelectOptions();
+  }, [videoType]);
 
   const [mavidGroupRows, setMavidGroupRows] = useState<MavidGroupRow[]>([]);
   useEffect(() => {
@@ -187,7 +191,7 @@ export function ChannelAddDialog({
 
   const thumbnailPromptOptionsList = useMemo(
     () =>
-      PROMPTS_CREATE_THUMBNAIL_OPTIONS.map(o => ({
+      PROMPTS_CREATE_THUMBNAIL_OPTIONS.map((o: any) => ({
         value: String(o.value),
         label: String(o.label),
       })),
@@ -196,9 +200,13 @@ export function ChannelAddDialog({
 
   const resolvedReupOverlay = useMemo(() => {
     const pick = reupOverlayOption.trim();
+    if (videoType === 'from_audio') {
+      if (pick && OPTIONS_CONTENT.some((o: any) => o.value === pick)) return pick;
+      return OPTIONS_CONTENT[0]?.value ?? '';
+    }
     if (pick && isValidReupOverlayName(pick)) return pick;
     return defaultReupOverlayName();
-  }, [reupOverlayOption]);
+  }, [reupOverlayOption, videoType]);
 
   const resolvedthumbnailPrompt = useMemo(() => {
     const pick = thumbnailPrompt.trim();
@@ -361,9 +369,9 @@ export function ChannelAddDialog({
 
   const hasBackgroundColumn = indexHeaders.includes('background');
   const showBackgroundField = videoType === 'from_audio' && (!isEditMode || hasBackgroundColumn);
-  const showReupOverlayField = videoType === 'reup_full';
+  const showReupOverlayField = true; // Luôn hiển thị Option reup cho cả 2 loại video
   const requireBackground = videoType === 'from_audio' && backgroundFolders.length > 0 && (!isEditMode || hasBackgroundColumn);
-  const requireReupOverlay = videoType === 'reup_full' && reupOverlayOptionsList.length > 0;
+  const requireReupOverlay = reupOverlayOptionsList.length > 0;
 
   const handleConfirm = useCallback(() => {
     void (async () => {
@@ -386,7 +394,7 @@ export function ChannelAddDialog({
         setFormError('Chọn background.');
         return;
       }
-      if (requireReupOverlay && !isValidReupOverlayName(resolvedReupOverlay)) {
+      if (requireReupOverlay && !reupOverlayOptionsList.some((o: any) => o.value === resolvedReupOverlay)) {
         setFormError('Chọn Option reup (overlay).');
         return;
       }
@@ -483,7 +491,7 @@ export function ChannelAddDialog({
                   durationMinuteFrom: from,
                   durationMinuteTo: to,
                   background: videoType === 'from_audio' ? resolvedBackground.trim() : '',
-                  ...(videoType === 'reup_full' ? { overlay: resolvedReupOverlay.trim() } : {}),
+                  overlay: resolvedReupOverlay.trim(),
                   thumbnailPrompt: resolvedthumbnailPrompt.trim(),
                   videosPerDayPreset,
                   publishTimes: times,
@@ -533,7 +541,7 @@ export function ChannelAddDialog({
               durationMinuteFrom: from,
               durationMinuteTo: to,
               background: videoType === 'from_audio' ? resolvedBackground.trim() : '',
-              ...(videoType === 'reup_full' ? { overlay: resolvedReupOverlay.trim() } : {}),
+              overlay: resolvedReupOverlay.trim(),
               thumbnailPrompt: resolvedthumbnailPrompt.trim(),
               videosPerDayPreset,
               publishTimes: times,
@@ -556,6 +564,7 @@ export function ChannelAddDialog({
     folderIdOverride,
     requireBackground,
     requireReupOverlay,
+    reupOverlayOptionsList,
     resolvedReupOverlay,
     resolvedthumbnailPrompt,
     indexHeaders,
@@ -586,7 +595,7 @@ export function ChannelAddDialog({
       role='presentation'
     >
       <div
-        className='w-full my-8 rounded-2xl p-6 sm:p-8 shadow-xl overflow-visible relative z-1 max-h-[min(90vh,760px)] min-h-0'
+        className='w-full my-8 rounded-2xl p-6 sm:p-8 shadow-xl overflow-hidden relative z-1 max-h-[min(90vh,760px)] min-h-0 flex flex-col'
         style={{ background: 'var(--card-bg)', border: '1px solid var(--border)', maxWidth: '680px' }}
         onClick={e => e.stopPropagation()}
         role='dialog'

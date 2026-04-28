@@ -202,6 +202,8 @@ export interface VideoFromAudioConfig {
   maxVideosPerBatch: number;
   /** 0 = không lọc; >0 = chỉ dòng có cột DURATION ≥ N phút. */
   minDurationMinutes?: number;
+  /** Tùy chọn nâng cao (ví dụ: stock/image cho from_audio). */
+  overlay?: string;
 }
 
 export type DirectScriptId =

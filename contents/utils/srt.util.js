@@ -6,6 +6,52 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const DOWNLOADS_DIR = path.join(__dirname, '..', 'downloads');
 
 /**
+ * Parse chuỗi SRT thành mảng objects { id, timeline, text }.
+ * @param {string} srtContent
+ * @returns {{ id: string, timeline: string, text: string }[]}
+ */
+export function parseSrtToObjects(srtContent) {
+  const raw = String(srtContent ?? '')
+    .replace(/\r/g, '')
+    .trim();
+  if (!raw) return [];
+
+  const blocks = raw
+    .split(/\n\n+/)
+    .map(b => b.trim())
+    .filter(Boolean);
+  const result = [];
+
+  const timelineRe = /^\d{2}:\d{2}:\d{2}[.,]\d{3}\s*-->\s*\d{2}:\d{2}:\d{2}[.,]\d{3}/;
+
+  for (const block of blocks) {
+    const lines = block
+      .split('\n')
+      .map(l => l.trim())
+      .filter(Boolean);
+    if (lines.length < 3) continue;
+
+    const id = lines[0];
+    const timeline = lines[1];
+    if (!/^\d+$/.test(id) || !timelineRe.test(timeline)) continue;
+
+    const text = lines.slice(2).join('\n').trim();
+    result.push({ id, timeline, text });
+  }
+
+  return result;
+}
+
+/**
+ * Chuyển mảng objects thành dạng "[id] text" để gửi cho AI.
+ * @param {{ id: string, timeline: string, text: string }[]} objects
+ * @returns {string}
+ */
+export function objectsToIdTextFormat(objects) {
+  return objects.map(o => `[${o.id}] ${o.text}`).join('\n');
+}
+
+/**
  * Parse timestamp SRT/VTT (hỗ trợ dấu phẩy hoặc chấm cho phần ms).
  * @param {string} timeStr
  * @returns {number}

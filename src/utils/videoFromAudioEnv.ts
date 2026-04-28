@@ -38,5 +38,8 @@ export function buildMavidEnvForVideoFromAudio(config: VideoFromAudioConfig, ava
   if (config.email) {
     env.MAVID_EMAIL = config.email;
   }
+  if (config.overlay) {
+    env.MAVID_VIDEO_OPTION = config.overlay;
+  }
   return env;
 }

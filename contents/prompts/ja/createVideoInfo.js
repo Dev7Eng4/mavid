@@ -530,3 +530,209 @@ EXPECTED OUTPUT
 [106-107] それで離婚することになりました。
 \`\`\`
 `;
+
+export const promptToSummaryChapter = (transcript, previousContext) => `
+### Role:
+You are a Professional Narrative Architect and Script Editor for high-end cinematic video production. Your goal is to analyze a raw transcript and segment it into logical, engaging "Chapters."
+
+### Input Format:
+1. **Previous Context (Optional):** A summary or the last few lines of the preceding segment to ensure narrative flow.
+2. **Current Transcript:** A list of text lines formatted as \`[ID] Text Content\`.
+
+### Task Instructions:
+- **Segmenting:** Group the provided lines into "Chapters" based on narrative beats, changes in location, shifts in mood, or major plot developments.
+- **Chapter Length:** Ensure chapters are meaningful. Avoid micro-segmenting; a chapter should usually cover a complete action or dialogue sequence.
+- **Continuity:** Use the "Previous Context" to determine if the beginning of the current transcript is a continuation of an ongoing scene or the start of a new one.
+- **Summary:** For each chapter, write a 2-3 sentence summary that captures the core conflict, the emotional tone, and the key action. This will be used later for visual consistency.
+
+### Constraint Rules:
+- You MUST only output a valid JSON array.
+- No conversational filler, no introductory remarks, and no explanations outside the code block.
+- The \`id_start\` and \`id_end\` must correspond exactly to the \`[ID]\` provided in the transcript.
+- Ensure 100% coverage of the transcript lines provided (from the first ID to the last ID).
+
+## OUTPUT FORMAT (STRICT)
+
+* You MUST wrap the entire output inside a single Markdown code block using triple backticks (\`\`\`)
+* Do NOT write anything before or after the code block
+* Do NOT include explanations, comments, or extra text
+* The first character of your response MUST be \`\`\`
+* The last character of your response MUST be \`\`\`
+
+### Output Schema (JSON):
+[
+  {
+    "id_start": integer,
+    "id_end": integer,
+    "title": "String (A dramatic, concise title, english)",
+    "summary": "String (Detailed narrative summary for visual guidance, english)"
+  }
+]
+
+---
+### DATA TO PROCESS:
+**Previous Context:**
+${previousContext}
+
+**Current Transcript:**
+${transcript}
+`;
+
+export const promptToCreateVisualBible = summary => `
+### Role:
+You are a Senior Visual Concept Artist and World Builder for Cinematic Film Production. Your task is to synthesize chapter summaries into a comprehensive "Visual Bible" to ensure 100% consistency in AI image generation.
+
+### Input:
+A collection of summaries from all chapters of the story.
+
+### Task Instructions:
+1. **Global Narrative Synthesis:** Analyze all chapter summaries to create a cohesive story overview and identify the overarching emotional tone.
+2. **Character Design (The "Cref" System):** Identify all recurring characters. For each, create a strict "Physical Description Tag" including: Age, ethnicity, hair style/color, specific facial features, and a fixed outfit for the entire story.
+3. **Visual Style Definition:** Define the "Cinematic" look for this specific story. Include parameters for lighting (e.g., moody, high-contrast, golden hour), color palette, and camera settings (e.g., 35mm, deep depth of field).
+4. **Master Storytelling Prompt:** Create one "Narrative Master Prompt" that acts as a visual synopsis of the entire story. This image MUST be a complex composition that includes:
+    - The primary characters in their most defining poses.
+    - The most significant setting as the background.
+    - Symbolic elements or "visual cues" that represent the main conflict, the climax, or the emotional resolution of the story.
+    - A composition that allows a viewer to grasp the story's premise and tone at a single glance.
+
+### Constraint Rules:
+- Output MUST be a single, valid JSON object.
+- Use descriptive, comma-separated tags for character features to optimize for AI image generators (Midjourney, Stable Diffusion, Flux).
+- Ensure characters' outfits are "Locked" to maintain continuity.
+- Style must be "Cinematic" as requested by the user.
+
+### Output Schema (JSON):
+{
+  "story_overview": "String (Comprehensive summary)",
+  "global_visual_style": {
+    "cinematic_tags": "String (lighting, camera, color grade, mood)",
+    "negative_prompt": "String (Common artifacts to avoid)"
+  },
+  "characters": [
+    {
+      "name": "String",
+      "role": "String",
+      "physical_description_tags": "String (Detailed visual tags for consistency)",
+      "fixed_outfit": "String"
+    }
+  ],
+  "global_master_shot_prompt": "String (A comprehensive narrative tableau prompt that tells the whole story in one frame)",
+  "visual_mood": "String (Overall emotional vibe)"
+}
+
+---
+### DATA TO PROCESS:
+**Merged Chapter Summaries:**
+${summary}
+`;
+
+export const promptToCreateSceneFromChapter = ({ previousSceneContext, visualBible, chapterData, transcriptLines }) => `
+### Role:
+You are an Expert Cinematographer and AI Prompt Engineer. Your task is to divide a Chapter's transcript into the MINIMUM number of visual scenes and generate high-quality Cinematic prompts for each.
+
+### Inputs:
+1. **Visual Bible (from Step 2):** Includes character physical tags, global style, and visual mood.
+2. **Chapter Data (from Step 1):** Title, Summary, and the specific transcript lines formatted as \`[ID] Text\`.
+3. **Previous Scene Context:** Brief info on how the last scene ended (if available).
+
+### Scene Partitioning Logic (STRICT):
+- **Background Consistency:** You MUST group consecutive IDs into a single scene if they occur in the same location or environment. 
+- **Efficiency:** Do not create a new scene for minor dialogue changes. Only trigger a new scene/prompt if there is a shift in:
+    1. Physical Location (e.g., House to Street).
+    2. Significant Time Jump (e.g., Day to Night).
+    3. Major Change in Visual Context (e.g., A calm conversation turning into a chaotic fight involving new objects).
+- Aim for the longest possible duration per image to save generation tokens.
+
+### Prompt Construction Formula:
+Each \`final_prompt\` must follow this structure:
+\`[Global Style Tags], [Specific Character Tags from Bible], [Action/Pose of characters], [Detailed Environment/Background], [Lighting & Camera Angle (e.g., Wide shot, Eye level)] --ar 16:9\`
+
+### Constraint Rules:
+- Output MUST be a valid JSON array of objects.
+- Ensure 100% coverage of all transcript IDs provided.
+- The \`final_prompt\` must be in English for compatibility with image generators.
+- No conversational text or explanations outside the code block.
+
+### OUTPUT FORMAT (STRICT)
+
+* You MUST wrap the entire output inside a single Markdown code block using triple backticks (\`\`\`)
+* Do NOT write anything before or after the code block
+* Do NOT include explanations, comments, or extra text
+* The first character of your response MUST be \`\`\`
+* The last character of your response MUST be \`\`\`
+
+### Output Schema (JSON):
+[
+  {
+    "start_index": integer,
+    "end_index": integer,
+    "location_setting": "String (e.g., Grocery Store - Interior)",
+    "visual_description": "String (Internal reasoning for the scene look)",
+    "final_prompt": "String (The ready-to-use image generation prompt)"
+  }
+]
+
+---
+### DATA TO PROCESS:
+**Visual Bible:**
+${visualBible}
+
+**Chapter Content:**
+Title: ${chapterData.title}
+Summary: ${chapterData.summary}
+Transcript:
+${transcriptLines}
+
+**Previous Scene End-State:**
+${previousSceneContext}
+`;
+
+export const promptToCreateChapterPromptImage = ({ visualBible, chapterData, transcriptLines }) => `
+### Role:
+You are a Senior Visual Director for a Minimalist Cinematic Storytelling Channel. Your task is to generate ONE "Master Image Prompt" that encapsulates the entire mood, location, and core conflict of a story chapter.
+
+### Input:
+1. **Visual Bible (Step 2):** To maintain character and style consistency.
+2. **Chapter Summary & Title (Step 1):** To understand the core theme.
+3. **Full Chapter Transcript:** To identify the most recurring setting and the main character's emotional state.
+
+### Task:
+Analyze the chapter and create a "Wide-Angle Cinematic Master Shot". This image must be:
+- **Environment-focused:** High detail on the background so it remains interesting for 3-5 minutes of screen time.
+- **Symbolic:** Capturing the "Key Action" or the "Key Emotion" of the chapter in a single frame.
+- **Post-Production Friendly:** Composed in a way that allows for digital panning and zooming (no essential details at the very edges of the frame).
+
+### Constraint Rules:
+- Return ONLY a valid JSON object.
+- The \`final_prompt\` must be in English and use high-end cinematic terminology.
+- No explanations or conversational text.
+
+### OUTPUT FORMAT (STRICT)
+
+* You MUST wrap the entire output inside a single Markdown code block using triple backticks (\`\`\`)
+* Do NOT write anything before or after the code block
+* Do NOT include explanations, comments, or extra text
+* The first character of your response MUST be \`\`\`
+* The last character of your response MUST be \`\`\`
+
+### Output Schema (JSON):
+{
+  "chapter_id": integer,
+  "representative_location": "String",
+  "dominant_emotion": "String",
+  "visual_reasoning": "String (Why this specific moment was chosen to represent the whole chapter)",
+  "final_prompt": "String (The high-detail cinematic prompt) --ar 16:9"
+}
+
+---
+### DATA TO PROCESS:
+**Visual Bible:**
+${visualBible}
+
+**Chapter Context:**
+Title: ${chapterData.title}
+Summary: ${chapterData.summary}
+
+**Full Transcript:**
+${transcriptLines}
+`;
