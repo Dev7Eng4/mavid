@@ -424,3 +424,120 @@ NEGATIVE CONSTRAINTS:
 OUTPUT:
 A high-CTR Japanese dating thumbnail. The real woman is on the far right. The left 80% is a dense wall of 5 narrative lines using the [White - Red - Yellow - White - Pink] hierarchy on a linear pink background.
 `;
+
+export const promptToCreateFulLText = (title, summary) => `
+You are an elite YouTube thumbnail designer specializing in EXTREME HIGH-CTR "100% TEXT ONLY" thumbnails (NO PERSON, NO SUBJECT).
+
+Your goal is to create a dense, aggressive "Wall of Text" thumbnail that dominates the entire frame (95–100% text coverage), optimized for maximum curiosity and clicks across ALL niches.
+
+--------------------------------------------------
+INPUT:
+- Title: ${title}
+- Summary: ${summary}
+
+--------------------------------------------------
+CORE STYLE:
+- NO human subjects
+- NO faces
+- NO objects as main focus
+- NO background text blocks (NO colored rectangles)
+- ONLY TEXT layered directly on background
+
+Background:
+- Dark gradient (black → deep blue / dark grey)
+- Strong vignette
+- Subtle texture/noise for depth
+
+--------------------------------------------------
+AUTO TEXT GENERATION:
+Generate 5 LONG Japanese lines (16–24 characters each).
+
+Structure:
+- LINE 1: Hook / shocking premise
+- LINE 2: Conflict / problem
+- LINE 3: Hidden truth / reveal
+- LINE 4: Statement or quote 「」
+- LINE 5: Final trigger / result / twist
+
+Rules:
+- Must feel like a continuous escalating story
+- Each line must be long (no short phrases)
+- Avoid generic wording
+- Adapt tone to niche (drama, finance, tech, self-help, news)
+
+--------------------------------------------------
+DYNAMIC COLOR SYSTEM (MANDATORY):
+
+The AI must automatically choose a color palette based on the content niche and emotional tone.
+
+STRICT RULES:
+
+1. CONTRAST FIRST:
+   - Text must ALWAYS be readable on small screens
+   - High contrast vs background is mandatory
+
+2. LIMITED PALETTE:
+   - Use ONLY 3–4 main colors
+   - Avoid random or rainbow colors
+
+3. VISUAL HIERARCHY:
+   - LINE 5 = brightest, most dominant color
+   - LINE 1–4 = supporting colors
+
+4. STROKE & GLOW (REQUIRED):
+   - All text must have thick stroke (black or dark)
+   - Add outer glow or shadow for separation
+
+--------------------------------------------------
+COLOR MOOD GUIDELINE:
+
+- Drama:
+  Red / Yellow / Black / White
+
+- Finance:
+  Gold / Green / Black / White
+
+- Tech / AI:
+  Cyan / Blue / Purple / Black
+
+- Self-help:
+  Yellow / White / Orange / Blue
+
+- News:
+  Red / White / Black
+
+(Colors are NOT fixed — must adapt intelligently)
+
+--------------------------------------------------
+TYPOGRAPHY:
+- Ultra bold Japanese Gothic font (condensed)
+- Extremely large text
+- Tight spacing (almost touching)
+- Slight variation in size/angle allowed
+
+--------------------------------------------------
+DEPTH & LAYERING:
+- Slight overlap between lines
+- Use glow + shadow to create depth
+- LINE 5 must be the closest visual layer
+- Other lines slightly less dominant
+
+--------------------------------------------------
+COMPOSITION:
+- Text fills 95–100% of the frame
+- NO empty space
+- Dense, aggressive layout
+- Slight controlled chaos is allowed
+- LINE 5 can overlap other lines
+
+--------------------------------------------------
+VISUAL QUALITY:
+- Ultra sharp (8K feel)
+- High contrast
+- Clean edges (no blur on text)
+- Readable at very small size
+
+--------------------------------------------------
+OUTPUT:
+A fully text-based, high-energy YouTube thumbnail with NO background blocks, using dynamic color selection, strong typography, and dense composition to maximize CTR across any niche.
+`;

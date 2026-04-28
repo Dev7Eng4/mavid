@@ -15,6 +15,7 @@ import {
   INDEX_VIDEO_TYPE_VALUES,
   indexHeadersMissingForAddChannel,
   isValidPublishScheduleTime,
+  isValidFromAudioOverlayValue,
   isValidReupOverlayName,
   isValidthumbnailPrompt,
   labelForPublishTimeSlot,
@@ -269,8 +270,13 @@ export function ChannelAddDialog({
           }
 
           if (typeof ch.background === 'string') next.selectedBackground = ch.background;
-          if (typeof ch.overlay === 'string' && ch.overlay.trim() && isValidReupOverlayName(ch.overlay)) {
-            next.reupOverlayOption = ch.overlay.trim();
+          if (typeof ch.overlay === 'string' && ch.overlay.trim()) {
+            const ov = ch.overlay.trim();
+            if (next.videoType === 'from_audio' && isValidFromAudioOverlayValue(ov)) {
+              next.reupOverlayOption = ov;
+            } else if (next.videoType === 'reup_full' && isValidReupOverlayName(ov)) {
+              next.reupOverlayOption = ov;
+            }
           }
           if (typeof ch.thumbnailPrompt === 'string' && ch.thumbnailPrompt.trim() && isValidthumbnailPrompt(ch.thumbnailPrompt)) {
             next.thumbnailPrompt = ch.thumbnailPrompt.trim();

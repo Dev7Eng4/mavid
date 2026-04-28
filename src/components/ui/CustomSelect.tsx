@@ -7,7 +7,8 @@ export interface SelectOption {
 
 interface Props {
   value: string;
-  options: SelectOption[];
+  /** Chỉ đọc — chấp nhận cả mảng `readonly` (hằng từ module). */
+  options: readonly SelectOption[];
   onChange: (value: string) => void;
   placeholder?: string;
   emptyText?: string;

@@ -11,4 +11,8 @@ export const OPTIONS_CONTENT = [
     label: 'Stock video + Image',
     value: 'SI',
   },
+  {
+    label: 'Auto Generate Image',
+    value: 'AGI',
+  },
 ];

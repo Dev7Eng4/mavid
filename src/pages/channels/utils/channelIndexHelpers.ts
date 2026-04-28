@@ -1,5 +1,6 @@
 import type { ChannelRow, ScriptId } from '@/types';
 import { PROMPTS_CREATE_THUMBNAIL_OPTIONS } from '@contents/prompts/index.js';
+import { OPTIONS_CONTENT } from '@contents/makeFromAudio/constant.js';
 import { OVERLAY_OPTIONS } from '@contents/constants/overlayOptions.js';
 import { buildMavidEnvForVideoFromAudio, defaultBackgroundFolder } from '@/utils/videoFromAudioEnv';
 import { buildMavidEnvForReupFull } from '@/utils/reupFullEnv';
@@ -296,6 +297,13 @@ export function isValidReupOverlayName(name: string): boolean {
   const t = name.trim();
   if (!t) return false;
   return OVERLAY_OPTIONS.some(o => String(o.NAME).trim() === t);
+}
+
+/** Giá trị hợp lệ cho overlay khi `videoType === 'from_audio'` (dropdown OPTIONS_CONTENT). */
+export function isValidFromAudioOverlayValue(name: string): boolean {
+  const t = name.trim();
+  if (!t) return false;
+  return OPTIONS_CONTENT.some(o => o.value === t);
 }
 
 export function defaultthumbnailPrompt(): string {

@@ -9,7 +9,7 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.join(__dirname, '..', '..');
 
 async function main() {
-  const url = 'https://www.youtube.com/watch?v=L2vaKBw9ObU';
+  const url = 'https://www.youtube.com/watch?v=VD6RZRSRF7s';
   console.log(`=== Test Make Video Image Option (Full Flow) ===`);
   console.log(`URL: ${url}`);
 
@@ -28,7 +28,7 @@ async function main() {
   }
 
   console.log(`\n[2] Tải hoàn tất! Bắt đầu gọi processImageOption...`);
-  
+
   // Dựng đường dẫn thư mục xuất riêng biệt để kiểm tra kết quả cuối cùng (giống batch mode)
   const perVideoDir = path.join(ROOT, 'outputs', `test_imageOption_result_${Date.now()}`);
 
@@ -41,7 +41,7 @@ async function main() {
       description: dlResult.description,
       tags: dlResult.tags,
       url: url,
-      perVideoDir: perVideoDir // processStockVideo ở Bước 6 sẽ dùng biến này để copy thành phẩm ra đây
+      perVideoDir: perVideoDir, // processStockVideo ở Bước 6 sẽ dùng biến này để copy thành phẩm ra đây
     });
 
     console.log(`\n=== KẾT QUẢ THÀNH CÔNG ===`);
@@ -49,7 +49,7 @@ async function main() {
     console.log(`Tổng ảnh sinh ra (prompts): ${result.chapterImagePrompts.length}`);
     console.log(`Thư mục lưu video đầu ra: ${perVideoDir}`);
     console.log(`Thư mục chứa tài nguyên tải về: ${isolatedDownloadsDir}`);
-    
+
     // Lưu kết quả JSON ra perVideoDir để theo dõi các prompt đã dùng
     if (fs.existsSync(perVideoDir)) {
       const outputPath = path.join(perVideoDir, 'imageOption_prompts_result.json');
@@ -57,7 +57,6 @@ async function main() {
       fs.writeFileSync(outputPath, JSON.stringify(saveData, null, 2), 'utf-8');
       console.log(`Đã lưu file log JSON tại: ${outputPath}`);
     }
-
   } catch (e) {
     console.error(`\nLỗi khi chạy processImageOption: ${e.message}`);
     process.exit(1);

@@ -580,44 +580,42 @@ ${transcript}
 
 export const promptToCreateVisualBible = summary => `
 ### Role:
-You are a Senior Visual Concept Artist and World Builder for Cinematic Film Production. Your task is to synthesize chapter summaries into a comprehensive "Visual Bible" to ensure 100% consistency in AI image generation.
-
-### Input:
-A collection of summaries from all chapters of the story.
+You are a Senior Visual Concept Artist and World Builder for Cinematic Film Production. Your task is to synthesize chapter summaries into a comprehensive "Visual Bible" and a "Master Visual Anchor" (the one-frame storytelling image) optimized for a full-length video background.
 
 ### Task Instructions:
 1. **Global Narrative Synthesis:** Analyze all chapter summaries to create a cohesive story overview and identify the overarching emotional tone.
 2. **Character Design (The "Cref" System):** Identify all recurring characters. For each, create a strict "Physical Description Tag" including: Age, ethnicity, hair style/color, specific facial features, and a fixed outfit for the entire story.
-3. **Visual Style Definition:** Define the "Cinematic" look for this specific story. Include parameters for lighting (e.g., moody, high-contrast, golden hour), color palette, and camera settings (e.g., 35mm, deep depth of field).
-4. **Master Storytelling Prompt:** Create one "Narrative Master Prompt" that acts as a visual synopsis of the entire story. This image MUST be a complex composition that includes:
-    - The primary characters in their most defining poses.
-    - The most significant setting as the background.
-    - Symbolic elements or "visual cues" that represent the main conflict, the climax, or the emotional resolution of the story.
-    - A composition that allows a viewer to grasp the story's premise and tone at a single glance.
+3. **Visual Style Definition:** Define the "Cinematic" look. Must include lighting (moody, volumetric, or golden hour), color palette, and camera settings (35mm, wide-angle to capture the scene).
+4. **Master Storytelling Prompt (The Visual Anchor):** Create one "Global Master Shot Prompt" that will serve as the background for the entire video. This prompt MUST be engineered with the following "Video-Centric" rules:
+    - **Composition:** Use the Rule of Thirds. Place primary characters on the left or right third to leave "Negative Space" for subtitles/text on the opposing side or bottom.
+    - **Depth of Field:** Deep depth of field to ensure both character and symbolic background elements are clear (f/8 or f/11 style).
+    - **Symbolic Tableau:** The frame must be a "Narrative Tableau" – including a foreground element representing the start, the main characters in the center representing the conflict, and a background/atmospheric element representing the climax or resolution.
+    - **Technical Optimization:** Specify 16:9 aspect ratio, 8k resolution, cinematic movie poster aesthetics, and "ultra-detailed textures" to prevent pixelation on large screens.
+    - **Ambient Motion Prep:** Include atmospheric tags like "drifting dust particles," "volumetric light beams," or "mist" to facilitate adding simple overlays in post-production.
 
 ### Constraint Rules:
 - Output MUST be a single, valid JSON object.
-- Use descriptive, comma-separated tags for character features to optimize for AI image generators (Midjourney, Stable Diffusion, Flux).
-- Ensure characters' outfits are "Locked" to maintain continuity.
-- Style must be "Cinematic" as requested by the user.
+- Use descriptive, comma-separated tags for character features.
+- STYLE: Must be "Cinematic Narrative Realism."
+- Ensure the Master Prompt explicitly avoids "cluttered centers" to allow for readability of video subtitles.
 
 ### Output Schema (JSON):
 {
   "story_overview": "String (Comprehensive summary)",
   "global_visual_style": {
-    "cinematic_tags": "String (lighting, camera, color grade, mood)",
-    "negative_prompt": "String (Common artifacts to avoid)"
+    "cinematic_tags": "String (lighting, camera, color grade, mood, lens specs)",
+    "negative_prompt": "String (avoid: text, watermark, blurry, deformed, cluttered center, low resolution)"
   },
   "characters": [
     {
       "name": "String",
       "role": "String",
-      "physical_description_tags": "String (Detailed visual tags for consistency)",
-      "fixed_outfit": "String"
+      "physical_description_tags": "String (Age, ethnicity, hair, face, specific features)",
+      "fixed_outfit": "String (Detailed description of the locked outfit)"
     }
   ],
-  "global_master_shot_prompt": "String (A comprehensive narrative tableau prompt that tells the whole story in one frame)",
-  "visual_mood": "String (Overall emotional vibe)"
+  "global_master_shot_prompt": "String (The ultimate cinematic tableau: 16:9, rule of thirds composition, negative space for subtitles, symbolic storytelling elements, volumetric lighting, high-detail texture)",
+  "visual_mood": "String (Overall emotional vibe and color theory)"
 }
 
 ---

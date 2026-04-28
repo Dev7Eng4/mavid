@@ -4,6 +4,10 @@
  * Bước 1: Đọc file transcript SRT cuối cùng → parseSrtToObjects → mảng objects.
  * Bước 2: Chia mảng thành các đoạn 500 objects, gửi promptToSummaryChapter tới Gemini.
  *         Nếu nhiều đoạn → xử lý song song tối đa 5 profile (profile 4→8).
+ *
+ * Mode AGI (Auto Generate Image):
+ *   Bước 1–5 đầy đủ (bao gồm Bước 4 tạo scene prompts).
+ *   Bước 6: Mở flow tạo image cho từng scene thay vì tạo video.
  */
 
 import fs from 'fs';
@@ -16,10 +20,29 @@ import { openChromeProfile } from '../scripts/makeChromeProfile.js';
 import { openGeminiPage, sendPromptToGemini } from '../gemini/browser.util.js';
 import { runCreateThumbnailFlow } from '../flow/runCreateThumbnail.js';
 
-import { DOWNLOADS_DIR, getSubtitleFile, OUTPUT_DIR, ROOT, getAudioFile, resolveAudioSpeed, getAudioDurationSeconds, formatClockDuration, sanitizeFilename, ffmpegSpawnAsync } from './shared.js';
+import {
+  DOWNLOADS_DIR,
+  getSubtitleFile,
+  OUTPUT_DIR,
+  ROOT,
+  getAudioFile,
+  resolveAudioSpeed,
+  getAudioDurationSeconds,
+  formatClockDuration,
+  sanitizeFilename,
+  ffmpegSpawnAsync,
+} from './shared.js';
 import { processStockVideo } from './stockVideoOption.js';
 import { GPU_INFO } from '../utils/hardware.util.js';
-import { scaleSrtTimestamps, resolveJapaneseSubtitleStyle, convertSrtToAss, escapePathForFfmpegSubtitles, SUBTITLE_FONT_DIR, SUBTITLE_FONT_FILE, SUBTITLE_MARGIN_BOTTOM_PX } from './subtitle.js';
+import {
+  scaleSrtTimestamps,
+  resolveJapaneseSubtitleStyle,
+  convertSrtToAss,
+  escapePathForFfmpegSubtitles,
+  SUBTITLE_FONT_DIR,
+  SUBTITLE_FONT_FILE,
+  SUBTITLE_MARGIN_BOTTOM_PX,
+} from './subtitle.js';
 
 /** Số object mỗi lần gửi cho Gemini */
 const CHUNK_SIZE = 500;
@@ -70,7 +93,9 @@ function normalizeChapterArray(chapters) {
       fixed.id_start = numericValues[0].val;
       fixed.id_end = numericValues[numericValues.length - 1].val;
       console.warn(
-        `[normalizeChapter] Sửa "${numericValues[0].key}" → id_start: ${fixed.id_start}, "${numericValues[numericValues.length - 1].key}" → id_end: ${fixed.id_end}`,
+        `[normalizeChapter] Sửa "${numericValues[0].key}" → id_start: ${fixed.id_start}, "${
+          numericValues[numericValues.length - 1].key
+        }" → id_end: ${fixed.id_end}`
       );
     } else if (fixed.id_start == null) {
       fixed.id_start = numericValues[0].val;
@@ -108,12 +133,12 @@ function deduplicateChapters(chapters) {
       const currRange = Number(curr.id_end) - currStart;
       if (currRange > prevRange) {
         console.warn(
-          `[deduplicateChapters] Thay chapter [${prev.id_start}-${prev.id_end}] bằng [${curr.id_start}-${curr.id_end}] (range rộng hơn)`,
+          `[deduplicateChapters] Thay chapter [${prev.id_start}-${prev.id_end}] bằng [${curr.id_start}-${curr.id_end}] (range rộng hơn)`
         );
         result[result.length - 1] = curr;
       } else {
         console.warn(
-          `[deduplicateChapters] Bỏ chapter trùng [${curr.id_start}-${curr.id_end}] (nằm trong [${prev.id_start}-${prev.id_end}])`,
+          `[deduplicateChapters] Bỏ chapter trùng [${curr.id_start}-${curr.id_end}] (nằm trong [${prev.id_start}-${prev.id_end}])`
         );
       }
     } else {
@@ -123,7 +148,7 @@ function deduplicateChapters(chapters) {
 
   if (result.length < chapters.length) {
     console.log(
-      `[deduplicateChapters] Đã loại ${chapters.length - result.length} chapters trùng lặp (${chapters.length} → ${result.length}).`,
+      `[deduplicateChapters] Đã loại ${chapters.length - result.length} chapters trùng lặp (${chapters.length} → ${result.length}).`
     );
   }
   return result;
@@ -173,7 +198,7 @@ function deduplicateScenes(scenes) {
  * @param {string} [options.videoLanguage]
  */
 export async function processImageOption(options = {}) {
-  const { downloadsDir = DOWNLOADS_DIR, videoLanguage } = options;
+  const { downloadsDir = DOWNLOADS_DIR, videoLanguage, autoGenerateImage = false } = options;
   const lang = String(videoLanguage || DEFAULT_PROMPT_LANG).toUpperCase();
   const prompts = await loadPromptByLanguage(lang);
 
@@ -187,16 +212,23 @@ export async function processImageOption(options = {}) {
   const { visualBible, globalMasterShotPrompt } = await generateVisualBible(allChapters, prompts);
 
   // ─── Bước 4: Từng chapter → promptToCreateSceneFromChapter → Gemini (5 profile song song) ───
-  // Hiện tại 2 options IN và SI chưa cần bước 4 (sau này thêm option sẽ cần)
   let chapterImagePrompts = [];
-  // chapterImagePrompts = await generateScenePrompts(allChapters, allObjects, visualBible, prompts);
+  if (autoGenerateImage) {
+    chapterImagePrompts = await generateScenePrompts(allChapters, allObjects, visualBible, prompts);
+  }
 
   // ─── Bước 5: Tạo background từ globalMasterShotPrompt ───
   await generateBackground(globalMasterShotPrompt, downloadsDir);
 
-  // ─── Bước 6: Tạo video từ video stock + layer background hoặc image + noise ───
-  const bgImgPath = path.join(downloadsDir, 'background.jpg');
-  await generateVideo(options, bgImgPath);
+  console.log('🚀 ~ processImageOption ~ chapterImagePrompts:', chapterImagePrompts);
+  if (autoGenerateImage) {
+    // ─── Bước 6 (AGI): Mở flow tạo image cho từng scene ───
+    await generateImagesFromScenePrompts(chapterImagePrompts, downloadsDir);
+  } else {
+    // ─── Bước 6: Tạo video từ video stock + layer background hoặc image + noise ───
+    const bgImgPath = path.join(downloadsDir, 'background.jpg');
+    await generateVideo(options, bgImgPath);
+  }
 
   return { allObjects, allChapters, visualBible, globalMasterShotPrompt, chapterImagePrompts };
 }
@@ -240,7 +272,7 @@ async function generateChapters(allObjects, prompts) {
   const activeConcurrency = Math.min(PROFILE_IDS.length, totalChunks);
 
   console.log(
-    `[Option 2] Mở ${activeConcurrency} Chrome profile (${PROFILE_IDS.slice(0, activeConcurrency).join(',')}) cho ${totalChunks} đoạn...`,
+    `[Option 2] Mở ${activeConcurrency} Chrome profile (${PROFILE_IDS.slice(0, activeConcurrency).join(',')}) cho ${totalChunks} đoạn...`
   );
 
   let nextChunkIndex = 0;
@@ -282,7 +314,9 @@ async function generateChapters(allObjects, prompts) {
           try {
             chapterResults[i] = normalizeChapterArray(JSON.parse(jsonStr));
             console.log(
-              `[Option 2] Đoạn ${i + 1}/${totalChunks}: Đã nhận ${Array.isArray(chapterResults[i]) ? chapterResults[i].length : 1} chapter(s).`,
+              `[Option 2] Đoạn ${i + 1}/${totalChunks}: Đã nhận ${
+                Array.isArray(chapterResults[i]) ? chapterResults[i].length : 1
+              } chapter(s).`
             );
           } catch (parseErr) {
             console.error(`[Option 2] Đoạn ${i + 1}/${totalChunks}: Không parse được JSON:`, parseErr.message);
@@ -451,7 +485,7 @@ async function generateScenePrompts(allChapters, allObjects, visualBible, prompt
   const chapterImagePrompts = sceneResults.filter(Boolean);
 
   console.log(
-    `\n[Option 2] Bước 4 hoàn thành: Tổng cộng ${chapterImagePrompts.length} image prompts từ ${totalChaptersForScene} chapters.`,
+    `\n[Option 2] Bước 4 hoàn thành: Tổng cộng ${chapterImagePrompts.length} image prompts từ ${totalChaptersForScene} chapters.`
   );
 
   return chapterImagePrompts;
@@ -499,7 +533,55 @@ async function generateVideo(options, bgImgPath) {
 }
 
 /**
- * Xử lý tạo video dành riêng cho chế độ `imageNoise`: 
+ * Bước 6 (AGI): Mở flow tạo image cho từng scene prompt.
+ * Duyệt qua chapterImagePrompts → từng scene → gọi runCreateThumbnailFlow.
+ *
+ * @param {object[][]} chapterImagePrompts — mảng 2 chiều: [chapter][scene]
+ * @param {string} downloadsDir
+ */
+async function generateImagesFromScenePrompts(chapterImagePrompts, downloadsDir) {
+  const imagesDir = path.join(downloadsDir, 'generated-images');
+  fs.mkdirSync(imagesDir, { recursive: true });
+
+  const allScenes = chapterImagePrompts.flat();
+  if (allScenes.length === 0) {
+    console.warn('[AGI Bước 6] Không có scene prompt nào — bỏ qua tạo image.');
+    return;
+  }
+
+  console.log(`\n[AGI Bước 6] Bắt đầu tạo ${allScenes.length} images từ scene prompts...`);
+
+  let successCount = 0;
+  for (let i = 0; i < allScenes.length; i++) {
+    const scene = allScenes[i];
+    const prompt = scene.image_prompt || scene.prompt || scene.description || '';
+    if (!prompt) {
+      console.warn(`[AGI Bước 6] Scene ${i + 1}/${allScenes.length}: Không có prompt — bỏ qua.`);
+      continue;
+    }
+
+    const exportName = `scene_${String(i + 1).padStart(3, '0')}`;
+    console.log(`[AGI Bước 6] Scene ${i + 1}/${allScenes.length}: Đang tạo image "${exportName}"...`);
+
+    try {
+      await runCreateThumbnailFlow({
+        prompt,
+        pathSave: imagesDir,
+        exportName,
+        isNeedImage: true,
+      });
+      successCount++;
+      console.log(`[AGI Bước 6] Scene ${i + 1}/${allScenes.length}: Tạo image thành công.`);
+    } catch (err) {
+      console.error(`[AGI Bước 6] Scene ${i + 1}/${allScenes.length}: Lỗi tạo image — ${err.message}`);
+    }
+  }
+
+  console.log(`\n[AGI Bước 6] Hoàn thành: ${successCount}/${allScenes.length} images tạo thành công tại ${imagesDir}`);
+}
+
+/**
+ * Xử lý tạo video dành riêng cho chế độ `imageNoise`:
  * Ảnh nền toàn màn hình + video noise bỏ nền đen + audio + phụ đề.
  */
 async function processImageNoiseVideo(options = {}, bgImgPath) {
@@ -525,7 +607,9 @@ async function processImageNoiseVideo(options = {}, bgImgPath) {
 
   const originalAudioDuration = await getAudioDurationSeconds(audioPath);
   const audioDurationAfterTempo = originalAudioDuration / speed;
-  console.log(`Thời lượng audio: ${originalAudioDuration.toFixed(1)}s, sau atempo (SPEED=${speed}): ${formatClockDuration(audioDurationAfterTempo)}`);
+  console.log(
+    `Thời lượng audio: ${originalAudioDuration.toFixed(1)}s, sau atempo (SPEED=${speed}): ${formatClockDuration(audioDurationAfterTempo)}`
+  );
 
   let subtitlePath = getSubtitleFile(downloadsDir);
   const useJaSubtitleStyle = resolveJapaneseSubtitleStyle(subtitlePath, videoLanguage);
@@ -547,8 +631,8 @@ async function processImageNoiseVideo(options = {}, bgImgPath) {
   const mergeArgs = ['-y'];
   let inputIdx = 0;
 
-  // Input 0: Image loop
-  mergeArgs.push('-loop', '1', '-i', bgImgPath);
+  // Input 0: Image (no loop — zoompan generates frames)
+  mergeArgs.push('-i', bgImgPath);
   const bgIndex = inputIdx++;
 
   // Input 1: Noise loop
@@ -581,14 +665,29 @@ async function processImageNoiseVideo(options = {}, bgImgPath) {
   // Image background filter
   const w = STOCK_VIDEO.CANVAS_W;
   const h = STOCK_VIDEO.CANVAS_H;
-  // Padding & scaling for image
-  filterParts.push(`[${bgIndex}:v]fps=${STOCK_VIDEO.FPS},scale=${w}:${h}:force_original_aspect_ratio=decrease,pad=${w}:${h}:(ow-iw)/2:(oh-ih)/2,format=yuv420p,setsar=1[bg]`);
+  const fps = STOCK_VIDEO.FPS;
+
+  const ZOOM_DURATION_SEC = 8;
+  const ZOOM_MAX = 1.3;
+  const zoomFrames = ZOOM_DURATION_SEC * fps;
+  const totalFrames = Math.ceil(audioDurationAfterTempo * fps) + fps;
+  const zpW = Math.ceil((w * ZOOM_MAX) / 2) * 2;
+  const zpH = Math.ceil((h * ZOOM_MAX) / 2) * 2;
+
+  filterParts.push(
+    `[${bgIndex}:v]scale=${zpW}:${zpH}:force_original_aspect_ratio=decrease,pad=${zpW}:${zpH}:(ow-iw)/2:(oh-ih)/2,` +
+      `zoompan=z='if(lte(on,${zoomFrames}),${ZOOM_MAX}-(${ZOOM_MAX}-1)*on/${zoomFrames},1)':` +
+      `d=${totalFrames}:x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':s=${w}x${h}:fps=${fps},` +
+      `format=yuv420p,setsar=1[bg]`
+  );
 
   let currentVLabel = 'bg';
 
   if (hasNoise && noiseIndex >= 0) {
     // Noise filter: remove black background, set opacity to 0.6
-    filterParts.push(`[${noiseIndex}:v]fps=${STOCK_VIDEO.FPS},scale=${w}:${h},format=yuva420p,colorkey=0x000000:0.1:0.1,colorchannelmixer=aa=0.6[noise]`);
+    filterParts.push(
+      `[${noiseIndex}:v]fps=${STOCK_VIDEO.FPS},scale=${w}:${h},format=yuva420p,colorkey=0x000000:0.1:0.1,colorchannelmixer=aa=0.6[noise]`
+    );
     filterParts.push(`[${currentVLabel}][noise]overlay=0:0:shortest=1[v_noised]`);
     currentVLabel = 'v_noised';
   }
@@ -619,7 +718,7 @@ async function processImageNoiseVideo(options = {}, bgImgPath) {
     const r = Math.floor(LOGO.SIZE / 2);
     const geqExpr = `if(lte(hypot(X-W/2,Y-H/2),${r}),255,0)`;
     filterParts.push(
-      `[${logoIndex}:v]scale=${LOGO.SIZE}:${LOGO.SIZE}:flags=fast_bilinear,format=rgba,geq=r='r(X,Y)':g='g(X,Y)':b='b(X,Y)':a='${geqExpr}'[logo]`,
+      `[${logoIndex}:v]scale=${LOGO.SIZE}:${LOGO.SIZE}:flags=fast_bilinear,format=rgba,geq=r='r(X,Y)':g='g(X,Y)':b='b(X,Y)':a='${geqExpr}'[logo]`
     );
     filterParts.push(`[${currentVLabel}][logo]overlay=main_w-overlay_w-${LOGO.MARGIN_RIGHT}:${LOGO.MARGIN_TOP}[vout_final]`);
     currentVLabel = 'vout_final';
@@ -631,14 +730,20 @@ async function processImageNoiseVideo(options = {}, bgImgPath) {
   fs.writeFileSync(filterScriptPath, fullGraph, 'utf-8');
 
   mergeArgs.push(
-    '-filter_complex_script', filterScriptPath,
-    '-map', '[vout_final]',
-    '-map', '[aout]',
+    '-filter_complex_script',
+    filterScriptPath,
+    '-map',
+    '[vout_final]',
+    '-map',
+    '[aout]',
     ...GPU_INFO.videoEncodeArgs,
-    '-c:a', 'aac',
-    '-b:a', '128k',
-    '-t', String(audioDurationAfterTempo),
-    outputPath,
+    '-c:a',
+    'aac',
+    '-b:a',
+    '128k',
+    '-t',
+    String(audioDurationAfterTempo),
+    outputPath
   );
 
   console.log(`Đang merge nội dung Image Noise Pipeline...`);
@@ -660,14 +765,15 @@ async function processImageNoiseVideo(options = {}, bgImgPath) {
     if (fs.existsSync(downloadsDir)) {
       const downloadFiles = fs.readdirSync(downloadsDir);
 
-      const thumbFile = downloadFiles.find(f => /\.(jpg|jpeg|png|webp)$/i.test(f));
+      const thumbFile = downloadFiles.find(f => /^thumbnail\./i.test(f))
+        || downloadFiles.find(f => /\.(jpg|jpeg|png|webp)$/i.test(f) && !/^background\./i.test(f));
       if (thumbFile) {
         const thumbExt = path.extname(thumbFile);
         const thumbDestPath = path.join(perVideoDir, `thumbnail${thumbExt}`);
         fs.copyFileSync(path.join(downloadsDir, thumbFile), thumbDestPath);
       }
 
-      const transcriptFiles = downloadFiles.filter(f => /\.(srt|vtt)$/i.test(f) || /\.srt\.cleaned$/i.test(f));
+      const transcriptFiles = downloadFiles.filter(f => /\.(srt|vtt)$/i.test(f));
       for (const transcript of transcriptFiles) {
         const trDestPath = path.join(perVideoDir, transcript);
         fs.copyFileSync(path.join(downloadsDir, transcript), trDestPath);
@@ -692,5 +798,10 @@ async function processImageNoiseVideo(options = {}, bgImgPath) {
     };
     const metaPath = path.join(perVideoDir, 'video-meta.json');
     fs.writeFileSync(metaPath, JSON.stringify(metaPayload, null, 2), 'utf8');
+  }
+
+  if (fs.existsSync(bgImgPath)) {
+    fs.unlinkSync(bgImgPath);
+    console.log(`[Image Noise] Đã xóa ảnh background tạm: ${bgImgPath}`);
   }
 }

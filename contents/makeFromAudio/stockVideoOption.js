@@ -519,7 +519,7 @@ export async function processStockVideo(bgNameArg, options = {}) {
         console.log(`>>> Đã copy thumbnail YouTube: ${thumbDestPath}`);
       }
 
-      const transcriptFiles = downloadFiles.filter(f => /\.(srt|vtt)$/i.test(f) || /\.srt\.cleaned$/i.test(f));
+      const transcriptFiles = downloadFiles.filter(f => /\.(srt|vtt)$/i.test(f));
       for (const transcript of transcriptFiles) {
         const trDestPath = path.join(perVideoDir, transcript);
         fs.copyFileSync(path.join(downloadsDir, transcript), trDestPath);

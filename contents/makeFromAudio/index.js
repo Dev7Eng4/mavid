@@ -87,7 +87,7 @@ export async function testMakeVideoFromDownloads(options = {}) {
 
   const currentOption = options.option || defaultOption;
 
-  if (currentOption === 'IN' || currentOption === 'SI') {
+  if (currentOption === 'IN' || currentOption === 'SI' || currentOption === 'AGI') {
     await processImageOption({
       bgNameArg: stockFolder,
       downloadsDir,
@@ -102,6 +102,7 @@ export async function testMakeVideoFromDownloads(options = {}) {
       geminiByUrl: undefined,
       videoLanguage: options.videoLanguage,
       imageNoiseMode: currentOption === 'IN',
+      autoGenerateImage: currentOption === 'AGI',
     });
   } else {
     // Mặc định dùng Option 1: Stock Video
@@ -271,7 +272,7 @@ async function main(options = {}) {
 
       try {
         const currentOption = result.overlay || options.overlay || options.option || defaultOption;
-        if (currentOption === 'IN' || currentOption === 'SI') {
+        if (currentOption === 'IN' || currentOption === 'SI' || currentOption === 'AGI') {
           await processImageOption({
             bgNameArg: background || defaultStockFolder,
             logoPath: runLogoPath,
@@ -284,6 +285,7 @@ async function main(options = {}) {
             geminiByUrl,
             audioSpeed: batchAudioSpeedOverride,
             imageNoiseMode: currentOption === 'IN',
+            autoGenerateImage: currentOption === 'AGI',
           });
         } else {
           await processStockVideo(background || defaultStockFolder, {
