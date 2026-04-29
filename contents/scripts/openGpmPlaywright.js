@@ -32,7 +32,7 @@ import net from 'net';
 import { chromium } from 'playwright';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import { GPM_API_DEFAULT_ORIGIN } from '../constants/gpmApi.js';
+import { GPM_API_DEFAULT_ORIGIN, GPM_API_VERSION } from '../constants/gpmApi.js';
 
 function sleep(ms) {
   return new Promise(resolve => setTimeout(resolve, ms));
@@ -79,7 +79,7 @@ async function waitForCdpPort(host, port, { timeoutMs = 120000, pollMs = 400 } =
         () => {
           socket.destroy();
           resolve(true);
-        },
+        }
       );
       const t = Math.min(2500, Math.max(200, pollMs * 2));
       socket.setTimeout(t);
@@ -181,7 +181,7 @@ export function resolveGpmChromiumExecutable(profileDir, dataRoot, preferredExe)
   }
 
   throw new Error(
-    'Không tìm thấy trình duyệt GPM (browser.exe / chrome.exe). Trong tab GPM hãy «Chọn browser GPM», hoặc đặt biến môi trường GPM_CHROMIUM_PATH trỏ tới file .exe của GPM.',
+    'Không tìm thấy trình duyệt GPM (browser.exe / chrome.exe). Trong tab GPM hãy «Chọn browser GPM», hoặc đặt biến môi trường GPM_CHROMIUM_PATH trỏ tới file .exe của GPM.'
   );
 }
 
@@ -274,7 +274,9 @@ export async function startGpmProfile(profileId, options = {}) {
   }
 
   if (!addr || typeof addr !== 'string' || !String(addr).trim()) {
-    throw new Error('GPM không trả `remote_debugging_address` hoặc `remote_debugging_port` trong `data`. Kiểm tra profile / GPM đang chạy.');
+    throw new Error(
+      'GPM không trả `remote_debugging_address` hoặc `remote_debugging_port` trong `data`. Kiểm tra profile / GPM đang chạy.'
+    );
   }
 
   if (d.success === false) {
