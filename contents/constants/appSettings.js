@@ -41,7 +41,7 @@ export const STOCK_VIDEO = {
   SLOWMO_FACTOR: 2,
   CANVAS_W: 1280,
   CANVAS_H: 720,
-  FPS: 30,
+  FPS: 15,
   BITRATE: '4M',
   MAX_BITRATE: '5M',
   BUFSIZE: '8M',

@@ -1,4 +1,4 @@
-export type Page = 'pipeline' | 'create-video' | 'settings' | 'channels' | 'groups' | 'analyst' | 'gpm' | 'logs';
+export type Page = 'pipeline' | 'create-video' | 'settings' | 'channels' | 'groups' | 'warnings' | 'analyst' | 'gpm' | 'logs';
 
 export type ScriptId =
   | 'tao-chrome-profile'
@@ -136,6 +136,13 @@ export interface GpmProfileRow {
 export interface MavidGroupRow {
   id: string;
   name: string;
+}
+
+/** Cảnh báo lưu trong `MaVidMedia/channels/warning.json`. */
+export interface MavidWarningRow {
+  id: string;
+  channelLink: string;
+  note: string;
 }
 
 export interface LoadGpmProfilesResult {
@@ -373,6 +380,8 @@ declare global {
       minimizeApp: () => Promise<{ ok: boolean }>;
       getMavidGroups: () => Promise<{ items: MavidGroupRow[] }>;
       setMavidGroups: (payload: { items: MavidGroupRow[] }) => Promise<{ ok: boolean }>;
+      getMavidWarnings: () => Promise<{ items: MavidWarningRow[] }>;
+      setMavidWarnings: (payload: { items: MavidWarningRow[] }) => Promise<{ ok: boolean }>;
     };
   }
 }

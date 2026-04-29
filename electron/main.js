@@ -428,6 +428,62 @@ ipcMain.handle('set-mavid-groups', async (_event, { items }) => {
   return { ok: true };
 });
 
+// --------------- Warning (màn hình Warning — `MaVidMedia/channels/warning.json`) ---------------
+
+const WARNING_JSON_BASENAME = 'warning.json';
+
+function parseMavidWarningsJson(raw) {
+  const j = JSON.parse(raw);
+  const items = Array.isArray(j.items) ? j.items : [];
+  return {
+    items: items
+      .filter(x => x && typeof x === 'object')
+      .map(x => ({
+        id: String(x.id ?? '').trim(),
+        channelLink: String(x.channelLink ?? '').trim(),
+        note: String(x.note ?? '').trim(),
+      }))
+      .filter(x => x.id),
+  };
+}
+
+function readMavidWarningsFile(absPath) {
+  try {
+    if (!fs.existsSync(absPath) || !fs.statSync(absPath).isFile()) {
+      return { items: [] };
+    }
+    const raw = fs.readFileSync(absPath, 'utf8');
+    return parseMavidWarningsJson(raw);
+  } catch {
+    return { items: [] };
+  }
+}
+
+ipcMain.handle('get-mavid-warnings', async () => {
+  const channelsDir = await resolveChannelsDirFromDisk();
+  return readMavidWarningsFile(path.join(channelsDir, WARNING_JSON_BASENAME));
+});
+
+ipcMain.handle('set-mavid-warnings', async (_event, { items }) => {
+  if (!Array.isArray(items)) throw new Error('items không hợp lệ.');
+  const seen = new Set();
+  const norm = [];
+  for (const it of items) {
+    if (!it || typeof it !== 'object') continue;
+    const id = String(it.id ?? '').trim();
+    const channelLink = String(it.channelLink ?? '').trim();
+    const note = String(it.note ?? '').trim();
+    if (!id || seen.has(id)) continue;
+    seen.add(id);
+    norm.push({ id, channelLink, note });
+  }
+  const channelsDir = await resolveChannelsDirFromDisk();
+  fs.mkdirSync(channelsDir, { recursive: true });
+  const absPath = path.join(channelsDir, WARNING_JSON_BASENAME);
+  fs.writeFileSync(absPath, JSON.stringify({ version: 1, items: norm }, null, 2), 'utf8');
+  return { ok: true };
+});
+
 // --------------- GPM: thư mục dữ liệu + đọc SQLite Profiles ---------------
 
 let sqlJsPromise = null;

@@ -9,7 +9,7 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.join(__dirname, '..', '..');
 
 async function main() {
-  const url = 'https://www.youtube.com/watch?v=VD6RZRSRF7s';
+  const url = 'https://www.youtube.com/watch?v=YVieJHhkkpY';
   console.log(`=== Test Make Video Image Option (Full Flow) ===`);
   console.log(`URL: ${url}`);
 
@@ -42,6 +42,7 @@ async function main() {
       tags: dlResult.tags,
       url: url,
       perVideoDir: perVideoDir, // processStockVideo ở Bước 6 sẽ dùng biến này để copy thành phẩm ra đây
+      autoGenerateImage: true,
     });
 
     console.log(`\n=== KẾT QUẢ THÀNH CÔNG ===`);
@@ -51,12 +52,11 @@ async function main() {
     console.log(`Thư mục chứa tài nguyên tải về: ${isolatedDownloadsDir}`);
 
     // Lưu kết quả JSON ra perVideoDir để theo dõi các prompt đã dùng
-    if (fs.existsSync(perVideoDir)) {
-      const outputPath = path.join(perVideoDir, 'imageOption_prompts_result.json');
-      const { allObjects, ...saveData } = result;
-      fs.writeFileSync(outputPath, JSON.stringify(saveData, null, 2), 'utf-8');
-      console.log(`Đã lưu file log JSON tại: ${outputPath}`);
-    }
+    fs.mkdirSync(perVideoDir, { recursive: true });
+    const outputPath = path.join(perVideoDir, 'imageOption_prompts_result.json');
+    const { allObjects, ...saveData } = result;
+    fs.writeFileSync(outputPath, JSON.stringify(saveData, null, 2), 'utf-8');
+    console.log(`Đã lưu file log JSON tại: ${outputPath}`);
   } catch (e) {
     console.error(`\nLỗi khi chạy processImageOption: ${e.message}`);
     process.exit(1);

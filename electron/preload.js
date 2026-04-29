@@ -54,4 +54,6 @@ contextBridge.exposeInMainWorld('runner', {
   minimizeApp: () => ipcRenderer.invoke('minimize-app'),
   getMavidGroups: () => ipcRenderer.invoke('get-mavid-groups'),
   setMavidGroups: payload => ipcRenderer.invoke('set-mavid-groups', payload),
+  getMavidWarnings: () => ipcRenderer.invoke('get-mavid-warnings'),
+  setMavidWarnings: payload => ipcRenderer.invoke('set-mavid-warnings', payload),
 });

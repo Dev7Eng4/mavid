@@ -446,7 +446,17 @@ async function generateScenePrompts(allChapters, allObjects, visualBible, prompt
           }
           const transcriptLines = objectsToIdTextFormat(chapterObjects);
 
-          const scenePrompt = prompts.promptToCreateChapterPromptImage({
+          let previousSceneContext = '';
+          if (ci > 0 && sceneResults[ci - 1]) {
+            const prevScenes = Array.isArray(sceneResults[ci - 1]) ? sceneResults[ci - 1] : [];
+            const lastScene = prevScenes[prevScenes.length - 1];
+            if (lastScene) {
+              previousSceneContext = `Location: ${lastScene.location_setting || 'N/A'}, Visual: ${lastScene.visual_description || lastScene.final_prompt || 'N/A'}`;
+            }
+          }
+
+          const scenePrompt = prompts.promptToCreateSceneFromChapter({
+            previousSceneContext,
             visualBible: JSON.stringify(visualBible, null, 2),
             chapterData: { title: chapter.title, summary: chapter.summary },
             transcriptLines,
@@ -482,10 +492,15 @@ async function generateScenePrompts(allChapters, allObjects, visualBible, prompt
 
   await Promise.all(Array.from({ length: sceneActiveConcurrency }, (_, w) => sceneWorkerProfile(w)));
 
-  const chapterImagePrompts = sceneResults.filter(Boolean);
+  const chapterImagePrompts = sceneResults
+    .flatMap((scenes, idx) => {
+      if (!scenes) return [];
+      const arr = Array.isArray(scenes) ? scenes : [scenes];
+      return arr.map(s => ({ ...s, _chapterIndex: idx }));
+    });
 
   console.log(
-    `\n[Option 2] Bước 4 hoàn thành: Tổng cộng ${chapterImagePrompts.length} image prompts từ ${totalChaptersForScene} chapters.`
+    `\n[Option 2] Bước 4 hoàn thành: Tổng cộng ${chapterImagePrompts.length} scenes từ ${totalChaptersForScene} chapters.`
   );
 
   return chapterImagePrompts;
@@ -674,10 +689,24 @@ async function processImageNoiseVideo(options = {}, bgImgPath) {
   const zpW = Math.ceil((w * ZOOM_MAX) / 2) * 2;
   const zpH = Math.ceil((h * ZOOM_MAX) / 2) * 2;
 
+  // 8s đầu: zoom-out từ 1.3x → 1.0x | Sau 8s → hết video: Burns (pan drift liên tục)
+  const PAN_CYCLE_X_SEC = 13;
+  const PAN_CYCLE_Y_SEC = 9;
+  const panCycleXFrames = PAN_CYCLE_X_SEC * fps;
+  const panCycleYFrames = PAN_CYCLE_Y_SEC * fps;
+  const panRange = 0.4;
+
+  const zoomExpr = `if(lte(on,${zoomFrames}),${ZOOM_MAX}-(${ZOOM_MAX}-1)*on/${zoomFrames},1)`;
+  const cx = `iw/2-(iw/zoom/2)`;
+  const burnsPanX = `sin(2*PI*(on-${zoomFrames})/${panCycleXFrames})*(iw-iw/zoom)*${panRange}`;
+  const burnsPanY = `sin(2*PI*(on-${zoomFrames})/${panCycleYFrames})*(ih-ih/zoom)*${panRange}`;
+  const panX = `if(lte(on,${zoomFrames}),${cx},${cx}+${burnsPanX})`;
+  const panY = `if(lte(on,${zoomFrames}),ih/2-(ih/zoom/2),ih/2-(ih/zoom/2)+${burnsPanY})`;
+
   filterParts.push(
     `[${bgIndex}:v]scale=${zpW}:${zpH}:force_original_aspect_ratio=decrease,pad=${zpW}:${zpH}:(ow-iw)/2:(oh-ih)/2,` +
-      `zoompan=z='if(lte(on,${zoomFrames}),${ZOOM_MAX}-(${ZOOM_MAX}-1)*on/${zoomFrames},1)':` +
-      `d=${totalFrames}:x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':s=${w}x${h}:fps=${fps},` +
+      `zoompan=z='${zoomExpr}':` +
+      `d=${totalFrames}:x='${panX}':y='${panY}':s=${w}x${h}:fps=${fps},` +
       `format=yuv420p,setsar=1[bg]`
   );
 
@@ -736,7 +765,7 @@ async function processImageNoiseVideo(options = {}, bgImgPath) {
     '[vout_final]',
     '-map',
     '[aout]',
-    ...GPU_INFO.videoEncodeArgs,
+    ...GPU_INFO.makeAudioVideoEncodeArgs,
     '-c:a',
     'aac',
     '-b:a',
