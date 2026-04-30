@@ -1,5 +1,6 @@
-import type { GpmProfileRow } from '@/types';
+import type { ChannelRow, GpmProfileRow } from '@/types';
 import { gpmApi } from '@/services';
+import { CHANNELS } from './models/channelsIndexSection.model';
 
 /** Số kênh upload YouTube tối đa chạy song song; kênh còn lại xếp hàng, khi một kênh xong sẽ tự chạy tiếp. */
 export const MAX_CONCURRENT_YOUTUBE_UPLOAD_CHANNELS = 2;
@@ -37,7 +38,7 @@ export async function fetchAllGpmProfileRows(): Promise<GpmProfileRow[]> {
   do {
     const res = await gpmApi.listProfiles({ page, per_page: perPage });
     const env = res as unknown as GpmListProfilesEnvelope;
-    
+
     let list: unknown[] = [];
     if (Array.isArray(env.data)) {
       list = env.data;
@@ -49,7 +50,7 @@ export async function fetchAllGpmProfileRows(): Promise<GpmProfileRow[]> {
       const m = mapGpmApiProfileRow(item);
       if (m?.id?.trim()) rows.push(m);
     }
-    
+
     let tp = env.pagination?.total_page;
     if (tp == null && env.data && typeof env.data === 'object' && 'last_page' in env.data) {
       tp = (env.data as any).last_page;
@@ -96,3 +97,22 @@ export interface ChannelUploadVideoDialogProps {
   /** Gọi khi đã có payloads hợp lệ; parent tự chạy upload nền (không cần await). */
   onConfirm: (payloads: ChannelUploadVideoPayload[]) => void;
 }
+
+export const convertIndexRowToChannel = (rows: ChannelRow[]) => {
+  const labelToKeyMap = Object.fromEntries(CHANNELS.map(item => [item.label, item.key]));
+
+  const convertedData = rows.map(row => {
+    const newRow: ChannelRow = {};
+
+    for (const oldKey in row) {
+      const newKey = labelToKeyMap[oldKey];
+      if (newKey) {
+        newRow[newKey] = row[oldKey];
+      }
+    }
+
+    return newRow;
+  });
+
+  return convertedData;
+};

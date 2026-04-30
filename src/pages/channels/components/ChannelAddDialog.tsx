@@ -1,7 +1,7 @@
 import { PROMPTS_CREATE_THUMBNAIL_OPTIONS } from '@contents/prompts/index.js';
 import { OPTIONS_CONTENT } from '@contents/makeFromAudio/constant.js';
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import type { ChannelRow, MavidGroupRow } from '@/types';
+import type { ChannelRow, Group } from '@/types';
 import { AppButton } from '@/components/ui/AppButton';
 import { CustomSelect } from '@/components/ui/CustomSelect';
 import {
@@ -56,7 +56,7 @@ const ADD_FORM_DEFAULT: ChannelAddDialogInitialFields = {
   channelUrl: '',
   email: '',
   myChannel: '',
-  mavidGroupId: '',
+  groupId: '',
   videoType: 'reup_full',
   durationOption: '0_null',
   selectedBackground: '',
@@ -622,12 +622,12 @@ export function ChannelAddDialog({
           Mỗi channel có thể có nhiều email, nhưng khoảng thời gian video khác nhau
         </p>
 
-        {isEditMode && missingHeaders.length > 0 ? (
+        {/* {isEditMode && missingHeaders.length > 0 ? (
           <p className='text-sm mt-3 shrink-0' style={{ color: '#fecaca' }}>
             Thiếu cột trong index: {missingHeaders.join(', ')}. Thêm vào <code className='text-xs'>MaVidMedia/channels/index.xlsx</code> rồi
             Tải lại.
           </p>
-        ) : null}
+        ) : null} */}
 
         <div className='grid grid-cols-1 lg:grid-cols-2 gap-x-8 gap-y-4 mt-4 overflow-y-auto min-h-0 flex-1 pr-1 content-start'>
           <div className='mb-4'>

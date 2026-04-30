@@ -35,14 +35,10 @@ export const INDEX_HEADER_TO_PROP = {
 };
 
 /** camelCase prop name → Excel header (viết hoa / tiếng Việt gốc). */
-export const INDEX_PROP_TO_HEADER = Object.fromEntries(
-  Object.entries(INDEX_HEADER_TO_PROP).map(([k, v]) => [v, k]),
-);
+export const INDEX_PROP_TO_HEADER = Object.fromEntries(Object.entries(INDEX_HEADER_TO_PROP).map(([k, v]) => [v, k]));
 
 /** Lookup nhanh: uppercase header → prop (để so khớp case-insensitive). */
-const _headerUpperMap = Object.fromEntries(
-  Object.entries(INDEX_HEADER_TO_PROP).map(([k, v]) => [k.toUpperCase(), v]),
-);
+const _headerUpperMap = Object.fromEntries(Object.entries(INDEX_HEADER_TO_PROP).map(([k, v]) => [k.toUpperCase(), v]));
 
 /**
  * Map một header sang prop name (case-insensitive).
@@ -51,7 +47,9 @@ const _headerUpperMap = Object.fromEntries(
  * @returns {string}
  */
 export function mapHeaderToProp(header) {
-  const norm = String(header ?? '').trim().toUpperCase();
+  const norm = String(header ?? '')
+    .trim()
+    .toUpperCase();
   return _headerUpperMap[norm] ?? header;
 }
 
@@ -92,6 +90,7 @@ export function mapIndexDataToProps(data) {
   if (!data || !data.headers?.length) return data;
 
   const mappedHeaders = mapHeadersToPropNames(data.headers);
+  console.log('🚀 ~ mapIndexDataToProps ~ mappedHeaders:', mappedHeaders);
 
   /** @type {Map<string, string>} original header → prop name */
   const keyMap = new Map();

@@ -1236,37 +1236,11 @@ async function readXlsxAsChannelData(absPath) {
   return { headers, rows };
 }
 
-function readCsvAsChannelData(absPath) {
-  try {
-    const content = fs.readFileSync(absPath, 'utf-8').replace(/^\uFEFF/, '');
-    const lines = content
-      .split(/\n/)
-      .map(l => l.trimEnd())
-      .filter(l => l.trim());
-    if (lines.length === 0) return { headers: [], rows: [] };
-    const parseLine = line => line.split(',').map(c => c.trim().replace(/^"|"$/g, ''));
-    const headers = parseLine(lines[0]);
-    const rows = [];
-    for (let i = 1; i < lines.length; i++) {
-      const cells = parseLine(lines[i]);
-      const obj = {};
-      headers.forEach((h, idx) => {
-        obj[h] = cells[idx] ?? '';
-      });
-      rows.push(obj);
-    }
-    return { headers, rows };
-  } catch {
-    return { headers: [], rows: [] };
-  }
-}
-
 async function readSpreadsheetAsChannelData(absPath) {
   if (!fs.existsSync(absPath)) return { headers: [], rows: [] };
   const stat = fs.statSync(absPath);
   if (stat.size === 0) return { headers: [], rows: [] };
   const lower = absPath.toLowerCase();
-  if (lower.endsWith('.csv')) return readCsvAsChannelData(absPath);
   if (lower.endsWith('.xlsx')) return readXlsxAsChannelData(absPath);
   return { headers: [], rows: [] };
 }
@@ -1282,7 +1256,7 @@ const INDEX_VIDEO_TYPE_OPTIONS = ['from_audio', 'reup_full'];
 const INDEX_THOI_GIAN_OPTIONS = [15, 20, 30, 60];
 
 ipcMain.handle('read-channel-data', async (_event, { filePath }) => {
-  if (!filePath || typeof filePath !== 'string') throw new Error('filePath không hợp lệ.');
+  if (!filePath || typeof filePath !== 'string') throw new Error('FilePath không hợp lệ.');
 
   const { channelsDir, abs: norm } = await resolvePathUnderChannelsDir(filePath);
 
@@ -1294,7 +1268,7 @@ ipcMain.handle('read-channel-data', async (_event, { filePath }) => {
 
   const raw = await readSpreadsheetAsChannelData(norm);
   // Map Excel headers (tiếng Việt) → camelCase prop names cho frontend
-  return mapIndexDataToProps(raw);
+  return raw;
 });
 
 /**

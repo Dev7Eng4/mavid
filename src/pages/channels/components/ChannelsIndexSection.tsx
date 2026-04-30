@@ -2,20 +2,15 @@ import { useEffect, useMemo, useRef } from 'react';
 import type { ChannelsIndexSectionProps } from '../models/channelsIndexSection.model';
 import { SpinnerIcon } from '@/components/ui/Icons';
 import { TablePaginationBar } from '@/components/ui/TablePaginationBar';
-import { CHANNELS_INDEX_VISIBLE_COLUMNS, CHANNELS_INDEX_COLUMN_LABELS } from '../models/channelsIndexSection.model';
+import { CHANNELS_INDEX_VISIBLE_COLUMNS, CHANNELS_INDEX_COLUMN_LABELS, CHANNELS } from '../models/channelsIndexSection.model';
 
 export function ChannelsIndexSection({
-  indexHeaders: _indexHeaders,
-  indexListError,
-  indexLoading,
-  indexSaving,
-  indexDraftRows,
+  loading,
   pageIndexRows,
-  pageIndexGlobalIndices,
   indexFilteredCount,
   indexPag,
   indexColCount,
-  selectedRowIndices,
+  selectedRows,
   onToggleRowSelected,
   onToggleSelectAllOnPage,
   onOpenEditRow,
@@ -24,6 +19,7 @@ export function ChannelsIndexSection({
   pageSelectSome,
   groupNameById = {},
 }: ChannelsIndexSectionProps) {
+  console.log('🚀 ~ ChannelsIndexSection ~ pageIndexRows:', pageIndexRows);
   /** Prop name = row key trực tiếp; label lấy từ CHANNELS_INDEX_COLUMN_LABELS. */
   const indexDisplayColumns = useMemo(() => {
     return CHANNELS_INDEX_VISIBLE_COLUMNS.map(prop => ({
@@ -40,19 +36,6 @@ export function ChannelsIndexSection({
 
   return (
     <div className='space-y-4 w-full min-w-0'>
-      {indexListError && (
-        <div
-          className='rounded-2xl px-4 py-3 text-base wrap-break-word'
-          style={{
-            color: '#fecaca',
-            background: 'rgba(239, 68, 68, 0.12)',
-            border: '1px solid rgba(239, 68, 68, 0.35)',
-          }}
-        >
-          {indexListError}
-        </div>
-      )}
-
       <div
         className='rounded-2xl w-full min-w-0 overflow-hidden'
         style={{ background: 'var(--card-bg)', border: '1px solid var(--border)' }}
@@ -61,11 +44,7 @@ export function ChannelsIndexSection({
           <table className='w-full min-w-0 text-base' style={{ borderCollapse: 'collapse', tableLayout: 'auto' }}>
             <thead>
               <tr style={{ background: 'var(--code-bg)' }}>
-                <th
-                  className='w-12 px-2 py-3 text-center align-middle'
-                  style={{ borderBottom: '1px solid var(--border)' }}
-                  scope='col'
-                >
+                <th className='w-12 px-2 py-3 text-center align-middle' style={{ borderBottom: '1px solid var(--border)' }} scope='col'>
                   <input
                     ref={headerSelectRef}
                     type='checkbox'
@@ -73,19 +52,21 @@ export function ChannelsIndexSection({
                     style={{ borderColor: 'var(--border)', accentColor: 'var(--accent)' }}
                     checked={pageSelectAll}
                     onChange={() => onToggleSelectAllOnPage()}
-                    disabled={indexLoading || indexSaving || pageIndexRows.length === 0}
+                    disabled={loading || pageIndexRows.length === 0}
                     aria-label='Chọn tất cả kênh trên trang này'
                   />
                 </th>
-                {indexDisplayColumns.map((col, colIdx) => (
-                  <th
-                    key={`idx-h-${colIdx}-${col.label}`}
-                    className='text-left px-4 py-3 font-medium whitespace-nowrap uppercase text-base tracking-wider'
-                    style={{ color: 'var(--text-muted)', borderBottom: '1px solid var(--border)' }}
-                  >
-                    {col.label}
-                  </th>
-                ))}
+                {CHANNELS.map((col, colIdx) =>
+                  col.show ? (
+                    <th
+                      key={`idx-h-${colIdx}-${col.key}`}
+                      className='text-left px-4 py-3 font-medium whitespace-nowrap uppercase text-base tracking-wider'
+                      style={{ color: 'var(--text-muted)', borderBottom: '1px solid var(--border)' }}
+                    >
+                      {col.label}
+                    </th>
+                  ) : null,
+                )}
                 <th
                   className='text-center px-4 py-3 font-medium whitespace-nowrap uppercase text-base tracking-wider w-28'
                   style={{ color: 'var(--text-muted)', borderBottom: '1px solid var(--border)' }}
@@ -96,7 +77,7 @@ export function ChannelsIndexSection({
             </thead>
 
             <tbody>
-              {indexLoading ? (
+              {loading ? (
                 <tr>
                   <td colSpan={indexColCount} className='px-4 py-8 text-center'>
                     <div className='flex items-center justify-center gap-3' style={{ color: 'var(--text)' }}>
@@ -105,22 +86,21 @@ export function ChannelsIndexSection({
                     </div>
                   </td>
                 </tr>
-              ) : indexDraftRows.length > 0 && indexFilteredCount === 0 ? (
+              ) : pageIndexRows.length === 0 && indexFilteredCount === 0 ? (
                 <tr>
                   <td colSpan={indexColCount} className='px-4 py-8 text-center' style={{ color: 'var(--text-muted)' }}>
                     Không có dòng nào khớp bộ lọc (email / nhóm).
                   </td>
                 </tr>
-              ) : indexDraftRows.length > 0 ? (
+              ) : (
                 pageIndexRows.map((row, i) => {
-                  const globalIndex = pageIndexGlobalIndices[i] ?? indexPag.startIndex + i;
                   return (
                     <tr
-                      key={globalIndex}
-                      className={`transition-colors duration-150${indexSaving ? '' : ' cursor-pointer'}`}
+                      key={row.id}
+                      className={`transition-colors duration-150cursor-pointer`}
                       style={{ borderBottom: '1px solid var(--border)' }}
                       onClick={() => {
-                        if (!indexSaving) onToggleRowSelected(globalIndex);
+                        onToggleRowSelected(row.id);
                       }}
                       onMouseEnter={e => {
                         e.currentTarget.style.background = 'var(--hover-bg)';
@@ -129,66 +109,63 @@ export function ChannelsIndexSection({
                         e.currentTarget.style.background = 'transparent';
                       }}
                     >
-                      <td
-                        className='px-2 py-3 align-middle text-center'
-                        onClick={e => e.stopPropagation()}
-                      >
+                      <td className='px-2 py-3 align-middle text-center' onClick={e => e.stopPropagation()}>
                         <input
                           type='checkbox'
                           className='w-4 h-4 cursor-pointer rounded border align-middle'
                           style={{ borderColor: 'var(--border)', accentColor: 'var(--accent)' }}
-                          checked={selectedRowIndices.has(globalIndex)}
-                          onChange={() => onToggleRowSelected(globalIndex)}
-                          disabled={indexSaving}
-                          aria-label={`Chọn kênh dòng ${globalIndex + 1}`}
+                          checked={selectedRows.has(row.id)}
+                          onChange={() => onToggleRowSelected(row.id)}
+                          aria-label={`Chọn kênh dòng ${row.id}`}
                         />
                       </td>
-                      {indexDisplayColumns.map((col, colIdx) => {
-                        const cell = col.rowKey ? row[col.rowKey] : '';
+                      {CHANNELS.map((col, colIdx) => {
+                        if (!col.show) return null;
+
+                        const cell = col.key ? row[col.key] : '';
                         const raw = String(cell ?? '').trim();
-                        const isGroupCol = col.rowKey === 'mavidGroupId';
+                        const isGroupCol = col.key === 'group';
                         const displayText = (() => {
                           if (!isGroupCol) return String(cell ?? '');
                           if (!raw) return '';
                           const name = groupNameById[raw];
                           return name?.trim() ? name.trim() : raw;
                         })();
-                        const titleText = (() => {
-                          if (!isGroupCol) return String(cell ?? '');
-                          if (!raw) return '';
-                          const name = groupNameById[raw]?.trim();
-                          return name ? `${name} (${raw})` : raw;
-                        })();
+
                         return (
                           <td
                             key={`idx-c-${colIdx}-${col.label}`}
                             className='px-4 py-3 align-top wrap-break-word min-w-0'
                             style={{ color: 'var(--text-h)' }}
-                            title={titleText}
                           >
                             {displayText}
                           </td>
                         );
                       })}
+
                       <td
                         className='px-4 py-3 align-top whitespace-nowrap text-center space-x-3'
                         style={{ borderBottom: '1px solid var(--border)' }}
                       >
                         <button
                           type='button'
-                          onClick={(e) => { e.stopPropagation(); onOpenEditRow(globalIndex); }}
+                          onClick={e => {
+                            e.stopPropagation();
+                            onOpenEditRow(row.id);
+                          }}
                           className='text-sm font-medium hover:underline transition-opacity duration-150 disabled:opacity-40 disabled:cursor-not-allowed'
                           style={{ color: 'var(--accent)' }}
-                          disabled={indexSaving}
                         >
                           Sửa
                         </button>
                         <button
                           type='button'
-                          onClick={(e) => { e.stopPropagation(); onOpenDetailRow(globalIndex); }}
+                          onClick={e => {
+                            e.stopPropagation();
+                            onOpenDetailRow(row.id);
+                          }}
                           className='text-sm font-medium hover:underline transition-opacity duration-150 disabled:opacity-40 disabled:cursor-not-allowed'
                           style={{ color: 'var(--accent)' }}
-                          disabled={indexSaving}
                         >
                           Chi tiết
                         </button>
@@ -196,17 +173,11 @@ export function ChannelsIndexSection({
                     </tr>
                   );
                 })
-              ) : (
-                <tr>
-                  <td colSpan={indexDisplayColumns.length + 2} className='px-4 py-8 text-center' style={{ color: 'var(--text-muted)' }}>
-                    Chưa có dữ liệu trong index. Hãy thêm channel từ Pipeline.
-                  </td>
-                </tr>
               )}
             </tbody>
           </table>
         </div>
-        {!indexLoading && indexDraftRows.length > 0 && indexFilteredCount > 0 ? (
+        {!loading && indexFilteredCount > 0 ? (
           <TablePaginationBar
             page={indexPag.page}
             totalPages={indexPag.totalPages}

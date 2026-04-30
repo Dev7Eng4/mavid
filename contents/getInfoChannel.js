@@ -10,6 +10,7 @@ import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import ExcelJS from 'exceljs';
+import { v4 as uuidv4 } from 'uuid';
 import { resolveChannelsDir } from './utils/channelsStoragePath.js';
 import { CHANNEL_CONFIG_FILE, CHANNEL_DETAIL, CHANNELS, MIN_DURATION_VIDEO, VIDEO_STATUS_OPTIONS } from './constants/channel.js';
 
@@ -224,10 +225,10 @@ async function updateIndexFile(channelData) {
     } else {
       // Thêm row mới
       sheet.addRow([
-        Date.now(),
+        id,
         channelId,
         link,
-        meta.channelName,
+        name,
         meta.colEmail,
         meta.colMyChannel,
         meta.colVideoType,
@@ -244,10 +245,10 @@ async function updateIndexFile(channelData) {
     sheet = workbook.addWorksheet('Channels', { views: [{ state: 'frozen', ySplit: 1 }] });
     sheet.addRow(CHANNELS.map(item => item.label));
     sheet.addRow([
-      Date.now(),
+      id,
       channelId,
       link,
-      meta.channelName,
+      name,
       meta.colEmail,
       meta.colMyChannel,
       meta.colVideoType,
@@ -258,16 +259,16 @@ async function updateIndexFile(channelData) {
     ]);
 
     sheet.columns = [
-      { width: 12 }, // TIME
-      { width: 40 }, // ID
-      { width: 60 }, // LINK
+      { width: 30 }, // TIME
+      { width: 30 }, // ID
+      { width: 50 }, // LINK
       { width: 36 }, // NAME
-      { width: 45 }, // EMAIL
-      { width: 14 }, // KÊNH CỦA TÔI
-      { width: 14 }, // LOẠI VIDEO
-      { width: 14 }, // THỜI GIAN VIDEO
+      { width: 35 }, // EMAIL
+      { width: 24 }, // KÊNH CỦA TÔI
+      { width: 25 }, // LOẠI VIDEO
+      { width: 20 }, // THỜI GIAN VIDEO
       { width: 18 }, // LAST UPLOAD
-      { width: 14 }, // GROUP
+      { width: 20 }, // GROUP
       { width: 18 }, // STATUS
     ];
 
@@ -460,6 +461,7 @@ const handleUpdateChannelConfigFile = async (channelDir, formData) => {
 
   const newChannelConfig = {
     ...restConfig,
+    id,
     uploadedVideos: 0,
     latestUploadDate: getDefaultLastUpload().dateFormatted,
     latestUploadTime: getDefaultLastUpload().timeFormatted,
@@ -522,7 +524,7 @@ export async function addChannelFromForm(options = {}) {
   const formData = options.formData;
   console.log('🚀 ~ addChannelFromForm ~ formData:', formData);
   const id = formData.id;
-  const newId = Date.now();
+  const newId = uuidv4();
 
   if (!formData || !formData.channelUrl) throw new Error('Thiếu thông tin form.');
 
@@ -551,7 +553,7 @@ export async function addChannelFromForm(options = {}) {
     let usernameId = result.metadata?.uploader_id || '';
 
     channelLink = usernameId.startsWith('@')
-      ? `https://www.youtube.com/@${usernameId}`
+      ? `https://www.youtube.com/${usernameId}`
       : result.metadata?.uploader_url || result.metadata?.channel_url || formData.channelUrl;
     channelName = result.name || '';
 
@@ -612,6 +614,7 @@ export async function addChannelFromForm(options = {}) {
 
     await handleUpdateChannelConfigFile(channelDir, {
       ...formData,
+      id: newId,
       channelId,
       channelName,
     });
@@ -627,6 +630,7 @@ export async function addChannelFromForm(options = {}) {
   else if (f === 60 && t === null) durationLabel = 'Từ 60 phút';
 
   await updateIndexFile({
+    id: id || newId,
     name: channelName,
     link: channelLink,
     channelId,

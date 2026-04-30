@@ -117,7 +117,7 @@ export interface ChannelFile {
 }
 
 export interface ChannelRow {
-  [key: string]: string | number | boolean | null;
+  [key: string]: any;
 }
 
 export interface ChannelData {
@@ -133,7 +133,7 @@ export interface GpmProfileRow {
 }
 
 /** Nhóm lưu trong `MaVidMedia/channels/group.json`. */
-export interface MavidGroupRow {
+export interface Group {
   id: string;
   name: string;
 }

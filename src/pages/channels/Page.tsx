@@ -26,7 +26,12 @@ import {
   SCRIPT_FROM_AUDIO,
   SCRIPT_REUP_FULL,
 } from './utils/channelIndexHelpers';
-import { MAX_CONCURRENT_YOUTUBE_UPLOAD_CHANNELS, type ChannelItem, type ChannelUploadVideoPayload } from './channelUploadVideoHelpers';
+import {
+  convertIndexRowToChannel,
+  MAX_CONCURRENT_YOUTUBE_UPLOAD_CHANNELS,
+  type ChannelItem,
+  type ChannelUploadVideoPayload,
+} from './channelUploadVideoHelpers';
 
 const INDEX_FILE = 'channels/index.xlsx';
 
@@ -47,9 +52,10 @@ function normalizeYoutubeUploadEmailKey(email: string): string {
 }
 
 function ChannelsPage() {
-  const [indexData, setIndexData] = useState<ChannelData | null>(null);
-  const [indexLoading, setIndexLoading] = useState(true);
+  const [channels, setChannels] = useState<ChannelRow[]>([]);
+  const [loading, setLoading] = useState(true);
   const [selectedChannel, setSelectedChannel] = useState<string | null>(null);
+  const [selectedRows, setSelectedRows] = useState<Set<string>>(new Set<string>());
   const [detail, setDetail] = useState<ChannelFolderDataResult | null>(null);
   const [detailLoading, setDetailLoading] = useState(false);
   const [detailLinkFilter, setDetailLinkFilter] = useState('');
@@ -60,18 +66,14 @@ function ChannelsPage() {
   const [detailActionError, setDetailActionError] = useState<string | null>(null);
   const [detailUploadPrepBusy, setDetailUploadPrepBusy] = useState(false);
 
-  const [indexDraftRows, setIndexDraftRows] = useState<ChannelRow[]>([]);
-  const [indexListError, setIndexListError] = useState<string | null>(null);
-  const [indexSaving, setIndexSaving] = useState(false);
   const [indexBackgrounds, setIndexBackgrounds] = useState<string[]>([]);
-  /** null = idle; khi chạy batch tạo video cho mọi kênh trong index */
   const [indexBatchVideo, setIndexBatchVideo] = useState<{
     current: number;
     total: number;
     channelLabel: string;
   } | null>(null);
 
-  const [indexEditRowIndex, setIndexEditRowIndex] = useState<number | null>(null);
+  const [indexEditRowIndex, setIndexEditRowIndex] = useState<string | null>(null);
   const [uploadVideoOpen, setUploadVideoOpen] = useState(false);
   /** Số luồng upload YouTube (runScript) đang chạy — hiển thị trên header / dialog. */
   const [youtubeUploadActiveThreads, setYoutubeUploadActiveThreads] = useState(0);
@@ -82,19 +84,19 @@ function ChannelsPage() {
   const [addChannelOpen, setAddChannelOpen] = useState(false);
   const [_addChannelInfo, setAddChannelInfo] = useState<string | null>(null);
   const [googleDriveSyncInfo, setGoogleDriveSyncInfo] = useState<string | null>(null);
-  const [mavidGroupRows, setMavidGroupRows] = useState<Group[]>([]);
+  const [groups, setGroups] = useState<Group[]>([]);
   /** Lọc danh sách kênh (bảng index): email + nhóm. */
   const [indexListEmailFilter, setIndexListEmailFilter] = useState('');
   const [indexListGroupFilter, setIndexListGroupFilter] = useState('__all__');
 
   const groupNameById = useMemo(() => {
     const m: Record<string, string> = {};
-    for (const g of mavidGroupRows) {
+    for (const g of groups) {
       const id = String(g.id ?? '').trim();
       if (id) m[id] = String(g.name ?? '').trim();
     }
     return m;
-  }, [mavidGroupRows]);
+  }, [groups]);
 
   const indexGroupFilterOptions = useMemo(() => {
     const base: { value: string; label: string }[] = [
@@ -102,7 +104,7 @@ function ChannelsPage() {
       { value: '__empty__', label: '— (chưa gán nhóm)' },
     ];
     const seen = new Set(base.map(b => b.value));
-    for (const g of mavidGroupRows) {
+    for (const g of groups) {
       const id = String(g.id ?? '').trim();
       if (!id || seen.has(id)) continue;
       seen.add(id);
@@ -112,30 +114,27 @@ function ChannelsPage() {
       });
     }
     return base;
-  }, [mavidGroupRows]);
+  }, [groups]);
 
-  const loadIndex = useCallback(async () => {
-    setIndexLoading(true);
+  const fetchChannels = useCallback(async () => {
+    setLoading(true);
     try {
       const d = await window.runner.readChannelData(INDEX_FILE);
-      setIndexData(d);
-      setIndexDraftRows(d.rows?.map(r => ({ ...r })) ?? []);
+      setChannels(convertIndexRowToChannel(d.rows));
       setIndexSelectedRowIndices(new Set());
-      setIndexListError(null);
       setIndexEditRowIndex(null);
     } catch {
-      setIndexData({ headers: [], rows: [] });
-      setIndexDraftRows([]);
+      setChannels([]);
       setIndexSelectedRowIndices(new Set());
       setIndexEditRowIndex(null);
     } finally {
-      setIndexLoading(false);
+      setLoading(false);
     }
     try {
       const r = await window.runner?.getMavidGroups?.();
-      setMavidGroupRows(Array.isArray(r?.items) ? r.items : []);
+      setGroups(Array.isArray(r?.items) ? r.items : []);
     } catch {
-      setMavidGroupRows([]);
+      setGroups([]);
     }
   }, []);
 
@@ -147,8 +146,8 @@ function ChannelsPage() {
   }, []);
 
   useEffect(() => {
-    void loadIndex();
-  }, [loadIndex]);
+    void fetchChannels();
+  }, [fetchChannels]);
 
   const loadDetail = useCallback(async (channelFolder: string) => {
     setDetailLoading(true);
@@ -186,12 +185,12 @@ function ChannelsPage() {
     setDetailSelectedRowIndices(new Set());
   }, [selectedChannel]);
 
-  const indexHeaders = useMemo(() => {
-    if (indexData?.headers?.length) return indexData.headers;
-    const first = indexData?.rows?.[0];
-    if (first && typeof first === 'object') return Object.keys(first);
-    return [...CHANNELS_INDEX_VISIBLE_COLUMNS];
-  }, [indexData]);
+  // const indexHeaders = useMemo(() => {
+  //   if (indexData?.headers?.length) return indexData.headers;
+  //   const first = indexData?.rows?.[0];
+  //   if (first && typeof first === 'object') return Object.keys(first);
+  //   return [...CHANNELS_INDEX_VISIBLE_COLUMNS];
+  // }, [indexData]);
 
   /** Checkbox + các cột cố định (`CHANNELS_INDEX_VISIBLE_COLUMNS`) trên bảng index. */
   const indexColCount = 1 + CHANNELS_INDEX_VISIBLE_COLUMNS.length;
@@ -568,45 +567,46 @@ function ChannelsPage() {
     startIndex: indexStartIndex,
     totalPages: indexTotalPages,
     pageSize: indexPageSize,
-  } = useClientPagination(indexFilteredIndices.length);
+  } = useClientPagination(channels.length);
+
   useEffect(() => {
     setIndexPage(1);
   }, [indexListEmailFilter, indexListGroupFilter, setIndexPage]);
 
   const pageIndexGlobalIndices = useMemo(
-    () => indexFilteredIndices.slice(indexStartIndex, indexStartIndex + indexPageSize),
-    [indexFilteredIndices, indexStartIndex, indexPageSize],
+    () => channels.slice(indexStartIndex, indexStartIndex + indexPageSize),
+    [channels, indexStartIndex, indexPageSize],
   );
-  console.log('🚀 ~ ChannelsPage ~ pageIndexGlobalIndices:', pageIndexGlobalIndices);
-  const pageIndexRows = useMemo(() => pageIndexGlobalIndices.map(i => indexDraftRows[i]), [indexDraftRows, pageIndexGlobalIndices]);
-  console.log('🚀 ~ ChannelsPage ~ pageIndexRows:', pageIndexRows);
+
+  const pageIndexRows = useMemo(
+    () => channels.slice(indexStartIndex, indexStartIndex + indexPageSize),
+    [channels, indexStartIndex, indexPageSize],
+  );
 
   const indexPageSelectionFlags = useMemo(() => {
-    const onPage = pageIndexGlobalIndices;
-    const all = onPage.length > 0 && onPage.every(i => indexSelectedRowIndices.has(i));
-    const some = onPage.some(i => indexSelectedRowIndices.has(i));
+    const all = pageIndexRows.length > 0 && pageIndexRows.every(row => selectedRows.has(row.id));
+    const some = pageIndexRows.some(row => selectedRows.has(row.id));
     return { all, some };
-  }, [pageIndexGlobalIndices, indexSelectedRowIndices]);
+  }, [pageIndexRows, selectedRows]);
 
-  const toggleIndexRowSelected = useCallback((globalIndex: number) => {
-    setIndexSelectedRowIndices(prev => {
+  const toggleIndexRowSelected = useCallback((rowId: string) => {
+    setSelectedRows(prev => {
       const next = new Set(prev);
-      if (next.has(globalIndex)) next.delete(globalIndex);
-      else next.add(globalIndex);
+      if (next.has(rowId)) next.delete(rowId);
+      else next.add(rowId);
       return next;
     });
   }, []);
 
   const toggleIndexSelectAllOnPage = useCallback(() => {
-    const onPage = pageIndexGlobalIndices;
-    setIndexSelectedRowIndices(prev => {
+    setSelectedRows(prev => {
       const next = new Set(prev);
-      const allSelected = onPage.length > 0 && onPage.every(i => next.has(i));
-      if (allSelected) onPage.forEach(i => next.delete(i));
-      else onPage.forEach(i => next.add(i));
+      const allSelected = pageIndexRows.length > 0 && pageIndexRows.every(pageRow => next.has(pageRow.id));
+      if (allSelected) pageIndexRows.forEach(pageRow => next.delete(pageRow.id));
+      else pageIndexRows.forEach(pageRow => next.add(pageRow.id));
       return next;
     });
-  }, [pageIndexGlobalIndices]);
+  }, [pageIndexRows]);
 
   const {
     page: detailPageNum,
@@ -792,12 +792,12 @@ function ChannelsPage() {
     if (selectedChannel) {
       await loadDetail(selectedChannel);
     } else {
-      await loadIndex();
+      await fetchChannels();
     }
   }
 
-  const refreshBusy = selectedChannel ? detailLoading : indexLoading;
-  const hasIndexRows = (indexData?.rows?.length ?? 0) > 0;
+  const refreshBusy = selectedChannel ? detailLoading : loading;
+  const hasIndexRows = channels.length > 0;
 
   /** Kênh có ID + EMAIL trong các dòng đã tick hoặc tất cả dòng nếu không tick (popup Upload video). */
   const uploadChannelsFromSelection = useMemo((): ChannelItem[] => {
@@ -1053,8 +1053,7 @@ function ChannelsPage() {
           <ChannelsPageHeaderActions
             selectedChannel={selectedChannel}
             hasIndexRows={hasIndexRows}
-            indexSaving={indexSaving}
-            indexLoading={indexLoading}
+            loading={loading}
             indexBatchVideo={indexBatchVideo}
             indexSelectedRowCount={indexSelectedRowIndices.size}
             indexCreateVideoEligibleSelectedCount={createVideoQueueFromSelection.length}
@@ -1111,7 +1110,7 @@ function ChannelsPage() {
             detailBulkVideo={
               selectedChannel && !detailLoading && detailLayout.tableHeaders.length > 0
                 ? {
-                    actionsLocked: startMarkingIndex !== null || indexLoading,
+                    actionsLocked: startMarkingIndex !== null || loading,
                     createVideoBusy: Boolean(indexBatchVideo),
                     detailUploadPrepBusy,
                     emptyStatusSelectedCount: detailMetaSelectionStats.emptyStatusSelectedCount,
@@ -1176,58 +1175,51 @@ function ChannelsPage() {
 
       {!selectedChannel ? (
         <>
-          {!indexLoading && indexDraftRows.length > 0 ? (
-            <div
-              className='rounded-2xl p-4 w-full min-w-0 space-y-3'
-              style={{ background: 'var(--card-bg)', border: '1px solid var(--border)' }}
-            >
-              <div className='text-sm font-medium uppercase tracking-wider' style={{ color: 'var(--text-muted)' }}>
-                Tìm & lọc
-              </div>
-              <div className='grid grid-cols-1 md:grid-cols-2 gap-4 items-end'>
-                <label className='block min-w-0'>
-                  <span className='block text-sm mb-2' style={{ color: 'var(--text-h)' }}>
-                    Email
-                  </span>
-                  <input
-                    type='search'
-                    value={indexListEmailFilter}
-                    onChange={e => setIndexListEmailFilter(e.target.value)}
-                    placeholder='Tìm trong email kênh…'
-                    autoComplete='off'
-                    className={indexListFilterInputClass}
-                    style={{
-                      background: 'var(--code-bg)',
-                      color: 'var(--text-h)',
-                      borderColor: 'var(--border)',
-                    }}
-                  />
-                </label>
-                <div className='min-w-0'>
-                  <div className='text-sm mb-2' style={{ color: 'var(--text-h)' }}>
-                    Nhóm
-                  </div>
-                  <CustomSelect
-                    value={indexListGroupFilter}
-                    options={indexGroupFilterOptions}
-                    onChange={setIndexListGroupFilter}
-                    placeholder='Nhóm'
-                    menuZIndex={100}
-                  />
+          <div
+            className='rounded-2xl p-4 w-full min-w-0 space-y-3'
+            style={{ background: 'var(--card-bg)', border: '1px solid var(--border)' }}
+          >
+            <div className='text-sm font-medium uppercase tracking-wider' style={{ color: 'var(--text-muted)' }}>
+              Tìm & lọc
+            </div>
+            <div className='grid grid-cols-1 md:grid-cols-2 gap-4 items-end'>
+              <label className='block min-w-0'>
+                <span className='block text-sm mb-2' style={{ color: 'var(--text-h)' }}>
+                  Email
+                </span>
+                <input
+                  type='search'
+                  value={indexListEmailFilter}
+                  onChange={e => setIndexListEmailFilter(e.target.value)}
+                  placeholder='Tìm trong email kênh…'
+                  autoComplete='off'
+                  className={indexListFilterInputClass}
+                  style={{
+                    background: 'var(--code-bg)',
+                    color: 'var(--text-h)',
+                    borderColor: 'var(--border)',
+                  }}
+                />
+              </label>
+              <div className='min-w-0'>
+                <div className='text-sm mb-2' style={{ color: 'var(--text-h)' }}>
+                  Nhóm
                 </div>
+                <CustomSelect
+                  value={indexListGroupFilter}
+                  options={indexGroupFilterOptions}
+                  onChange={setIndexListGroupFilter}
+                  placeholder='Nhóm'
+                  menuZIndex={100}
+                />
               </div>
             </div>
-          ) : null}
+          </div>
 
           <ChannelsIndexSection
-            channels={[]}
-            indexHeaders={indexHeaders}
-            indexListError={indexListError}
-            indexLoading={indexLoading}
-            indexSaving={indexSaving}
-            indexDraftRows={indexDraftRows}
+            channels={channels}
+            loading={loading}
             pageIndexRows={pageIndexRows}
-            pageIndexGlobalIndices={pageIndexGlobalIndices}
             indexFilteredCount={indexFilteredIndices.length}
             groupNameById={groupNameById}
             indexPag={{
@@ -1238,12 +1230,12 @@ function ChannelsPage() {
               startIndex: indexStartIndex,
             }}
             indexColCount={indexColCount}
-            selectedRowIndices={indexSelectedRowIndices}
+            selectedRows={selectedRows}
             onToggleRowSelected={toggleIndexRowSelected}
             onToggleSelectAllOnPage={toggleIndexSelectAllOnPage}
-            onOpenEditRow={globalIndex => setIndexEditRowIndex(globalIndex)}
-            onOpenDetailRow={globalIndex => {
-              const row = indexDraftRows[globalIndex];
+            onOpenEditRow={id => setIndexEditRowIndex(id)}
+            onOpenDetailRow={id => {
+              const row = channels.find(r => r.id === id);
               if (row) {
                 const folder = channelFolderFromRow(row);
                 if (folder?.trim()) setSelectedChannel(folder.trim());
@@ -1253,20 +1245,18 @@ function ChannelsPage() {
             pageSelectSome={indexPageSelectionFlags.some}
           />
 
-          {indexEditRowIndex !== null && indexDraftRows[indexEditRowIndex] != null && (
+          {indexEditRowIndex !== null && (
             <ChannelAddDialog
               key={`edit-${indexEditRowIndex}`}
-              initialRow={indexDraftRows[indexEditRowIndex]}
-              indexHeaders={indexHeaders}
+              initialRow={pageIndexRows.find(r => r.id === indexEditRowIndex)}
               backgroundFolders={indexBackgrounds}
-              indexRows={indexDraftRows}
-              onClose={closeIndexRowEdit}
+              onClose={() => setIndexEditRowIndex(null)}
               onAdd={async row => {
                 if (indexEditRowIndex === null) return;
                 const idx = indexEditRowIndex;
-                const nextRows = indexDraftRows.map((r, i) => (i === idx ? { ...r, ...row } : r));
-                const headersForSave = indexHeaders.includes('mavidGroupId') ? indexHeaders : [...indexHeaders, 'mavidGroupId'];
-                await persistIndexRows(nextRows, headersForSave);
+                // const nextRows = pageIndexRows.map((r, i) => (i === idx ? { ...r, ...row } : r));
+                // const headersForSave = indexHeaders.includes('mavidGroupId') ? indexHeaders : [...indexHeaders, 'mavidGroupId'];
+                // await persistIndexRows(nextRows, headersForSave);
               }}
             />
           )}
