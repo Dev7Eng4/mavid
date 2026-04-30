@@ -30,8 +30,7 @@ import { MAX_CONCURRENT_YOUTUBE_UPLOAD_CHANNELS, type ChannelItem, type ChannelU
 
 const INDEX_FILE = 'channels/index.xlsx';
 
-const indexListFilterInputClass =
-  'w-full rounded-xl px-3 py-2.5 text-sm outline-none border transition-colors duration-150';
+const indexListFilterInputClass = 'w-full rounded-xl px-3 py-2.5 text-sm outline-none border transition-colors duration-150';
 
 /** Khớp cột STATUS trong file chi tiết kênh (khi đã tạo file video). */
 const DETAIL_STATUS_VIDEO_CREATED = 'Đã tạo video';
@@ -238,7 +237,7 @@ function ChannelsPage() {
         setIndexSaving(false);
       }
     },
-    [canWriteIndex, indexHeaders, loadIndex]
+    [canWriteIndex, indexHeaders, loadIndex],
   );
 
   type IndexCreateVideoQueueEntry = {
@@ -443,14 +442,14 @@ function ChannelsPage() {
           setIndexListError(
             failures.length === queue.length
               ? `Tất cả ${failures.length} kênh lỗi: ${failures.slice(0, 3).join(' ')}${failures.length > 3 ? '…' : ''}`
-              : `Một số kênh lỗi (${failures.length}/${queue.length}): ${failures.slice(0, 4).join(' ')}${failures.length > 4 ? '…' : ''}`
+              : `Một số kênh lỗi (${failures.length}/${queue.length}): ${failures.slice(0, 4).join(' ')}${failures.length > 4 ? '…' : ''}`,
           );
         }
       } finally {
         setIndexBatchVideo(null);
       }
     },
-    [indexBackgrounds]
+    [indexBackgrounds],
   );
 
   const detailLayout = useMemo(() => {
@@ -576,12 +575,9 @@ function ChannelsPage() {
 
   const pageIndexGlobalIndices = useMemo(
     () => indexFilteredIndices.slice(indexStartIndex, indexStartIndex + indexPageSize),
-    [indexFilteredIndices, indexStartIndex, indexPageSize]
+    [indexFilteredIndices, indexStartIndex, indexPageSize],
   );
-  const pageIndexRows = useMemo(
-    () => pageIndexGlobalIndices.map(i => indexDraftRows[i]),
-    [indexDraftRows, pageIndexGlobalIndices]
-  );
+  const pageIndexRows = useMemo(() => pageIndexGlobalIndices.map(i => indexDraftRows[i]), [indexDraftRows, pageIndexGlobalIndices]);
 
   const indexPageSelectionFlags = useMemo(() => {
     const onPage = pageIndexGlobalIndices;
@@ -624,7 +620,7 @@ function ChannelsPage() {
 
   const pageDetailRows = useMemo(
     () => filteredRowsWithIndex.slice(detailStartIndex, detailStartIndex + detailPageSize),
-    [filteredRowsWithIndex, detailStartIndex, detailPageSize]
+    [filteredRowsWithIndex, detailStartIndex, detailPageSize],
   );
 
   const detailPageSelectionFlags = useMemo(() => {
@@ -756,7 +752,7 @@ function ChannelsPage() {
         setDetailUpdateMetaBusy(false);
       }
     },
-    [selectedChannel, detail?.rows, detailLayout.linkVideoKey, detailLayout.statusKey]
+    [selectedChannel, detail?.rows, detailLayout.linkVideoKey, detailLayout.statusKey],
   );
 
   async function handleSetStartFromRow(dataRowIndex: number) {
@@ -780,8 +776,8 @@ function ChannelsPage() {
   const detailTheadHeaders = detailLoading
     ? DETAIL_TABLE_LOADING_HEADERS
     : detailLayout.tableHeaders.length > 0
-    ? detailLayout.tableHeaders
-    : ['—'];
+      ? detailLayout.tableHeaders
+      : ['—'];
 
   /** Cột checkbox riêng (chỉ khi có bảng video hoặc đang load). */
   const detailShowSelectColumn = detailLoading || detailLayout.tableHeaders.length > 0;
@@ -859,7 +855,7 @@ function ChannelsPage() {
     if (skippedBusy.length > 0) {
       const uniq = [...new Set(skippedBusy)];
       setUploadScheduleInfo(
-        `Bỏ qua ${uniq.length} email đang upload trên luồng khác: ${uniq.join(', ')}. Chờ xong rồi mới chạy lại cho các email đó.`
+        `Bỏ qua ${uniq.length} email đang upload trên luồng khác: ${uniq.join(', ')}. Chờ xong rồi mới chạy lại cho các email đó.`,
       );
     }
 
@@ -919,8 +915,8 @@ function ChannelsPage() {
         if (fail > 0) parts.push(`${fail} kênh lỗi`);
         setUploadScheduleInfo(
           `${skipNote}Upload YouTube (${claimed.length} kênh, tối đa ${MAX_CONCURRENT_YOUTUBE_UPLOAD_CHANNELS} song song): ${parts.join(
-            ' — '
-          )}. Kiểm tra GPM / YouTube Studio và tab Logs.`
+            ' — ',
+          )}. Kiểm tra GPM / YouTube Studio và tab Logs.`,
         );
       } catch (e) {
         const msg = e instanceof Error ? e.message : String(e);
@@ -1100,7 +1096,7 @@ function ChannelsPage() {
               selectedChannel
                 ? {
                     canUpdateMeta: Boolean(
-                      detailLayout.linkVideoKey && detailLayout.statusKey && typeof window.runner?.runScript === 'function'
+                      detailLayout.linkVideoKey && detailLayout.statusKey && typeof window.runner?.runScript === 'function',
                     ),
                     updateMetaBusy: detailUpdateMetaBusy,
                     detailActionsLocked: startMarkingIndex !== null,
@@ -1344,14 +1340,12 @@ function ChannelsPage() {
           backgroundFolders={indexBackgrounds}
           onClose={() => setAddChannelOpen(false)}
           onSaveNewChannel={async payload => {
+            console.log('🚀 ~ ChannelsPage ~ payload:', payload);
             if (!window.runner?.runScript) throw new Error('Chỉ chạy trong Electron.');
             await window.runner.runScript('addChannelFromForm', {
-              url: payload.channelUrl.trim(),
-              formMeta: {
-                channels: payload.channels,
-                folderIdOverride: payload.folderIdOverride.trim() || undefined,
-              },
+              formData: payload,
             });
+
             await loadIndex();
             setAddChannelInfo(`Đã tạo thư mục kênh, mavid-channel-config.json và cập nhật ${INDEX_FILE}.`);
           }}

@@ -80,22 +80,22 @@ const VIDEO_PER_DAY_OPTIONS: { value: VideoPerDayPreset; label: string }[] = [
 /** Payload gửi tới `addChannelFromForm` (không ghi bảng nháp index). */
 export interface ChannelAddSavePayload {
   channelUrl: string;
-  folderIdOverride: string;
-  channels: {
-    email: string;
-    /** Cột index «KÊNH CỦA TÔI» + lưu trong mavid-channel-config. */
-    myChannel?: string;
-    /** ID nhóm trong `MaVidMedia/channels/group.json`. */
-    groupId?: string;
-    videoType: 'from_audio' | 'reup_full';
-    durationMinuteFrom: number;
-    durationMinuteTo: number | null;
-    background: string;
-    overlay?: string;
-    thumbnailPrompt: string;
-    videosPerDayPreset: VideoPerDayPreset;
-    publishTimes: string[];
-  }[];
+  // folderIdOverride: string;
+  // channels: {
+  email: string;
+  /** Cột index «KÊNH CỦA TÔI» + lưu trong mavid-channel-config. */
+  myChannel?: string;
+  /** ID nhóm trong `MaVidMedia/channels/group.json`. */
+  groupId?: string;
+  videoType: 'from_audio' | 'reup_full';
+  durationMinuteFrom: number;
+  durationMinuteTo: number | null;
+  background: string;
+  overlay?: string;
+  thumbnailPrompt: string;
+  videosPerDayPreset: VideoPerDayPreset;
+  publishTimes: string[];
+  // }[];
 }
 
 export interface ChannelAddDialogProps {
@@ -128,7 +128,7 @@ export function ChannelAddDialog({
   const [configHydrated, setConfigHydrated] = useState(!isEditMode);
 
   const [form, setForm] = useState<ChannelAddDialogInitialFields>(() =>
-    initialRow != null ? channelAddDialogInitialFromIndexRow(initialRow, indexHeaders) : ADD_FORM_DEFAULT
+    initialRow != null ? channelAddDialogInitialFromIndexRow(initialRow, indexHeaders) : ADD_FORM_DEFAULT,
   );
 
   const {
@@ -196,7 +196,7 @@ export function ChannelAddDialog({
         value: String(o.value),
         label: String(o.label),
       })),
-    []
+    [],
   );
 
   const resolvedReupOverlay = useMemo(() => {
@@ -251,10 +251,17 @@ export function ChannelAddDialog({
           const list = Array.isArray(cfg.channels) ? cfg.channels : [];
           let ch: any = null;
           if (list.length > 0) {
-            const want = String(initialRow.email ?? '').trim().toLowerCase();
+            const want = String(initialRow.email ?? '')
+              .trim()
+              .toLowerCase();
             ch = list.find((row: { email?: string }) => String(row?.email ?? '').trim() === String(initialRow.email ?? '').trim());
             if (!ch && want) {
-              ch = list.find((row: { email?: string }) => String(row?.email ?? '').trim().toLowerCase() === want);
+              ch = list.find(
+                (row: { email?: string }) =>
+                  String(row?.email ?? '')
+                    .trim()
+                    .toLowerCase() === want,
+              );
             }
             if (!ch && list.length === 1) ch = list[0];
           }
@@ -409,7 +416,7 @@ export function ChannelAddDialog({
         setFormError(
           videosPerDayPreset === '1-2'
             ? 'Chọn đủ 3 giờ (HH:mm): 1 suất ngày thường + 2 suất cuối tuần.'
-            : 'Chọn đủ giờ upload (HH:mm) cho từng video trong ngày.'
+            : 'Chọn đủ giờ upload (HH:mm) cho từng video trong ngày.',
         );
         return;
       }
@@ -470,7 +477,7 @@ export function ChannelAddDialog({
             folderIdOverride,
             channelStatus: statusForIndex,
           },
-          { preserveChannelFromRow: initialRow }
+          { preserveChannelFromRow: initialRow },
         );
         if (error) {
           setFormError(error);
@@ -537,22 +544,22 @@ export function ChannelAddDialog({
 
         await onSaveNewChannel({
           channelUrl,
-          folderIdOverride,
-          channels: [
-            {
-              email: email.trim(),
-              myChannel: myChannel.trim(),
-              ...(mavidGroupId.trim() ? { groupId: mavidGroupId.trim() } : {}),
-              videoType: videoType as 'from_audio' | 'reup_full',
-              durationMinuteFrom: from,
-              durationMinuteTo: to,
-              background: videoType === 'from_audio' ? resolvedBackground.trim() : '',
-              overlay: resolvedReupOverlay.trim(),
-              thumbnailPrompt: resolvedthumbnailPrompt.trim(),
-              videosPerDayPreset,
-              publishTimes: times,
-            },
-          ],
+          // folderIdOverride,
+          // channels: [
+          //   {
+          email: email.trim(),
+          myChannel: myChannel.trim(),
+          ...(mavidGroupId.trim() ? { groupId: mavidGroupId.trim() } : {}),
+          videoType: videoType as 'from_audio' | 'reup_full',
+          durationMinuteFrom: from,
+          durationMinuteTo: to,
+          background: videoType === 'from_audio' ? resolvedBackground.trim() : '',
+          overlay: resolvedReupOverlay.trim(),
+          thumbnailPrompt: resolvedthumbnailPrompt.trim(),
+          videosPerDayPreset,
+          publishTimes: times,
+          //   },
+          // ],
         });
         onClose();
       } catch (e) {

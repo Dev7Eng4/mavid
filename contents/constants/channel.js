@@ -26,71 +26,81 @@ export const CHANNELS = [
     index: 1,
   },
   {
-    key: 'link',
-    label: 'LINK',
+    key: 'channelId',
+    label: 'CHANNEL ID',
     index: 2,
+  },
+  {
+    key: 'channelLink',
+    label: 'CHANNEL LINK',
+    index: 3,
+  },
+  {
+    key: 'channelName',
+    label: 'CHANNEL NAME',
+    index: 4,
   },
   {
     key: 'email',
     label: 'EMAIL',
-    index: 3,
-  },
-  {
-    key: 'myChannel',
-    label: 'KÊNH CỦA TÔI',
-    index: 4,
-  },
-  {
-    key: 'videoType',
-    label: 'LOẠI VIDEO',
     index: 5,
   },
   {
-    key: 'durationMinutes',
-    label: 'THỜI GIAN VIDEO',
+    key: 'myChannel',
+    label: 'MY CHANNEL',
     index: 6,
   },
   {
-    key: 'background',
-    label: 'BACKGROUND',
+    key: 'videoType',
+    label: 'VIDEO TYPE',
     index: 7,
+  },
+  {
+    key: 'durationMinutes',
+    label: 'VIDEO DURATION',
+    index: 8,
   },
   {
     key: 'lastUpload',
     label: 'LAST UPLOAD',
-    index: 8,
+    index: 9,
   },
   {
     key: 'group',
     label: 'GROUP',
-    index: 9,
+    index: 10,
   },
   {
     key: 'status',
     label: 'STATUS',
-    index: 10,
+    index: 11,
   },
 ];
 
 export const CHANNEL_DETAIL = [
   {
-    id: 'link',
-    label: 'LINK',
+    key: 'link',
+    label: 'LINK VIDEO',
     index: 1,
   },
   {
-    id: 'views',
+    key: 'views',
     label: 'VIEWS',
     index: 2,
   },
   {
-    id: 'duration',
+    key: 'duration',
     label: 'DURATION',
     index: 3,
   },
   {
-    id: 'status',
+    key: 'status',
     label: 'STATUS',
     index: 4,
   },
+  // {
+  //   key: 'email',
+  //   label: 'EMAIL',
+  //   index: 5,
+  // },
 ];
