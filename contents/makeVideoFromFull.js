@@ -167,7 +167,16 @@ async function remakeVideo(videoPath, imagePath, overlayVideoPath, outputPath, o
     console.log(`Ảnh phủ (dưới, opacity ${imageOpacity}): ${path.basename(imagePath)}`);
     console.log(`Video phủ (trên, loop, opacity ${videoOpacity}): ${path.basename(overlayVideoPath)}`);
 
-    const { width, height } = getVideoResolution(videoPath);
+    const src = getVideoResolution(videoPath);
+    const maxH = overlayRender.outputHeight ?? 720;
+    // Tính effective output resolution: scale xuống nếu source cao hơn maxH
+    const outH = src.height > maxH ? maxH : src.height;
+    const outW = src.height > maxH ? Math.round((src.width * maxH) / src.height / 2) * 2 : src.width;
+    const width = outW;
+    const height = outH;
+    if (src.height > maxH) {
+      console.log(`[OPT-5] Downscale ${src.width}x${src.height} → ${outW}x${outH} (outputHeight=${maxH})`);
+    }
 
     // [A] Pre-process ảnh overlay: scale + alpha 1 lần, dùng cache
     const cachedImage = getPreprocessedImageOverlay(imagePath, width, height, imageOpacity, overlayCacheDir);
@@ -177,10 +186,16 @@ async function remakeVideo(videoPath, imagePath, overlayVideoPath, outputPath, o
     const cachedVideo = getPreprocessedVideoOverlay(overlayVideoPath, width, height, videoOpacity, overlayCacheDir);
     const useVideoCache = cachedVideo != null;
 
+    // Scale xuống trước khi crop/overlay nếu source lớn hơn target
+    const needsDownscale = src.height > maxH;
+    const scaleStep = needsDownscale ? `[0:v]scale=${outW}:${outH}[v_ds];` : '';
+    const baseInput = needsDownscale ? '[v_ds]' : '[0:v]';
+
     const p = videoCropPercent;
     const inner = 100 - 2 * p;
-    const headCrop = p > 0 && inner > 0 ? `[0:v]scale=iw*100/${inner}:ih*100/${inner},crop=iw*${inner}/100:ih*${inner}/100[v0];` : '';
-    const vid0 = p > 0 && inner > 0 ? '[v0]' : '[0:v]';
+    const headCrop =
+      p > 0 && inner > 0 ? `${baseInput}scale=iw*100/${inner}:ih*100/${inner},crop=iw*${inner}/100:ih*${inner}/100[v0];` : '';
+    const vid0 = p > 0 && inner > 0 ? '[v0]' : baseInput;
     if (p > 0) {
       console.log(`Video gốc: zoom + crop ${p}% mỗi phía (4 phía), đầu ra ${width}x${height}.`);
     }
@@ -196,7 +211,7 @@ async function remakeVideo(videoPath, imagePath, overlayVideoPath, outputPath, o
       : `[2:v]scale=${width}:${height},format=yuva420p,colorchannelmixer=aa=${videoOpacity}[ova];` +
         `[base1][ova]overlay=0:0:shortest=1,format=yuv420p[outv]`;
 
-    const filterComplex = headCrop + imgFilter + vidOverlayFilter;
+    const filterComplex = scaleStep + headCrop + imgFilter + vidOverlayFilter;
 
     // [OPT-3] Dùng -hwaccel auto: cho FFmpeg tự chọn HW decode tối ưu, không đổi filter graph
     const args = ['-y', '-hwaccel', 'auto', '-threads', '0'];
@@ -262,7 +277,10 @@ async function main(options = {}) {
     console.log(`[crop] VIDEO_CROP_PERCENT=${videoCropPercent}`);
   }
 
-  const overlayRender = { imageOpacity, videoOpacity, overlayCacheDir, videoCropPercent };
+  const outputHeight = Number(options.outputHeight) || 720;
+  console.log(`[OPT-5] outputHeight=${outputHeight} (giảm resolution để tăng tốc encode)`);
+
+  const overlayRender = { imageOpacity, videoOpacity, overlayCacheDir, videoCropPercent, outputHeight };
 
   const { downloadSingleVideo } = await import('./downloadVideo.js');
 
@@ -326,6 +344,7 @@ async function main(options = {}) {
       mode: MAKE_VIDEO_MODE.REUP_FULL, // Tải cả video
       thumbnailChannelRoot: destFolder,
       thumbnailPrompt: options.thumbnailPrompt,
+      downloadMaxHeight: outputHeight,
       callback: ({ title: gemTitle, description: gemDesc, tags: gemTags, summary: gemSummary }) => {
         const tagsStr = typeof gemTags === 'string' ? gemTags : Array.isArray(gemTags) ? gemTags.join(', ') : '';
         geminiByUrl[url] = {

@@ -73,8 +73,8 @@ function detectHardware() {
   const { BITRATE, MAX_BITRATE, BUFSIZE } = STOCK_VIDEO;
   const bitrateArgs = ['-b:v', BITRATE, '-maxrate', MAX_BITRATE, '-bufsize', BUFSIZE];
 
-  // [OPT-4] Bitrate thấp hơn cho reup_full (video đã overlay, không cần bitrate cao)
-  const reupBitrateArgs = ['-b:v', '3M', '-maxrate', '4M', '-bufsize', '6M'];
+  // [OPT-4] Bitrate thấp hơn cho reup_full (720p, đã overlay, không cần bitrate cao)
+  const reupBitrateArgs = ['-b:v', '2M', '-maxrate', '3M', '-bufsize', '4M'];
 
   const makeAudioBitrateArgs = ['-b:v', '1M', '-maxrate', '1.5M', '-bufsize', '2M'];
 

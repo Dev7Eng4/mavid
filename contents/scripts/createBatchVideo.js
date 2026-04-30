@@ -12,7 +12,7 @@ const MAVID_CHANNEL_CONFIG_FILENAME = 'mavid-channel-config.json';
  * Mặc định: chỉ chọn video có độ dài (cột DURATION) lớn hơn N phút (giây > N×60).
  * Ghi đè: `props.minDurationMinutes` hoặc env `MAVID_MIN_DURATION_MINUTES`; `0` = tắt lọc tối thiểu.
  */
-export const MIN_VIDEO_DURATION_MINUTES = 18;
+export const MIN_VIDEO_DURATION_MINUTES = 8;
 
 /**
  * Phút tối thiểu (suy ra ngưỡng lọc dưới) — 0 = không lọc theo tối thiểu.

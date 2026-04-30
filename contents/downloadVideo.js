@@ -6,6 +6,7 @@
 import youtubedl from 'youtube-dl-exec';
 import path from 'path';
 import fs from 'fs';
+import { promises as fsp } from 'fs';
 import { fileURLToPath } from 'url';
 import { detectVideoLang, getLanguageOptions } from './utils/detectLanguage.util.js';
 
@@ -17,6 +18,63 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const DEFAULT_OUTPUT_DIR = path.join(__dirname, '..', 'downloads');
 const INPUT_FILE = path.join(__dirname, '..', 'input.txt');
 const OUTPUT_FILE = path.join(DEFAULT_OUTPUT_DIR, 'output.json');
+
+/** Một số mã lỗi khi xóa file trên Windows (khoá bởi AV/Explorer/tiến trình khác) — nên thử lại. */
+const RETRYABLE_FS_REMOVE_CODES = new Set(['EBUSY', 'EPERM', 'EACCES', 'EMFILE', 'EAGAIN']);
+
+/**
+ * Xóa file hoặc thư mục, retry khi bị EBUSY; sau cùng bỏ qua (cảnh báo) thay vì ném lỗi
+ * để batch không dừng cả pipeline vì một file cũ còn bị khoá.
+ * @param {string} fullPath
+ * @param {boolean} isDirectory
+ */
+async function removePathWithRetry(fullPath, isDirectory) {
+  const maxAttempts = 20;
+  const baseMs = 120;
+  let lastErr;
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    try {
+      if (isDirectory) {
+        await fsp.rm(fullPath, { recursive: true, force: true });
+      } else {
+        await fsp.unlink(fullPath);
+      }
+      return;
+    } catch (err) {
+      if (err && err.code === 'ENOENT') return;
+      lastErr = err;
+      const code = err && err.code;
+      const canRetry = RETRYABLE_FS_REMOVE_CODES.has(code) && attempt < maxAttempts;
+      if (!canRetry) {
+        console.warn(
+          `[download] Không xóa được (bỏ qua): ${fullPath} — ${err.message}`,
+        );
+        return;
+      }
+      const delay = Math.min(2500, baseMs * attempt);
+      await new Promise((r) => setTimeout(r, delay));
+    }
+  }
+  console.warn(
+    `[download] Hết số lần thử xóa, bỏ qua: ${fullPath} — ${lastErr && lastErr.message}`,
+  );
+}
+
+/**
+ * Dọn nội dung thư mục output trước khi tải (từng entry, async + retry).
+ * @param {string} dir
+ */
+async function clearOutputDirResilient(dir) {
+  const entries = fs.readdirSync(dir, { withFileTypes: true });
+  for (const entry of entries) {
+    const fullPath = path.join(dir, entry.name);
+    if (entry.isFile()) {
+      await removePathWithRetry(fullPath, false);
+    } else {
+      await removePathWithRetry(fullPath, true);
+    }
+  }
+}
 
 /**
  * Lấy thông tin video đơn lẻ
@@ -59,7 +117,7 @@ async function getVideoInfo(url) {
  * @returns {Promise<string>} - Đường dẫn file đã tải
  */
 async function downloadVideo(url, options = {}) {
-  const { outputDir = DEFAULT_OUTPUT_DIR, format = 'best' } = options;
+  const { outputDir = DEFAULT_OUTPUT_DIR, format = 'best', maxHeight = 0 } = options;
 
   if (!fs.existsSync(outputDir)) {
     fs.mkdirSync(outputDir, { recursive: true });
@@ -77,7 +135,21 @@ async function downloadVideo(url, options = {}) {
     '22/18/' +
     'bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best';
 
-  const actualFormat = format === 'best' ? FORMAT_H264_MP4 : format;
+  // Ưu tiên tải đúng height để giảm I/O; fallback về FORMAT_H264_MP4 nếu không có
+  const FORMAT_H264_MP4_CAPPED =
+    maxHeight > 0
+      ? `bestvideo[height<=${maxHeight}][vcodec^=avc1]+bestaudio[ext=m4a]/` +
+        `bestvideo[height<=${maxHeight}][vcodec^=avc1]+bestaudio/` +
+        `best[height<=${maxHeight}][vcodec^=avc1][ext=mp4]/` +
+        `best[height<=${maxHeight}][ext=mp4]/` +
+        FORMAT_H264_MP4
+      : null;
+
+  const actualFormat = format !== 'best' ? format : FORMAT_H264_MP4_CAPPED ?? FORMAT_H264_MP4;
+
+  if (maxHeight > 0) {
+    console.log(`[DL] maxHeight=${maxHeight} → ưu tiên tải ≤${maxHeight}p để giảm I/O`);
+  }
 
   const subprocess = youtubedl.exec(url, {
     output: outputTemplate,
@@ -399,6 +471,7 @@ async function downloadSingleVideo(url, options = {}) {
     generateThumbnailWithFlow = true,
     thumbnailPrompt = null,
     outputDir = DEFAULT_OUTPUT_DIR,
+    downloadMaxHeight = 0,
   } = options;
 
   const actualOutputDir = outputDir;
@@ -406,15 +479,7 @@ async function downloadSingleVideo(url, options = {}) {
   if (!fs.existsSync(actualOutputDir)) {
     fs.mkdirSync(actualOutputDir, { recursive: true });
   } else {
-    const entries = fs.readdirSync(actualOutputDir, { withFileTypes: true });
-    for (const entry of entries) {
-      const fullPath = path.join(actualOutputDir, entry.name);
-      if (entry.isFile()) {
-        fs.unlinkSync(fullPath);
-      } else {
-        fs.rmSync(fullPath, { recursive: true });
-      }
-    }
+    await clearOutputDirResilient(actualOutputDir);
   }
 
   try {
@@ -461,7 +526,7 @@ async function downloadSingleVideo(url, options = {}) {
       // REUP_FULL: song song hóa → tiết kiệm ~5-10 phút
       console.log('[OPT-2] Song song: download video + transcript/Gemini/thumbnail...');
       const [videoResult, transcriptResult] = await Promise.allSettled([
-        downloadVideo(url, { outputDir: actualOutputDir }),
+        downloadVideo(url, { outputDir: actualOutputDir, maxHeight: downloadMaxHeight }),
         downloadAndFinalizeTranscript().catch(err => {
           console.warn('Không tải được transcript:', err.message);
         }),

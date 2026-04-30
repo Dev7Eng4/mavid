@@ -20,7 +20,6 @@ const INDEX_FILE = path.join(DEFAULT_OUTPUT_DIR, 'index.xlsx');
 
 /** Headers cho file index.xlsx — cột ID = tên thư mục kênh (MaVidMedia/channels/<ID>/) */
 const INDEX_HEADERS = [
-  'CHANNEL',
   'LINK',
   'ID',
   'EMAIL',
@@ -35,25 +34,32 @@ const INDEX_HEADERS = [
 
 /** Chỉ số cột 1-based (khớp INDEX_HEADERS). Cột cuối = ID nhóm (group.json). */
 const IDX = {
-  CHANNEL: 1,
-  LINK: 2,
-  ID: 3,
-  EMAIL: 4,
-  MY_CHANNEL: 5,
-  LOAI_VIDEO: 6,
-  THOI_GIAN: 7,
-  BACKGROUND: 8,
-  LAST_UPLOAD: 9,
-  STATUS: 10,
-  GROUP: 11,
+  LINK: 1,
+  ID: 2,
+  EMAIL: 3,
+  MY_CHANNEL: 4,
+  LOAI_VIDEO: 5,
+  THOI_GIAN: 6,
+  BACKGROUND: 7,
+  LAST_UPLOAD: 8,
+  STATUS: 9,
+  GROUP: 10,
 };
 
 /**
  * Gỡ dataValidation cũ trên index (file từng có dropdown); không đổi giá trị ô.
+ * Nếu cột đầu tiên là 'CHANNEL' (layout cũ), tự động splice để bỏ cột đó.
  * @param {import('exceljs').Worksheet} sheet
  */
 function migrateIndexSheetIfNeeded(sheet) {
   if (!sheet) return;
+
+  // Migration: xóa cột CHANNEL cũ (cột 1) nếu tồn tại
+  const firstHeader = String(sheet.getRow(1).getCell(1).value || '').trim();
+  if (firstHeader === 'CHANNEL') {
+    sheet.spliceColumns(1, 1);
+  }
+
   const maxR = Math.min(sheet.rowCount || 0, 2000);
   const maxC = Math.min(sheet.columnCount || 12, 20);
   for (let r = 1; r <= maxR; r++) {
@@ -245,7 +251,6 @@ async function updateIndexFile(channelData) {
     } else {
       // Thêm row mới
       sheet.addRow([
-        '', // Không ghi đè/lưu tên Channel vào cột này
         link,
         id,
         meta.colEmail,
@@ -265,7 +270,6 @@ async function updateIndexFile(channelData) {
     sheet = workbook.addWorksheet('Channels', { views: [{ state: 'frozen', ySplit: 1 }] });
     sheet.addRow(INDEX_HEADERS);
     sheet.addRow([
-      name,
       link,
       id,
       meta.colEmail,
@@ -279,7 +283,6 @@ async function updateIndexFile(channelData) {
     ]);
 
     sheet.columns = [
-      { width: 45 }, // CHANNEL
       { width: 60 }, // LINK
       { width: 40 }, // ID
       { width: 45 }, // EMAIL
