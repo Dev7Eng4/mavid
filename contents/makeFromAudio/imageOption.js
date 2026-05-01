@@ -694,14 +694,14 @@ async function processImageNoiseVideo(options = {}, bgImgPath) {
   filterParts.push(`[${audioIndex}:a]atempo=${speed}[aout]`);
 
   // Image background filter (w/h/fps đã khai báo ở trên cho prebake noise)
-  const ZOOM_DURATION_SEC = 8;
+  const ZOOM_DURATION_SEC = 15;
   const ZOOM_MAX = 1.3;
   const zoomFrames = ZOOM_DURATION_SEC * fps;
   const totalFrames = Math.ceil(audioDurationAfterTempo * fps) + fps;
   const zpW = Math.ceil((w * ZOOM_MAX) / 2) * 2;
   const zpH = Math.ceil((h * ZOOM_MAX) / 2) * 2;
 
-  // 8s đầu: zoom-out từ 1.3x → 1.0x | Sau 8s → hết video: Burns (pan drift liên tục)
+  // 15s đầu: zoom-out từ 1.3x → 1.0x | Sau 15s → hết video: Burns (pan drift liên tục)
   const PAN_CYCLE_X_SEC = 13;
   const PAN_CYCLE_Y_SEC = 9;
   const panCycleXFrames = PAN_CYCLE_X_SEC * fps;
