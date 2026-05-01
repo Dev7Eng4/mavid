@@ -108,11 +108,16 @@ export function ChannelAddDialog({ backgroundOptions, channels = [], onClose, on
   const isEditMode = initialRow != null;
 
   const [formError, setFormError] = useState<string | null>(null);
+  console.log('🚀 ~ ChannelAddDialog ~ formError:', formError);
   const [saving, setSaving] = useState(false);
   /** Chế độ sửa: đã thử đọc `mavid-channel-config.json` trong thư mục kênh (để không ghi đè form bằng fetch muộn). */
   const [configHydrated, setConfigHydrated] = useState(!isEditMode);
 
-  const [form, setForm] = useState<ChannelAddDialogInitialFields>(() => (isEditMode ? (initialRow as any) : ADD_FORM_DEFAULT));
+  console.log('🚀 ~ ChannelAddDialog ~ initialRow:', initialRow);
+  const [form, setForm] = useState<ChannelAddDialogInitialFields>(() => {
+    return isEditMode ? (initialRow as any) : ADD_FORM_DEFAULT;
+  });
+  console.log('🚀 ~ ChannelAddDialog ~ form:', form);
 
   const {
     channelLink,
@@ -226,6 +231,7 @@ export function ChannelAddDialog({ backgroundOptions, channels = [], onClose, on
 
     return '';
   }, [email, channels, initialRow]);
+  console.log('🚀 ~ ChannelAddDialog ~ emailDuplicateWarning:', emailDuplicateWarning);
 
   const durationMinuteOptions = CHANNEL_ADD_DURATION_SELECT_OPTIONS;
 
@@ -236,12 +242,13 @@ export function ChannelAddDialog({ backgroundOptions, channels = [], onClose, on
 
   const handleConfirm = async () => {
     const [fromStr, toStr] = durationMinutes.split('_');
+    console.log('🚀 ~ handleConfirm ~ durationMinutes:', durationMinutes);
     const from = Number(fromStr);
     const to = toStr === 'null' ? null : Number(toStr);
 
     const times = readPublishTimesFromTimeInputs(slotCount, publishTimes);
 
-    const payload = {
+    const payload: any = {
       id: initialRow?.id,
       channelLink: channelLink.trim(),
       email: email.trim(),
@@ -268,8 +275,10 @@ export function ChannelAddDialog({ backgroundOptions, channels = [], onClose, on
       const statusForIndex = initialStatusNorm === 'INIT' && !initialEmailTrim && emailNowTrim ? 'LIVE' : initialRow?.status;
 
       payload.status = statusForIndex;
+      payload.channelId = initialRow?.channelId;
     }
 
+    console.log('🚀 ~ handleConfirm ~ payload:', payload);
     await onMapping(payload);
     onClose();
   };
@@ -433,7 +442,7 @@ export function ChannelAddDialog({ backgroundOptions, channels = [], onClose, on
               <CustomSelect
                 value={resolvedReupOverlay}
                 options={reupOverlayOptionsList}
-                onChange={v => setForm(f => ({ ...f, reupOverlayOption: v }))}
+                onChange={v => setForm(f => ({ ...f, overlay: v }))}
                 placeholder='Chọn overlay'
                 menuZIndex={100}
               />
@@ -518,12 +527,7 @@ export function ChannelAddDialog({ backgroundOptions, channels = [], onClose, on
           <AppButton type='button' variant='neutral' onClick={() => onClose()}>
             Hủy
           </AppButton>
-          <AppButton
-            type='button'
-            variant='primary'
-            onClick={handleConfirm}
-            disabled={isEditMode || saving || (isEditMode && !configHydrated) || !emailDuplicateWarning}
-          >
+          <AppButton type='button' variant='primary' onClick={handleConfirm} disabled={saving || !!emailDuplicateWarning}>
             {saving ? 'Đang xử lý…' : isEditMode ? 'Cập nhật' : 'Lưu'}
           </AppButton>
         </div>

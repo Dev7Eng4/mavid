@@ -9,4 +9,9 @@ export const OVERLAY_OPTIONS = [
     IMAGE_OVERLAY_OPACITY: 0.5,
     VIDEO_OVERLAY_OPACITY: 0.5,
   },
+  {
+    NAME: 'Option 2 (Show Subtitle)',
+    IMAGE_OVERLAY_OPACITY: 0.5,
+    VIDEO_OVERLAY_OPACITY: 0.5,
+  },
 ];

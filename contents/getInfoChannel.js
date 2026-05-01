@@ -152,7 +152,7 @@ function resolveIndexMetaColumns(channelData) {
   const colVideoType = String(channelData.videoType ?? '').trim();
   const dm = channelData.durationMinutes;
   const colDurationMinutes = dm === '' || dm == null ? '' : String(dm);
-  const colGroup = String(channelData.groupId ?? '').trim();
+  const colGroup = String(channelData.group ?? '').trim();
   const rawSt = String(channelData.channelStatus ?? '')
     .trim()
     .toUpperCase();
@@ -167,6 +167,7 @@ function resolveIndexMetaColumns(channelData) {
  * @param {string} channelData.id — tên thư mục kênh (khớp thư mục trong MaVidMedia/channels/)
  */
 async function updateIndexFile(channelData) {
+  console.log('🚀 ~ updateIndexFile ~ channelData:', channelData);
   const { name, link, id, channelId } = channelData;
   const meta = resolveIndexMetaColumns(channelData);
 
@@ -628,7 +629,7 @@ export async function addChannelFromForm(options = {}) {
     lastUpload: String(formData.lastUpload ?? '').trim(),
     email: String(formData.email || '').trim(),
     myChannel: String(formData.myChannel ?? '').trim(),
-    groupId: String(formData.groupId ?? '').trim(),
+    group: String(formData.group ?? '').trim(),
     videoType: formData.videoType,
     durationMinutes: formData.durationMinuteFrom + '_' + formData.durationMinuteTo,
     background:
