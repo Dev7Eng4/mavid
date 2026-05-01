@@ -18,6 +18,7 @@ import {
   resolveAudioSpeed, getDuration, getAudioDurationSeconds,
   formatClockDuration, sanitizeFilename, shuffleArray,
   getAudioFile, getSubtitleFile, ffmpegSpawnAsync,
+  getPrebakedLogoPng, getPrebakedChartVideo,
 } from './shared.js';
 
 import {
@@ -52,7 +53,7 @@ function stockNormalizeFilterInner(slowmoFactor, isFlip = false) {
   const factor = slowmoFactor ?? SLOWMO_FACTOR;
   const slowmo = factor !== 1.0 ? `,setpts=${factor.toFixed(4)}*PTS` : '';
   const flipFilter = isFlip ? ',hflip' : '';
-  return `scale=${w}:${h}:force_original_aspect_ratio=decrease,pad=${w}:${h}:(ow-iw)/2:(oh-ih)/2,format=yuv420p${flipFilter}${slowmo},fps=${f},settb=tb=1/90000,setsar=1`;
+  return `scale=${w}:${h}:force_original_aspect_ratio=decrease:flags=fast_bilinear,pad=${w}:${h}:(ow-iw)/2:(oh-ih)/2,format=yuv420p${flipFilter}${slowmo},fps=${f},setsar=1`;
 }
 
 function stockNormalizeFilterChain(inputLabel, outLabel, slowmoFactor, isFlip = false) {
@@ -180,7 +181,8 @@ function getStockVideos(backgroundsDir) {
   return shuffled.map(f => path.join(backgroundsDir, f));
 }
 
-async function buildStockSegmentPlan(videoPaths, requiredXfadeOutputSec) {
+async function buildStockSegmentPlan(videoPaths, requiredOutputSec) {
+  const useXfade = STOCK_VIDEO.USE_XFADE === true;
   const segments = [];
   let accumulated = 0;
   let idx = 0;
@@ -194,13 +196,13 @@ async function buildStockSegmentPlan(videoPaths, requiredXfadeOutputSec) {
     accumulated += duration;
     idx++;
 
-    const currentDurations = segments.map(s => s.duration);
-    const minSegmentDur = Math.min(...currentDurations);
-    const fadeEst = Math.max(0.15, Math.min(STOCK_VIDEO.CROSSFADE_SEC, minSegmentDur * 0.45));
-
-    const n = segments.length;
-    const xfadeLen = n <= 1 ? accumulated : accumulated - (n - 1) * fadeEst;
-    if (xfadeLen >= requiredXfadeOutputSec) break;
+    let effectiveLen = accumulated;
+    if (useXfade && segments.length > 1) {
+      const minSegmentDur = Math.min(...segments.map(s => s.duration));
+      const fadeEst = Math.max(0.15, Math.min(STOCK_VIDEO.CROSSFADE_SEC, minSegmentDur * 0.45));
+      effectiveLen = accumulated - (segments.length - 1) * fadeEst;
+    }
+    if (effectiveLen >= requiredOutputSec) break;
   }
 
   return shuffleArray(segments);
@@ -304,8 +306,11 @@ export async function processStockVideo(bgNameArg, options = {}) {
 
   updateStockUsage(stockSegments, backgroundsDir);
 
-  const logoPathForMerge = logoPathOpt != null && String(logoPathOpt).trim() && fs.existsSync(logoPathOpt) ? logoPathOpt : null;
+  const logoPathOriginal = logoPathOpt != null && String(logoPathOpt).trim() && fs.existsSync(logoPathOpt) ? logoPathOpt : null;
+  const prebakedLogo = logoPathOriginal ? await getPrebakedLogoPng(logoPathOriginal, LOGO.SIZE) : null;
+  const logoPathForMerge = prebakedLogo || logoPathOriginal;
   const hasLogo = Boolean(logoPathForMerge);
+  const logoIsPrebaked = Boolean(prebakedLogo);
 
   const stockOverlayDir = path.join(stockBgRoot, STOCK_OVERLAY_DIR);
   const stockOverlaySourcePath = pickFirstOverlayVideo(stockOverlayDir);
@@ -324,6 +329,9 @@ export async function processStockVideo(bgNameArg, options = {}) {
 
   const chartSourcePath = pickFirstChartVideo();
   const hasChart = Boolean(chartSourcePath);
+  const prebakedChart = hasChart ? await getPrebakedChartVideo(chartSourcePath, CHART_CORNER_MAX_WIDTH, STOCK_VIDEO.FPS) : null;
+  const chartPathForMerge = prebakedChart || chartSourcePath;
+  const chartIsPrebaked = Boolean(prebakedChart);
   if (fs.existsSync(ASSET_CHART_DIR) && getChartVideoFiles(ASSET_CHART_DIR).length === 0) {
     console.log('[chart] Thư mục assets/chart/ trống — bỏ qua lớp bar chart góc phải trên.');
   }
@@ -332,7 +340,10 @@ export async function processStockVideo(bgNameArg, options = {}) {
   const mergeArgs = ['-y'];
   let inputIdx = 0;
 
+  const stockDecodeArgs = Array.isArray(GPU_INFO.stockDecodeArgs) ? GPU_INFO.stockDecodeArgs : [];
+
   for (const s of stockSegments) {
+    if (stockDecodeArgs.length > 0) mergeArgs.push(...stockDecodeArgs);
     if (stockSegments.length === 1 && s.duration < stockRenderTarget - 0.01) {
       mergeArgs.push('-stream_loop', '-1', '-i', s.path);
     } else {
@@ -356,8 +367,10 @@ export async function processStockVideo(bgNameArg, options = {}) {
   let chartIndex = -1;
   if (hasChart) {
     chartIndex = inputIdx++;
-    mergeArgs.push('-stream_loop', '-1', '-i', chartSourcePath);
-    console.log(`[chart] Góc phải trên: ${path.basename(chartSourcePath)} (max ${CHART_CORNER_MAX_WIDTH}px rộng, lặp theo hết video)`);
+    mergeArgs.push('-stream_loop', '-1', '-i', chartPathForMerge);
+    console.log(
+      `[chart] Góc phải trên: ${path.basename(chartSourcePath)} (max ${CHART_CORNER_MAX_WIDTH}px rộng, lặp theo hết video, ${chartIsPrebaked ? 'cache ProRes' : 'realtime'})`,
+    );
   }
 
   let logoIndex = -1;
@@ -381,10 +394,11 @@ export async function processStockVideo(bgNameArg, options = {}) {
   filterParts.push(`[${audioIndex}:a]atempo=${speed}[aout]`);
 
   // Video Background graph
+  const useXfade = STOCK_VIDEO.USE_XFADE === true;
   let vBgLabel = 'vout_bg';
   if (stockSegments.length === 1) {
     filterParts.push(stockNormalizeFilterChain(`0:v`, vBgLabel, stockSegments[0].slowmoFactor, stockSegments[0].isFlip));
-  } else {
+  } else if (useXfade) {
     const minDur = Math.min(...stockSegments.map(s => s.duration));
     const fade = Math.max(0.15, Math.min(STOCK_VIDEO.CROSSFADE_SEC, minDur * 0.45));
     for (let i = 0; i < stockSegments.length; i++) {
@@ -399,16 +413,22 @@ export async function processStockVideo(bgNameArg, options = {}) {
       cur = outTag;
       accLen += stockSegments[i].duration - fade;
     }
+  } else {
+    for (let i = 0; i < stockSegments.length; i++) {
+      filterParts.push(stockNormalizeFilterChain(`${i}:v`, `s${i}`, stockSegments[i].slowmoFactor, stockSegments[i].isFlip));
+    }
+    const concatInputs = stockSegments.map((_, i) => `[s${i}]`).join('');
+    filterParts.push(`${concatInputs}concat=n=${stockSegments.length}:v=1:a=0[${vBgLabel}]`);
   }
 
   let currentVLabel = vBgLabel;
   if (hasStockOverlay && overlayIndex >= 0) {
     if (usePrebakedOverlay) {
-      filterParts.push(`[${overlayIndex}:v]fps=${STOCK_VIDEO.FPS},settb=tb=1/90000,setsar=1[ovlay]`);
+      filterParts.push(`[${overlayIndex}:v]fps=${STOCK_VIDEO.FPS},setsar=1[ovlay]`);
     } else {
       const pm = STOCK_OVERLAY_PTS_MULT;
       const chain = stockOverlayScaleCropAlphaSubchain();
-      filterParts.push(`[${overlayIndex}:v]setpts=${pm}*PTS,${chain},fps=${STOCK_VIDEO.FPS},settb=tb=1/90000,setsar=1[ovlay]`);
+      filterParts.push(`[${overlayIndex}:v]setpts=${pm}*PTS,${chain},fps=${STOCK_VIDEO.FPS},setsar=1[ovlay]`);
     }
     filterParts.push(`[${currentVLabel}][ovlay]overlay=0:0[v_plated]`);
     currentVLabel = 'v_plated';
@@ -421,7 +441,7 @@ export async function processStockVideo(bgNameArg, options = {}) {
     currentVLabel = 'v_centered_img';
   }
 
-  // Drawbox + Subtitles Graph
+  // Drawbox + Subtitles Graph (gộp 1 chain — bỏ split/crop/overlay)
   if (subtitlePath) {
     convertSrtToAss(subtitlePath, tempSubPath, useJaSubtitleStyle);
     const subPathEscaped = escapePathForFfmpegSubtitles(tempSubPath);
@@ -433,14 +453,12 @@ export async function processStockVideo(bgNameArg, options = {}) {
       ? `subtitles='${subPathEscaped}:fontsdir=${fontsDirEscaped}'`
       : `subtitles='${subPathEscaped}'`;
 
-    filterParts.push(`[${currentVLabel}]${drawboxFilter},split[v_base][v_for_sub]`);
-    filterParts.push(`[v_for_sub]${subFilter},crop=iw:${subtitleBoxHeight}:0:${boxY}[v_sub_clipped]`);
-    filterParts.push(`[v_base][v_sub_clipped]overlay=0:${boxY}[v_subbed]`);
+    filterParts.push(`[${currentVLabel}]${drawboxFilter},${subFilter}[v_subbed]`);
 
     if (useJaSubtitleStyle) {
-      console.log('Phụ đề (JA): Chữ cyan / viền đen dày, có hộp nền (đã giới hạn vùng hiển thị).');
+      console.log('Phụ đề (JA): Chữ cyan / viền đen dày, có hộp nền.');
     } else {
-      console.log('Phụ đề: Có hộp nền (đã giới hạn vùng hiển thị).');
+      console.log('Phụ đề: Có hộp nền.');
     }
     currentVLabel = 'v_subbed';
   } else {
@@ -456,20 +474,28 @@ export async function processStockVideo(bgNameArg, options = {}) {
     const boxY = STOCK_VIDEO.CANVAS_H - h_box - SUBTITLE_MARGIN_BOTTOM_PX;
     const f = STOCK_VIDEO.FPS;
 
-    filterParts.push(
-      `[${chartIndex}:v]scale=${wCap}:-2:flags=fast_bilinear,colorkey=0x000000:0.1:0.1,format=yuva420p,fps=${f},settb=tb=1/90000,setsar=1[chartvid]`,
-    );
+    if (chartIsPrebaked) {
+      filterParts.push(`[${chartIndex}:v]null[chartvid]`);
+    } else {
+      filterParts.push(
+        `[${chartIndex}:v]scale=${wCap}:-2:flags=fast_bilinear,colorkey=0x000000:0.1:0.1,format=yuva420p,fps=${f}[chartvid]`,
+      );
+    }
     filterParts.push(`[${currentVLabel}][chartvid]overlay=main_w-overlay_w-${mr}:${boxY}-overlay_h[v_charted]`);
     currentVLabel = 'v_charted';
   }
 
   // Logo Graph
   if (hasLogo) {
-    const r = Math.floor(LOGO.SIZE / 2);
-    const geqExpr = `if(lte(hypot(X-W/2,Y-H/2),${r}),255,0)`;
-    filterParts.push(
-      `[${logoIndex}:v]scale=${LOGO.SIZE}:${LOGO.SIZE}:flags=fast_bilinear,format=rgba,geq=r='r(X,Y)':g='g(X,Y)':b='b(X,Y)':a='${geqExpr}'[logo]`,
-    );
+    if (logoIsPrebaked) {
+      filterParts.push(`[${logoIndex}:v]null[logo]`);
+    } else {
+      const r = Math.floor(LOGO.SIZE / 2);
+      const geqExpr = `if(lte(hypot(X-W/2,Y-H/2),${r}),255,0)`;
+      filterParts.push(
+        `[${logoIndex}:v]scale=${LOGO.SIZE}:${LOGO.SIZE}:flags=fast_bilinear,format=rgba,geq=r='r(X,Y)':g='g(X,Y)':b='b(X,Y)':a='${geqExpr}'[logo]`,
+      );
+    }
     filterParts.push(`[${currentVLabel}][logo]overlay=main_w-overlay_w-${LOGO.MARGIN_RIGHT}:${LOGO.MARGIN_TOP}[vout_final]`);
     currentVLabel = 'vout_final';
   } else {

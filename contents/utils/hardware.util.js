@@ -46,13 +46,14 @@ function detectGPUs() {
 /**
  * Test 1 frame nhỏ để xác nhận encoder thực sự hoạt động trên máy.
  */
-function testEncoder(encoder) {
+export function testEncoder(encoder) {
   try {
-    execSync(`ffmpeg -hide_banner -loglevel error -f lavfi -i nullsrc=s=64x64:d=0.04 -c:v ${encoder} -f null -`, {
+    execSync(`ffmpeg -hide_banner -loglevel error -f lavfi -i nullsrc=s=320x240:d=0.04 -c:v ${encoder} -f null -`, {
       encoding: 'utf-8',
       stdio: 'pipe',
-      timeout: 10000,
+      timeout: 20000,
     });
+    console.log('🔍 Test encoder: true', encoder);
     return true;
   } catch {
     return false;
@@ -74,39 +75,135 @@ function detectHardware() {
   const bitrateArgs = ['-b:v', BITRATE, '-maxrate', MAX_BITRATE, '-bufsize', BUFSIZE];
 
   // [OPT-4] Bitrate thấp hơn cho reup_full (720p, đã overlay, không cần bitrate cao)
-  const reupBitrateArgs = ['-b:v', '2M', '-maxrate', '3M', '-bufsize', '4M'];
+  const reupBitrateArgs = ['-maxrate', '2M', '-bufsize', '3M'];
 
   const makeAudioBitrateArgs = ['-b:v', '1M', '-maxrate', '1.5M', '-bufsize', '2M'];
 
-  let encoder, videoEncodeArgs, reupVideoEncodeArgs, makeAudioVideoEncodeArgs, encoderLabel;
+  let encoder, videoEncodeArgs, reupVideoEncodeArgs, makeAudioVideoEncodeArgs, encoderLabel, stockDecodeArgs;
 
   if (hasNvenc) {
+    console.log('🔍 NVIDIA NVENC: true');
     encoder = 'h264_nvenc';
-    videoEncodeArgs = ['-c:v', 'h264_nvenc', '-preset', 'p1', '-rc', 'vbr', '-cq', '28', ...bitrateArgs, '-pix_fmt', 'yuv420p', '-tag:v', 'avc1'];
-    reupVideoEncodeArgs = ['-c:v', 'h264_nvenc', '-preset', 'p1', '-rc', 'vbr', '-cq', '30', ...reupBitrateArgs, '-pix_fmt', 'yuv420p', '-tag:v', 'avc1'];
-    makeAudioVideoEncodeArgs = ['-c:v', 'h264_nvenc', '-preset', 'p1', '-rc', 'vbr', '-cq', '32', ...makeAudioBitrateArgs, '-pix_fmt', 'yuv420p', '-tag:v', 'avc1'];
+    stockDecodeArgs = ['-hwaccel', 'cuda'];
+    videoEncodeArgs = [
+      '-c:v',
+      'h264_nvenc',
+      '-preset',
+      'p1',
+      '-rc',
+      'vbr',
+      '-cq',
+      '28',
+      ...bitrateArgs,
+      '-pix_fmt',
+      'yuv420p',
+      '-tag:v',
+      'avc1',
+    ];
+    reupVideoEncodeArgs = [
+      '-c:v',
+      'h264_nvenc',
+      '-preset',
+      'p2',
+      '-rc',
+      'vbr',
+      '-cq',
+      '32',
+      ...reupBitrateArgs,
+      '-pix_fmt',
+      'yuv420p',
+      '-tag:v',
+      'avc1',
+    ];
+    makeAudioVideoEncodeArgs = [
+      '-c:v',
+      'h264_nvenc',
+      '-preset',
+      'p1',
+      '-rc',
+      'vbr',
+      '-cq',
+      '32',
+      ...makeAudioBitrateArgs,
+      '-pix_fmt',
+      'yuv420p',
+      '-tag:v',
+      'avc1',
+    ];
     encoderLabel = 'GPU NVIDIA (h264_nvenc p1)';
   } else if (hasAmf) {
+    console.log('🔍 AMD AMF: true');
     encoder = 'h264_amf';
+    stockDecodeArgs = ['-hwaccel', 'd3d11va'];
     videoEncodeArgs = ['-c:v', 'h264_amf', '-quality', 'speed', ...bitrateArgs, '-pix_fmt', 'yuv420p', '-tag:v', 'avc1'];
     reupVideoEncodeArgs = ['-c:v', 'h264_amf', '-quality', 'speed', ...reupBitrateArgs, '-pix_fmt', 'yuv420p', '-tag:v', 'avc1'];
     makeAudioVideoEncodeArgs = ['-c:v', 'h264_amf', '-quality', 'speed', ...makeAudioBitrateArgs, '-pix_fmt', 'yuv420p', '-tag:v', 'avc1'];
     encoderLabel = 'GPU AMD (h264_amf)';
   } else if (hasQsv) {
+    console.log('🔍 Intel Quick Sync Video: true');
     encoder = 'h264_qsv';
+    stockDecodeArgs = ['-hwaccel', 'qsv'];
     videoEncodeArgs = ['-c:v', 'h264_qsv', '-preset', 'veryfast', ...bitrateArgs, '-pix_fmt', 'yuv420p', '-tag:v', 'avc1'];
     reupVideoEncodeArgs = ['-c:v', 'h264_qsv', '-preset', 'veryfast', ...reupBitrateArgs, '-pix_fmt', 'yuv420p', '-tag:v', 'avc1'];
-    makeAudioVideoEncodeArgs = ['-c:v', 'h264_qsv', '-preset', 'veryfast', ...makeAudioBitrateArgs, '-pix_fmt', 'yuv420p', '-tag:v', 'avc1'];
+    makeAudioVideoEncodeArgs = [
+      '-c:v',
+      'h264_qsv',
+      '-preset',
+      'veryfast',
+      ...makeAudioBitrateArgs,
+      '-pix_fmt',
+      'yuv420p',
+      '-tag:v',
+      'avc1',
+    ];
     encoderLabel = 'GPU Intel QSV (h264_qsv)';
   } else {
+    console.log('🔍 libx264: true');
     encoder = 'libx264';
+    stockDecodeArgs = [];
     videoEncodeArgs = ['-c:v', 'libx264', '-crf', '28', '-preset', 'ultrafast', ...bitrateArgs, '-pix_fmt', 'yuv420p', '-tag:v', 'avc1'];
-    reupVideoEncodeArgs = ['-c:v', 'libx264', '-crf', '30', '-preset', 'ultrafast', ...reupBitrateArgs, '-pix_fmt', 'yuv420p', '-tag:v', 'avc1'];
-    makeAudioVideoEncodeArgs = ['-c:v', 'libx264', '-crf', '32', '-preset', 'ultrafast', ...makeAudioBitrateArgs, '-pix_fmt', 'yuv420p', '-tag:v', 'avc1'];
+    reupVideoEncodeArgs = [
+      '-c:v',
+      'libx264',
+      '-crf',
+      '30',
+      '-preset',
+      'ultrafast',
+      ...reupBitrateArgs,
+      '-pix_fmt',
+      'yuv420p',
+      '-tag:v',
+      'avc1',
+    ];
+    makeAudioVideoEncodeArgs = [
+      '-c:v',
+      'libx264',
+      '-crf',
+      '32',
+      '-preset',
+      'ultrafast',
+      ...makeAudioBitrateArgs,
+      '-pix_fmt',
+      'yuv420p',
+      '-tag:v',
+      'avc1',
+    ];
     encoderLabel = 'CPU (libx264 ultrafast)';
   }
 
-  return { gpus, encoder, videoEncodeArgs, reupVideoEncodeArgs, makeAudioVideoEncodeArgs, encoderLabel, hasNvenc, hasAmf, hasQsv, isHwAccelerated: hasNvenc || hasAmf || hasQsv };
+  return {
+    gpus,
+    encoder,
+    videoEncodeArgs,
+    reupVideoEncodeArgs,
+    makeAudioVideoEncodeArgs,
+    stockDecodeArgs,
+    encoderLabel,
+    hasNvenc,
+    hasAmf,
+    hasQsv,
+    isHwAccelerated: hasNvenc || hasAmf || hasQsv,
+  };
 }
 
 const GPU_INFO = detectHardware();

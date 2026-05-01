@@ -37,7 +37,9 @@ export const GEMINI_CHUNK_SIZE = {
 
 export const STOCK_VIDEO = {
   CROSSFADE_SEC: 1,
-  RENDER_EXTRA_SEC: 15,
+  /** false (mặc định) = concat thuần (cut-cut, nhanh hơn nhiều); true = xfade chuỗi (đẹp hơn nhưng tốn CPU). */
+  USE_XFADE: false,
+  RENDER_EXTRA_SEC: 3,
   SLOWMO_FACTOR: 2,
   CANVAS_W: 1280,
   CANVAS_H: 720,

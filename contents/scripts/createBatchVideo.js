@@ -2,6 +2,7 @@ import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { resolveChannelsDir } from '../utils/channelsStoragePath.js';
+import { testEncoder } from '../utils/hardware.util.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.join(__dirname, '..', '..');
@@ -629,6 +630,10 @@ function buildMakeVideoFromAudioOptions(props, channelFolderName) {
 async function main(props = {}) {
   const { MAKE_VIDEO_MODE } = await import('../constants/index.js');
   console.time('createBatchVideo');
+
+  testEncoder('h264_nvenc');
+  testEncoder('h264_amf');
+  testEncoder('h264_qsv');
 
   const channelParam = props.channel || process.env.MAVID_CHANNEL;
   const mappingParam = props.mapping || process.env.MAVID_MAPPING;

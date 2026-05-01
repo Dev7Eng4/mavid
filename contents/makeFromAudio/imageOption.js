@@ -31,6 +31,7 @@ import {
   formatClockDuration,
   sanitizeFilename,
   ffmpegSpawnAsync,
+  getPrebakedLogoPng,
 } from './shared.js';
 import { processStockVideo } from './stockVideoOption.js';
 import { GPU_INFO } from '../utils/hardware.util.js';
@@ -664,8 +665,11 @@ async function processImageNoiseVideo(options = {}, bgImgPath) {
   const audioIndex = inputIdx++;
 
   // Input 3: Logo
-  const logoPathForMerge = logoPathOpt != null && String(logoPathOpt).trim() && fs.existsSync(logoPathOpt) ? logoPathOpt : null;
+  const logoPathOriginal = logoPathOpt != null && String(logoPathOpt).trim() && fs.existsSync(logoPathOpt) ? logoPathOpt : null;
+  const prebakedLogo = logoPathOriginal ? await getPrebakedLogoPng(logoPathOriginal, LOGO.SIZE) : null;
+  const logoPathForMerge = prebakedLogo || logoPathOriginal;
   const hasLogo = Boolean(logoPathForMerge);
+  const logoIsPrebaked = Boolean(prebakedLogo);
   let logoIndex = -1;
   if (hasLogo) {
     mergeArgs.push('-i', logoPathForMerge);
@@ -721,7 +725,7 @@ async function processImageNoiseVideo(options = {}, bgImgPath) {
     currentVLabel = 'v_noised';
   }
 
-  // Subtitle filter
+  // Subtitle filter (gộp 1 chain — bỏ split/crop/overlay)
   if (subtitlePath) {
     convertSrtToAss(subtitlePath, tempSubPath, useJaSubtitleStyle);
     const subPathEscaped = escapePathForFfmpegSubtitles(tempSubPath);
@@ -733,9 +737,7 @@ async function processImageNoiseVideo(options = {}, bgImgPath) {
       ? `subtitles='${subPathEscaped}:fontsdir=${fontsDirEscaped}'`
       : `subtitles='${subPathEscaped}'`;
 
-    filterParts.push(`[${currentVLabel}]${drawboxFilter},split[v_base][v_for_sub]`);
-    filterParts.push(`[v_for_sub]${subFilter},crop=iw:${subtitleBoxHeight}:0:${boxY}[v_sub_clipped]`);
-    filterParts.push(`[v_base][v_sub_clipped]overlay=0:${boxY}[v_subbed]`);
+    filterParts.push(`[${currentVLabel}]${drawboxFilter},${subFilter}[v_subbed]`);
     currentVLabel = 'v_subbed';
   } else {
     filterParts.push(`[${currentVLabel}]null[vpadded]`);
@@ -744,11 +746,15 @@ async function processImageNoiseVideo(options = {}, bgImgPath) {
 
   // Logo filter
   if (hasLogo) {
-    const r = Math.floor(LOGO.SIZE / 2);
-    const geqExpr = `if(lte(hypot(X-W/2,Y-H/2),${r}),255,0)`;
-    filterParts.push(
-      `[${logoIndex}:v]scale=${LOGO.SIZE}:${LOGO.SIZE}:flags=fast_bilinear,format=rgba,geq=r='r(X,Y)':g='g(X,Y)':b='b(X,Y)':a='${geqExpr}'[logo]`
-    );
+    if (logoIsPrebaked) {
+      filterParts.push(`[${logoIndex}:v]null[logo]`);
+    } else {
+      const r = Math.floor(LOGO.SIZE / 2);
+      const geqExpr = `if(lte(hypot(X-W/2,Y-H/2),${r}),255,0)`;
+      filterParts.push(
+        `[${logoIndex}:v]scale=${LOGO.SIZE}:${LOGO.SIZE}:flags=fast_bilinear,format=rgba,geq=r='r(X,Y)':g='g(X,Y)':b='b(X,Y)':a='${geqExpr}'[logo]`
+      );
+    }
     filterParts.push(`[${currentVLabel}][logo]overlay=main_w-overlay_w-${LOGO.MARGIN_RIGHT}:${LOGO.MARGIN_TOP}[vout_final]`);
     currentVLabel = 'vout_final';
   } else {

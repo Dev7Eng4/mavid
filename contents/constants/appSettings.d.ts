@@ -21,6 +21,7 @@ export declare const GEMINI_CHUNK_SIZE: {
 
 export declare const STOCK_VIDEO: {
   CROSSFADE_SEC: number;
+  USE_XFADE: boolean;
   RENDER_EXTRA_SEC: number;
   SLOWMO_FACTOR: number;
   CANVAS_W: number;

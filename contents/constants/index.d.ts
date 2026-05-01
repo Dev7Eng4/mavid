@@ -48,6 +48,7 @@ export const AUDIO_SPEED: number;
 
 export const STOCK_VIDEO: {
   CROSSFADE_SEC: number;
+  USE_XFADE: boolean;
   RENDER_EXTRA_SEC: number;
   SLOWMO_FACTOR: number;
   CANVAS_W: number;
