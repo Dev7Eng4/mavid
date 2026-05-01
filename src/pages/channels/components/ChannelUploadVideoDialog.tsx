@@ -47,14 +47,13 @@ export function ChannelUploadVideoDialog({
       const payloads: ChannelUploadVideoPayload[] = [];
 
       for (const ch of channels) {
-        const email = ch.emails[0];
-        if (!email) continue;
-        const gpmProfileId = resolveGpmProfileIdByEmail(profiles, email);
+        const gpmProfileId = resolveGpmProfileIdByEmail(profiles, ch.email);
+
         if (!gpmProfileId) {
-          setFormError(`Kênh ${ch.folder}: Không tìm thấy profile GPM có trường name trùng email «${email}».`);
+          setFormError(`Kênh ${ch.channelId}: Không tìm thấy profile GPM có trường name trùng email «${ch.email}».`);
           return;
         }
-        payloads.push({ channelFolder: ch.folder, email, totalVideos: total, gpmProfileId });
+        payloads.push({ channelFolder: ch.channelId, email: ch.email, totalVideos: total, gpmProfileId });
       }
 
       if (payloads.length === 0) {

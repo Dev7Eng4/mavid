@@ -1372,18 +1372,20 @@ ipcMain.handle('write-channel-index', async (_event, { filePath, headers, rows }
   return { ok: true };
 });
 
-/** Đọc file .xlsx hoặc .csv đầu tiên (ưu tiên .xlsx) trong `MaVidMedia/channels/{channelFolder}/`. */
 ipcMain.handle('read-channel-folder-data', async (_event, { channelFolder }) => {
   const channelsDir = await resolveChannelsDirFromDisk();
   const safe = assertSafeChannelFolderName(channelFolder);
   const dir = path.join(channelsDir, safe);
+
   if (!isPathInsideDir(channelsDir, dir)) throw new Error('Truy cập bị từ chối.');
+
   if (!fs.existsSync(dir) || !fs.statSync(dir).isDirectory()) {
     return { headers: [], rows: [], fileName: null, channelFolder: safe };
   }
+
   const names = fs.readdirSync(dir);
   const dataFiles = names
-    .filter(f => /\.xlsx$/i.test(f) || /\.csv$/i.test(f))
+    .filter(f => /\.xlsx$/i.test(f))
     .sort((a, b) => {
       const ax = /\.xlsx$/i.test(a);
       const bx = /\.xlsx$/i.test(b);
@@ -1391,9 +1393,11 @@ ipcMain.handle('read-channel-folder-data', async (_event, { channelFolder }) => 
       if (!ax && bx) return 1;
       return a.localeCompare(b);
     });
+
   if (dataFiles.length === 0) {
     return { headers: [], rows: [], fileName: null, channelFolder: safe };
   }
+
   const fileName = dataFiles[0];
   const fullPath = path.join(dir, fileName);
   const data = await readSpreadsheetAsChannelData(fullPath);

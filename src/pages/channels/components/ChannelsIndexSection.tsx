@@ -153,7 +153,7 @@ export function ChannelsIndexSection({
                             e.stopPropagation();
                             onOpenEditRow(row.id);
                           }}
-                          className='text-sm font-medium hover:underline transition-opacity duration-150 disabled:opacity-40 disabled:cursor-not-allowed'
+                          className='text-sm font-medium hover:underline transition-opacity duration-150 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed'
                           style={{ color: 'var(--accent)' }}
                         >
                           Sửa
@@ -164,7 +164,7 @@ export function ChannelsIndexSection({
                             e.stopPropagation();
                             onOpenDetailRow(row.id);
                           }}
-                          className='text-sm font-medium hover:underline transition-opacity duration-150 disabled:opacity-40 disabled:cursor-not-allowed'
+                          className='text-sm font-medium hover:underline transition-opacity duration-150 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed'
                           style={{ color: 'var(--accent)' }}
                         >
                           Chi tiết

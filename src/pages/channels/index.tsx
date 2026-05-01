@@ -1053,8 +1053,8 @@ function ChannelsPage() {
           <ChannelsPageHeaderActions
             selectedChannel={selectedChannel}
             hasIndexRows={hasIndexRows}
-            indexSaving={indexSaving}
-            indexLoading={indexLoading}
+            // indexSaving={indexSaving}
+            loading={indexLoading}
             indexBatchVideo={indexBatchVideo}
             indexSelectedRowCount={indexSelectedRowIndices.size}
             indexCreateVideoEligibleSelectedCount={createVideoQueueFromSelection.length}

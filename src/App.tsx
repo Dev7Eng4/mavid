@@ -4,7 +4,7 @@ import { Sidebar } from './components/layout/Sidebar';
 import { PipelinePage } from '@/pages/PipelinePage';
 import CreateVideoPage from '@/pages/create-video';
 import { SettingsPage } from '@/pages/SettingsPage';
-import ChannelsPage from '@/pages/channels';
+import ChannelsPage from '@/pages/channels/Page';
 import { GroupsPage } from '@/pages/GroupsPage';
 import { WarningsPage } from '@/pages/WarningsPage';
 import AnalystPage from '@/pages/analyst';

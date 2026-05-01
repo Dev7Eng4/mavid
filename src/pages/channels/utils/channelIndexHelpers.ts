@@ -170,40 +170,19 @@ export function indexRowMatchesPickedEmail(row: ChannelRow, emailHeaderKey: stri
 }
 
 export function buildExtraEnvForIndexChannelRow(
-  row: ChannelRow,
-  folder: string,
-  videoType: 'from_audio' | 'reup_full',
-  bgList: string[],
-  opts?: { maxVideosPerBatch?: number },
+  id: string,
+  channelId: string,
+  videos: string[],
+  maxVideosPerBatch?: number,
 ): Record<string, string> {
-  const maxBatch = opts?.maxVideosPerBatch ?? 5;
-
-  const email = String(row.email ?? '').trim();
-  const bgRaw = String(row.background ?? '').trim();
-  const background = bgRaw || defaultBackgroundFolder(bgList);
-  if (videoType === 'from_audio') {
-    return buildMavidEnvForVideoFromAudio(
-      {
-        channel: folder,
-        email,
-        background,
-        backgroundSource: 'stock',
-        stockVideoCount: 0,
-        audioSpeed: 0.91,
-        maxVideosPerBatch: maxBatch,
-        minDurationMinutes: 0,
-        showLogo: false,
-      },
-      bgList,
-    );
-  }
-  const overlayReup = videoType === 'reup_full' ? bgRaw : '';
-  return buildMavidEnvForReupFull({
-    channel: folder,
-    email,
-    maxVideosPerBatch: maxBatch,
-    ...(overlayReup ? { overlay: overlayReup } : {}),
-  });
+  const maxBatch = Math.max(1, Math.min(100, Math.floor(Number(maxVideosPerBatch) || 5)));
+  const env: Record<string, string> = {
+    MAVID_CHANNEL: channelId,
+    MAVID_MAPPING: id,
+    MAVID_ONLY_LINKS: JSON.stringify(videos),
+    MAVID_MAX_VIDEOS_PER_BATCH: String(maxBatch),
+  };
+  return env;
 }
 
 /** Lựa chọn «số video update mỗi ngày» trong form; `1-2` = 1 suất ngày thường + 2 suất cuối tuần. */
@@ -242,7 +221,7 @@ export interface ChannelAddFormInput {
   /** Cột index «KÊNH CỦA TÔI» (sau EMAIL). */
   myChannel: string;
   /** Cột index cuối «Group». */
-  mavidGroupId: string;
+  group: string;
   videoType: 'from_audio' | 'reup_full';
   durationOption: string;
   /** from_audio — tên folder trong MaVidMedia/backgrounds */
@@ -261,23 +240,25 @@ export interface ChannelAddFormInput {
 
 /** Giá trị khởi tạo form thêm/sửa kênh (map từ một dòng index). */
 export interface ChannelAddDialogInitialFields {
-  channelUrl: string;
+  id: string;
+  channelName: string;
+  channelId: string;
+  channelLink: string;
   email: string;
   myChannel: string;
   /** ID nhóm (group.json); rỗng = không gán. */
-  mavidGroupId: string;
+  group: string;
   videoType: string;
   /** Chuỗi cấu hình duration (vd. "0_30"). */
-  durationOption: string;
-  selectedBackground: string;
+  durationMinutes: string;
+  background: string;
   /** reup_full — tên preset overlay */
-  reupOverlayOption: string;
+  overlay: string;
   /** Style thumbnail — `PROMPTS_CREATE_THUMBNAIL_OPTIONS` */
   thumbnailPrompt: string;
-  folderIdOverride: string;
   videosPerDayPreset: VideoPerDayPreset;
   publishTimes: string[];
-  channelStatus: ChannelIndexLifecycleStatus;
+  status: ChannelIndexLifecycleStatus;
 }
 
 /** Danh sách NAME hợp lệ cho dropdown Reup (đồng bộ makeVideoFromFull). */
@@ -306,7 +287,7 @@ export function isValidFromAudioOverlayValue(name: string): boolean {
   return OPTIONS_CONTENT.some(o => o.value === t);
 }
 
-export function defaultthumbnailPrompt(): string {
+export function defaultThumbnailPrompt(): string {
   const first = PROMPTS_CREATE_THUMBNAIL_OPTIONS[0];
   return first ? String(first.value) : '';
 }
@@ -396,60 +377,18 @@ export function parseIndexPublishTimesCell(raw: unknown): string[] {
 }
 
 /** Điền form «Thêm/Sửa channel» từ một dòng bảng nháp (row đã dùng prop names). */
-export function channelAddDialogInitialFromIndexRow(row: ChannelRow, headers: string[]): ChannelAddDialogInitialFields {
-  const channelUrl = String(row.link ?? '').trim();
-  const email = String(row.email ?? '').trim();
-  const myChannel = String(row.myChannel ?? '').trim();
-  const mavidGroupId = String(row.mavidGroupId ?? '').trim();
+export function channelAddDialogInitialFromIndexRow(row: ChannelRow): ChannelAddDialogInitialFields {
+  const { videoType, durationMinutes, videosPerDayPreset, background, status, ...rest } = row as any;
 
-  let videoType = resolveIndexRowVideoType(row);
-  if (!videoType) videoType = 'from_audio';
-
-  let durationOption = '0_null';
-  if (row.videoDuration != null && row.videoDuration !== '') {
-    const v = String(row.videoDuration);
-    // It might be a label from the new format, or numbers from the old format
-    if (['15', '20', '30', '60'].includes(v)) {
-      durationOption = '0_null'; // Or mapping for legacy? "0_null" is safest
-    } else {
-      durationOption = durationLabelToOption(v);
-    }
+  let convertedDurationMinutes = '0_null';
+  if (durationMinutes != null && durationMinutes !== '') {
+    convertedDurationMinutes = durationLabelToOption(durationMinutes);
   }
 
-  const bgCell = String(row.background ?? '').trim();
-  const overlayNames = new Set(OVERLAY_OPTIONS.map(o => String(o.NAME).trim()));
-  const selectedBackground = videoType === 'reup_full' ? '' : bgCell;
-  const reupOverlayOption = videoType === 'reup_full' && bgCell && overlayNames.has(bgCell) ? bgCell : defaultReupOverlayName();
-
-  const folder = channelFolderFromRow(row) ?? '';
-
-  const videosPerDayColumnKey = findIndexHeaderKeyAny(headers, ['SỐ VIDEO MỖI NGÀY', 'VIDEO MỖI NGÀY', 'SỐ VIDEO UPDATE MỖI NGÀY']);
-  const videosPerDayPreset =
-    videosPerDayColumnKey != null && row[videosPerDayColumnKey] != null && String(row[videosPerDayColumnKey]).trim() !== ''
-      ? parseVideoPerDayCell(row[videosPerDayColumnKey])
-      : '1';
-
-  const slotCount = timeSlotCountForVideoPerDayPreset(videosPerDayPreset);
-
-  const publishTimesColumnKey = findIndexHeaderKeyAny(headers, ['GIỜ UPDATE', 'GIỜ UPLOAD MỖI NGÀY', 'GIỜ UPLOAD']);
-  let publishTimes = publishTimesColumnKey ? parseIndexPublishTimesCell(row[publishTimesColumnKey]) : ['09:00'];
-  while (publishTimes.length < slotCount) publishTimes.push('09:00');
-  publishTimes = publishTimes.slice(0, slotCount);
-
   return {
-    channelUrl,
-    email,
-    myChannel,
-    mavidGroupId,
-    videoType,
-    durationOption,
-    selectedBackground,
-    reupOverlayOption,
-    thumbnailPrompt: defaultthumbnailPrompt(),
-    folderIdOverride: folder,
     videosPerDayPreset,
-    publishTimes,
-    channelStatus: normalizeChannelIndexStatus(row.status),
+    status: normalizeChannelIndexStatus(row.status),
+    ...rest,
   };
 }
 
@@ -477,7 +416,7 @@ export function buildChannelRowFromAddForm(
   row.link = normalizedUrl;
   row.email = input.email.trim();
   row.myChannel = input.myChannel.trim();
-  row.mavidGroupId = input.mavidGroupId.trim();
+  row.group = input.group.trim();
   row.videoType = input.videoType;
   row.videoDuration = durationOptionToLabel(input.durationOption);
 

@@ -24,7 +24,13 @@ function clampInt(n: number, min: number, max: number): number {
 
 const MAX_VIDEOS_CAP = 100;
 
-export function ChannelCreateVideoDialog({ onClose, onConfirm, selectedRowCount, eligibleQueueLength, targetChannelFolder }: ChannelCreateVideoDialogProps) {
+export function ChannelCreateVideoDialog({
+  onClose,
+  onConfirm,
+  selectedRowCount,
+  eligibleQueueLength,
+  targetChannelFolder,
+}: ChannelCreateVideoDialogProps) {
   const [maxVideosInput, setMaxVideosInput] = useState<number | null>(MAX_VIDEOS_PREPARE_AHEAD);
   const [formError, setFormError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -44,19 +50,24 @@ export function ChannelCreateVideoDialog({ onClose, onConfirm, selectedRowCount,
       setConfigEmails([]);
       return;
     }
-    window.runner?.readMavidChannelConfig?.(targetChannelFolder).then(cfg => {
-      if (mountedRef.current && cfg?.channels && cfg.channels.length > 1) {
-        const emails = cfg.channels.map(c => {
-          const e = c.email || '';
-          const from = c.durationMinuteFrom != null ? c.durationMinuteFrom : '';
-          const to = c.durationMinuteTo != null ? c.durationMinuteTo : '∞';
-          const dur = from !== '' ? ` (${from} - ${to} phút)` : '';
-          return { email: e, label: `${e}${dur}` };
-        }).filter(e => e.email.trim() !== '');
-        setConfigEmails(emails);
-        if (emails.length > 0) setSelectedEmail(emails[0].email);
-      }
-    }).catch(console.error);
+    window.runner
+      ?.readMavidChannelConfig?.(targetChannelFolder)
+      .then(cfg => {
+        if (mountedRef.current && cfg?.channels && cfg.channels.length > 1) {
+          const emails = cfg.channels
+            .map(c => {
+              const e = c.email || '';
+              const from = c.durationMinuteFrom != null ? c.durationMinuteFrom : '';
+              const to = c.durationMinuteTo != null ? c.durationMinuteTo : '∞';
+              const dur = from !== '' ? ` (${from} - ${to} phút)` : '';
+              return { email: e, label: `${e}${dur}` };
+            })
+            .filter(e => e.email.trim() !== '');
+          setConfigEmails(emails);
+          if (emails.length > 0) setSelectedEmail(emails[0].email);
+        }
+      })
+      .catch(console.error);
   }, [targetChannelFolder]);
 
   useEffect(() => {
@@ -186,7 +197,6 @@ export function ChannelCreateVideoDialog({ onClose, onConfirm, selectedRowCount,
               </select>
             </div>
           ) : null}
-
 
           {formError ? (
             <p className='text-sm' style={{ color: '#fecaca' }}>

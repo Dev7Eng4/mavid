@@ -1,6 +1,6 @@
 import type { ChannelRow, GpmProfileRow } from '@/types';
 import { gpmApi } from '@/services';
-import { CHANNELS } from './models/channelsIndexSection.model';
+import { CHANNEL_DETAIL, CHANNELS } from './models/channelsIndexSection.model';
 
 /** Số kênh upload YouTube tối đa chạy song song; kênh còn lại xếp hàng, khi một kênh xong sẽ tự chạy tiếp. */
 export const MAX_CONCURRENT_YOUTUBE_UPLOAD_CHANNELS = 2;
@@ -87,8 +87,7 @@ export interface ChannelItem {
 }
 
 export interface ChannelUploadVideoDialogProps {
-  /** Kênh đủ điều kiện trong phần đã chọn (ID + EMAIL). */
-  channels: ChannelItem[];
+  channels: ChannelRow[];
   /** Số dòng đã tick trên bảng. */
   selectedRowCount: number;
   /** Số luồng upload đang chạy nền (từ parent). */
@@ -100,6 +99,25 @@ export interface ChannelUploadVideoDialogProps {
 
 export const convertIndexRowToChannel = (rows: ChannelRow[]) => {
   const labelToKeyMap = Object.fromEntries(CHANNELS.map(item => [item.label, item.key]));
+
+  const convertedData = rows.map(row => {
+    const newRow: ChannelRow = {};
+
+    for (const oldKey in row) {
+      const newKey = labelToKeyMap[oldKey];
+      if (newKey) {
+        newRow[newKey] = row[oldKey];
+      }
+    }
+
+    return newRow;
+  });
+
+  return convertedData;
+};
+
+export const convertChannelVideosRowToData = (rows: ChannelRow[]) => {
+  const labelToKeyMap = Object.fromEntries(CHANNEL_DETAIL.map(item => [item.label, item.key]));
 
   const convertedData = rows.map(row => {
     const newRow: ChannelRow = {};

@@ -323,7 +323,7 @@ function resolveUploadedVideosFromChannelEntry(cfg, configItem) {
  * @param {Record<string, unknown>|null} configItem
  */
 function pickChannelDataFileForBatch(folderPath, cfg, configItem) {
-  const files = fs.readdirSync(folderPath).filter(f => f.endsWith('.xlsx') || f.endsWith('.csv'));
+  const files = fs.readdirSync(folderPath).filter(f => f.endsWith('.xlsx'));
   if (files.length === 0) return { absPath: null, displayName: null, usedRandom: false };
   const uploaded = resolveUploadedVideosFromChannelEntry(cfg, configItem);
   if (files.length === 1 || uploaded < UPLOADED_VIDEOS_SPREAD_THRESHOLD) {
@@ -505,14 +505,13 @@ function normalizeEmailForMatch(s) {
  * @param {string} [emailFromProps]
  * @returns {Record<string, unknown>|null}
  */
-function pickChannelConfigItem(config, emailFromProps) {
+function pickChannelConfigItem(config, mappingParam) {
   if (!config || typeof config !== 'object') return null;
 
   const list = Array.isArray(config.channels) ? config.channels : [];
-  const want = normalizeEmailForMatch(emailFromProps);
 
-  if (want && list.length > 0) {
-    const found = list.find(c => c && typeof c === 'object' && normalizeEmailForMatch(c.email) === want);
+  if (mappingParam && list.length > 0) {
+    const found = list.find(c => c && typeof c === 'object' && c.id === mappingParam);
     if (found) return /** @type {Record<string, unknown>} */ (found);
     console.warn(`[MaVid] Không tìm thấy email khớp trong ${MAVID_CHANNEL_CONFIG_FILENAME} — dùng phần tử đầu tiên.`);
   }
@@ -632,6 +631,7 @@ async function main(props = {}) {
   console.time('createBatchVideo');
 
   const channelParam = props.channel || process.env.MAVID_CHANNEL;
+  const mappingParam = props.mapping || process.env.MAVID_MAPPING;
   const email = props.email || process.env.MAVID_EMAIL;
   const videoCropReup = props.videoCropPercent ?? process.env.MAVID_VIDEO_CROP_PERCENT;
 
@@ -648,7 +648,7 @@ async function main(props = {}) {
       const cfg = readMavidChannelConfigFromFolder(folderPath);
       let configItem = null;
       if (cfg) {
-        configItem = pickChannelConfigItem(cfg, email);
+        configItem = pickChannelConfigItem(cfg, mappingParam);
         mergedProps = mergeChannelConfigIntoProps(mergedProps, configItem);
         console.log(`[MaVid] Đã đọc ${MAVID_CHANNEL_CONFIG_FILENAME} trong folder "${channelParam}".`);
       }
@@ -695,7 +695,7 @@ async function main(props = {}) {
       effectiveChannelName = selectedFolder;
       const folderPath = path.join(CHANNELS_DIR, selectedFolder);
       const cfgPick = readMavidChannelConfigFromFolder(folderPath);
-      const itemPick = cfgPick ? pickChannelConfigItem(cfgPick, email) : null;
+      const itemPick = cfgPick ? pickChannelConfigItem(cfgPick, mappingParam) : null;
       const pick = pickChannelDataFileForBatch(folderPath, cfgPick, itemPick);
       if (pick.absPath) {
         inputFile = pick.absPath;

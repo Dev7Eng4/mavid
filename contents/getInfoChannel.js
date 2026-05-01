@@ -446,7 +446,7 @@ function resolveChannelFolderNameFromResult(url, result) {
 
 const handleUpdateChannelConfigFile = async (channelDir, formData) => {
   console.log('🚀 ~ handleUpdateChannelConfigFile ~ formData:', formData);
-  const { id, channelUrl, channelId, channelName, groupId, ...restConfig } = formData;
+  const { id, channelLink, channelId, channelName, groupId, ...restConfig } = formData;
 
   const configPath = path.join(channelDir, CHANNEL_CONFIG_FILE);
   let config;
@@ -485,14 +485,14 @@ const handleUpdateChannelConfigFile = async (channelDir, formData) => {
       };
     } else {
       config.channels.push(newChannelConfig);
-      config.channelUrl = channelUrl;
+      config.channelLink = channelLink;
       config.channelName = channelName;
     }
   } else {
     config = {
       version: 1,
       channels: [newChannelConfig],
-      channelUrl,
+      channelLink,
       channelName,
       folderId: channelId,
       createdAt: new Date().toISOString(),
@@ -509,7 +509,7 @@ const handleUpdateChannelConfigFile = async (channelDir, formData) => {
  *
  * @param {Object} options
  * @param {Object} options.formData
- * @param {string} options.formData.channelUrl - URL kênh / playlist
+ * @param {string} options.formData.channelLink - URL kênh / playlist
  * @param {string} options.formData.email
  * @param {string} [options.formData.myChannel] — cột «KÊNH CỦA TÔI» index (sau EMAIL)
  * @param {string} options.formData.videoType - from_audio | reup_full
@@ -526,13 +526,13 @@ export async function addChannelFromForm(options = {}) {
   const id = formData.id;
   const newId = uuidv4();
 
-  if (!formData || !formData.channelUrl) throw new Error('Thiếu thông tin form.');
+  if (!formData || !formData.channelLink) throw new Error('Thiếu thông tin form.');
 
-  const urlType = detectUrlType(formData.channelUrl);
+  const urlType = detectUrlType(formData.channelLink);
   if (urlType !== 'channel') throw new Error('Chỉ hỗ trợ link kênh.');
 
   let channelId = formData.channelId || '';
-  let channelLink = formData.channelUrl || '';
+  let channelLink = formData.channelLink || '';
   let channelName = formData.name || '';
 
   if (id) {
@@ -543,8 +543,8 @@ export async function addChannelFromForm(options = {}) {
   } else {
     // handle add channel information
     // consider validate email exists
-    console.log(`[ADD CHANNEL] Đang lấy thông tin: ${formData.channelUrl}`);
-    const result = await getChannelInfo(formData.channelUrl);
+    console.log(`[ADD CHANNEL] Đang lấy thông tin: ${formData.channelLink}`);
+    const result = await getChannelInfo(formData.channelLink);
 
     channelId = result.metadata?.channel_id || result.metadata?.channel_url?.split('/')?.[4] || '';
 
@@ -554,7 +554,7 @@ export async function addChannelFromForm(options = {}) {
 
     channelLink = usernameId.startsWith('@')
       ? `https://www.youtube.com/${usernameId}`
-      : result.metadata?.uploader_url || result.metadata?.channel_url || formData.channelUrl;
+      : result.metadata?.uploader_url || result.metadata?.channel_url || formData.channelLink;
     channelName = result.name || '';
 
     const channelDir = path.join(DEFAULT_OUTPUT_DIR, channelId);
@@ -620,15 +620,6 @@ export async function addChannelFromForm(options = {}) {
     });
   }
 
-  const f = formData.durationMinuteFrom;
-  const t = formData.durationMinuteTo;
-  let durationLabel = 'Tất cả';
-  if (f === 0 && t === 30) durationLabel = '0 - 30 phút';
-  else if (f === 0 && t === 60) durationLabel = '0 - 60 phút';
-  else if (f === 30 && t === 60) durationLabel = '30 - 60 phút';
-  else if (f === 30 && t === null) durationLabel = 'Từ 30 phút';
-  else if (f === 60 && t === null) durationLabel = 'Từ 60 phút';
-
   await updateIndexFile({
     id: id || newId,
     name: channelName,
@@ -639,7 +630,7 @@ export async function addChannelFromForm(options = {}) {
     myChannel: String(formData.myChannel ?? '').trim(),
     groupId: String(formData.groupId ?? '').trim(),
     videoType: formData.videoType,
-    durationMinutes: durationLabel,
+    durationMinutes: formData.durationMinuteFrom + '_' + formData.durationMinuteTo,
     background:
       formData.videoType === 'reup_full'
         ? String(formData.overlay ?? formData.background ?? '').trim()

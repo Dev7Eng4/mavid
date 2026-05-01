@@ -27,6 +27,7 @@ import {
   SCRIPT_REUP_FULL,
 } from './utils/channelIndexHelpers';
 import {
+  convertChannelVideosRowToData,
   convertIndexRowToChannel,
   MAX_CONCURRENT_YOUTUBE_UPLOAD_CHANNELS,
   type ChannelItem,
@@ -51,17 +52,26 @@ function normalizeYoutubeUploadEmailKey(email: string): string {
   return email.trim().toLowerCase();
 }
 
+type IndexCreateVideoQueueEntry = {
+  row: ChannelRow;
+  folder: string;
+  email: string;
+  videoType: 'from_audio' | 'reup_full';
+  /** Chỉ số dòng trong `indexDraftRows` — khớp checkbox bảng index. */
+  draftRowIndex: number;
+};
+
 function ChannelsPage() {
   const [channels, setChannels] = useState<ChannelRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedChannel, setSelectedChannel] = useState<string | null>(null);
   const [selectedRows, setSelectedRows] = useState<Set<string>>(new Set<string>());
   const [detail, setDetail] = useState<ChannelFolderDataResult | null>(null);
+  const [channelVideos, setChannelVideos] = useState<ChannelRow[]>([]);
   const [detailLoading, setDetailLoading] = useState(false);
   const [detailLinkFilter, setDetailLinkFilter] = useState('');
   const [detailDurationPreset, setDetailDurationPreset] = useState('0_null');
   const [detailStatusFilter, setDetailStatusFilter] = useState<string>('__all__');
-  const [startMarkingIndex, setStartMarkingIndex] = useState<number | null>(null);
   const [detailUpdateMetaBusy, setDetailUpdateMetaBusy] = useState(false);
   const [detailActionError, setDetailActionError] = useState<string | null>(null);
   const [detailUploadPrepBusy, setDetailUploadPrepBusy] = useState(false);
@@ -72,6 +82,7 @@ function ChannelsPage() {
     total: number;
     channelLabel: string;
   } | null>(null);
+  console.log('🚀 ~ ChannelsPage ~ indexBatchVideo:', indexBatchVideo);
 
   const [indexEditRowIndex, setIndexEditRowIndex] = useState<string | null>(null);
   const [uploadVideoOpen, setUploadVideoOpen] = useState(false);
@@ -88,6 +99,15 @@ function ChannelsPage() {
   /** Lọc danh sách kênh (bảng index): email + nhóm. */
   const [indexListEmailFilter, setIndexListEmailFilter] = useState('');
   const [indexListGroupFilter, setIndexListGroupFilter] = useState('__all__');
+  const [mappingStatus, setMappingStatus] = useState<{ type: 'edit' | 'add'; data: ChannelRow | null } | null>(null);
+
+  const {
+    page: indexPage,
+    setPage: setIndexPage,
+    startIndex: indexStartIndex,
+    totalPages: indexTotalPages,
+    pageSize: indexPageSize,
+  } = useClientPagination(channels.length);
 
   const groupNameById = useMemo(() => {
     const m: Record<string, string> = {};
@@ -121,12 +141,10 @@ function ChannelsPage() {
     try {
       const d = await window.runner.readChannelData(INDEX_FILE);
       setChannels(convertIndexRowToChannel(d.rows));
-      setIndexSelectedRowIndices(new Set());
-      setIndexEditRowIndex(null);
+      setSelectedRows(new Set());
     } catch {
       setChannels([]);
-      setIndexSelectedRowIndices(new Set());
-      setIndexEditRowIndex(null);
+      setSelectedRows(new Set());
     } finally {
       setLoading(false);
     }
@@ -149,19 +167,17 @@ function ChannelsPage() {
     void fetchChannels();
   }, [fetchChannels]);
 
-  const loadDetail = useCallback(async (channelFolder: string) => {
+  const loadDetail = useCallback(async (id: string) => {
     setDetailLoading(true);
-    setDetail(null);
+    setChannelVideos([]);
     try {
-      const d = await window.runner.readChannelFolderData(channelFolder);
-      setDetail(d);
+      const selectedChannelRow = channels.find(r => r.id === id);
+      if (!selectedChannelRow) return;
+
+      const d = await window.runner.readChannelFolderData(selectedChannelRow.channelId);
+      setChannelVideos(convertChannelVideosRowToData(d.rows));
     } catch {
-      setDetail({
-        headers: [],
-        rows: [],
-        fileName: null,
-        channelFolder,
-      });
+      setChannelVideos([]);
     } finally {
       setDetailLoading(false);
     }
@@ -171,7 +187,7 @@ function ChannelsPage() {
     if (selectedChannel) {
       void loadDetail(selectedChannel);
     } else {
-      setDetail(null);
+      setChannelVideos([]);
     }
   }, [selectedChannel, loadDetail]);
 
@@ -185,105 +201,27 @@ function ChannelsPage() {
     setDetailSelectedRowIndices(new Set());
   }, [selectedChannel]);
 
-  // const indexHeaders = useMemo(() => {
-  //   if (indexData?.headers?.length) return indexData.headers;
-  //   const first = indexData?.rows?.[0];
-  //   if (first && typeof first === 'object') return Object.keys(first);
-  //   return [...CHANNELS_INDEX_VISIBLE_COLUMNS];
-  // }, [indexData]);
-
   /** Checkbox + các cột cố định (`CHANNELS_INDEX_VISIBLE_COLUMNS`) trên bảng index. */
   const indexColCount = 1 + CHANNELS_INDEX_VISIBLE_COLUMNS.length;
 
-  const [indexSelectedRowIndices, setIndexSelectedRowIndices] = useState<Set<number>>(() => new Set());
-  const [detailSelectedRowIndices, setDetailSelectedRowIndices] = useState<Set<number>>(() => new Set());
-
-  const canWriteIndex = typeof window.runner?.writeChannelIndex === 'function';
-
-  const closeIndexRowEdit = useCallback(() => {
-    setIndexEditRowIndex(null);
-  }, []);
-
-  /** Ghi `MaVidMedia/channels/index.xlsx` (token UI: channels/index.xlsx). */
-  const persistIndexRows = useCallback(
-    async (rows: ChannelRow[], headersOverride?: string[]) => {
-      if (!canWriteIndex) {
-        throw new Error('Chỉ lưu index được trong app Electron.');
-      }
-      const headers = headersOverride?.length ? headersOverride : indexHeaders;
-      setIndexSaving(true);
-      setIndexListError(null);
-      try {
-        const normalized = rows.map(row => {
-          const o: ChannelRow = {};
-          for (const h of headers) {
-            const v = row[h];
-            o[h] = v == null || v === '' ? '' : v;
-          }
-          return o;
-        });
-        await window.runner.writeChannelIndex({
-          filePath: INDEX_FILE,
-          headers,
-          rows: normalized,
-        });
-        await loadIndex();
-      } catch (e) {
-        const msg = e instanceof Error ? e.message : 'Không lưu được index.xlsx.';
-        setIndexListError(msg);
-        throw e;
-      } finally {
-        setIndexSaving(false);
-      }
-    },
-    [canWriteIndex, indexHeaders, loadIndex],
-  );
-
-  type IndexCreateVideoQueueEntry = {
-    row: ChannelRow;
-    folder: string;
-    email: string;
-    videoType: 'from_audio' | 'reup_full';
-    /** Chỉ số dòng trong `indexDraftRows` — khớp checkbox bảng index. */
-    draftRowIndex: number;
-  };
-
-  const indexCreateVideoQueue = useMemo((): IndexCreateVideoQueueEntry[] => {
-    const queue: IndexCreateVideoQueueEntry[] = [];
-    for (let i = 0; i < indexDraftRows.length; i++) {
-      const row = indexDraftRows[i];
-      const folder = channelFolderFromRow(row);
-      const email = String(row.email ?? '').trim();
-      const videoType = resolveIndexRowVideoType(row);
-      // Tạo video: Khi render queue gốc thì không bắt buộc có email
-      if (folder && videoType) {
-        queue.push({
-          row,
-          folder,
-          email,
-          videoType: videoType as 'from_audio' | 'reup_full',
-          draftRowIndex: i,
-        });
-      }
-    }
-    return queue;
-  }, [indexDraftRows]);
+  const [detailSelectedRowIndices, setDetailSelectedRowIndices] = useState<Set<string>>(() => new Set());
 
   const createVideoQueueFromSelection = useMemo(() => {
-    if (indexSelectedRowIndices.size === 0) {
+    console.log('🚀 ~ ChannelsPage ~ selectedRows:', selectedRows);
+    if (selectedRows.size === 0) {
       // Nếu không select dòng nào: tạo cho TẤT CẢ các dòng CÓ EMAIL
-      return indexCreateVideoQueue.filter(q => q.email !== '');
+      return channels.filter(channel => channel.email !== '');
     }
     // Nếu CÓ select dòng: chỉ tạo cho các dòng được select (KHÔNG cần quan tâm đến email, thư mục + loại video đã được check ở queue gốc)
-    return indexCreateVideoQueue.filter(q => indexSelectedRowIndices.has(q.draftRowIndex));
-  }, [indexCreateVideoQueue, indexSelectedRowIndices]);
+    return channels.filter(channel => selectedRows.has(channel.id));
+  }, [channels, selectedRows]);
 
   /** Dòng index khớp thư mục đang xem chi tiết — cần cho Tạo video / Upload từ chi tiết. */
   const indexRowForDetailChannel = useMemo((): IndexCreateVideoQueueEntry | null => {
     if (!selectedChannel?.trim()) return null;
     const target = selectedChannel.trim();
-    for (let i = 0; i < indexDraftRows.length; i++) {
-      const row = indexDraftRows[i];
+    for (let i = 0; i < channels.length; i++) {
+      const row = channels[i];
       const folder = channelFolderFromRow(row);
       if (!folder?.trim() || folder.trim() !== target) continue;
       const videoType = resolveIndexRowVideoType(row);
@@ -297,255 +235,86 @@ function ChannelsPage() {
       };
     }
     return null;
-  }, [selectedChannel, indexDraftRows]);
+  }, [selectedChannel, channels]);
 
   const indexSingleSelectedRowIndex = useMemo((): number | null => {
-    if (indexSelectedRowIndices.size !== 1) return null;
-    const [only] = indexSelectedRowIndices;
-    return only ?? null;
-  }, [indexSelectedRowIndices]);
-
-  const indexSingleSelectedFolder = useMemo(() => {
-    if (indexSingleSelectedRowIndex == null) return null;
-    const row = indexDraftRows[indexSingleSelectedRowIndex];
-    if (!row) return null;
-    return channelFolderFromRow(row);
-  }, [indexSingleSelectedRowIndex, indexDraftRows]);
-
-  const indexChannelStatusToggle = useMemo(() => {
-    if (indexSingleSelectedRowIndex == null) {
-      return {
-        nextStatus: null as 'LIVE' | 'STOPPED' | null,
-        label: 'ACTIVE / DEACTIVE',
-        enabled: false,
-        title: 'Chọn đúng một dòng trên bảng (checkbox).',
-      };
-    }
-    const hasStatus = indexHeaders.includes('status');
-    if (!hasStatus) {
-      return {
-        nextStatus: null as 'LIVE' | 'STOPPED' | null,
-        label: 'ACTIVE / DEACTIVE',
-        enabled: false,
-        title: 'File index chưa có cột STATUS. Cập nhật index (Thêm channel / script getInfoChannel) hoặc thêm cột STATUS ở cuối sheet.',
-      };
-    }
-    const raw = String(indexDraftRows[indexSingleSelectedRowIndex]?.status ?? '')
-      .trim()
-      .toUpperCase();
-    const st = raw === 'LIVE' || raw === 'STOPPED' || raw === 'INIT' ? raw : 'INIT';
-    if (st === 'LIVE') {
-      return {
-        nextStatus: 'STOPPED' as const,
-        label: 'DEACTIVE',
-        enabled: true,
-        title: 'Đặt trạng thái kênh thành STOPPED.',
-      };
-    }
-    if (st === 'STOPPED') {
-      return {
-        nextStatus: 'LIVE' as const,
-        label: 'ACTIVE',
-        enabled: true,
-        title: 'Đặt trạng thái kênh thành LIVE.',
-      };
-    }
-    return {
-      nextStatus: null as 'LIVE' | 'STOPPED' | null,
-      label: 'ACTIVE / DEACTIVE',
-      enabled: false,
-      title: 'Chỉ kênh LIVE hoặc STOPPED mới bật/tắt từ đây (INIT: dùng Thêm channel hoặc chỉnh index).',
-    };
-  }, [indexSingleSelectedRowIndex, indexHeaders, indexDraftRows]);
-
-  const onChannelStatusToggle = useCallback(async () => {
-    const { nextStatus, enabled } = indexChannelStatusToggle;
-    if (!enabled || !nextStatus || indexSingleSelectedRowIndex == null || indexSaving) return;
-
-    const rowIdx = indexSingleSelectedRowIndex;
-    const hasStatusCol = indexHeaders.includes('status');
-    const headersOut = hasStatusCol ? [...indexHeaders] : [...indexHeaders, 'status'];
-
-    const nextRows = indexDraftRows.map((r, i) => {
-      const copy: ChannelRow = { ...r };
-      for (const h of headersOut) {
-        if (copy[h] === undefined || copy[h] === null) copy[h] = '';
-      }
-      if (i === rowIdx) copy.status = nextStatus;
-      return copy;
-    });
-
-    try {
-      await persistIndexRows(nextRows, headersOut);
-    } catch {
-      /* persistIndexRows đã set indexListError */
-    }
-  }, [indexChannelStatusToggle, indexSingleSelectedRowIndex, indexSaving, indexHeaders, indexDraftRows, persistIndexRows]);
-
-  const openIndexEditForSingleSelection = useCallback(() => {
-    if (indexSingleSelectedRowIndex == null) return;
-    setIndexEditRowIndex(indexSingleSelectedRowIndex);
-  }, [indexSingleSelectedRowIndex]);
-
-  const openIndexDetailForSingleSelection = useCallback(() => {
-    const folder = indexSingleSelectedFolder?.trim();
-    if (!folder) return;
-    setSelectedChannel(folder);
-  }, [indexSingleSelectedFolder]);
+    if (selectedRows.size !== 1) return null;
+    const [only] = Array.from(selectedRows)[0];
+    return only ? parseInt(only, 10) : null;
+  }, [selectedRows]);
 
   const canRunIndexBatchVideo = typeof window.runner?.runNpmScript === 'function';
 
-  const runCreateVideoForQueue = useCallback(
-    async (queue: IndexCreateVideoQueueEntry[], maxVideosPerBatch: number, opts?: { onlyLinks?: string[] }) => {
-      if (!window.runner?.runNpmScript) {
-        setIndexListError('Runner chưa sẵn sàng.');
-        return;
-      }
-      if (queue.length === 0) {
-        setIndexListError('Không có kênh nào đủ điều kiện: cần thư mục (cột ID hoặc CHANNEL), EMAIL.');
-        return;
-      }
-
-      const bgList = indexBackgrounds.length > 0 ? indexBackgrounds : await window.runner.listBackgrounds().catch(() => []);
-      setIndexListError(null);
-      const failures: string[] = [];
-
-      try {
-        for (let i = 0; i < queue.length; i++) {
-          const { row, folder, videoType } = queue[i];
-          setIndexBatchVideo({ current: i + 1, total: queue.length, channelLabel: folder });
-          const def = scriptDefs.find(s => s.id === (videoType === 'reup_full' ? SCRIPT_REUP_FULL : SCRIPT_FROM_AUDIO));
-          if (!def) {
-            failures.push(`${folder}: không tìm thấy script.`);
-            continue;
-          }
-
-          const baseEnv = buildExtraEnvForIndexChannelRow(row, folder, videoType, bgList, {
-            maxVideosPerBatch,
-          });
-          const extraEnv =
-            opts?.onlyLinks?.length && queue.length === 1 ? { ...baseEnv, MAVID_ONLY_LINKS: JSON.stringify(opts.onlyLinks) } : baseEnv;
-          try {
-            const res = await window.runner.runNpmScript(def.npmScript, extraEnv);
-            if (res.cancelled) {
-              setIndexListError(`Đã dừng sau kênh ${folder} (${i + 1}/${queue.length}).`);
-              return;
-            }
-            if (res.code !== 0) failures.push(`${folder}: thoát mã ${res.code}.`);
-          } catch (e) {
-            failures.push(`${folder}: ${e instanceof Error ? e.message : 'lỗi'}.`);
-          }
-        }
-
-        if (failures.length > 0) {
-          setIndexListError(
-            failures.length === queue.length
-              ? `Tất cả ${failures.length} kênh lỗi: ${failures.slice(0, 3).join(' ')}${failures.length > 3 ? '…' : ''}`
-              : `Một số kênh lỗi (${failures.length}/${queue.length}): ${failures.slice(0, 4).join(' ')}${failures.length > 4 ? '…' : ''}`,
-          );
-        }
-      } finally {
-        setIndexBatchVideo(null);
-      }
-    },
-    [indexBackgrounds],
-  );
-
-  const detailLayout = useMemo(() => {
-    if (!detail) {
-      return {
-        meta: { email: '', channelName: '', channelTags: '' },
-        tableHeaders: [] as string[],
-        showEmail: false,
-        showChannelName: false,
-        showTags: false,
-        linkVideoKey: undefined as string | undefined,
-        durationKey: undefined as string | undefined,
-        statusKey: undefined as string | undefined,
-        startFromKey: undefined as string | undefined,
-      };
+  const runCreateVideoForQueue = useCallback(async (queue: ChannelRow[], maxVideosPerBatch: number) => {
+    if (!window.runner?.runNpmScript) {
+      return;
     }
-    const headers = detail.headers.length > 0 ? detail.headers : detail.rows[0] ? Object.keys(detail.rows[0]) : [];
 
-    const findKey = (name: string) => headers.find(h => headerNorm(h) === headerNorm(name));
-    const emailKey = findKey('EMAIL');
-    const nameKey = findKey('CHANNEL NAME');
-    const tagsKey = findKey('CHANNEL TAGS');
+    const failures: string[] = [];
 
-    const firstNonEmpty = (key: string | undefined) => {
-      if (!key || !detail.rows?.length) return '';
-      for (const row of detail.rows) {
-        const v = row[key];
-        if (v != null && String(v).trim()) return String(v).trim();
+    try {
+      for (let i = 0; i < queue.length; i++) {
+        const { videoType, channelId, id, videos } = queue[i];
+        setIndexBatchVideo({ current: i + 1, total: queue.length, channelLabel: channelId });
+        const def = scriptDefs.find(s => s.id === (videoType === 'reup_full' ? SCRIPT_REUP_FULL : SCRIPT_FROM_AUDIO));
+        if (!def) {
+          continue;
+        }
+
+        const baseEnv = buildExtraEnvForIndexChannelRow(id, channelId, videos, maxVideosPerBatch);
+        try {
+          const res = await window.runner.runNpmScript(def.npmScript, baseEnv);
+          if (res.cancelled) {
+            console.log(`Đã dừng sau kênh ${channelId} (${i + 1}/${queue.length}).`);
+            return;
+          }
+          if (res.code !== 0) failures.push(`${channelId}: thoát mã ${res.code}.`);
+        } catch (e) {
+          failures.push(`${channelId}: ${e instanceof Error ? e.message : 'lỗi'}.`);
+        }
       }
-      return '';
-    };
 
-    const meta = {
-      email: firstNonEmpty(emailKey),
-      channelName: firstNonEmpty(nameKey),
-      channelTags: firstNonEmpty(tagsKey),
-    };
-
-    const skip = new Set([emailKey, nameKey, tagsKey].filter(Boolean) as string[]);
-    const rest = headers.filter(h => !skip.has(h));
-    const linkVideoKey = findKey('LINK VIDEO');
-    /** Cột 2 (sau checkbox): LINK VIDEO nếu có, còn lại giữ thứ tự sheet. */
-    const tableHeaders = linkVideoKey && rest.includes(linkVideoKey) ? [linkVideoKey, ...rest.filter(h => h !== linkVideoKey)] : rest;
-
-    return {
-      meta,
-      tableHeaders,
-      showEmail: Boolean(emailKey),
-      showChannelName: Boolean(nameKey),
-      showTags: Boolean(tagsKey),
-      linkVideoKey,
-      durationKey: findKey('DURATION'),
-      statusKey: findKey('STATUS'),
-      startFromKey: findKey('START FROM'),
-    };
-  }, [detail]);
+      if (failures.length > 0) {
+        console.log(
+          failures.length === queue.length
+            ? `Tất cả ${failures.length} kênh lỗi: ${failures.slice(0, 3).join(' ')}${failures.length > 3 ? '…' : ''}`
+            : `Một số kênh lỗi (${failures.length}/${queue.length}): ${failures.slice(0, 4).join(' ')}${failures.length > 4 ? '…' : ''}`,
+        );
+      }
+    } finally {
+      setIndexBatchVideo(null);
+    }
+  }, []);
 
   const filteredRowsWithIndex = useMemo(() => {
-    if (!detail?.rows?.length) return [];
-    const lk = detailLayout.linkVideoKey;
-    const dk = detailLayout.durationKey;
-    const sk = detailLayout.statusKey;
+    console.log('🚀 ~ ChannelsPage ~ channelVideos:', channelVideos);
+    if (!channelVideos.length) return [];
+
     const linkQ = detailLinkFilter.trim().toLowerCase();
     const durRange = durationPresetToSecRange(detailDurationPreset);
-    return detail.rows
-      .map((row, originalIndex) => ({ row, originalIndex }))
-      .filter(({ row }) => {
-        if (lk && linkQ) {
-          const url = String(row[lk] ?? '').toLowerCase();
-          if (!url.includes(linkQ)) return false;
-        }
-        if (dk && durRange) {
-          const sec = parseDurationToSeconds(String(row[dk] ?? ''));
-          if (sec == null || sec < durRange.min || sec > durRange.max) return false;
-        }
-        if (sk && detailStatusFilter !== '__all__') {
-          const s = String(row[sk] ?? '').trim();
-          if (s !== detailStatusFilter) return false;
-        }
-        return true;
-      });
-  }, [
-    detail?.rows,
-    detailLayout.linkVideoKey,
-    detailLayout.durationKey,
-    detailLayout.statusKey,
-    detailLinkFilter,
-    detailDurationPreset,
-    detailStatusFilter,
-  ]);
+    return channelVideos.filter(row => {
+      if (linkQ) {
+        const url = String(row.link ?? '').toLowerCase();
+        if (!url.includes(linkQ)) return false;
+      }
+      if (durRange) {
+        const sec = parseDurationToSeconds(String(row.duration ?? ''));
+        if (sec == null || sec < durRange.min || sec > durRange.max) return false;
+      }
+      if (detailStatusFilter !== '__all__') {
+        const s = String(row.status ?? '').trim();
+        if (s !== detailStatusFilter) return false;
+      }
+      return true;
+    });
+  }, [channelVideos, detailLinkFilter, detailDurationPreset, detailStatusFilter]);
 
   const indexFilteredIndices = useMemo(() => {
     const emailQ = indexListEmailFilter.trim().toLowerCase();
     const groupF = indexListGroupFilter;
     const out: number[] = [];
-    for (let i = 0; i < indexDraftRows.length; i++) {
-      const row = indexDraftRows[i];
+    for (let i = 0; i < channels.length; i++) {
+      const row = channels[i];
       if (emailQ) {
         const e = String(row.email ?? '').toLowerCase();
         if (!e.includes(emailQ)) continue;
@@ -559,24 +328,11 @@ function ChannelsPage() {
       out.push(i);
     }
     return out;
-  }, [indexDraftRows, indexListEmailFilter, indexListGroupFilter]);
-
-  const {
-    page: indexPage,
-    setPage: setIndexPage,
-    startIndex: indexStartIndex,
-    totalPages: indexTotalPages,
-    pageSize: indexPageSize,
-  } = useClientPagination(channels.length);
+  }, [channels, indexListEmailFilter, indexListGroupFilter]);
 
   useEffect(() => {
     setIndexPage(1);
   }, [indexListEmailFilter, indexListGroupFilter, setIndexPage]);
-
-  const pageIndexGlobalIndices = useMemo(
-    () => channels.slice(indexStartIndex, indexStartIndex + indexPageSize),
-    [channels, indexStartIndex, indexPageSize],
-  );
 
   const pageIndexRows = useMemo(
     () => channels.slice(indexStartIndex, indexStartIndex + indexPageSize),
@@ -626,37 +382,33 @@ function ChannelsPage() {
   );
 
   const detailPageSelectionFlags = useMemo(() => {
-    const onPage = pageDetailRows.map(({ originalIndex }) => originalIndex);
-    const all = onPage.length > 0 && onPage.every(i => detailSelectedRowIndices.has(i));
-    const some = onPage.some(i => detailSelectedRowIndices.has(i));
+    const all = pageDetailRows.length > 0 && pageDetailRows.every(row => detailSelectedRowIndices.has(row.link));
+    const some = pageDetailRows.some(row => detailSelectedRowIndices.has(row.link));
     return { all, some };
   }, [pageDetailRows, detailSelectedRowIndices]);
 
   const toggleDetailSelectAllOnPage = useCallback(() => {
-    const onPage = pageDetailRows.map(({ originalIndex }) => originalIndex);
     setDetailSelectedRowIndices(prev => {
       const next = new Set(prev);
-      const allSelected = onPage.length > 0 && onPage.every(i => next.has(i));
-      if (allSelected) onPage.forEach(i => next.delete(i));
-      else onPage.forEach(i => next.add(i));
+      const allSelected = pageDetailRows.length > 0 && pageDetailRows.every(row => next.has(row.link));
+      if (allSelected) pageDetailRows.forEach(row => next.delete(row.link));
+      else pageDetailRows.forEach(row => next.add(row.link));
       return next;
     });
   }, [pageDetailRows]);
 
-  const canSetStartFrom = Boolean(detail?.fileName?.toLowerCase().endsWith('.xlsx') && detailLayout.startFromKey);
-
-  const toggleDetailRowSelected = useCallback((originalRowIndex: number) => {
+  const toggleDetailRowSelected = useCallback((originalRowLink: string) => {
+    console.log('🚀 ~ ChannelsPage ~ originalRowLink:', originalRowLink);
     setDetailSelectedRowIndices(prev => {
       const next = new Set(prev);
-      if (next.has(originalRowIndex)) next.delete(originalRowIndex);
-      else next.add(originalRowIndex);
+      if (next.has(originalRowLink)) next.delete(originalRowLink);
+      else next.add(originalRowLink);
       return next;
     });
   }, []);
 
   const detailMetaSelectionStats = useMemo(() => {
-    const rows = detail?.rows;
-    if (!rows?.length) {
+    if (!channelVideos?.length) {
       return {
         hasCreatedVideoInSelection: false,
         createdVideoSelectedCount: 0,
@@ -666,35 +418,51 @@ function ChannelsPage() {
         hasCreatedVideoWithYoutubeIdInSelection: false,
       };
     }
-    const sk = detailLayout.statusKey;
-    const lk = detailLayout.linkVideoKey;
     let hasCreatedVideoInSelection = false;
     let createdVideoSelectedCount = 0;
     let emptyStatusSelectedCount = 0;
     let hasEmptyStatusWithLinkInSelection = false;
     let createdVideoWithYoutubeIdCount = 0;
     let hasCreatedVideoWithYoutubeIdInSelection = false;
-    for (const i of detailSelectedRowIndices) {
-      const row = rows[i];
-      if (!row) continue;
-      const st = sk ? String(row[sk] ?? '').trim() : '';
-      if (st === DETAIL_STATUS_VIDEO_CREATED) {
-        hasCreatedVideoInSelection = true;
-        createdVideoSelectedCount += 1;
-        if (lk) {
-          const url = String(row[lk] ?? '').trim();
+
+    if (detailSelectedRowIndices.size === 0) {
+      for (const row of channelVideos) {
+        const status = String(row.status ?? '').trim();
+        if (status === DETAIL_STATUS_VIDEO_CREATED) {
+          hasCreatedVideoInSelection = true;
+          createdVideoSelectedCount += 1;
+          const url = String(row.link ?? '').trim();
           if (extractYoutubeVideoIdFromUrl(url)) {
             createdVideoWithYoutubeIdCount += 1;
             hasCreatedVideoWithYoutubeIdInSelection = true;
           }
         }
-      }
-      if (sk && lk && isDetailRowStatusEmpty(row[sk])) {
-        const url = String(row[lk] ?? '').trim();
-        const okLink = (url.startsWith('http://') || url.startsWith('https://')) && !url.includes('(Không có video)');
-        if (okLink) {
+        if (isDetailRowStatusEmpty(row.status)) {
           emptyStatusSelectedCount += 1;
           hasEmptyStatusWithLinkInSelection = true;
+        }
+      }
+    } else {
+      for (const link of detailSelectedRowIndices) {
+        const row = channelVideos.find(r => r.link === link);
+        if (!row) continue;
+        const st = String(row.status ?? '').trim();
+        if (st === DETAIL_STATUS_VIDEO_CREATED) {
+          hasCreatedVideoInSelection = true;
+          createdVideoSelectedCount += 1;
+          const url = String(row.link ?? '').trim();
+          if (extractYoutubeVideoIdFromUrl(url)) {
+            createdVideoWithYoutubeIdCount += 1;
+            hasCreatedVideoWithYoutubeIdInSelection = true;
+          }
+        }
+        if (isDetailRowStatusEmpty(row.status)) {
+          const url = String(row.link ?? '').trim();
+          const okLink = (url.startsWith('http://') || url.startsWith('https://')) && !url.includes('(Không có video)');
+          if (okLink) {
+            emptyStatusSelectedCount += 1;
+            hasEmptyStatusWithLinkInSelection = true;
+          }
         }
       }
     }
@@ -706,87 +474,55 @@ function ChannelsPage() {
       createdVideoWithYoutubeIdCount,
       hasCreatedVideoWithYoutubeIdInSelection,
     };
-  }, [detail?.rows, detailSelectedRowIndices, detailLayout.statusKey, detailLayout.linkVideoKey]);
+  }, [channelVideos, detailSelectedRowIndices]);
 
-  const handleDetailUpdateMeta = useCallback(
-    async (originalIndices: number[]) => {
-      if (!selectedChannel || !detail?.rows?.length || originalIndices.length === 0) return;
-      const lk = detailLayout.linkVideoKey;
-      const sk = detailLayout.statusKey;
-      if (!lk) {
-        setDetailActionError('File chi tiết không có cột LINK VIDEO.');
-        return;
-      }
-      if (!sk) {
-        setDetailActionError('File chi tiết không có cột STATUS — không lọc được «Đã tạo video».');
-        return;
-      }
-      const items: { url: string }[] = [];
-      for (const i of originalIndices) {
-        const row = detail.rows[i];
-        if (!row) continue;
-        const status = String(row[sk] ?? '').trim();
+  const handleDetailUpdateMeta = useCallback(async () => {
+    if (!selectedChannel || !channelVideos?.length) return;
+
+    const items: { url: string }[] = [];
+
+    if (detailSelectedRowIndices.size === 0) {
+      for (const row of channelVideos) {
+        const status = String(row.status ?? '').trim();
         if (status !== DETAIL_STATUS_VIDEO_CREATED) continue;
-        const url = String(row[lk] ?? '').trim();
+        const url = String(row.link ?? '').trim();
         if (url) items.push({ url });
       }
-      if (items.length === 0) {
-        setDetailActionError('Không có dòng «Đã tạo video» nào (trong phần đã chọn) có link video hợp lệ.');
-        return;
+    } else {
+      for (const link of detailSelectedRowIndices) {
+        const row = channelVideos.find(r => r.link === link);
+        if (!row) continue;
+        const status = String(row.status ?? '').trim();
+        if (status !== DETAIL_STATUS_VIDEO_CREATED) continue;
+        const url = String(row.link ?? '').trim();
+        if (url) items.push({ url });
       }
-      if (!window.runner?.runScript) {
-        setDetailActionError('Chỉ chạy cập nhật meta trong app Electron.');
-        return;
-      }
-      setDetailActionError(null);
-      setDetailUpdateMetaBusy(true);
-      try {
-        if (typeof window.runner.minimizeApp === 'function') {
-          window.runner.minimizeApp();
-        }
-        await window.runner.runScript('updateChannelVideosMeta', {
-          channelFolder: selectedChannel,
-          items,
-        });
-      } catch (e) {
-        setDetailActionError(e instanceof Error ? e.message : String(e));
-      } finally {
-        setDetailUpdateMetaBusy(false);
-      }
-    },
-    [selectedChannel, detail?.rows, detailLayout.linkVideoKey, detailLayout.statusKey],
-  );
-
-  async function handleSetStartFromRow(dataRowIndex: number) {
-    if (!selectedChannel || startMarkingIndex !== null) return;
-    if (!window.runner?.setChannelFolderStartFromRow) {
-      setDetailActionError('Chỉ dùng đánh dấu Start trong app Electron.');
+    }
+    if (items.length === 0) {
+      setDetailActionError('Không có dòng «Đã tạo video» nào (trong phần đã chọn) có link video hợp lệ.');
       return;
     }
-    setDetailActionError(null);
-    setStartMarkingIndex(dataRowIndex);
-    try {
-      await window.runner.setChannelFolderStartFromRow(selectedChannel, dataRowIndex);
-      await loadDetail(selectedChannel);
-    } catch (e) {
-      setDetailActionError(e instanceof Error ? e.message : 'Không đánh dấu được START FROM.');
-    } finally {
-      setStartMarkingIndex(null);
+    if (!window.runner?.runScript) {
+      setDetailActionError('Chỉ chạy cập nhật meta trong app Electron.');
+      return;
     }
-  }
 
-  const detailTheadHeaders = detailLoading
-    ? DETAIL_TABLE_LOADING_HEADERS
-    : detailLayout.tableHeaders.length > 0
-      ? detailLayout.tableHeaders
-      : ['—'];
-
-  /** Cột checkbox riêng (chỉ khi có bảng video hoặc đang load). */
-  const detailShowSelectColumn = detailLoading || detailLayout.tableHeaders.length > 0;
-  const detailColCount = Math.max(detailTheadHeaders.length, 1) + (detailShowSelectColumn ? 1 : 0);
-
-  const showDetailMetaAbove =
-    !detailLoading && detail != null && (detailLayout.showEmail || detailLayout.showChannelName || detailLayout.showTags);
+    setDetailActionError(null);
+    setDetailUpdateMetaBusy(true);
+    try {
+      if (typeof window.runner.minimizeApp === 'function') {
+        window.runner.minimizeApp();
+      }
+      await window.runner.runScript('updateChannelVideosMeta', {
+        channelFolder: selectedChannel,
+        items,
+      });
+    } catch (e) {
+      setDetailActionError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setDetailUpdateMetaBusy(false);
+    }
+  }, [selectedChannel, channelVideos, detailSelectedRowIndices]);
 
   async function handleRefresh() {
     if (selectedChannel) {
@@ -800,37 +536,11 @@ function ChannelsPage() {
   const hasIndexRows = channels.length > 0;
 
   /** Kênh có ID + EMAIL trong các dòng đã tick hoặc tất cả dòng nếu không tick (popup Upload video). */
-  const uploadChannelsFromSelection = useMemo((): ChannelItem[] => {
-    const map = new Map<string, Set<string>>();
+  const uploadChannelsFromSelection = useMemo((): ChannelRow[] => {
+    const selectedChannels = selectedRows.size > 0 ? channels.filter(channel => selectedRows.has(channel.id)) : channels;
 
-    // Nếu không chọn dòng nào, lấy toàn bộ dòng có email
-    const activeIndices =
-      indexSelectedRowIndices.size > 0 ? Array.from(indexSelectedRowIndices) : Array.from({ length: indexDraftRows.length }, (_, i) => i);
-
-    for (const idx of activeIndices) {
-      const row = indexDraftRows[idx];
-      if (!row) continue;
-      const f = channelFolderFromRow(row);
-      if (!f?.trim()) continue;
-      const emailRaw = String(row.email ?? '').trim();
-      if (!emailRaw) continue; // Upload luôn yêu cầu có email
-
-      const emails = emailRaw
-        .split(',')
-        .map(e => e.trim())
-        .filter(Boolean);
-      if (emails.length > 0) {
-        const folder = f.trim();
-        if (!map.has(folder)) map.set(folder, new Set());
-        emails.forEach(e => map.get(folder)!.add(e));
-      }
-    }
-    const result: ChannelItem[] = Array.from(map.entries()).map(([folder, emails]) => ({
-      folder,
-      emails: Array.from(emails).sort((a, b) => a.localeCompare(b, undefined, { sensitivity: 'base' })),
-    }));
-    return result.sort((a, b) => a.folder.localeCompare(b.folder, undefined, { sensitivity: 'base' }));
-  }, [indexDraftRows, indexSelectedRowIndices]);
+    return selectedChannels.filter(channel => channel.email !== '');
+  }, [channels, selectedRows]);
 
   const handleYoutubeUploadConfirm = useCallback((payloads: ChannelUploadVideoPayload[]) => {
     if (!window.runner?.runScript) {
@@ -935,68 +645,57 @@ function ChannelsPage() {
   }, []);
 
   const runDetailCreateVideoForSelection = useCallback(async () => {
-    if (!selectedChannel || !detail?.rows?.length) return;
-    const lk = detailLayout.linkVideoKey;
-    const sk = detailLayout.statusKey;
-    if (!lk || !sk) {
-      setDetailActionError('File chi tiết cần cột LINK VIDEO và STATUS.');
-      return;
-    }
-    if (!indexRowForDetailChannel) {
-      setDetailActionError('Không tìm thấy kênh này trong index.xlsx (hoặc thiếu LOẠI VIDEO from_audio / reup_full).');
-      return;
-    }
+    if (!selectedChannel || !channelVideos?.length) return;
+
+    const selectedChannelRow = channels.find(r => r.id === selectedChannel);
+
     const onlyLinks: string[] = [];
-    for (const i of detailSelectedRowIndices) {
-      const row = detail.rows[i];
+    for (const link of detailSelectedRowIndices) {
+      const row = channelVideos.find(r => r.link === link);
       if (!row) continue;
-      if (!isDetailRowStatusEmpty(row[sk])) continue;
-      const url = String(row[lk] ?? '').trim();
-      if (!url || !(url.startsWith('http://') || url.startsWith('https://')) || url.includes('(Không có video)')) {
+
+      if (!isDetailRowStatusEmpty(row.status)) continue;
+
+      const url = String(row.link ?? '').trim();
+      if (!url || !(url.startsWith('http://') || url.startsWith('https://'))) {
         continue;
       }
       onlyLinks.push(url);
     }
-    if (onlyLinks.length === 0) {
-      setDetailActionError('Chọn ít nhất một dòng có status trống (hoặc empty) và link video hợp lệ.');
-      return;
-    }
+
     setDetailActionError(null);
     if (typeof window.runner?.minimizeApp === 'function') {
       window.runner.minimizeApp();
     }
-    await runCreateVideoForQueue([indexRowForDetailChannel], defaultMaxVideosPerBatchDetail, { onlyLinks });
-  }, [
-    selectedChannel,
-    detail?.rows,
-    detailSelectedRowIndices,
-    detailLayout.linkVideoKey,
-    detailLayout.statusKey,
-    indexRowForDetailChannel,
-    defaultMaxVideosPerBatchDetail,
-    runCreateVideoForQueue,
-  ]);
+
+    await runCreateVideoForQueue(
+      [
+        {
+          ...selectedChannelRow,
+          videos: onlyLinks,
+        },
+      ],
+      defaultMaxVideosPerBatchDetail,
+    );
+  }, [selectedChannel, channelVideos, detailSelectedRowIndices, channels, defaultMaxVideosPerBatchDetail, runCreateVideoForQueue]);
 
   const runDetailUploadForSelection = useCallback(async () => {
-    if (!selectedChannel || !detail?.rows?.length) return;
-    const lk = detailLayout.linkVideoKey;
-    const sk = detailLayout.statusKey;
-    if (!lk || !sk) {
-      setDetailActionError('File chi tiết cần cột LINK VIDEO và STATUS.');
-      return;
-    }
+    if (!selectedChannel || !channelVideos?.length) return;
+
     const uploadFolderNames: string[] = [];
-    for (const i of detailSelectedRowIndices) {
-      const row = detail.rows[i];
+    for (const link of detailSelectedRowIndices) {
+      const row = channelVideos.find(r => r.link === link);
       if (!row) continue;
-      if (String(row[sk] ?? '').trim() !== DETAIL_STATUS_VIDEO_CREATED) continue;
-      const id = extractYoutubeVideoIdFromUrl(String(row[lk] ?? '').trim());
+      if (String(row.status ?? '').trim() !== DETAIL_STATUS_VIDEO_CREATED) continue;
+      const id = extractYoutubeVideoIdFromUrl(String(row.link ?? '').trim());
       if (id) uploadFolderNames.push(id);
     }
+
     if (uploadFolderNames.length === 0) {
       setDetailActionError('Chọn ít nhất một dòng «Đã tạo video» có link YouTube dạng watch (?v=…).');
       return;
     }
+
     if (!indexRowForDetailChannel) {
       setDetailActionError('Không tìm thấy kênh này trong index.xlsx.');
       return;
@@ -1013,6 +712,8 @@ function ChannelsPage() {
     setDetailActionError(null);
     setDetailUploadPrepBusy(true);
     try {
+      const selectedChannelRow = channels.find(r => r.id === selectedChannel);
+
       const profiles = await fetchAllGpmProfileRows();
       const gpmProfileId = resolveGpmProfileIdByEmail(profiles, email);
       if (!gpmProfileId) {
@@ -1021,7 +722,7 @@ function ChannelsPage() {
       }
       handleYoutubeUploadConfirm([
         {
-          channelFolder: selectedChannel,
+          channelFolder: selectedChannelRow?.channelId,
           email,
           totalVideos: uploadFolderNames.length,
           gpmProfileId,
@@ -1033,15 +734,34 @@ function ChannelsPage() {
     } finally {
       setDetailUploadPrepBusy(false);
     }
-  }, [
-    selectedChannel,
-    detail?.rows,
-    detailSelectedRowIndices,
-    detailLayout.linkVideoKey,
-    detailLayout.statusKey,
-    indexRowForDetailChannel,
-    handleYoutubeUploadConfirm,
-  ]);
+  }, [selectedChannel, channelVideos, channels, detailSelectedRowIndices, indexRowForDetailChannel, handleYoutubeUploadConfirm]);
+
+  const handleOpenEditRow = useCallback(
+    async (id: string) => {
+      const selectedChannel = channels.find(r => r.id === id);
+
+      if (!selectedChannel) return;
+
+      try {
+        const cfg = await window.runner.readMavidChannelConfig(selectedChannel.channelId);
+        if (!cfg || typeof cfg !== 'object' || !Array.isArray(cfg.channels)) return;
+
+        const configChannel = cfg.channels.find(c => c.id === selectedChannel.id) || {};
+        const { durationMinuteFrom, durationMinuteTo, uploadedVideos, latestUploadDate, latestUploadTime, ...rest } = configChannel;
+
+        setMappingStatus({
+          type: 'edit',
+          data: {
+            ...selectedChannel,
+            ...rest,
+          },
+        });
+      } catch (e) {
+        setMappingStatus(null);
+      }
+    },
+    [channels],
+  );
 
   return (
     <div className='space-y-6 w-full min-w-0'>
@@ -1055,20 +775,22 @@ function ChannelsPage() {
             hasIndexRows={hasIndexRows}
             loading={loading}
             indexBatchVideo={indexBatchVideo}
-            indexSelectedRowCount={indexSelectedRowIndices.size}
+            indexSelectedRowCount={selectedRows.size}
             indexCreateVideoEligibleSelectedCount={createVideoQueueFromSelection.length}
             canRunIndexBatchVideo={canRunIndexBatchVideo}
             indexSingleSelectedRowIndex={indexSingleSelectedRowIndex}
-            indexSingleSelectedFolder={indexSingleSelectedFolder}
-            indexChannelStatusToggle={indexChannelStatusToggle}
-            onChannelStatusToggle={() => void onChannelStatusToggle()}
+            indexSingleSelectedFolder={selectedChannel}
             uploadEligibleSelectedCount={uploadChannelsFromSelection.length}
             youtubeUploadActiveThreads={youtubeUploadActiveThreads}
             refreshBusy={refreshBusy}
             onOpenCreateVideo={() => setCreateVideoOpen(true)}
             onOpenAddChannel={() => {
-              setAddChannelInfo(null);
-              setAddChannelOpen(true);
+              // setAddChannelInfo(null);
+              // setAddChannelOpen(true);
+              setMappingStatus({
+                type: 'add',
+                data: null,
+              });
             }}
             onOpenUploadVideo={() => setUploadVideoOpen(true)}
             onUploadToGoogleDrive={() => {
@@ -1096,35 +818,22 @@ function ChannelsPage() {
             detailUpdateMeta={
               selectedChannel
                 ? {
-                    canUpdateMeta: Boolean(
-                      detailLayout.linkVideoKey && detailLayout.statusKey && typeof window.runner?.runScript === 'function',
-                    ),
                     updateMetaBusy: detailUpdateMetaBusy,
-                    detailActionsLocked: startMarkingIndex !== null,
                     createdVideoSelectedCount: detailMetaSelectionStats.createdVideoSelectedCount,
                     hasCreatedVideoInSelection: detailMetaSelectionStats.hasCreatedVideoInSelection,
-                    onUpdateMeta: () => void handleDetailUpdateMeta(Array.from(detailSelectedRowIndices)),
+                    onUpdateMeta: () => void handleDetailUpdateMeta(),
                   }
                 : undefined
             }
             detailBulkVideo={
-              selectedChannel && !detailLoading && detailLayout.tableHeaders.length > 0
+              selectedChannel && !detailLoading
                 ? {
-                    actionsLocked: startMarkingIndex !== null || loading,
                     createVideoBusy: Boolean(indexBatchVideo),
                     detailUploadPrepBusy,
                     emptyStatusSelectedCount: detailMetaSelectionStats.emptyStatusSelectedCount,
                     createdVideoSelectedCount: detailMetaSelectionStats.createdVideoWithYoutubeIdCount,
-                    canCreateVideo:
-                      canRunIndexBatchVideo &&
-                      Boolean(detailLayout.linkVideoKey && detailLayout.statusKey) &&
-                      Boolean(indexRowForDetailChannel) &&
-                      detailMetaSelectionStats.hasEmptyStatusWithLinkInSelection,
-                    canUploadVideo:
-                      typeof window.runner?.runScript === 'function' &&
-                      Boolean(detailLayout.linkVideoKey && detailLayout.statusKey) &&
-                      Boolean(indexRowForDetailChannel) &&
-                      detailMetaSelectionStats.hasCreatedVideoWithYoutubeIdInSelection,
+                    canCreateVideo: canRunIndexBatchVideo && detailMetaSelectionStats.hasEmptyStatusWithLinkInSelection,
+                    canUploadVideo: Boolean(indexRowForDetailChannel) && detailMetaSelectionStats.hasCreatedVideoWithYoutubeIdInSelection,
                     onCreateVideo: () => void runDetailCreateVideoForSelection(),
                     onUploadVideo: runDetailUploadForSelection,
                   }
@@ -1147,19 +856,6 @@ function ChannelsPage() {
         </div>
       ) : null}
 
-      {/* {addChannelInfo ? (
-        <div
-          className='rounded-2xl px-4 py-3 text-base wrap-break-word'
-          style={{
-            color: 'var(--text-h)',
-            background: 'var(--accent-bg)',
-            border: '1px solid var(--accent-border)',
-          }}
-        >
-          {addChannelInfo}
-        </div>
-      ) : null} */}
-
       {googleDriveSyncInfo ? (
         <div
           className='rounded-2xl px-4 py-3 text-base wrap-break-word'
@@ -1175,7 +871,7 @@ function ChannelsPage() {
 
       {!selectedChannel ? (
         <>
-          <div
+          {/* <div
             className='rounded-2xl p-4 w-full min-w-0 space-y-3'
             style={{ background: 'var(--card-bg)', border: '1px solid var(--border)' }}
           >
@@ -1214,7 +910,7 @@ function ChannelsPage() {
                 />
               </div>
             </div>
-          </div>
+          </div> */}
 
           <ChannelsIndexSection
             channels={channels}
@@ -1233,41 +929,38 @@ function ChannelsPage() {
             selectedRows={selectedRows}
             onToggleRowSelected={toggleIndexRowSelected}
             onToggleSelectAllOnPage={toggleIndexSelectAllOnPage}
-            onOpenEditRow={id => setIndexEditRowIndex(id)}
+            onOpenEditRow={handleOpenEditRow}
             onOpenDetailRow={id => {
               const row = channels.find(r => r.id === id);
               if (row) {
-                const folder = channelFolderFromRow(row);
-                if (folder?.trim()) setSelectedChannel(folder.trim());
+                setSelectedChannel(row.id);
               }
             }}
             pageSelectAll={indexPageSelectionFlags.all}
             pageSelectSome={indexPageSelectionFlags.some}
           />
 
-          {indexEditRowIndex !== null && (
+          {mappingStatus?.type === 'edit' && (
             <ChannelAddDialog
-              key={`edit-${indexEditRowIndex}`}
-              initialRow={pageIndexRows.find(r => r.id === indexEditRowIndex)}
-              backgroundFolders={indexBackgrounds}
-              onClose={() => setIndexEditRowIndex(null)}
-              onAdd={async row => {
-                if (indexEditRowIndex === null) return;
-                const idx = indexEditRowIndex;
-                // const nextRows = pageIndexRows.map((r, i) => (i === idx ? { ...r, ...row } : r));
-                // const headersForSave = indexHeaders.includes('mavidGroupId') ? indexHeaders : [...indexHeaders, 'mavidGroupId'];
-                // await persistIndexRows(nextRows, headersForSave);
+              initialRow={mappingStatus.data}
+              backgroundOptions={indexBackgrounds}
+              onClose={() => setMappingStatus(null)}
+              onMapping={async payload => {
+                console.log('🚀 ~ ChannelsPage ~ payload:', payload);
+                if (!window.runner?.runScript) throw new Error('Chỉ chạy trong Electron.');
+                await window.runner.runScript('addChannelFromForm', {
+                  formData: payload,
+                });
+
+                await fetchChannels();
               }}
             />
           )}
         </>
       ) : (
         <ChannelsDetailSection
-          detailFileName={detail?.fileName}
           detailLoading={detailLoading}
-          detailRowsLength={detail?.rows?.length ?? 0}
-          detailLayout={detailLayout}
-          showDetailMetaAbove={showDetailMetaAbove}
+          detailRowsLength={filteredRowsWithIndex.length}
           detailActionError={detailActionError}
           filterLink={detailLinkFilter}
           onFilterLinkChange={setDetailLinkFilter}
@@ -1276,19 +969,15 @@ function ChannelsPage() {
           filterStatusFixed={detailStatusFilter}
           onFilterStatusFixedChange={setDetailStatusFilter}
           durationSelectOptions={CHANNEL_ADD_DURATION_SELECT_OPTIONS}
-          detailTheadHeaders={detailTheadHeaders}
-          detailColCount={detailColCount}
+          // detailColCount={detailColCount}
+          detailColCount={1}
           pageDetailRows={pageDetailRows}
-          filteredRowsCount={filteredRowsWithIndex.length}
           detailPag={{
             page: detailPageNum,
             totalPages: detailTotalPages,
             setPage: setDetailPage,
             pageSize: detailPageSize,
           }}
-          canSetStartFrom={canSetStartFrom}
-          startMarkingIndex={startMarkingIndex}
-          onSetStartFromRow={handleSetStartFromRow}
           detailSelectedRowIndices={detailSelectedRowIndices}
           onToggleDetailRowSelected={toggleDetailRowSelected}
           detailPageSelectAll={detailPageSelectionFlags.all}
@@ -1299,7 +988,7 @@ function ChannelsPage() {
 
       {createVideoOpen ? (
         <ChannelCreateVideoDialog
-          selectedRowCount={indexSelectedRowIndices.size}
+          selectedRowCount={selectedRows.size}
           eligibleQueueLength={createVideoQueueFromSelection.length}
           targetChannelFolder={createVideoQueueFromSelection.length === 1 ? createVideoQueueFromSelection[0].folder : undefined}
           onClose={() => setCreateVideoOpen(false)}
@@ -1307,11 +996,8 @@ function ChannelsPage() {
             if (typeof window.runner?.minimizeApp === 'function') {
               window.runner.minimizeApp();
             }
-            let queue = createVideoQueueFromSelection;
-            if (selectedEmail && queue.length === 1) {
-              queue = [{ ...queue[0], email: selectedEmail }];
-            }
-            await runCreateVideoForQueue(queue, maxVideosPerBatch);
+
+            await runCreateVideoForQueue(createVideoQueueFromSelection, maxVideosPerBatch);
           }}
         />
       ) : null}
@@ -1319,28 +1005,26 @@ function ChannelsPage() {
       {uploadVideoOpen ? (
         <ChannelUploadVideoDialog
           channels={uploadChannelsFromSelection}
-          selectedRowCount={indexSelectedRowIndices.size}
+          selectedRowCount={selectedRows.size}
           activeBackgroundUploadThreads={youtubeUploadActiveThreads}
           onClose={() => setUploadVideoOpen(false)}
           onConfirm={handleYoutubeUploadConfirm}
         />
       ) : null}
 
-      {addChannelOpen ? (
+      {mappingStatus?.type === 'add' ? (
         <ChannelAddDialog
-          indexHeaders={indexHeaders}
-          indexRows={indexDraftRows}
-          backgroundFolders={indexBackgrounds}
-          onClose={() => setAddChannelOpen(false)}
-          onSaveNewChannel={async payload => {
+          channels={channels}
+          backgroundOptions={indexBackgrounds}
+          onClose={() => setMappingStatus(null)}
+          onMapping={async payload => {
             console.log('🚀 ~ ChannelsPage ~ payload:', payload);
             if (!window.runner?.runScript) throw new Error('Chỉ chạy trong Electron.');
             await window.runner.runScript('addChannelFromForm', {
               formData: payload,
             });
 
-            await loadIndex();
-            setAddChannelInfo(`Đã tạo thư mục kênh, mavid-channel-config.json và cập nhật ${INDEX_FILE}.`);
+            await fetchChannels();
           }}
         />
       ) : null}

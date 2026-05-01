@@ -81,6 +81,34 @@ export const CHANNELS = [
   },
 ];
 
+export const CHANNEL_DETAIL = [
+  {
+    key: 'link',
+    label: 'LINK VIDEO',
+    index: 1,
+  },
+  {
+    key: 'views',
+    label: 'VIEWS',
+    index: 2,
+  },
+  {
+    key: 'duration',
+    label: 'DURATION',
+    index: 3,
+  },
+  {
+    key: 'status',
+    label: 'STATUS',
+    index: 4,
+  },
+  // {
+  //   key: 'email',
+  //   label: 'EMAIL',
+  //   index: 5,
+  // },
+];
+
 /** Alias tương thích — cùng danh sách với `CHANNELS_INDEX_VISIBLE_COLUMNS`. */
 export const CHANNELS_INDEX_TABLE_HEADERS = CHANNELS_INDEX_VISIBLE_COLUMNS;
 

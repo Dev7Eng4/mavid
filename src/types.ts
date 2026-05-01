@@ -289,8 +289,8 @@ export interface GetInfoChannelResult {
 
 /** `MaVidMedia/channels/{folder}/mavid-channel-config.json` — đồng bộ với form Thêm/Sửa channel. */
 export interface MavidChannelConfigItem {
+  id?: string;
   email?: string;
-  /** Đồng bộ cột index «KÊNH CỦA TÔI». */
   myChannel?: string;
   videoType?: string;
   durationMinuteFrom?: number;
@@ -302,6 +302,9 @@ export interface MavidChannelConfigItem {
   thumbnailPrompt?: string;
   videosPerDayPreset?: string;
   publishTimes?: string[];
+  uploadedVideos?: number;
+  latestUploadDate?: string;
+  latestUploadTime?: string;
 }
 
 export interface MavidChannelConfig {
@@ -378,8 +381,8 @@ declare global {
       appendPersistedErrorLog: (line: string) => Promise<{ ok: boolean }>;
       clearPersistedErrorLogs: () => Promise<{ ok: boolean }>;
       minimizeApp: () => Promise<{ ok: boolean }>;
-      getMavidGroups: () => Promise<{ items: MavidGroupRow[] }>;
-      setMavidGroups: (payload: { items: MavidGroupRow[] }) => Promise<{ ok: boolean }>;
+      getMavidGroups: () => Promise<{ items: Group[] }>;
+      setMavidGroups: (payload: { items: Group[] }) => Promise<{ ok: boolean }>;
       getMavidWarnings: () => Promise<{ items: MavidWarningRow[] }>;
       setMavidWarnings: (payload: { items: MavidWarningRow[] }) => Promise<{ ok: boolean }>;
     };

@@ -4,8 +4,7 @@ import { RefreshIcon, SpinnerIcon } from '@/components/ui/Icons';
 export interface ChannelsPageHeaderActionsProps {
   selectedChannel: string | null;
   hasIndexRows: boolean;
-  indexSaving: boolean;
-  indexLoading: boolean;
+  loading: boolean;
   indexBatchVideo: { current: number; total: number; channelLabel: string } | null;
   /** Số dòng đã tick trên bảng index (Tạo video). */
   indexSelectedRowCount: number;
@@ -16,13 +15,7 @@ export interface ChannelsPageHeaderActionsProps {
   indexSingleSelectedRowIndex: number | null;
   /** Folder kênh (ID) của dòng đơn chọn — null nếu thiếu ID. */
   indexSingleSelectedFolder: string | null;
-  /** LIVE ↔ STOPPED: nhãn nút, bật chỉ khi chọn đúng một dòng và trạng thái cho phép. */
-  indexChannelStatusToggle: {
-    label: string;
-    enabled: boolean;
-    title: string;
-  };
-  onChannelStatusToggle: () => void;
+
   /** Số kênh đủ ID+EMAIL trong phần đã chọn (Upload video). */
   uploadEligibleSelectedCount: number;
   /** Số luồng upload YouTube (runScript) đang chạy song song — hiển thị cạnh nút Upload video. */
@@ -37,10 +30,7 @@ export interface ChannelsPageHeaderActionsProps {
   onRefresh: () => void;
   /** Màn chi tiết kênh: nút cập nhật meta cạnh Tải lại. */
   detailUpdateMeta?: {
-    canUpdateMeta: boolean;
     updateMetaBusy: boolean;
-    /** Khóa khi đang đánh dấu Start. */
-    detailActionsLocked: boolean;
     /** Số dòng đã chọn có status «Đã tạo video» (hiển thị trên nút). */
     createdVideoSelectedCount: number;
     /** Có ít nhất một dòng đã chọn là «Đã tạo video». */
@@ -49,7 +39,6 @@ export interface ChannelsPageHeaderActionsProps {
   };
   /** Chi tiết kênh: Tạo video / Upload video (cùng hàng với Cập nhật meta). */
   detailBulkVideo?: {
-    actionsLocked: boolean;
     createVideoBusy: boolean;
     detailUploadPrepBusy: boolean;
     emptyStatusSelectedCount: number;
@@ -64,16 +53,13 @@ export interface ChannelsPageHeaderActionsProps {
 export function ChannelsPageHeaderActions({
   selectedChannel,
   hasIndexRows,
-  indexSaving,
-  indexLoading,
+  loading,
   indexBatchVideo,
   indexSelectedRowCount,
   indexCreateVideoEligibleSelectedCount,
   canRunIndexBatchVideo,
   indexSingleSelectedRowIndex,
   indexSingleSelectedFolder,
-  indexChannelStatusToggle,
-  onChannelStatusToggle,
   uploadEligibleSelectedCount,
   youtubeUploadActiveThreads,
   refreshBusy,
@@ -86,7 +72,8 @@ export function ChannelsPageHeaderActions({
   detailUpdateMeta,
   detailBulkVideo,
 }: ChannelsPageHeaderActionsProps) {
-  const indexActionsLocked = indexLoading || indexSaving || indexBatchVideo !== null;
+  console.log('🚀 ~ ChannelsPageHeaderActions ~ detailBulkVideo:', detailBulkVideo);
+  const indexActionsLocked = loading || indexBatchVideo !== null;
   const canEditSingleSelected = !indexActionsLocked && indexSingleSelectedRowIndex !== null;
   const canOpenDetailSelected = canEditSingleSelected && Boolean(indexSingleSelectedFolder?.trim());
 
@@ -94,38 +81,21 @@ export function ChannelsPageHeaderActions({
     <>
       {!selectedChannel && (
         <>
-          {hasIndexRows ? (
+          {hasIndexRows && (
             <>
-              {indexSaving ? (
-                <span className='text-sm inline-flex items-center gap-2' style={{ color: 'var(--text-muted)' }}>
-                  <SpinnerIcon className='w-4 h-4' />
-                  Đang lưu index…
-                </span>
-              ) : null}
-              <AppButton
-                type='button'
-                variant='secondary'
-                onClick={onChannelStatusToggle}
-                disabled={indexActionsLocked || !indexChannelStatusToggle.enabled}
-                title={indexChannelStatusToggle.title}
-              >
-                {indexChannelStatusToggle.label}
-              </AppButton>
               <AppButton
                 type='button'
                 variant='primary'
                 onClick={onOpenCreateVideo}
-                disabled={
-                  indexActionsLocked || indexCreateVideoEligibleSelectedCount === 0 || !canRunIndexBatchVideo
-                }
+                disabled={indexActionsLocked || indexCreateVideoEligibleSelectedCount === 0 || !canRunIndexBatchVideo}
                 title={
                   indexCreateVideoEligibleSelectedCount === 0
                     ? indexSelectedRowCount === 0
                       ? 'Không có kênh nào có email và đúng loại video để tạo.'
                       : 'Các dòng đã chọn cần có ID/CHANNEL và LOẠI VIDEO (from_audio/reup_full).'
                     : indexSelectedRowCount === 0
-                    ? `Không chọn dòng nào — tạo video cho TẤT CẢ ${indexCreateVideoEligibleSelectedCount} kênh CÓ EMAIL đầy đủ cấu hình.`
-                    : `Tạo video cho ${indexCreateVideoEligibleSelectedCount} kênh đang chọn.`
+                      ? `Không chọn dòng nào — tạo video cho TẤT CẢ ${indexCreateVideoEligibleSelectedCount} kênh CÓ EMAIL đầy đủ cấu hình.`
+                      : `Tạo video cho ${indexCreateVideoEligibleSelectedCount} kênh đang chọn.`
                 }
               >
                 {indexBatchVideo ? (
@@ -142,12 +112,12 @@ export function ChannelsPageHeaderActions({
                 )}
               </AppButton>
             </>
-          ) : null}
+          )}
           <AppButton
             type='button'
             variant='secondary'
             onClick={onOpenAddChannel}
-            disabled={indexLoading}
+            disabled={loading}
             title='Tạo thư mục kênh và tạo/cập nhật MaVidMedia/channels/index.xlsx (không cần có sẵn index)'
           >
             Thêm channel
@@ -156,19 +126,19 @@ export function ChannelsPageHeaderActions({
             type='button'
             variant='primary'
             onClick={onOpenUploadVideo}
-            disabled={indexLoading || indexSaving || uploadEligibleSelectedCount === 0}
+            disabled={loading || uploadEligibleSelectedCount === 0}
             title={
               uploadEligibleSelectedCount === 0
                 ? indexSelectedRowCount === 0
                   ? 'Không có kênh nào có email để upload.'
                   : 'Các dòng đã chọn cần có ID/CHANNEL và BẮT BUỘC có EMAIL để upload.'
                 : indexBatchVideo !== null
-                ? 'Có thể upload song song khi đang tạo video — chọn kênh và xác nhận trong hộp thoại.'
-                : youtubeUploadActiveThreads > 0
-                ? `Đang chạy ${youtubeUploadActiveThreads} luồng upload nền — vẫn có thể mở hộp thoại thêm kênh.`
-                : indexSelectedRowCount === 0
-                ? `Không chọn dòng nào — upload cho TẤT CẢ ${uploadEligibleSelectedCount} kênh CÓ EMAIL.`
-                : `Upload cho ${uploadEligibleSelectedCount} kênh đang chọn (có email).`
+                  ? 'Có thể upload song song khi đang tạo video — chọn kênh và xác nhận trong hộp thoại.'
+                  : youtubeUploadActiveThreads > 0
+                    ? `Đang chạy ${youtubeUploadActiveThreads} luồng upload nền — vẫn có thể mở hộp thoại thêm kênh.`
+                    : indexSelectedRowCount === 0
+                      ? `Không chọn dòng nào — upload cho TẤT CẢ ${uploadEligibleSelectedCount} kênh CÓ EMAIL.`
+                      : `Upload cho ${uploadEligibleSelectedCount} kênh đang chọn (có email).`
             }
           >
             {youtubeUploadActiveThreads > 0 ? (
@@ -188,7 +158,7 @@ export function ChannelsPageHeaderActions({
             type='button'
             variant='secondary'
             onClick={() => void onUploadToGoogleDrive()}
-            disabled={indexLoading}
+            disabled={loading}
             title='Chạy đồng bộ MaVidMedia/videos → Google Drive trong nền (npm run syncVideosToDrive). OAuth lần đầu có thể mở trình duyệt.'
           >
             Dọn dẹp
@@ -205,13 +175,7 @@ export function ChannelsPageHeaderActions({
           <AppButton
             type='button'
             variant='primary'
-            disabled={
-              !detailBulkVideo.canCreateVideo ||
-              detailBulkVideo.actionsLocked ||
-              detailBulkVideo.createVideoBusy ||
-              detailBulkVideo.detailUploadPrepBusy ||
-              refreshBusy
-            }
+            disabled={!detailBulkVideo.canCreateVideo || detailBulkVideo.createVideoBusy || refreshBusy}
             title={
               !detailBulkVideo.canCreateVideo
                 ? 'Cần cột LINK VIDEO + STATUS, kênh phải có trong index (EMAIL, LOẠI VIDEO) và ít nhất một dòng đã chọn có status trống + link hợp lệ.'
@@ -224,8 +188,6 @@ export function ChannelsPageHeaderActions({
                 <SpinnerIcon className='w-4 h-4' />
                 Đang tạo video…
               </span>
-            ) : detailBulkVideo.emptyStatusSelectedCount > 0 ? (
-              `Tạo video (${detailBulkVideo.emptyStatusSelectedCount})`
             ) : (
               'Tạo video'
             )}
@@ -233,12 +195,7 @@ export function ChannelsPageHeaderActions({
           <AppButton
             type='button'
             variant='secondary'
-            disabled={
-              !detailBulkVideo.canUploadVideo ||
-              detailBulkVideo.actionsLocked ||
-              detailBulkVideo.detailUploadPrepBusy ||
-              refreshBusy
-            }
+            disabled={!detailBulkVideo.canUploadVideo || detailBulkVideo.detailUploadPrepBusy || refreshBusy}
             title={
               !detailBulkVideo.canUploadVideo
                 ? 'Cần cột LINK VIDEO + STATUS, kênh trong index có EMAIL, và ít nhất một dòng đã chọn có status «Đã tạo video» + link YouTube (?v=…).'
@@ -263,17 +220,9 @@ export function ChannelsPageHeaderActions({
         <AppButton
           type='button'
           variant='secondary'
-          disabled={
-            !detailUpdateMeta.canUpdateMeta ||
-            detailUpdateMeta.updateMetaBusy ||
-            detailUpdateMeta.detailActionsLocked ||
-            refreshBusy ||
-            !detailUpdateMeta.hasCreatedVideoInSelection
-          }
+          disabled={detailUpdateMeta.updateMetaBusy || refreshBusy || !detailUpdateMeta.hasCreatedVideoInSelection}
           title={
-            !detailUpdateMeta.canUpdateMeta
-              ? 'Cần cột LINK VIDEO + STATUS và chạy trong Electron.'
-              : !detailUpdateMeta.hasCreatedVideoInSelection
+            !detailUpdateMeta.hasCreatedVideoInSelection
               ? 'Chọn ít nhất một dòng có status «Đã tạo video».'
               : 'Chỉ xử lý các dòng đã chọn có status «Đã tạo video»: thiếu Gemini (4 trường) hoặc thiếu thumbnail .png/.jpg/.jpeg.'
           }
