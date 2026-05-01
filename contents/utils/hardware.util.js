@@ -135,10 +135,24 @@ function detectHardware() {
     console.log('🔍 AMD AMF: true');
     encoder = 'h264_amf';
     stockDecodeArgs = ['-hwaccel', 'd3d11va'];
-    videoEncodeArgs = ['-c:v', 'h264_amf', '-quality', 'speed', ...bitrateArgs, '-pix_fmt', 'yuv420p', '-tag:v', 'avc1'];
-    reupVideoEncodeArgs = ['-c:v', 'h264_amf', '-quality', 'speed', ...reupBitrateArgs, '-pix_fmt', 'yuv420p', '-tag:v', 'avc1'];
-    makeAudioVideoEncodeArgs = ['-c:v', 'h264_amf', '-quality', 'speed', ...makeAudioBitrateArgs, '-pix_fmt', 'yuv420p', '-tag:v', 'avc1'];
-    encoderLabel = 'GPU AMD (h264_amf)';
+    // AMF tuning: usage=transcoding (cân bằng tốc độ), bf=0 (B-frame AMF hay flaky + chậm),
+    // async_depth=4 (pipeline GPU 4 frame), pix_fmt nv12 (native AMF, tránh swscale yuv420p→nv12 mỗi frame).
+    const amfBaseArgs = [
+      '-c:v',
+      'h264_amf',
+      '-usage',
+      'transcoding',
+      '-quality',
+      'speed',
+      '-bf',
+      '0',
+      '-async_depth',
+      '4',
+    ];
+    videoEncodeArgs = [...amfBaseArgs, ...bitrateArgs, '-pix_fmt', 'nv12', '-tag:v', 'avc1'];
+    reupVideoEncodeArgs = [...amfBaseArgs, ...reupBitrateArgs, '-pix_fmt', 'nv12', '-tag:v', 'avc1'];
+    makeAudioVideoEncodeArgs = [...amfBaseArgs, ...makeAudioBitrateArgs, '-pix_fmt', 'nv12', '-tag:v', 'avc1'];
+    encoderLabel = 'GPU AMD (h264_amf, async_depth=4)';
   } else if (hasQsv) {
     console.log('🔍 Intel Quick Sync Video: true');
     encoder = 'h264_qsv';

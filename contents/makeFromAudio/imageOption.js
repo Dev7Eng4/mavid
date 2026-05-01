@@ -11,6 +11,7 @@
  */
 
 import fs from 'fs';
+import os from 'os';
 import path from 'path';
 
 import { DEFAULT_PROMPT_LANG, STOCK_VIDEO, SUBTITLE, LOGO } from '../constants/index.js';
@@ -32,6 +33,7 @@ import {
   sanitizeFilename,
   ffmpegSpawnAsync,
   getPrebakedLogoPng,
+  getPrebakedNoiseMov,
 } from './shared.js';
 import { processStockVideo } from './stockVideoOption.js';
 import { GPU_INFO } from '../utils/hardware.util.js';
@@ -644,6 +646,16 @@ async function processImageNoiseVideo(options = {}, bgImgPath) {
   const noisePath = path.join(ROOT, 'assets', 'audioVisual', 'noise.mp4');
   const hasNoise = fs.existsSync(noisePath);
 
+  const w = STOCK_VIDEO.CANVAS_W;
+  const h = STOCK_VIDEO.CANVAS_H;
+  const fps = STOCK_VIDEO.FPS;
+  const NOISE_ALPHA = 0.6;
+
+  // Pre-bake noise (1 lần): bake fps + scale + colorkey + alpha → bỏ 5 filter per-frame ở pipeline chính.
+  const prebakedNoise = hasNoise ? await getPrebakedNoiseMov(noisePath, w, h, fps, NOISE_ALPHA) : null;
+  const noiseInputPath = prebakedNoise || noisePath;
+  const noiseIsPrebaked = Boolean(prebakedNoise);
+
   const mergeArgs = ['-y'];
   let inputIdx = 0;
 
@@ -651,10 +663,10 @@ async function processImageNoiseVideo(options = {}, bgImgPath) {
   mergeArgs.push('-i', bgImgPath);
   const bgIndex = inputIdx++;
 
-  // Input 1: Noise loop
+  // Input 1: Noise loop (bản đã prebake nếu có)
   let noiseIndex = -1;
   if (hasNoise) {
-    mergeArgs.push('-stream_loop', '-1', '-i', noisePath);
+    mergeArgs.push('-stream_loop', '-1', '-i', noiseInputPath);
     noiseIndex = inputIdx++;
   } else {
     console.warn(`[Image Noise] Không tìm thấy noise video: ${noisePath}`);
@@ -681,11 +693,7 @@ async function processImageNoiseVideo(options = {}, bgImgPath) {
   // Audio filter
   filterParts.push(`[${audioIndex}:a]atempo=${speed}[aout]`);
 
-  // Image background filter
-  const w = STOCK_VIDEO.CANVAS_W;
-  const h = STOCK_VIDEO.CANVAS_H;
-  const fps = STOCK_VIDEO.FPS;
-
+  // Image background filter (w/h/fps đã khai báo ở trên cho prebake noise)
   const ZOOM_DURATION_SEC = 8;
   const ZOOM_MAX = 1.3;
   const zoomFrames = ZOOM_DURATION_SEC * fps;
@@ -708,7 +716,8 @@ async function processImageNoiseVideo(options = {}, bgImgPath) {
   const panY = `if(lte(on,${zoomFrames}),ih/2-(ih/zoom/2),ih/2-(ih/zoom/2)+${burnsPanY})`;
 
   filterParts.push(
-    `[${bgIndex}:v]scale=${zpW}:${zpH}:force_original_aspect_ratio=decrease,pad=${zpW}:${zpH}:(ow-iw)/2:(oh-ih)/2,` +
+    `[${bgIndex}:v]scale=${zpW}:${zpH}:force_original_aspect_ratio=increase:flags=fast_bilinear,` +
+      `crop=${zpW}:${zpH},` +
       `zoompan=z='${zoomExpr}':` +
       `d=${totalFrames}:x='${panX}':y='${panY}':s=${w}x${h}:fps=${fps},` +
       `format=yuv420p,setsar=1[bg]`
@@ -717,10 +726,13 @@ async function processImageNoiseVideo(options = {}, bgImgPath) {
   let currentVLabel = 'bg';
 
   if (hasNoise && noiseIndex >= 0) {
-    // Noise filter: remove black background, set opacity to 0.6
-    filterParts.push(
-      `[${noiseIndex}:v]fps=${STOCK_VIDEO.FPS},scale=${w}:${h},format=yuva420p,colorkey=0x000000:0.1:0.1,colorchannelmixer=aa=0.6[noise]`
-    );
+    if (noiseIsPrebaked) {
+      filterParts.push(`[${noiseIndex}:v]null[noise]`);
+    } else {
+      filterParts.push(
+        `[${noiseIndex}:v]fps=${fps},scale=${w}:${h}:flags=fast_bilinear,format=yuva420p,colorkey=0x000000:0.1:0.1,colorchannelmixer=aa=${NOISE_ALPHA}[noise]`
+      );
+    }
     filterParts.push(`[${currentVLabel}][noise]overlay=0:0:shortest=1[v_noised]`);
     currentVLabel = 'v_noised';
   }
@@ -764,7 +776,16 @@ async function processImageNoiseVideo(options = {}, bgImgPath) {
   const fullGraph = filterParts.join(';');
   fs.writeFileSync(filterScriptPath, fullGraph, 'utf-8');
 
+  const cpuCount = (os.cpus()?.length || 4);
+  const filterThreads = String(Math.min(8, Math.max(2, cpuCount - 2)));
+
   mergeArgs.push(
+    '-threads',
+    '0',
+    '-filter_complex_threads',
+    filterThreads,
+    '-filter_threads',
+    filterThreads,
     '-filter_complex_script',
     filterScriptPath,
     '-map',
