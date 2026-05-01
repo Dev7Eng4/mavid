@@ -40,7 +40,10 @@ export async function generateImageWithFlow(prompt, pathSave, exportName, settin
   const { context, page } = await openChromeProfile({ profile: chromeProfile, visible: true });
 
   try {
+    // await openFlowPage(page, 'https://labs.google/fx/vi/tools/flow');
     await openFlowPage(page, cfg.FLOW_URL + cfg.FLOW_PROJECT_ID);
+
+    // await delay(2000);
 
     const dialogs = page.locator("div[data-state='open'][role='dialog']");
     const count = await dialogs.count();
@@ -48,18 +51,33 @@ export async function generateImageWithFlow(prompt, pathSave, exportName, settin
 
     if (isDialogOpen) {
       console.log('Có popup hiện. Đang tắt popup!');
-      const buttonXPath = 'html/body/div[1]/div[2]/div[2]/button';
-      await clickElement(page, buttonXPath);
-      await delay(1000);
+      try {
+        const buttonXPath = 'html/body/div[1]/div[2]/div[2]/button';
+        await clickElement(page, buttonXPath);
+        await delay(500);
+      } catch (error) {
+        console.error('❌ Lỗi: Tắt popup không thành công', error);
+      }
+
+      try {
+        const buttonXPath = "div[data-state='open'][role='dialog'] button";
+        await clickElement(page, buttonXPath);
+        await delay(500);
+      } catch (error) {
+        console.error('❌ Lỗi: Tắt popup không thành công', error);
+      }
     }
 
     const createWithFlowText = page.getByText('Create with Flow', { exact: true });
 
     if (await createWithFlowText.isVisible()) {
       console.log('🔄 Đang Create with Flow...');
-      await delay(3000);
+      await delay(2000);
       await clickElement(page, FLOW_SELECTOR.btnCreateWithFlow, true);
     }
+
+    // await delay(1000);
+    // await clickElement(page, FLOW_SELECTOR.btnNewProject, true);
 
     await clickElement(page, FLOW_SELECTOR.btnConfig, true);
     await clickElement(page, FLOW_SELECTOR.btnOptionRatio, true);
