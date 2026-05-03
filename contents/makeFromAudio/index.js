@@ -1,17 +1,7 @@
-/**
- * Entry point — Router chọn option tạo video từ audio.
- *
- * Option 1 (mặc định): Stock video + overlay + bar chart  → stockVideoOption.js
- * Option 2 (sắp tới):  Tạo video từ ảnh                   → (imageOption.js — chưa triển khai)
- *
- * Shared utilities      → shared.js
- * Xử lý phụ đề         → subtitle.js
- */
-
 import fs from 'fs';
 import path from 'path';
 
-import { MAKE_VIDEO_MODE } from '../constants/index.js';
+import { VIDEO_MAKE_MODE, VIDEO_MAKE_OPTION } from '../constant/index.js';
 import { resolveChannelsDir } from '../utils/channelsStoragePath.js';
 import { unlinkProgressSidecarForSpreadsheet } from '../syncProgressToSpreadsheet.js';
 
@@ -23,14 +13,13 @@ import {
   resolveAudioSpeed,
   SPEED,
   getLatestJobDownloadsDir,
-  getImageFilesFromDir,
   shouldShowLogo,
   resolveLogoFromChannelFolder,
   resolveDefaultStockFolder,
 } from './shared.js';
 
 import { processStockVideo } from './stockVideoOption.js';
-import { processImageOption } from './imageOption.js';
+import { processVideoWithImage } from './imageOption.js';
 import { OPTIONS_CONTENT } from './constant.js';
 
 // Re-export cho backward compatibility (convertAudio.js, v.v.)
@@ -88,7 +77,7 @@ export async function testMakeVideoFromDownloads(options = {}) {
   const currentOption = options.option || defaultOption;
 
   if (currentOption === 'IN' || currentOption === 'SI' || currentOption === 'AGI') {
-    await processImageOption({
+    await processVideoWithImage({
       bgNameArg: stockFolder,
       downloadsDir,
       logoPath: runLogoPath,
@@ -222,7 +211,7 @@ async function main(options = {}) {
     const isolatedDownloadsDir = path.join(ROOT, 'downloads', `job_${Date.now()}_${itemIndex}`);
 
     return downloadSingleVideo(url, {
-      mode: MAKE_VIDEO_MODE.FROM_AUDIO,
+      mode: VIDEO_MAKE_MODE.FROM_AUDIO,
       thumbnailChannelRoot: destFolder,
       thumbnailPrompt: options.thumbnailPrompt,
       outputDir: isolatedDownloadsDir,
@@ -272,8 +261,8 @@ async function main(options = {}) {
 
       try {
         const currentOption = result.overlay || options.overlay || options.option || defaultOption;
-        if (currentOption === 'IN' || currentOption === 'SI' || currentOption === 'AGI') {
-          await processImageOption({
+        if (currentOption === VIDEO_MAKE_OPTION.IN || currentOption === VIDEO_MAKE_OPTION.SI || currentOption === VIDEO_MAKE_OPTION.AGI) {
+          await processVideoWithImage({
             bgNameArg: background || defaultStockFolder,
             logoPath: runLogoPath,
             perVideoDir,
@@ -284,8 +273,7 @@ async function main(options = {}) {
             url,
             geminiByUrl,
             audioSpeed: batchAudioSpeedOverride,
-            imageNoiseMode: currentOption === 'IN',
-            autoGenerateImage: currentOption === 'AGI',
+            visualOption: currentOption,
           });
         } else {
           await processStockVideo(background || defaultStockFolder, {

@@ -258,48 +258,44 @@ function enforceSequentialScenes(scenes) {
  * @param {object} [options]
  * @param {string} [options.downloadsDir]
  * @param {string} [options.videoLanguage]
+ * @param {VIDEO_MAKE_OPTION} [options.visualOption]
  */
-export async function processImageOption(options = {}) {
-  const { downloadsDir = DOWNLOADS_DIR, videoLanguage, autoGenerateImage = false } = options;
+export async function processVideoWithImage(options = {}) {
+  const { downloadsDir = DOWNLOADS_DIR, videoLanguage, visualOption } = options;
+
   const lang = String(videoLanguage || DEFAULT_PROMPT_LANG).toUpperCase();
   const prompts = await loadPromptByLanguage(lang);
 
   // ─── Bước 1: Đọc transcript SRT cuối cùng → mảng objects ───
   const allObjects = parseTranscript(downloadsDir);
 
-  // ─── Bước 2: Tạo global niche từ head/tail transcript → promptToDetectNiche → Gemini ───
+  // ─── Bước 2: Tạo global niche từ head/tail transcript
   const globalNiche = await generateGlobalNiche(allObjects, prompts);
 
-  // ─── Bước 3: Chia chunk 500 objects → gửi promptToCreateChapter → Gemini ───
+  // ─── Bước 3: Chia chunk 500 objects → tạo chapters
   const allChapters = await generateChapters(allObjects, globalNiche, prompts);
 
-  // ─── Bước 4: Gộp summary → gửi promptToCreateVisualBible → Gemini ───
+  // ─── Bước 4: Gộp summary → tạo visual bible
   const { visualBible, globalMasterShotPrompt } = await generateVisualBible(globalNiche, allChapters, prompts);
 
-  // ─── Bước 5: Từng chapter → promptToCreateSceneFromChapter → Gemini (5 profile song song) ───
+  // ─── Bước 5: Từng chapter → tạo scene prompts
   let chapterImagePrompts = [];
-  let sceneResults = [];
-  if (autoGenerateImage) {
+  // let sceneResults = [];
+  if (visualOption === VIDEO_MAKE_OPTION.AGI) {
     const res = await generateScenePrompts(allChapters, allObjects, visualBible, prompts);
     chapterImagePrompts = res.chapterImagePrompts;
-    sceneResults = res.sceneResults;
+
+    await generateImagesFromScenePrompts(chapterImagePrompts, downloadsDir);
   }
 
   // ─── Bước 6: Tạo background từ globalMasterShotPrompt ───
   await generateBackground(globalMasterShotPrompt, downloadsDir);
 
-  // console.log('🚀 ~ processImageOption ~ chapterImagePrompts:', chapterImagePrompts);
-  // if (autoGenerateImage) {
-  //   // ─── Bước 7 (AGI): Mở flow tạo image cho từng scene ───
-  //   await generateImagesFromScenePrompts(chapterImagePrompts, downloadsDir);
-  // } else {
-  //   // ─── Bước 7: Tạo video từ video stock + layer background hoặc image + noise ───
-  //   const bgImgPath = path.join(downloadsDir, 'background.jpg');
-  //   await generateVideo(options, bgImgPath);
-  // }
+  // ─── Bước 7: Tạo video từ video stock + layer background hoặc image + noise ───
+  const bgImgPath = path.join(downloadsDir, 'background.jpg');
+  await generateVideo(options, bgImgPath);
 
-  // return { allObjects, globalNiche, allChapters };
-  return { allObjects, globalNiche, allChapters, visualBible, globalMasterShotPrompt, chapterImagePrompts, sceneResults };
+  return { allObjects, globalNiche, allChapters, visualBible, globalMasterShotPrompt, chapterImagePrompts };
 }
 
 /**
@@ -561,8 +557,6 @@ async function generateVisualBible(globalNiche, allChapters, prompts) {
 async function generateScenePrompts(allChapters, allObjects, visualBible, prompts) {
   const totalChaptersForScene = allChapters.length;
 
-  console.log(`\n[Option 2] Bước 5: Tạo scene cho ${totalChaptersForScene} chapters (profile ${PROFILE_IDS.join(',')})...`);
-
   const objectById = new Map();
   for (const obj of allObjects) {
     objectById.set(Number(obj.id), obj);
@@ -667,7 +661,6 @@ async function generateScenePrompts(allChapters, allObjects, visualBible, prompt
 
   await Promise.all(Array.from({ length: sceneActiveConcurrency }, (_, w) => sceneWorkerProfile(w)));
 
-  console.log('🚀 ~ generateScenePrompts ~ sceneResults:', sceneResults);
   const flatScenePrompts = sceneResults.flatMap((scenes, idx) => {
     if (!scenes) return [];
     const arr = Array.isArray(scenes) ? scenes : [scenes];
@@ -738,6 +731,7 @@ async function generateImagesFromScenePrompts(chapterImagePrompts, downloadsDir)
   fs.mkdirSync(imagesDir, { recursive: true });
 
   const allScenes = chapterImagePrompts.flat();
+
   if (allScenes.length === 0) {
     console.warn('[AGI Bước 7] Không có scene prompt nào — bỏ qua tạo image.');
     return;
@@ -748,13 +742,13 @@ async function generateImagesFromScenePrompts(chapterImagePrompts, downloadsDir)
   let successCount = 0;
   for (let i = 0; i < allScenes.length; i++) {
     const scene = allScenes[i];
-    const prompt = scene.image_prompt || scene.prompt || scene.description || '';
+    const prompt = scene.final_prompt;
     if (!prompt) {
       console.warn(`[AGI Bước 7] Scene ${i + 1}/${allScenes.length}: Không có prompt — bỏ qua.`);
       continue;
     }
 
-    const exportName = `scene_${String(i + 1).padStart(3, '0')}`;
+    const exportName = `scene_${scene.start_index}`;
     console.log(`[AGI Bước 7] Scene ${i + 1}/${allScenes.length}: Đang tạo image "${exportName}"...`);
 
     try {
@@ -762,8 +756,8 @@ async function generateImagesFromScenePrompts(chapterImagePrompts, downloadsDir)
         prompt,
         pathSave: imagesDir,
         exportName,
-        isNeedImage: true,
       });
+
       successCount++;
       console.log(`[AGI Bước 7] Scene ${i + 1}/${allScenes.length}: Tạo image thành công.`);
     } catch (err) {
