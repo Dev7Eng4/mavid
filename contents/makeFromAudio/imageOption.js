@@ -47,6 +47,7 @@ import {
   SUBTITLE_FONT_FILE,
   SUBTITLE_MARGIN_BOTTOM_PX,
 } from './subtitle.js';
+import { VIDEO_MAKE_OPTION } from '../constant/index.js';
 
 /** Số object mỗi lần gửi cho Gemini */
 const CHUNK_SIZE = 300;
@@ -704,7 +705,7 @@ async function generateBackground(globalMasterShotPrompt, downloadsDir) {
  * Bước 7: Tạo video từ video stock + layer background hoặc image + noise
  */
 async function generateVideo(options, bgImgPath) {
-  if (options.imageNoiseMode) {
+  if (options.visualOption === VIDEO_MAKE_OPTION.IN) {
     console.log(`\n[Option 2] Bước 7: Gọi processImageNoiseVideo tạo video từ image background + noise overlay...`);
     if (!fs.existsSync(bgImgPath)) {
       throw new Error(`[Option 2] Không tìm thấy ảnh background: ${bgImgPath}`);

@@ -19,3 +19,7 @@ export const FLOW_SETTINGS = {
   FLOW_PROJECT_URL: 'https://labs.google/fx/vi/tools/flow/project',
   FLOW_PROJECT_ID: '8a071d30-32db-4e34-9151-6fbc2b12705e',
 };
+
+export const THUMBNAIL_PROMPTS = {
+  JA_FULL_TEXT: 'jaFullText',
+};

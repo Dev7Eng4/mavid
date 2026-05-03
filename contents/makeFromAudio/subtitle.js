@@ -26,7 +26,30 @@ export const SUBTITLE_FONT_DIR = path.join(ROOT, 'assets', 'fonts');
 /** Face name trong TTF — khớp NotoSansJP-Black.ttf (libass + ffmpeg `fontsdir`). */
 export const SUBTITLE_FONT_ASS_NAME = 'Noto Sans JP Black';
 
-const optionSubtitle = 'White' | 'Cyan' | 'Blue';
+const SUBTITLE_OPTIONS = {
+  jaWhite: {
+    style: (outlinePx, shadowPx) =>
+      `Style: Default,Noto Sans JP Black,${CUSTOM_SUBTITLE_FONT_SIZE},&H00FFFFFF,&H000000FF,&H00000000,&H00000000,-1,0,0,0,100,100,${SUBTITLE.CHAR_SPACING},0,1,${outlinePx},${shadowPx},2,${CUSTOM_SUBTITLE_PADDING_HORIZONTAL},${CUSTOM_SUBTITLE_PADDING_HORIZONTAL},0,1\r`,
+    events: (start, end, eventMarginV, baseText) => `Dialogue: 0,${start},${end},Default,,0,0,${eventMarginV},,${baseText}\n`,
+  },
+  jaCyan: {
+    style: (outlinePx, shadowPx) =>
+      `Style: Default,Noto Sans JP Black,${CUSTOM_SUBTITLE_FONT_SIZE},&H00FFF0B4,&H000000FF,&H00000000,&H00000000,-1,0,0,0,100,100,${SUBTITLE.CHAR_SPACING},0,1,${outlinePx},${shadowPx},2,${CUSTOM_SUBTITLE_PADDING_HORIZONTAL},${CUSTOM_SUBTITLE_PADDING_HORIZONTAL},0,1\r`,
+    events: (start, end, eventMarginV, baseText) => `Dialogue: 0,${start},${end},Default,,0,0,${eventMarginV},,${baseText}\n`,
+  },
+  jaTextWhiteBlueShadow: {
+    style: (glowPx, outlinePx, shadowPx) =>
+      `Style: Glow,Noto Sans JP Black,${CUSTOM_SUBTITLE_FONT_SIZE},&H00C8FF00,&H000000FF,&H00000000,&H00000000,-1,0,0,0,100,100,${SUBTITLE.CHAR_SPACING},0,1,${glowPx},0,2,${CUSTOM_SUBTITLE_PADDING_HORIZONTAL},${CUSTOM_SUBTITLE_PADDING_HORIZONTAL},0,1\r
+   Style: Default,Noto Sans JP Black,${CUSTOM_SUBTITLE_FONT_SIZE},&H00FFFFFF,&H000000FF,&H00000000,&H00000000,-1,0,0,0,100,100,${SUBTITLE.CHAR_SPACING},0,1,${outlinePx},0,2,${CUSTOM_SUBTITLE_PADDING_HORIZONTAL},${CUSTOM_SUBTITLE_PADDING_HORIZONTAL},0,1\r`,
+    events: (
+      start,
+      end,
+      eventMarginV,
+      baseText,
+    ) => `Dialogue: 0,${start},${end},Glow,,0,0,${eventMarginV},,{\\blur10}${baseText}\nDialogue: 1,${start},${end},Default,,0,0,${eventMarginV},,${baseText}\n
+   `,
+  },
+};
 
 // ==========================================
 // SRT TIME HELPERS
@@ -152,15 +175,13 @@ WrapStyle: 1\r
 \r
 [V4+ Styles]\r
 Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding\r
-Style: Default,${fontName},${CUSTOM_SUBTITLE_FONT_SIZE},${primaryColour},${secondaryColour},${outlineColour},${backColour},-1,0,0,0,100,100,${SUBTITLE.CHAR_SPACING},0,1,${outlinePx},${shadowPx},2,${CUSTOM_SUBTITLE_PADDING_HORIZONTAL},${CUSTOM_SUBTITLE_PADDING_HORIZONTAL},0,1\r
+${SUBTITLE_OPTIONS.jaWhite.style(outlinePx, shadowPx)}
 \r
 [Events]\r
 Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text\r
 `;
 
-  // Style: Glow,${fontName},${CUSTOM_SUBTITLE_FONT_SIZE},${glowColour},${secondaryColour},${glowColour},&H00000000,-1,0,0,0,100,100,${SUBTITLE.CHAR_SPACING},0,1,${glowPx},0,2,${CUSTOM_SUBTITLE_PADDING_HORIZONTAL},${CUSTOM_SUBTITLE_PADDING_HORIZONTAL},0,1\r
-  // Style: Default,${fontName},${CUSTOM_SUBTITLE_FONT_SIZE},${primaryColour},${secondaryColour},${outlineColour},&H00000000,-1,0,0,0,100,100,${SUBTITLE.CHAR_SPACING},0,1,${outlinePx},0,2,${CUSTOM_SUBTITLE_PADDING_HORIZONTAL},${CUSTOM_SUBTITLE_PADDING_HORIZONTAL},0,1\r
-
+  // Style: Default,${fontName},${CUSTOM_SUBTITLE_FONT_SIZE},${primaryColour},${secondaryColour},${outlineColour},${backColour},-1,0,0,0,100,100,${SUBTITLE.CHAR_SPACING},0,1,${outlinePx},${shadowPx},2,${CUSTOM_SUBTITLE_PADDING_HORIZONTAL},${CUSTOM_SUBTITLE_PADDING_HORIZONTAL},0,1\r
   let events = '';
   for (const cue of cues) {
     const lines = cue
@@ -226,7 +247,8 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text\
     const eventMarginV = Math.max(0, Math.round(STOCK_VIDEO.CANVAS_H - boxMidY - totalTextH / 2));
 
     // option 1
-    events += `Dialogue: 0,${start},${end},Default,,0,0,${eventMarginV},,${baseText}\n`;
+    // events += `Dialogue: 0,${start},${end},Default,,0,0,${eventMarginV},,${baseText}\n`;
+    events += SUBTITLE_OPTIONS.jaWhite.events(start, end, eventMarginV, baseText);
 
     // option 2
     // Lớp 0: Dùng Style Glow kết hợp tag \blur để làm nhoè tạo hiệu ứng phát sáng mềm

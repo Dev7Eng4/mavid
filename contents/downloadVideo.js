@@ -11,8 +11,6 @@ import { fileURLToPath } from 'url';
 import { detectVideoLang, getLanguageOptions } from './utils/detectLanguage.util.js';
 
 import { MAKE_VIDEO_MODE, LANGUAGES_NEED_UPDATE_TRANSCRIPT } from './constants/index.js';
-import { optimizeFlowThumbnailJpegIfLarge } from './flow/thumbnailOptimize.util.js';
-import { loadPromptByLanguage, resolveThumbnailPromptBuilder } from './prompts/index.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const DEFAULT_OUTPUT_DIR = path.join(__dirname, '..', 'downloads');
@@ -278,19 +276,15 @@ async function processVttTranscriptsWithGemini(
         if (titleG && summaryG) {
           console.log('[thumbnail-flow] Tạo thumbnail từ title/summary Gemini →', path.basename(thumbnailFlowOutputDir));
           try {
-            const { runCreateThumbnailFlow } = await import('./flow/runCreateThumbnail.js');
-
-            const prompts = await loadPromptByLanguage(language);
-            const { build, isNeedImage } = resolveThumbnailPromptBuilder(prompts, thumbnailPrompt);
-            await runCreateThumbnailFlow({
-              prompt: build(titleG, summaryG),
-              pathSave: thumbnailFlowOutputDir,
-              exportName: 'flow-thumbnail',
-              isNeedImage,
+            const { generateFlowThumbnailFromGemini } = await import('./flow/generateFlowThumbnail.js');
+            await generateFlowThumbnailFromGemini({
+              title: titleG,
+              summary: summaryG,
+              outputDir: thumbnailFlowOutputDir,
+              language,
+              thumbnailPromptKey: thumbnailPrompt,
+              logTag: 'thumbnail-flow',
             });
-            const flowThumbPath = path.join(thumbnailFlowOutputDir, 'flow-thumbnail.jpg');
-            await optimizeFlowThumbnailJpegIfLarge(flowThumbPath);
-            console.log('[thumbnail-flow] Đã lưu flow-thumbnail.jpg trong folder video.');
           } catch (thumbErr) {
             console.warn('[thumbnail-flow]', thumbErr.message);
           }
