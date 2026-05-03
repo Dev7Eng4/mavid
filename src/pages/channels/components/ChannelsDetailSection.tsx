@@ -53,7 +53,7 @@ export function ChannelsDetailSection({
       )}
 
       <div className='rounded-2xl p-4 w-full min-w-0 space-y-3' style={{ background: 'var(--card-bg)', border: '1px solid var(--border)' }}>
-        <div className='text-sm font-medium uppercase tracking-wider' style={{ color: 'var(--text-muted)' }}>
+        <div className='text-sm font-medium tracking-wider' style={{ color: 'var(--text-muted)' }}>
           {channel.channelId} - {channel.email}
         </div>
       </div>

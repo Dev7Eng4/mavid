@@ -3,6 +3,7 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import { resolveChannelsDir } from '../utils/channelsStoragePath.js';
 import { testEncoder } from '../utils/hardware.util.js';
+import { VIDEO_MAKE_MODE } from '../constant/index.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.join(__dirname, '..', '..');
@@ -798,15 +799,9 @@ async function main(props = {}) {
 
   console.log(`Đọc được ${items.length} link từ file. Bắt đầu xử lý tuần tự...\n`);
 
-  if (videoType !== MAKE_VIDEO_MODE.FROM_AUDIO && videoType !== MAKE_VIDEO_MODE.REUP_FULL) {
-    throw new Error(
-      'Thiếu hoặc không hợp lệ videoType (from_audio | reup_full). Truyền props.videoType hoặc ghi videoType trong mavid-channel-config.json khi chạy với MAVID_CHANNEL.',
-    );
-  }
-
   let result;
   try {
-    if (videoType === MAKE_VIDEO_MODE.FROM_AUDIO) {
+    if (videoType === VIDEO_MAKE_MODE.FROM_AUDIO) {
       const { default: makeVideoFromAudio } = await import('../makeFromAudio/index.js');
       result = await makeVideoFromAudio({
         inputFile,
@@ -814,7 +809,7 @@ async function main(props = {}) {
         thumbnailPrompt: mergedProps.thumbnailPrompt,
         ...buildMakeVideoFromAudioOptions(mergedProps, effectiveChannelName),
       });
-    } else if (videoType === MAKE_VIDEO_MODE.REUP_FULL) {
+    } else if (videoType === VIDEO_MAKE_MODE.FROM_VIDEO) {
       const { default: makeVideoFromFull } = await import('../makeVideoFromFull.js');
       result = await makeVideoFromFull({
         inputFile,

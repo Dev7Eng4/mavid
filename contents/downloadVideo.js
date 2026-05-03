@@ -164,7 +164,7 @@ async function downloadVideo(url, options = {}) {
       const percent = parseFloat(match[1]);
       if (percent >= 0 && percent <= 100 && Math.floor(percent) !== Math.floor(lastPercent)) {
         lastPercent = percent;
-        process.stdout.write(`\rĐang tải: ${percent.toFixed(1)}%`);
+        // process.stdout.write(`\rĐang tải: ${percent.toFixed(1)}%`);
       }
     }
   };
@@ -437,7 +437,7 @@ async function downloadAudio(url, options = {}) {
       const percent = parseFloat(match[1]);
       if (percent >= 0 && percent <= 100 && Math.floor(percent) !== Math.floor(lastPercent)) {
         lastPercent = percent;
-        process.stdout.write(`\rĐang tải audio: ${percent.toFixed(1)}%`);
+        // process.stdout.write(`\rĐang tải audio: ${percent.toFixed(1)}%`);
       }
     }
   };

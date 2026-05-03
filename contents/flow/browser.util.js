@@ -9,6 +9,7 @@ import { flowSettings } from '../constants/index.js';
 import { FLOW_SELECTOR } from './selectors.js';
 import { resolveFlowChromeProfile } from './chromeProfile.util.js';
 import { FLOW_DOWNLOADS_DIR } from './paths.util.js';
+import { FLOW_SETTINGS } from '../constant/index.js';
 
 async function superClear(page, context) {
   try {
@@ -18,56 +19,48 @@ async function superClear(page, context) {
   }
 }
 
-export async function openFlowPage(page, projectUrl) {
-  await page.goto(projectUrl, { waitUntil: 'domcontentloaded', timeout: 30000 });
+export async function openFlowPage({ profile = 1, projectId }) {
+  const { context, page } = await openChromeProfile({ profile, visible: true });
+
+  await page.goto(`${FLOW_SETTINGS.FLOW_PROJECT_URL}/${projectId}`, { waitUntil: 'domcontentloaded', timeout: 30000 });
   await page.waitForTimeout(500);
 
   await page.keyboard.press('Escape');
+
+  await closeAnyPopup(page);
+
+  await setupFlow(page);
+
+  return { context, page };
 }
 
-/**
- * @param {string} prompt
- * @param {string} pathSave — thư mục lưu `{exportName}.jpg`
- * @param {string} exportName — không đuôi
- * @param {object} [setting] — merge lên flowSettings
- * @param {boolean} [isNeedImage]
- */
-export async function generateImageWithFlow(prompt, pathSave, exportName, setting = {}, isNeedImage = false, pathOldImage) {
-  const cfg = { ...flowSettings, ...setting };
-  const chromeProfile = resolveFlowChromeProfile(cfg);
-  console.log('🔄 Đang generate ảnh thumbnail từ Flow...');
+async function closeAnyPopup(page) {
+  const dialogs = page.locator("div[data-state='open'][role='dialog']");
+  const count = await dialogs.count();
+  const isDialogOpen = count > 0;
 
-  const { context, page } = await openChromeProfile({ profile: chromeProfile, visible: true });
-
-  try {
-    // await openFlowPage(page, 'https://labs.google/fx/vi/tools/flow');
-    await openFlowPage(page, cfg.FLOW_URL + cfg.FLOW_PROJECT_ID);
-
-    // await delay(2000);
-
-    const dialogs = page.locator("div[data-state='open'][role='dialog']");
-    const count = await dialogs.count();
-    const isDialogOpen = count > 0;
-
-    if (isDialogOpen) {
-      console.log('Có popup hiện. Đang tắt popup!');
-      try {
-        const buttonXPath = 'html/body/div[1]/div[2]/div[2]/button';
-        await clickElement(page, buttonXPath);
-        await delay(500);
-      } catch (error) {
-        console.error('❌ Lỗi: Tắt popup không thành công', error);
-      }
-
-      try {
-        const buttonXPath = "div[data-state='open'][role='dialog'] button";
-        await clickElement(page, buttonXPath);
-        await delay(500);
-      } catch (error) {
-        console.error('❌ Lỗi: Tắt popup không thành công', error);
-      }
+  if (isDialogOpen) {
+    console.log('Có popup hiện. Đang tắt popup!');
+    try {
+      const buttonXPath = 'html/body/div[1]/div[2]/div[2]/button';
+      await clickElement(page, buttonXPath);
+      await delay(500);
+    } catch (error) {
+      console.error('❌ Lỗi: Tắt popup không thành công', error);
     }
 
+    try {
+      const buttonXPath = "div[data-state='open'][role='dialog'] button";
+      await clickElement(page, buttonXPath);
+      await delay(500);
+    } catch (error) {
+      console.error('❌ Lỗi: Tắt popup không thành công', error);
+    }
+  }
+}
+
+async function setupFlow(page) {
+  try {
     const createWithFlowText = page.getByText('Create with Flow', { exact: true });
 
     if (await createWithFlowText.isVisible()) {
@@ -75,9 +68,6 @@ export async function generateImageWithFlow(prompt, pathSave, exportName, settin
       await delay(2000);
       await clickElement(page, FLOW_SELECTOR.btnCreateWithFlow, true);
     }
-
-    // await delay(1000);
-    // await clickElement(page, FLOW_SELECTOR.btnNewProject, true);
 
     await clickElement(page, FLOW_SELECTOR.btnConfig, true);
     await clickElement(page, FLOW_SELECTOR.btnOptionRatio, true);
@@ -88,9 +78,14 @@ export async function generateImageWithFlow(prompt, pathSave, exportName, settin
     await page.keyboard.press('Escape');
 
     await delay(500);
+  } catch (error) {
+    console.error('❌ Lỗi: Setup flow:', error);
+    throw error;
+  }
+}
 
-    console.log('🔄 Đang check file exists...', isNeedImage, fs.existsSync(FLOW_DOWNLOADS_DIR));
-
+async function attachImage(page) {
+  try {
     if (fs.existsSync(FLOW_DOWNLOADS_DIR)) {
       console.log('🔄 Đang attach ảnh thumbnail...');
       const files = fs.readdirSync(FLOW_DOWNLOADS_DIR);
@@ -124,6 +119,40 @@ export async function generateImageWithFlow(prompt, pathSave, exportName, settin
         await delay(2000);
       }
     }
+  } catch (error) {
+    console.error('❌ Lỗi: Attach image:', error);
+    throw error;
+  }
+}
+
+async function generateImage(page, prompt) {
+  try {
+    console.log('🔄 Đang check file exists...', isNeedImage, fs.existsSync(FLOW_DOWNLOADS_DIR));
+  } catch (error) {
+    console.error('❌ Lỗi: Generate image:', error);
+    throw error;
+  }
+}
+
+/**
+ * @param {string} prompt
+ * @param {string} pathSave — thư mục lưu `{exportName}.jpg`
+ * @param {string} exportName — không đuôi
+ * @param {object} [setting] — merge lên flowSettings
+ * @param {boolean} [isNeedImage]
+ */
+export async function generateImageWithFlow(prompt, pathSave, exportName, setting = {}, isNeedImage = false, pathOldImage) {
+  const cfg = { ...flowSettings, ...setting };
+  const chromeProfile = resolveFlowChromeProfile(cfg);
+  console.log('🔄 Đang generate ảnh thumbnail từ Flow...');
+
+  // const { context, page } = await openChromeProfile({ profile: chromeProfile, visible: true });
+  const { context, page } = await openFlowPage({ profile: chromeProfile, projectId: cfg.FLOW_PROJECT_ID });
+
+  try {
+    await attachImage(page);
+
+    // await generateImage(page, prompt);
 
     await clickElement(page, FLOW_SELECTOR.textbox);
     await delay(1000);

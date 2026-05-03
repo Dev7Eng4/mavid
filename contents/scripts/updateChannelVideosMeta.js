@@ -9,7 +9,6 @@ import { readThumbnailPromptKeyFromChannelDir } from '../channel/readChannelThum
 import { processOneVideoMetaUpdate } from '../channel/processOneVideoMetaUpdate.js';
 
 export default async function updateChannelVideosMeta(params = { channelFolder: '', items: [] }) {
-  console.log('🚀 ~ updateChannelVideosMeta ~ params:', params);
   const { channelFolder, items } = params;
 
   const channelsDir = resolveChannelsDir();
