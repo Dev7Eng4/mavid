@@ -30,6 +30,7 @@ export interface ChannelsDetailPagination {
 }
 
 export interface ChannelsDetailSectionProps {
+  channel: ChannelRow;
   detailLoading: boolean;
   detailRowsLength: number;
   detailActionError: string | null;

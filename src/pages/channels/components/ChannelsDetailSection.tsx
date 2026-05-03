@@ -9,6 +9,7 @@ import { CHANNEL_DETAIL } from '../models/channelsIndexSection.model';
 const inputClass = 'w-full rounded-xl px-3 py-2.5 text-sm outline-none border transition-colors duration-150';
 
 export function ChannelsDetailSection({
+  channel,
   detailLoading,
   detailRowsLength,
   detailActionError,
@@ -28,7 +29,6 @@ export function ChannelsDetailSection({
   detailPageSelectSome,
   onToggleDetailSelectAllOnPage,
 }: ChannelsDetailSectionProps) {
-  console.log('🚀 ~ ChannelsDetailSection ~ pageDetailRows:', pageDetailRows);
   const headerSelectRef = useRef<HTMLInputElement>(null);
   const detailBulkSelectDisabled = detailLoading || pageDetailRows.length === 0;
 
@@ -51,6 +51,12 @@ export function ChannelsDetailSection({
           {detailActionError}
         </div>
       )}
+
+      <div className='rounded-2xl p-4 w-full min-w-0 space-y-3' style={{ background: 'var(--card-bg)', border: '1px solid var(--border)' }}>
+        <div className='text-sm font-medium uppercase tracking-wider' style={{ color: 'var(--text-muted)' }}>
+          {channel.channelId} - {channel.email}
+        </div>
+      </div>
 
       <div className='rounded-2xl p-4 w-full min-w-0 space-y-3' style={{ background: 'var(--card-bg)', border: '1px solid var(--border)' }}>
         <div className='text-sm font-medium uppercase tracking-wider' style={{ color: 'var(--text-muted)' }}>
@@ -172,18 +178,10 @@ export function ChannelsDetailSection({
                         aria-label={`Chọn dòng ${row.link}`}
                       />
                     </td>
-                    <td className='px-2 py-3 align-top text-center w-12'>
-                      {row.link}
-                    </td>
-                    <td className='px-2 py-3 align-top text-center w-12'>
-                      {row.views}
-                    </td>
-                    <td className='px-2 py-3 align-top text-center w-12'>
-                      {row.duration}
-                    </td>
-                    <td className='px-2 py-3 align-top text-center w-12'>
-                      {row.status}
-                    </td>
+                    <td className='px-2 py-3 align-top text-center w-12'>{row.link}</td>
+                    <td className='px-2 py-3 align-top text-center w-12'>{row.views}</td>
+                    <td className='px-2 py-3 align-top text-center w-12'>{row.duration}</td>
+                    <td className='px-2 py-3 align-top text-center w-12'>{row.status}</td>
                   </tr>
                 ))
               ) : null}
