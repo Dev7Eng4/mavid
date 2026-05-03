@@ -10,15 +10,20 @@ const CONFIG_NAME = 'mavid-channel-config.json';
  * @param {string} channelDir — MaVidMedia/channels/{folderId}
  * @returns {string} Tên hàm style (khớp export trong `createImage.js` của từng ngôn ngữ), hoặc chuỗi rỗng = tự động (`resolveThumbnailPromptBuilder`)
  */
-export function readThumbnailPromptKeyFromChannelDir(channelDir) {
+export function readThumbnailPromptKeyFromChannelDir(channelDir, channelId) {
   const p = path.join(channelDir, CONFIG_NAME);
+
   if (!fs.existsSync(p)) return '';
+
   try {
     const cfg = JSON.parse(fs.readFileSync(p, 'utf8'));
     const list = Array.isArray(cfg.channels) ? cfg.channels : [];
-    const first = list[0];
-    const key = first && typeof first.thumbnailPrompt === 'string' ? first.thumbnailPrompt.trim() : '';
-    return key || '';
+
+    const selectedChannel = list.find(c => c.id === channelId);
+
+    if (!selectedChannel) return '';
+
+    return selectedChannel.thumbnailPrompt;
   } catch {
     return '';
   }
