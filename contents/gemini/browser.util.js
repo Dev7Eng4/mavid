@@ -28,7 +28,7 @@ import { GEMINI_SELECTOR } from './selectors.js';
 //   await page.waitForTimeout(2000);
 // }
 
-export async function waitForGeminiResponse(page, timeoutMs = 120000) {
+export async function waitForGeminiResponse(page, timeoutMs = 150000) {
   // 1. Lấy phần tử chứa câu trả lời cuối cùng (mới nhất)
   const responseLocator = page.locator('.model-response-text, .response-content, .message-content').last();
 
@@ -63,26 +63,34 @@ export async function waitForGeminiResponse(page, timeoutMs = 120000) {
   }
 }
 
+/**
+ * Trích xuất response từ Gemini.
+ * @param {import('playwright').Page} page
+ * @returns {Promise<{ text: string, hasCodeBlock: boolean }>}
+ *   - `hasCodeBlock = true` khi tìm thấy thẻ `<code>` trong response (response "đầy đủ").
+ *   - `hasCodeBlock = false` khi phải fallback về `innerText` (thường là response bị stop /
+ *     Gemini chỉ trả text thường — caller cần tự quyết retry hay không).
+ */
 export async function extractGeminiResponse(page) {
   // await page.waitForTimeout(1500);
   const responseLocator = page
     .locator('.model-response-text, .response-content, .message-content, div[data-message-author-role="model"]')
     .last();
-  await responseLocator.waitFor({ state: 'attached', timeout: 5000 });
+  await responseLocator.waitFor({ state: 'attached', timeout: 15000 });
 
   const specificCodeLocator = responseLocator.locator('code[data-test-id="code-content"]');
   if ((await specificCodeLocator.count()) > 0) {
-    return (await specificCodeLocator.last().innerText()).trim();
+    return { text: (await specificCodeLocator.last().innerText()).trim(), hasCodeBlock: true };
   }
 
   // 3. Fallback: Tìm thẻ code bất kỳ
   const anyCodeLocator = responseLocator.locator('code');
   if ((await anyCodeLocator.count()) > 0) {
-    return (await anyCodeLocator.last().innerText()).trim();
+    return { text: (await anyCodeLocator.last().innerText()).trim(), hasCodeBlock: true };
   }
 
-  // 4. Fallback cuối cùng: Lấy toàn bộ text
-  return (await responseLocator.innerText()).trim();
+  // 4. Fallback cuối cùng: Lấy toàn bộ text — coi như không có code block.
+  return { text: (await responseLocator.innerText()).trim(), hasCodeBlock: false };
 
   // return page.evaluate(() => {
   //   const responses = Array.from(
@@ -114,7 +122,21 @@ export async function chooseThinkingMode(page) {
   await clickElement(page, GEMINI_SELECTOR.thinkingMode);
 }
 
-export async function sendPromptToGemini(page, prompt) {
+/**
+ * Gửi prompt tới Gemini và lấy response text.
+ *
+ * @param {import('playwright').Page} page
+ * @param {string} prompt
+ * @param {object} [options]
+ * @param {boolean} [options.requireCodeBlock=false]
+ *   Nếu `true`, throw error khi response không chứa thẻ `<code>` (ví dụ Gemini hiển thị
+ *   "You stopped this response" hoặc chỉ trả về text thường) — dùng để trigger retry
+ *   ở `sendPromptToGeminiWithRetry`. Mặc định `false` để giữ tương thích với caller cũ.
+ * @returns {Promise<string>}
+ */
+export async function sendPromptToGemini(page, prompt, options = {}) {
+  const { requireCodeBlock = false } = options;
+
   await page.keyboard.press('Escape');
 
   await clickElement(page, GEMINI_SELECTOR.editor);
@@ -127,8 +149,65 @@ export async function sendPromptToGemini(page, prompt) {
 
   await waitForGeminiResponse(page, 150000);
 
-  const result = await extractGeminiResponse(page);
-  return result;
+  const { text, hasCodeBlock } = await extractGeminiResponse(page);
+
+  if (requireCodeBlock && !hasCodeBlock) {
+    const preview = text ? text.slice(0, 200).replace(/\s+/g, ' ') : '(empty)';
+    throw new Error(`Gemini response không chứa code block (có thể bị stop). Preview: "${preview}"`);
+  }
+
+  return text;
+}
+
+/**
+ * Gửi prompt tới Gemini với cơ chế retry.
+ *
+ * @param {import('playwright').Page} page
+ * @param {string} prompt
+ * @param {object} [options]
+ * @param {number} [options.maxRetries=2] Số lần retry tối đa (tổng số lần thử = maxRetries + 1).
+ * @param {number} [options.retryDelayMs=2000] Delay cơ bản giữa các lần retry (sẽ tăng dần theo attempt).
+ * @param {(raw: string) => any | Promise<any>} [options.validate]
+ *   Hàm validate response — nếu throw thì xem như fail và retry.
+ *   Ví dụ: validate JSON parse hợp lệ.
+ * @param {string} [options.label='Gemini'] Nhãn dùng để log.
+ * @param {boolean} [options.requireCodeBlock=true]
+ *   Nếu `true` (mặc định), response phải chứa thẻ `<code>` — nếu không sẽ retry
+ *   (bắt được case "You stopped this response" hoặc Gemini chỉ trả text thường).
+ * @returns {Promise<string>} Raw response từ Gemini sau khi pass validate.
+ */
+export async function sendPromptToGeminiWithRetry(page, prompt, options = {}) {
+  const { maxRetries = 2, retryDelayMs = 2000, validate = null, label = 'Gemini', requireCodeBlock = true } = options;
+  const totalAttempts = Math.max(1, maxRetries + 1);
+  let lastErr = null;
+
+  for (let attempt = 1; attempt <= totalAttempts; attempt++) {
+    try {
+      const raw = await sendPromptToGemini(page, prompt, { requireCodeBlock });
+      if (typeof validate === 'function') {
+        await validate(raw);
+      }
+      if (attempt > 1) {
+        console.log(`[${label} retry] Lần ${attempt}/${totalAttempts} thành công.`);
+      }
+      return raw;
+    } catch (err) {
+      lastErr = err;
+      const reason = err instanceof Error ? err.message : String(err);
+      console.warn(`[${label} retry] Lần ${attempt}/${totalAttempts} thất bại: ${reason}`);
+
+      if (attempt < totalAttempts) {
+        const waitMs = retryDelayMs * attempt;
+        try {
+          await page.waitForTimeout(waitMs);
+        } catch {
+          await new Promise(r => setTimeout(r, waitMs));
+        }
+      }
+    }
+  }
+
+  throw lastErr ?? new Error(`[${label} retry] Hết ${totalAttempts} lần thử nhưng không xác định được lỗi.`);
 }
 
 export async function openGeminiPage(page, thinkingMode = false) {

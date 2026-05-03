@@ -427,7 +427,7 @@ export function ChannelAddDialog({ backgroundOptions, channels = [], onClose, on
               <CustomSelect
                 value={resolvedBackground}
                 options={backgroundOptions.map(bg => ({ value: bg, label: bg }))}
-                onChange={v => setForm(f => ({ ...f, selectedBackground: v }))}
+                onChange={v => setForm(f => ({ ...f, background: v }))}
                 placeholder='Chọn background'
                 menuZIndex={100}
               />

@@ -46,18 +46,14 @@ async function removePathWithRetry(fullPath, isDirectory) {
       const code = err && err.code;
       const canRetry = RETRYABLE_FS_REMOVE_CODES.has(code) && attempt < maxAttempts;
       if (!canRetry) {
-        console.warn(
-          `[download] Không xóa được (bỏ qua): ${fullPath} — ${err.message}`,
-        );
+        console.warn(`[download] Không xóa được (bỏ qua): ${fullPath} — ${err.message}`);
         return;
       }
       const delay = Math.min(2500, baseMs * attempt);
-      await new Promise((r) => setTimeout(r, delay));
+      await new Promise(r => setTimeout(r, delay));
     }
   }
-  console.warn(
-    `[download] Hết số lần thử xóa, bỏ qua: ${fullPath} — ${lastErr && lastErr.message}`,
-  );
+  console.warn(`[download] Hết số lần thử xóa, bỏ qua: ${fullPath} — ${lastErr && lastErr.message}`);
 }
 
 /**
@@ -145,7 +141,7 @@ async function downloadVideo(url, options = {}) {
         FORMAT_H264_MP4
       : null;
 
-  const actualFormat = format !== 'best' ? format : FORMAT_H264_MP4_CAPPED ?? FORMAT_H264_MP4;
+  const actualFormat = format !== 'best' ? format : (FORMAT_H264_MP4_CAPPED ?? FORMAT_H264_MP4);
 
   if (maxHeight > 0) {
     console.log(`[DL] maxHeight=${maxHeight} → ưu tiên tải ≤${maxHeight}p để giảm I/O`);
@@ -225,7 +221,7 @@ async function processVttTranscriptsWithGemini(
     thumbnailFlowOutputDir = null,
     generateThumbnailWithFlow = true,
     thumbnailPrompt = null,
-  }
+  },
 ) {
   const { cleanSrt } = await import('./utils/srt.util.js');
   const { updateVideoInfo } = await import('./gemini/updateContent.js');
@@ -268,7 +264,7 @@ async function processVttTranscriptsWithGemini(
               description: geminiOut.description ?? '',
               tags: geminiOut.tags ?? '',
               summary: geminiOut.summary ?? '',
-            })
+            }),
           );
           console.log('✅ Đã gửi title/description/tags/summary (Gemini) qua callback.');
         } catch (cbErr) {
@@ -547,7 +543,7 @@ async function downloadSingleVideo(url, options = {}) {
       }
       result.filePath = path.join(actualOutputDir, pick);
     }
-    
+
     // Đính kèm các cấu hình mở rộng (như overlay - stock/image option) vào result
     if (options.overlay) result.overlay = options.overlay;
 

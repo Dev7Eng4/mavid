@@ -19,34 +19,6 @@ const DEFAULT_OUTPUT_DIR = resolveChannelsDir();
 const INPUT_FILE = path.join(__dirname, '..', 'input.txt');
 const INDEX_FILE = path.join(DEFAULT_OUTPUT_DIR, 'index.xlsx');
 
-/** Headers cho file index.xlsx — cột ID = tên thư mục kênh (MaVidMedia/channels/<ID>/) */
-const INDEX_HEADERS = [
-  'LINK',
-  'ID',
-  'EMAIL',
-  'KÊNH CỦA TÔI',
-  'LOẠI VIDEO',
-  'THỜI GIAN VIDEO',
-  'BACKGROUND',
-  'LAST UPLOAD',
-  'STATUS',
-  'Group',
-];
-
-/** Chỉ số cột 1-based (khớp INDEX_HEADERS). Cột cuối = ID nhóm (group.json). */
-const IDX = {
-  LINK: 1,
-  ID: 2,
-  EMAIL: 3,
-  MY_CHANNEL: 4,
-  LOAI_VIDEO: 5,
-  THOI_GIAN: 6,
-  BACKGROUND: 7,
-  LAST_UPLOAD: 8,
-  STATUS: 9,
-  GROUP: 10,
-};
-
 const IDX_CHANNELS = CHANNELS.reduce((acc, item) => {
   acc[item.key.toUpperCase()] = item.index;
   return acc;
@@ -167,7 +139,6 @@ function resolveIndexMetaColumns(channelData) {
  * @param {string} channelData.id — tên thư mục kênh (khớp thư mục trong MaVidMedia/channels/)
  */
 async function updateIndexFile(channelData) {
-  console.log('🚀 ~ updateIndexFile ~ channelData:', channelData);
   const { name, link, id, channelId } = channelData;
   const meta = resolveIndexMetaColumns(channelData);
 
@@ -214,14 +185,14 @@ async function updateIndexFile(channelData) {
       // row.getCell(IDX_CHANNELS.LINK).value = link;
       // row.getCell(IDX_CHANNELS.ID).value = id;
       // row.getCell(IDX_CHANNELS.LASTUPLOAD).value = lastUpload;
-      if ('email' in channelData) {
-        // row.getCell(IDX.EMAIL).value = meta.colEmail;
-        row.getCell(IDX_CHANNELS.MYCHANNEL).value = meta.colMyChannel;
-        row.getCell(IDX_CHANNELS.VIDEOTYPE).value = meta.colVideoType;
-        row.getCell(IDX_CHANNELS.DURATIONMINUTES).value = meta.colDurationMinutes;
-        row.getCell(IDX_CHANNELS.GROUP).value = meta.colGroup;
-        row.getCell(IDX_CHANNELS.STATUS).value = meta.colStatus;
-      }
+      // if ('email' in channelData) {
+      row.getCell(IDX_CHANNELS.EMAIL).value = meta.colEmail;
+      row.getCell(IDX_CHANNELS.MYCHANNEL).value = meta.colMyChannel;
+      row.getCell(IDX_CHANNELS.VIDEOTYPE).value = meta.colVideoType;
+      row.getCell(IDX_CHANNELS.DURATIONMINUTES).value = meta.colDurationMinutes;
+      row.getCell(IDX_CHANNELS.GROUP).value = meta.colGroup;
+      // row.getCell(IDX_CHANNELS.STATUS).value = meta.colStatus;
+      // }
       console.log(`Đã cập nhật channel "${name}" trong index.xlsx`);
     } else {
       // Thêm row mới
@@ -415,36 +386,6 @@ function handleFromYoutubeAtUrl(str) {
   return m?.[1] ? m[1] : '';
 }
 
-/**
- * Tên thư mục kênh (index cột ID / `MaVidMedia/channels/<tên>/`).
- * Trước đây: nếu `uploader_url` có `@` nhưng handle không khớp regex ASCII,
- * nhánh `else if` chặn → không dùng được `uploader_id` / `channel_id` → `unknown_id`.
- */
-function resolveChannelFolderNameFromResult(url, result) {
-  const meta = result?.metadata;
-
-  if (meta.channel_id) return meta.channel_id;
-
-  let name = handleFromYoutubeAtUrl(url);
-  if (name) return name;
-
-  if (meta?.uploader_url) {
-    name = handleFromYoutubeAtUrl(meta.uploader_url);
-    if (name) return name;
-  }
-
-  if (meta?.uploader_id) {
-    let up = String(meta.uploader_id).trim();
-    if (up.startsWith('@')) up = up.slice(1);
-    if (up) return up;
-  }
-
-  const cid = meta?.channel_id || meta?.id;
-  if (cid) return String(cid);
-
-  return 'unknown_id';
-}
-
 const handleUpdateChannelConfigFile = async (channelDir, formData) => {
   console.log('🚀 ~ handleUpdateChannelConfigFile ~ formData:', formData);
   const { id, channelLink, channelId, channelName, groupId, ...restConfig } = formData;
@@ -523,7 +464,6 @@ const handleUpdateChannelConfigFile = async (channelDir, formData) => {
  */
 export async function addChannelFromForm(options = {}) {
   const formData = options.formData;
-  console.log('🚀 ~ addChannelFromForm ~ formData:', formData);
   const id = formData.id;
   const newId = uuidv4();
 
@@ -621,6 +561,7 @@ export async function addChannelFromForm(options = {}) {
     });
   }
 
+  console.log('🚀 ~ addChannelFromForm ~ formData:', formData);
   await updateIndexFile({
     id: id || newId,
     name: channelName,
@@ -791,8 +732,8 @@ const handleAddChannel = async url => {
 };
 
 const handleGetVideo = async url => {
-  const { default: downloadVideo } = await import('./downloadVideo.js');
-  const videoResult = await downloadVideo({ url });
+  const { downloadAudio } = await import('./downloadVideo.js');
+  await downloadAudio(url);
 };
 
 /**
@@ -825,6 +766,7 @@ async function main(options = {}) {
   }
 
   const urlType = detectUrlType(url);
+  console.log('🚀 ~ main ~ urlType:', urlType);
 
   if (urlType === 'video') {
     await handleGetVideo(url);

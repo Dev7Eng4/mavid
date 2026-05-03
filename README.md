@@ -32,3 +32,9 @@ SUBTITLE LENGTH CONSTRAINT:
 - HARD RULE:
   - Do NOT exceed ~50 characters unless absolutely necessary.
 - If a sentence is long → split into multiple logical subtitle lines.
+
+// update channel background loi
+
+// retry của tạo scene chưa dc
+// sau khi có scene phải validate thứ tự start, end index dung chưa, nếu cái nào ko đúng thì bỏ
+// edge case -> không lấy dc response
