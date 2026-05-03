@@ -50,28 +50,21 @@ function transcriptHintsFromVideoMeta(meta) {
  * @returns {Promise<{ ok: boolean, reason?: string }>}
  */
 export async function processOneVideoMetaUpdate({ videoDir, url, thumbnailPromptKey }) {
-  console.log('🚀 ~ processOneVideoMetaUpdate ~ url:', url);
   const videoId = extractYoutubeVideoId(url);
   if (!videoId) {
     return { ok: false, reason: 'URL không hợp lệ' };
   }
-  console.log('🚀 ~ processOneVideoMetaUpdate ~ videoId:', videoId);
 
   if (!videoDir || !fs.existsSync(videoDir)) {
-    console.log('🚀 ~ processOneVideoMetaUpdate ~ videoDir:', videoDir);
     return { ok: false, reason: `Không tìm thấy thư mục: ${videoDir}` };
   }
-
-  console.log(`\n[update-meta] --- ${videoId} ---`);
 
   try {
     let meta = readVideoMetaFile(videoDir);
 
     const needGemini = geminiMetaFieldsIncomplete(meta);
     const needThumb = !hasRasterThumbnailInFolder(videoDir);
-    console.log('🚀 ~ processOneVideoMetaUpdate ~ needThumb:', needThumb);
     if (!needGemini && !needThumb) {
-      console.log('[update-meta] Đủ 4 trường Gemini + đã có thumbnail raster — bỏ qua.');
       return { ok: true };
     }
 
@@ -80,11 +73,9 @@ export async function processOneVideoMetaUpdate({ videoDir, url, thumbnailPrompt
 
     if (needGemini) {
       const { videoTitle, description, tags } = transcriptHintsFromVideoMeta(meta);
-      console.log('[update-meta] Thiếu trường Gemini → tải transcript + Gemini...');
 
       const transcriptOpts = {
         updateTranscript: false,
-        // outputDir: videoDir,
         videoTitle,
         description,
         tags,
@@ -103,7 +94,6 @@ export async function processOneVideoMetaUpdate({ videoDir, url, thumbnailPrompt
         thumbnailFlowOutputDir: null,
       };
       const dl = await downloadTranscript(url, transcriptOpts);
-      console.log('🚀 ~ processOneVideoMetaUpdate ~ dl:', dl);
       await finalizeDownloadedTranscript(url, dl, {
         ...transcriptOpts,
         // outputDir: videoDir,
@@ -127,7 +117,6 @@ export async function processOneVideoMetaUpdate({ videoDir, url, thumbnailPrompt
           console.warn('[update-meta] Không có thumbnail.webp trong thư mục video — Flow có thể không đính kèm ảnh gốc.');
         }
 
-        console.log('[update-meta] Chưa có thumbnail .png/.jpg/.jpeg → chạy Flow...');
         const { build, isNeedImage } = resolveThumbnailPromptBuilder(prompts, thumbnailPromptKey);
         try {
           await runCreateThumbnailFlow({

@@ -504,6 +504,7 @@ function ChannelsPage() {
 
       await window.runner.runScript('updateChannelVideosMeta', {
         channelFolder: selectedChannelFolder,
+        channelId: selectedChannel,
         items,
       });
     } catch (e) {
