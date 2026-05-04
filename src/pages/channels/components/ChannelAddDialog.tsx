@@ -1,44 +1,24 @@
-import { PROMPTS_CREATE_THUMBNAIL_OPTIONS } from '@contents/prompts/index.js';
-import { OPTIONS_CONTENT } from '@contents/makeFromAudio/constant.js';
-import { useCallback, useEffect, useMemo, useState } from 'react';
-import type { ChannelRow, Group } from '@/types';
 import { AppButton } from '@/components/ui/AppButton';
 import { CustomSelect } from '@/components/ui/CustomSelect';
+import type { ChannelRow, Group } from '@/types';
+import { OPTIONS_CONTENT } from '@contents/makeFromAudio/constant.js';
+import { PROMPTS_CREATE_THUMBNAIL_OPTIONS } from '@contents/prompts/index.js';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { VIDEO_PER_DAY_OPTIONS } from '../constants';
 import {
-  buildChannelRowFromAddForm,
   CHANNEL_ADD_DURATION_SELECT_OPTIONS,
-  channelFolderFromRow,
   defaultReupOverlayName,
   defaultThumbnailPrompt,
-  durationLabelToOption,
-  INDEX_VIDEO_TYPE_VALUES,
-  isValidPublishScheduleTime,
-  isValidFromAudioOverlayValue,
   isValidReupOverlayName,
   isValidthumbnailPrompt,
   labelForPublishTimeSlot,
   normalizeChannelIndexStatus,
   normalizeWallClockTimeToHHmm,
-  parseVideoPerDayCell,
   reupOverlaySelectOptions,
   timeSlotCountForVideoPerDayPreset,
   type ChannelAddDialogInitialFields,
   type VideoPerDayPreset,
 } from '../utils/channelIndexHelpers';
-import { VIDEO_PER_DAY_OPTIONS } from '../constants';
-
-function isDurationOverlap(opt1: string, opt2: string): boolean {
-  if (!opt1 || !opt2) return false;
-  const parseScale = (opt: string) => {
-    const [fromStr, toStr] = opt.split('_');
-    const from = fromStr === 'null' ? 0 : Number(fromStr);
-    const to = toStr === 'null' ? Infinity : Number(toStr);
-    return [from, to];
-  };
-  const [f1, t1] = parseScale(opt1);
-  const [f2, t2] = parseScale(opt2);
-  return f1 < t2 && f2 < t1;
-}
 
 const videoTypeOptions = [
   { value: 'reup_full', label: 'Tạo video reup toàn bộ' },
@@ -182,7 +162,7 @@ export function ChannelAddDialog({ backgroundOptions, channels = [], onClose, on
         value: String(o.value),
         label: String(o.label),
       })),
-    [],
+    []
   );
 
   const resolvedReupOverlay = useMemo(() => {

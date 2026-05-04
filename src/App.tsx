@@ -5,6 +5,7 @@ import { PipelinePage } from '@/pages/PipelinePage';
 import CreateVideoPage from '@/pages/create-video';
 import { SettingsPage } from '@/pages/SettingsPage';
 import ChannelsPage from '@/pages/channels';
+import VisualPage from '@/pages/visual';
 import { GroupsPage } from '@/pages/GroupsPage';
 import { WarningsPage } from '@/pages/WarningsPage';
 import AnalystPage from '@/pages/analyst';
@@ -93,6 +94,7 @@ export default function App() {
         )}
         {activePage === 'settings' && <SettingsPage key='settings' disabled={runningScript !== null} />}
         {activePage === 'channels' && <ChannelsPage key='channels' />}
+        {activePage === 'visual' && <VisualPage key='visual' />}
         {activePage === 'groups' && <GroupsPage key='groups' />}
         {activePage === 'warnings' && <WarningsPage key='warnings' />}
         {activePage === 'analyst' && <AnalystPage key='analyst' />}

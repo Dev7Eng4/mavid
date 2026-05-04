@@ -328,6 +328,7 @@ const SCRIPT_MAP = {
   summaryMetaFromTranscript: '../contents/scripts/summaryMetaFromTranscript.js',
   uploadYoutubeViaGpm: '../contents/youtube/uploadViaGpm.js',
   updateChannelVideosMeta: '../contents/scripts/updateChannelVideosMeta.js',
+  addVisualResource: '../contents/visual-resource/index.js',
 };
 
 ipcMain.handle('run-script', async (_event, { script, params = {} }) => {
@@ -1158,6 +1159,14 @@ ipcMain.handle('get-stats', async () => {
     outputs: countFiles(OUTPUTS_DIR) + countDirs(OUTPUTS_DIR),
     downloads: countFiles(DOWNLOADS_DIR) + countDirs(DOWNLOADS_DIR),
   };
+});
+
+// --------------- Visual Resource ---------------
+
+ipcMain.handle('list-visual-resources', async () => {
+  const moduleUrl = pathToFileURL(path.join(__dirname, '..', 'contents', 'visual-resource', 'getListVisualResources.js')).toString();
+  const { default: getListVisualResources } = await import(`${moduleUrl}?cacheBust=${Date.now()}`);
+  return getListVisualResources();
 });
 
 // --------------- Channels ---------------

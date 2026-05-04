@@ -1,4 +1,14 @@
-export type Page = 'pipeline' | 'create-video' | 'settings' | 'channels' | 'groups' | 'warnings' | 'analyst' | 'gpm' | 'logs';
+export type Page =
+  | 'pipeline'
+  | 'create-video'
+  | 'settings'
+  | 'channels'
+  | 'visual'
+  | 'groups'
+  | 'warnings'
+  | 'analyst'
+  | 'gpm'
+  | 'logs';
 
 export type ScriptId =
   | 'tao-chrome-profile'
@@ -222,7 +232,8 @@ export type DirectScriptId =
   | 'createThumbnailFlow'
   | 'summaryMetaFromTranscript'
   | 'uploadYoutubeViaGpm'
-  | 'updateChannelVideosMeta';
+  | 'updateChannelVideosMeta'
+  | 'addVisualResource';
 
 export interface ScriptResult<T = unknown> {
   success: boolean;
@@ -352,6 +363,7 @@ declare global {
         patch: Pick<MavidChannelConfig, 'channels'>;
       }) => Promise<{ ok: boolean }>;
       setChannelFolderStartFromRow: (channelFolder: string, dataRowIndex: number) => Promise<{ ok: boolean; fileName?: string }>;
+      listVisualResources: () => Promise<{ channelId: string; channelName: string; type: string }[]>;
       listBackgrounds: () => Promise<string[]>;
       listChannelFolders: () => Promise<string[]>;
       /** Email đã có trong index.xlsx hoặc file kênh con (tránh trùng khi thêm kênh). */

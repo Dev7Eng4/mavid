@@ -191,7 +191,7 @@ function ChannelsPage() {
         setDetailLoading(false);
       }
     },
-    [channels],
+    [channels]
   );
 
   useEffect(() => {
@@ -265,7 +265,7 @@ function ChannelsPage() {
         console.log(
           failures.length === queue.length
             ? `Tất cả ${failures.length} kênh lỗi: ${failures.slice(0, 3).join(' ')}${failures.length > 3 ? '…' : ''}`
-            : `Một số kênh lỗi (${failures.length}/${queue.length}): ${failures.slice(0, 4).join(' ')}${failures.length > 4 ? '…' : ''}`,
+            : `Một số kênh lỗi (${failures.length}/${queue.length}): ${failures.slice(0, 4).join(' ')}${failures.length > 4 ? '…' : ''}`
         );
       }
     } finally {
@@ -322,7 +322,7 @@ function ChannelsPage() {
 
   const pageIndexRows = useMemo(
     () => channels.slice(indexStartIndex, indexStartIndex + indexPageSize),
-    [channels, indexStartIndex, indexPageSize],
+    [channels, indexStartIndex, indexPageSize]
   );
 
   const indexPageSelectionFlags = useMemo(() => {
@@ -364,7 +364,7 @@ function ChannelsPage() {
 
   const pageDetailRows = useMemo(
     () => filteredRowsWithIndex.slice(detailStartIndex, detailStartIndex + detailPageSize),
-    [filteredRowsWithIndex, detailStartIndex, detailPageSize],
+    [filteredRowsWithIndex, detailStartIndex, detailPageSize]
   );
 
   const detailPageSelectionFlags = useMemo(() => {
@@ -557,7 +557,7 @@ function ChannelsPage() {
     if (skippedBusy.length > 0) {
       const uniq = [...new Set(skippedBusy)];
       setUploadScheduleInfo(
-        `Bỏ qua ${uniq.length} email đang upload trên luồng khác: ${uniq.join(', ')}. Chờ xong rồi mới chạy lại cho các email đó.`,
+        `Bỏ qua ${uniq.length} email đang upload trên luồng khác: ${uniq.join(', ')}. Chờ xong rồi mới chạy lại cho các email đó.`
       );
     }
 
@@ -617,8 +617,8 @@ function ChannelsPage() {
         if (fail > 0) parts.push(`${fail} kênh lỗi`);
         setUploadScheduleInfo(
           `${skipNote}Upload YouTube (${claimed.length} kênh, tối đa ${MAX_CONCURRENT_YOUTUBE_UPLOAD_CHANNELS} song song): ${parts.join(
-            ' — ',
-          )}. Kiểm tra GPM / YouTube Studio và tab Logs.`,
+            ' — '
+          )}. Kiểm tra GPM / YouTube Studio và tab Logs.`
         );
       } catch (e) {
         const msg = e instanceof Error ? e.message : String(e);
@@ -665,7 +665,7 @@ function ChannelsPage() {
           videos: onlyLinks,
         },
       ],
-      defaultMaxVideosPerBatchDetail,
+      defaultMaxVideosPerBatchDetail
     );
   }, [selectedChannel, channelVideos, detailSelectedRowIndices, channels, defaultMaxVideosPerBatchDetail, runCreateVideoForQueue]);
 
@@ -746,7 +746,7 @@ function ChannelsPage() {
         setMappingStatus(null);
       }
     },
-    [channels],
+    [channels]
   );
 
   return (

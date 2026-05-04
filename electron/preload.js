@@ -18,6 +18,7 @@ contextBridge.exposeInMainWorld('runner', {
   writeMavidChannelConfig: payload => ipcRenderer.invoke('write-mavid-channel-config', payload),
   setChannelFolderStartFromRow: (channelFolder, dataRowIndex) =>
     ipcRenderer.invoke('set-channel-folder-start-from-row', { channelFolder, dataRowIndex }),
+  listVisualResources: () => ipcRenderer.invoke('list-visual-resources'),
   listBackgrounds: () => ipcRenderer.invoke('list-backgrounds'),
   listChannelFolders: () => ipcRenderer.invoke('list-channel-folders'),
   listRegisteredChannelEmails: () => ipcRenderer.invoke('list-registered-channel-emails'),
