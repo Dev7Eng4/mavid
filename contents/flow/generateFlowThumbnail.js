@@ -6,10 +6,10 @@
  *  2. `resolveThumbnailPromptBuilder(prompts, thumbnailPromptKey)` — chọn builder + có cần ảnh tham chiếu.
  *  3. Build prompt cho Flow:
  *     - Mặc định: `build(title, summary)`.
- *     - `thumbnailPromptKey === 'jaFulLText'`: cần thêm bước Gemini (profile 4) chạy
- *       `promptToCreateTextForThumbnail` để lấy JSON `{ lines, colors }`, rồi dùng
- *       `promptToCreateThumbnailFulLText({ lines, colors })` build prompt Flow.
- *  4. `runCreateThumbnailFlow(...)` — gọi Flow lưu ảnh `outputDir/flow-thumbnail.jpg`.
+ *     - `thumbnailPromptKey === 'jaFulLText'`: Gemini (profile 4) chạy
+ *       `promptToCreateTextForThumbnail` để lấy JSON `{ lines, colors }`, rồi render
+ *       ảnh bằng Playwright (`thumbnail.cli.js` → `thumbnailFullText.html`), không gọi Flow.
+ *  4. Các style khác: `runCreateThumbnailFlow(...)` — Flow lưu `outputDir/flow-thumbnail.jpg`.
  *  5. `optimizeFlowThumbnailJpegIfLarge(...)` — re-encode JPG nếu vượt ngưỡng kích thước.
  *
  * Caller chịu trách nhiệm bao try/catch nếu muốn không dừng pipeline khi Flow lỗi.
@@ -19,6 +19,7 @@ import { THUMBNAIL_PROMPTS } from '../constant/index.js';
 import { openGeminiPage, sendPromptToGeminiWithRetry } from '../gemini/browser.util.js';
 import { loadPromptByLanguage, resolveThumbnailPromptBuilder } from '../prompts/index.js';
 import { openChromeProfile } from '../scripts/makeChromeProfile.js';
+import { renderThumbnailFullTextToPath } from '../thumbnail/thumbnail.cli.js';
 import { runCreateThumbnailFlow } from './runCreateThumbnail.js';
 import { optimizeFlowThumbnailJpegIfLarge } from './thumbnailOptimize.util.js';
 
@@ -65,7 +66,7 @@ function validateThumbnailFulLTextJson(raw) {
 
 /**
  * Mở Gemini (profile 4), chạy `promptToCreateTextForThumbnail` rồi parse JSON
- * trả về object `{ lines, colors }` để feed vào `promptToCreateThumbnailFulLText`.
+ * trả về object `{ lines, colors }` để render thumbnail (Playwright, không qua Flow).
  *
  * @param {object} params
  * @param {Record<string, any>} params.prompts
@@ -118,20 +119,22 @@ export async function generateFlowThumbnailFromGemini({
   const prompts = await loadPromptByLanguage(language);
   const { build, isNeedImage } = resolveThumbnailPromptBuilder(prompts, thumbnailPromptKey);
 
-  let flowPrompt;
   if (thumbnailPromptKey === 'jaFulLText') {
     const { lines, colors } = await generateFulLTextLinesColorsViaGemini({ prompts, title, summary, logTag });
-    flowPrompt = prompts.promptToCreateThumbnailFulLText({ lines, colors });
+    await renderThumbnailFullTextToPath({
+      lines,
+      colors,
+      outPath: path.join(outputDir, 'flow-thumbnail.jpg'),
+    });
   } else {
-    flowPrompt = build(title, summary);
+    const flowPrompt = build(title, summary);
+    await runCreateThumbnailFlow({
+      prompt: flowPrompt,
+      pathSave: outputDir,
+      exportName: 'flow-thumbnail',
+      isNeedImage: false,
+    });
   }
-
-  await runCreateThumbnailFlow({
-    prompt: flowPrompt,
-    pathSave: outputDir,
-    exportName: 'flow-thumbnail',
-    isNeedImage: false,
-  });
   const flowThumbPath = path.join(outputDir, 'flow-thumbnail.jpg');
   await optimizeFlowThumbnailJpegIfLarge(flowThumbPath);
   console.log(`[${logTag}] Đã lưu flow-thumbnail.jpg`);

@@ -1,0 +1,155 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="utf-8" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@900&display=swap" rel="stylesheet" />
+    <style>
+      body {
+        margin: 0;
+        background: #050a14;
+      }
+      #thumbCanvas {
+        display: block;
+      }
+    </style>
+  </head>
+  <body>
+    <canvas id="thumbCanvas" width="1280" height="720"></canvas>
+
+    <script>
+      const W = 1280;
+      const H = 720;
+      const canvas = document.getElementById('thumbCanvas');
+      const ctx = canvas.getContext('2d');
+
+      /** @type {{ L1: string, L2: string, L3: string, L4: string, L5: string }} */
+      const DEFAULT_LINES = {
+        L1: '',
+        L2: '',
+        L3: '',
+        L4: '',
+        L5: '',
+      };
+
+      /** @type {{ L1: string, L2: string, L3: string, L4: string, L5: string, canvas_from: string, canvas_to: string }} */
+      const DEFAULT_COLORS = {
+        L1: '#FF66B2',
+        L2: '#FFFFFF',
+        L3: '#FF3300',
+        L4: '#FFFFFF',
+        L5: '#FF50A8',
+        canvas_from: '#16223d',
+        canvas_to: '#050a14',
+      };
+
+      function mergeThumbnailPayload(raw) {
+        const out = {
+          lines: { ...DEFAULT_LINES },
+          colors: { ...DEFAULT_COLORS },
+        };
+        if (raw && typeof raw === 'object') {
+          if (raw.lines && typeof raw.lines === 'object') Object.assign(out.lines, raw.lines);
+          if (raw.colors && typeof raw.colors === 'object') Object.assign(out.colors, raw.colors);
+        }
+        return out;
+      }
+
+      /**
+       * @param {typeof DEFAULT_LINES} lines
+       * @param {typeof DEFAULT_COLORS} colors
+       */
+      async function drawThumbnail(lines, colors) {
+        const from = colors.canvas_from ?? DEFAULT_COLORS.canvas_from;
+        const to = colors.canvas_to ?? DEFAULT_COLORS.canvas_to;
+        const bg = ctx.createLinearGradient(0, 0, 0, H);
+        bg.addColorStop(0, from);
+        bg.addColorStop(1, to);
+        ctx.fillStyle = bg;
+        ctx.fillRect(0, 0, W, H);
+
+        await document.fonts.load(`900 220px "Noto Sans JP"`);
+        await document.fonts.ready;
+
+        const sideMargin = 15;
+        const maxTextWidth = W - 2 * sideMargin;
+
+        const jp = '900 %sizepx "Noto Sans JP", "Hiragino Sans", "Hiragino Kaku Gothic ProN", "Meiryo", "MS Gothic", sans-serif';
+
+        function drawText(text, x, y, fontSize, color, strokeColor, strokeWidth, isGlow = false) {
+          ctx.font = jp.replace('%size', String(fontSize));
+          ctx.textBaseline = 'alphabetic';
+          ctx.lineJoin = 'round';
+          ctx.miterLimit = 2;
+
+          const naturalW = ctx.measureText(text).width;
+          const scaleX = naturalW > maxTextWidth ? maxTextWidth / naturalW : 1;
+          const lineW = scaleX < 1 ? strokeWidth / scaleX : strokeWidth;
+
+          /** Độ dày giả lập (theo px màn hình); bù scale ngang để không bị mảnh khi nén. */
+          const boldScreenPx = Math.max(0.45, fontSize * 0.0055);
+          const bdx = boldScreenPx / scaleX;
+          const bdy = boldScreenPx;
+          const boldDirs = [
+            [bdx, 0],
+            [-bdx, 0],
+            [0, bdy],
+            [0, -bdy],
+          ];
+
+          ctx.save();
+          ctx.translate(x, y);
+          ctx.scale(scaleX, 1);
+          ctx.textAlign = 'left';
+          const leftX = -naturalW / 2;
+
+          ctx.shadowBlur = 0;
+          ctx.shadowOffsetX = 0;
+          ctx.shadowOffsetY = 0;
+          ctx.strokeStyle = strokeColor;
+          ctx.lineWidth = lineW;
+          ctx.strokeText(text, leftX, 0);
+
+          ctx.fillStyle = color;
+          for (const [ox, oy] of boldDirs) {
+            ctx.fillText(text, leftX + ox, oy);
+          }
+
+          if (isGlow) {
+            ctx.shadowColor = color;
+            ctx.shadowBlur = scaleX < 1 ? 32 / scaleX : 32;
+          }
+          ctx.fillText(text, leftX, 0);
+          ctx.shadowBlur = 0;
+          ctx.restore();
+        }
+
+        const x = W / 2;
+        const stroke = '#000000';
+
+        drawText(String(lines.L1 ?? ''), x, 100, 100, colors.L1, stroke, 10);
+        drawText(String(lines.L2 ?? ''), x, 210, 100, colors.L2, stroke, 8);
+        drawText(String(lines.L3 ?? ''), x, 320, 100, colors.L3, stroke, 26 / 3);
+        drawText(String(lines.L4 ?? ''), x, 430, 100, colors.L4, stroke, 8);
+        drawText(String(lines.L5 ?? ''), x, 668, 220, colors.L5, stroke, 21, false);
+      }
+
+      function runThumbnailFromPayload() {
+        const payload = mergeThumbnailPayload(window.__THUMB_PAYLOAD__);
+        return drawThumbnail(payload.lines, payload.colors);
+      }
+
+      window.drawThumbnail = drawThumbnail;
+      window.mergeThumbnailPayload = mergeThumbnailPayload;
+
+      runThumbnailFromPayload()
+        .then(() => {
+          window.__THUMBNAIL_READY__ = true;
+        })
+        .catch(e => {
+          window.__THUMBNAIL_ERROR__ = String(e);
+        });
+    </script>
+  </body>
+</html>
