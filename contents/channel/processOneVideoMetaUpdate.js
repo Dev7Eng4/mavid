@@ -8,10 +8,8 @@ import { downloadTranscript, finalizeDownloadedTranscript } from '../downloadVid
 import { readVideoMetaFile, writeVideoMetaFile, geminiMetaFieldsIncomplete, mergeGeminiIntoVideoMeta } from './videoMetaFile.util.js';
 import { hasRasterThumbnailInFolder } from './videoFolderThumbnail.util.js';
 import { extractYoutubeVideoId } from './youtubeUrl.util.js';
-import { loadPromptByLanguage, resolveThumbnailPromptBuilder } from '../prompts/index.js';
-import { runCreateThumbnailFlow } from '../flow/runCreateThumbnail.js';
+import { generateFlowThumbnailFromGemini } from '../flow/generateFlowThumbnail.js';
 import { FLOW_DOWNLOADS_DIR } from '../flow/paths.util.js';
-import { optimizeFlowThumbnailJpegIfLarge } from '../flow/thumbnailOptimize.util.js';
 import { detectVideoLang } from '../utils/detectLanguage.util.js';
 
 /** Xóa toàn bộ nội dung trong `downloads/` (transcript + Flow dùng chung thư mục này). */
@@ -69,7 +67,6 @@ export async function processOneVideoMetaUpdate({ videoDir, url, thumbnailPrompt
     }
 
     const detechtedLang = detectVideoLang(meta.title);
-    const prompts = await loadPromptByLanguage(detechtedLang);
 
     if (needGemini) {
       const { videoTitle, description, tags } = transcriptHintsFromVideoMeta(meta);
@@ -117,17 +114,15 @@ export async function processOneVideoMetaUpdate({ videoDir, url, thumbnailPrompt
           console.warn('[update-meta] Không có thumbnail.webp trong thư mục video — Flow có thể không đính kèm ảnh gốc.');
         }
 
-        const { build, isNeedImage } = resolveThumbnailPromptBuilder(prompts, thumbnailPromptKey);
         try {
-          await runCreateThumbnailFlow({
-            prompt: build(titleG, summaryG),
-            pathSave: videoDir,
-            exportName: 'flow-thumbnail',
-            isNeedImage,
+          await generateFlowThumbnailFromGemini({
+            title: titleG,
+            summary: summaryG,
+            outputDir: videoDir,
+            language: detechtedLang,
+            thumbnailPromptKey,
+            logTag: 'update-meta',
           });
-          const flowThumbPath = path.join(videoDir, 'flow-thumbnail.jpg');
-          await optimizeFlowThumbnailJpegIfLarge(flowThumbPath);
-          console.log('[update-meta] Đã lưu flow-thumbnail.jpg');
         } catch (e) {
           const msg = e instanceof Error ? e.message : String(e);
           console.warn(`[update-meta] Flow thumbnail: ${msg}`);

@@ -425,119 +425,69 @@ OUTPUT:
 A high-CTR Japanese dating thumbnail. The real woman is on the far right. The left 80% is a dense wall of 5 narrative lines using the [White - Red - Yellow - White - Pink] hierarchy on a linear pink background.
 `;
 
-export const promptToCreateFulLText = (title, summary) => `
-You are an elite YouTube thumbnail designer specializing in EXTREME HIGH-CTR "100% TEXT ONLY" thumbnails (NO PERSON, NO SUBJECT).
+export const promptToCreateThumbnailFulLText = ({ lines, colors }) => `
+YouTube thumbnail, 1280x720 pixels, 16:9 landscape.
+Typography poster. Fulltext only.
+No photography. No illustrations. No decorative elements.
 
-Your goal is to create a dense, aggressive "Wall of Text" thumbnail that dominates the entire frame (95–100% text coverage), optimized for maximum curiosity and clicks across ALL niches.
+═══ CANVAS BACKGROUND ═══
+Full canvas: smooth vertical gradient from ${colors.canvas_from} (top) to ${colors.canvas_to} (bottom).
+Dark, deep, cinematic.
+Absolutely zero grain, zero noise, zero texture, zero film grain, zero vignette.
+Pure smooth color transition only.
 
---------------------------------------------------
-INPUT:
-- Title: ${title}
-- Summary: ${summary}
+═══ OUTPUT DIMENSIONS ═══
+Exactly 1280x720 pixels. Do not crop. Do not add letterbox or pillarbox.
 
---------------------------------------------------
-CORE STYLE:
-- NO human subjects
-- NO faces
-- NO objects as main focus
-- NO background text blocks (NO colored rectangles)
-- ONLY TEXT layered directly on background
+═══ LAYOUT ═══
+5 lines of Japanese text stacked vertically.
+NO background color block behind any text line.
+Text renders directly on canvas gradient.
+All text: LEFT-ALIGNED, 60px from left canvas edge. Do NOT center any text.
+All text must stay within safe zone: left 60px, right 60px (max text width: 1160px).
+If any line would exceed 1160px width, reduce that line's font size proportionally to fit.
 
-Background:
-- Dark gradient (black → deep blue / dark grey)
-- Strong vignette
-- Subtle texture/noise for depth
+Top zone    (y:   0px – 461px): Lines 1–4, each 115px height.
+Bottom zone (y: 461px – 720px): Line 5 only, 259px height.
 
---------------------------------------------------
-AUTO TEXT GENERATION:
-Generate 5 LONG Japanese lines (16–24 characters each).
+═══ LINES 1–4 ═══
+Font size: 72px
+Font: ultra-heavy gothic condensed Japanese, weight 900
+      Style: extremely thick strokes, minimal stroke variation, flat terminals,
+             compressed horizontally — like Japanese pachinko/manga title lettering.
+Each line: optically centered (not mathematically) within its 115px zone.
+Left-aligned, 60px from left edge.
+Stroke: 4px solid #000000 surrounding each character, hard edge, no blur.
 
-Structure:
-- LINE 1: Hook / shocking premise
-- LINE 2: Conflict / problem
-- LINE 3: Hidden truth / reveal
-- LINE 4: Statement or quote 「」
-- LINE 5: Final trigger / result / twist
+LINE 1 (y: 0–115px):   '${lines.L1}'  color: ${colors.L1}
+LINE 2 (y: 115–230px): '${lines.L2}'  color: ${colors.L2}
+LINE 3 (y: 230–345px): '${lines.L3}'  color: ${colors.L3}
+LINE 4 (y: 345–461px): '${lines.L4}'  color: ${colors.L4}
 
-Rules:
-- Must feel like a continuous escalating story
-- Each line must be long (no short phrases)
-- Avoid generic wording
-- Adapt tone to niche (drama, finance, tech, self-help, news)
+═══ LINE 5 (hero text) ═══
+Zone: y 461px – 720px (259px height)
+Text: '${lines.L5}'
+Color: ${colors.L5}
+Font size: 108px (exactly 1.5x lines 1–4)
+Font weight: 900, same ultra-heavy gothic condensed as above.
+Stroke: 7px solid #000000 surrounding each character, hard edge, no blur.
+Glow: soft outer glow matching ${colors.L5} color — warm and luminous, not white.
+Optically centered within bottom zone.
+Left-aligned, 60px from left edge.
 
---------------------------------------------------
-DYNAMIC COLOR SYSTEM (MANDATORY):
+═══ TYPOGRAPHY RULES ═══
+Script: Japanese (日本語), Kanji and Kana mixed.
+Letter spacing: tight, condensed.
+Single line per entry — absolutely no text wrapping.
+Zero blur — sharp, crisp, hard edges on all characters.
 
-The AI must automatically choose a color palette based on the content niche and emotional tone.
-
-STRICT RULES:
-
-1. CONTRAST FIRST:
-   - Text must ALWAYS be readable on small screens
-   - High contrast vs background is mandatory
-
-2. LIMITED PALETTE:
-   - Use ONLY 3–4 main colors
-   - Avoid random or rainbow colors
-
-3. VISUAL HIERARCHY:
-   - LINE 5 = brightest, most dominant color
-   - LINE 1–4 = supporting colors
-
-4. STROKE & GLOW (REQUIRED):
-   - All text must have thick stroke (black or dark)
-   - Add outer glow or shadow for separation
-
---------------------------------------------------
-COLOR MOOD GUIDELINE:
-
-- Drama:
-  Red / Yellow / Black / White
-
-- Finance:
-  Gold / Green / Black / White
-
-- Tech / AI:
-  Cyan / Blue / Purple / Black
-
-- Self-help:
-  Yellow / White / Orange / Blue
-
-- News:
-  Red / White / Black
-
-(Colors are NOT fixed — must adapt intelligently)
-
---------------------------------------------------
-TYPOGRAPHY:
-- Ultra bold Japanese Gothic font (condensed)
-- Extremely large text
-- Tight spacing (almost touching)
-- Slight variation in size/angle allowed
-
---------------------------------------------------
-DEPTH & LAYERING:
-- Slight overlap between lines
-- Use glow + shadow to create depth
-- LINE 5 must be the closest visual layer
-- Other lines slightly less dominant
-
---------------------------------------------------
-COMPOSITION:
-- Text fills 95–100% of the frame
-- NO empty space
-- Dense, aggressive layout
-- Slight controlled chaos is allowed
-- LINE 5 can overlap other lines
-
---------------------------------------------------
-VISUAL QUALITY:
-- Ultra sharp (8K feel)
-- High contrast
-- Clean edges (no blur on text)
-- Readable at very small size
-
---------------------------------------------------
-OUTPUT:
-A fully text-based, high-energy YouTube thumbnail with NO background blocks, using dynamic color selection, strong typography, and dense composition to maximize CTR across any niche.
+═══ STRICTLY FORBIDDEN ═══
+No background blocks or color bands behind any text.
+No people, faces, characters, anime, manga, illustrations.
+No icons, borders, frames, decorations, emojis, symbols.
+No centered text — LEFT-ALIGN only.
+No extra text beyond the 5 specified lines.
+No English text, no watermarks, no labels.
+No textures, patterns, grain, or noise on canvas.
+No letterbox, pillarbox, or cropping.
 `;

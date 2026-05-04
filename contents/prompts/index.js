@@ -16,6 +16,7 @@ export const THUMBNAIL_PROMPT_KEY_ALIASES = {
   jaSukattoImage: 'promptToCreateThumbnailSukatto',
   jaSukattoFullText: 'promptToCreateThumbnailSukattoFulLText',
   ja2CHOnlyText: 'createPromptToCreateThumbnailOnlyTextFromImage',
+  jaFulLText: 'promptToCreateThumbnailFulLText',
 };
 
 /**
@@ -32,6 +33,7 @@ export function resolveThumbnailPromptBuilder(prompts, styleKey) {
   if (!raw) {
     return { build: def, isNeedImage: false, usedStyleKey: '', didFallback: false };
   }
+
   const k = THUMBNAIL_PROMPT_KEY_ALIASES[raw] || raw;
   const candidate = prompts[k];
   if (typeof candidate === 'function') {
@@ -43,13 +45,14 @@ export function resolveThumbnailPromptBuilder(prompts, styleKey) {
     };
   }
   console.warn(
-    `[thumbnail] Style "${raw}" (→ "${k}") không có trong gói createImage (hoặc không phải hàm) — dùng promptToCreateThumbnail (tự động).`
+    `[thumbnail] Style "${raw}" (→ "${k}") không có trong gói createImage (hoặc không phải hàm) — dùng promptToCreateThumbnail (tự động).`,
   );
   return { build: def, isNeedImage: false, usedStyleKey: '', didFallback: true };
 }
 
 export const PROMPTS_CREATE_THUMBNAIL_OPTIONS = [
   { label: 'Tự động', value: '' },
+  { label: '[JAPAN] FulL Text', value: 'jaFulLText' },
   // { label: 'Japan 2CH Chỉ text', value: 'ja2CHOnlyText' },
   {
     label: '[JAPAN] Love Story',
