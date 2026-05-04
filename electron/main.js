@@ -908,6 +908,31 @@ async function resolveStockBackgroundsDirFromDisk() {
   return path.join(root, 'backgrounds');
 }
 
+/**
+ * Đọc danh sách stock video channels từ assets/visual-resource/stock.
+ * Mỗi subfolder chứa mavid-config.json với { channelId, channelName }.
+ * @returns {{ id: string, label: string }[]}
+ */
+function listVisualResourceStockChannels() {
+  const stockDir = path.join(ROOT, 'assets', 'visual-resource', 'stock');
+  if (!fs.existsSync(stockDir)) return [];
+
+  return fs
+    .readdirSync(stockDir, { withFileTypes: true })
+    .filter(d => d.isDirectory())
+    .map(d => {
+      const configPath = path.join(stockDir, d.name, 'mavid-config.json');
+      if (!fs.existsSync(configPath)) return null;
+      try {
+        const config = JSON.parse(fs.readFileSync(configPath, 'utf-8'));
+        return { id: config.channelId || d.name, label: config.channelName || d.name };
+      } catch {
+        return null;
+      }
+    })
+    .filter(Boolean);
+}
+
 async function resolveChannelsDirFromDisk() {
   const mod = await importConstantsFresh();
   let root = typeof mod.VIDEO_STORAGE_ROOT === 'string' ? mod.VIDEO_STORAGE_ROOT.trim() : '';
@@ -945,7 +970,7 @@ async function importConstantsFresh() {
   } catch (e) {
     console.warn(
       '[MaVid] Không import được contents/constants/index.js. Dùng giá trị fallback trong main cho đến khi sửa lỗi / Lưu settings.',
-      e instanceof Error ? e.message : e,
+      e instanceof Error ? e.message : e
     );
     mod = getDefaultConstantsModule();
   }
@@ -1047,12 +1072,19 @@ ipcMain.handle('select-video-storage-folder', async (_event, { currentPath } = {
 
 ipcMain.handle('list-backgrounds', async () => {
   const dir = await resolveStockBackgroundsDirFromDisk();
-  if (!fs.existsSync(dir)) return [];
-  return fs
-    .readdirSync(dir, { withFileTypes: true })
-    .filter(d => d.isDirectory())
-    .map(d => d.name)
-    .sort((a, b) => a.localeCompare(b));
+  const localFolders = fs.existsSync(dir)
+    ? fs
+        .readdirSync(dir, { withFileTypes: true })
+        .filter(d => d.isDirectory())
+        .map(d => ({ id: d.name, label: d.name, source: 'local' }))
+    : [];
+
+  const stockChannels = listVisualResourceStockChannels().map(ch => ({
+    ...ch,
+    source: 'stock',
+  }));
+
+  return [...localFolders, ...stockChannels].sort((a, b) => a.label.localeCompare(b.label));
 });
 
 // --------------- Channel Folders ---------------

@@ -1,15 +1,15 @@
-import type { VideoFromAudioConfig } from '../types';
+import type { BackgroundOption, VideoFromAudioConfig } from '../types';
 
 /** Ưu tiên folder tên "stock video" (không phân biệt hoa thường), không có thì phần tử đầu, fallback "cat". */
-export function defaultBackgroundFolder(available: string[]): string {
+export function defaultBackgroundFolder(available: BackgroundOption[]): string {
   if (available.length === 0) return 'cat';
   const norm = (s: string) => s.trim().toLowerCase().replace(/\s+/g, ' ');
-  const idx = available.findIndex(n => norm(n) === 'stock video');
-  return idx >= 0 ? available[idx] : available[0];
+  const idx = available.findIndex(n => norm(n.label) === 'stock video');
+  return idx >= 0 ? available[idx].id : available[0].id;
 }
 
 /** Biến cấu hình UI thành biến môi trường cho script batch từ audio. */
-export function buildMavidEnvForVideoFromAudio(config: VideoFromAudioConfig, availableBackgrounds: string[]): Record<string, string> {
+export function buildMavidEnvForVideoFromAudio(config: VideoFromAudioConfig, availableBackgrounds: BackgroundOption[]): Record<string, string> {
   const source = config.backgroundSource ?? 'stock';
   let background = config.background;
   let stockCount = config.stockVideoCount;

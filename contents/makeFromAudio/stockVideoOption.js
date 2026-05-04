@@ -14,18 +14,45 @@ import { resolveStockBackgroundsDir } from '../utils/stockBackgroundsPath.js';
 import { GPU_INFO } from '../utils/hardware.util.js';
 
 import {
-  DOWNLOADS_DIR, OUTPUT_DIR, ASSET_CHART_DIR, DEFAULT_STOCK_FOLDER,
-  resolveAudioSpeed, getDuration, getAudioDurationSeconds,
-  formatClockDuration, sanitizeFilename, shuffleArray,
-  getAudioFile, getSubtitleFile, ffmpegSpawnAsync,
-  getPrebakedLogoPng, getPrebakedChartVideo,
+  DOWNLOADS_DIR,
+  OUTPUT_DIR,
+  ASSET_CHART_DIR,
+  DEFAULT_STOCK_FOLDER,
+  ROOT,
+  resolveAudioSpeed,
+  getDuration,
+  getAudioDurationSeconds,
+  formatClockDuration,
+  sanitizeFilename,
+  shuffleArray,
+  getAudioFile,
+  getSubtitleFile,
+  ffmpegSpawnAsync,
+  getPrebakedLogoPng,
+  getPrebakedChartVideo,
 } from './shared.js';
+import { prepareStockVisualClip } from './getStockVisual.js';
 
 import {
-  SUBTITLE_MARGIN_BOTTOM_PX, SUBTITLE_FONT_FILE, SUBTITLE_FONT_DIR,
-  scaleSrtTimestamps, escapePathForFfmpegSubtitles,
-  convertSrtToAss, resolveJapaneseSubtitleStyle,
+  SUBTITLE_MARGIN_BOTTOM_PX,
+  SUBTITLE_FONT_FILE,
+  SUBTITLE_FONT_DIR,
+  scaleSrtTimestamps,
+  escapePathForFfmpegSubtitles,
+  convertSrtToAss,
+  resolveJapaneseSubtitleStyle,
 } from './subtitle.js';
+
+/**
+ * Kiểm tra tên background có phải channelId trong assets/visual-resource/stock/ hay không.
+ * @param {string} name
+ * @returns {boolean}
+ */
+function isVisualResourceStock(name) {
+  if (!name) return false;
+  const configPath = path.join(ROOT, 'assets', 'visual-resource', 'stock', name, 'mavid-config.json');
+  return fs.existsSync(configPath);
+}
 
 // ==========================================
 // STOCK VIDEO CONSTANTS
@@ -245,21 +272,25 @@ export async function processStockVideo(bgNameArg, options = {}) {
   const speed = speedIn != null && Number.isFinite(Number(speedIn)) && Number(speedIn) > 0 ? Number(speedIn) : resolveAudioSpeed({});
   const stockBgRoot = resolveStockBackgroundsDir();
   let backgroundName = bgNameArg || DEFAULT_STOCK_FOLDER;
-  let backgroundsDir = path.join(stockBgRoot, backgroundName);
+  const useVisualStock = isVisualResourceStock(backgroundName);
 
-  if (!fs.existsSync(backgroundsDir)) {
-    console.warn(`Không tìm thấy folder backgrounds/${backgroundName}/ (MaVidMedia/backgrounds), thử "nature"`);
-    backgroundName = DEFAULT_STOCK_FOLDER;
+  let backgroundsDir = null;
+  if (!useVisualStock) {
     backgroundsDir = path.join(stockBgRoot, backgroundName);
+    if (!fs.existsSync(backgroundsDir)) {
+      console.warn(`Không tìm thấy folder backgrounds/${backgroundName}/ (MaVidMedia/backgrounds), thử "${DEFAULT_STOCK_FOLDER}"`);
+      backgroundName = DEFAULT_STOCK_FOLDER;
+      backgroundsDir = path.join(stockBgRoot, backgroundName);
+    }
+    if (!fs.existsSync(backgroundsDir)) {
+      throw new Error(
+        `Không tìm thấy folder stock "${backgroundName}" trong ${stockBgRoot}/ — kiểm tra Settings (VIDEO_STORAGE_ROOT) và tạo thư mục con tương ứng.`
+      );
+    }
   }
 
   if (!fs.existsSync(downloadsDir)) {
     throw new Error('Không tìm thấy folder ' + downloadsDir);
-  }
-  if (!fs.existsSync(backgroundsDir)) {
-    throw new Error(
-      `Không tìm thấy folder stock "${backgroundName}" trong ${stockBgRoot}/ — kiểm tra Settings (VIDEO_STORAGE_ROOT) và tạo thư mục con tương ứng.`,
-    );
   }
 
   const audioPath = getAudioFile(downloadsDir);
@@ -273,13 +304,29 @@ export async function processStockVideo(bgNameArg, options = {}) {
   const audioDurationAfterTempo = originalAudioDuration / speed;
   console.log(
     `Thời lượng audio gốc: ${originalAudioDuration.toFixed(1)}s, sau atempo (SPEED=${speed}): ${formatClockDuration(
-      audioDurationAfterTempo,
-    )} (${audioDurationAfterTempo.toFixed(1)}s)`,
+      audioDurationAfterTempo
+    )} (${audioDurationAfterTempo.toFixed(1)}s)`
   );
 
-  // 2. Lấy toàn bộ video stock
-  const videoPaths = getStockVideos(backgroundsDir);
-  console.log(`Đã nạp danh sách ${videoPaths.length} stock video từ thư mục (sẽ chọn ngẫu nhiên để ghép).`);
+  // 2. Lấy video stock — 2 trường hợp: local folder hoặc visual resource (YouTube)
+  const stockRenderTarget = audioDurationAfterTempo + STOCK_VIDEO.RENDER_EXTRA_SEC;
+  let stockSegments;
+  let stockTempDir = null;
+
+  if (useVisualStock) {
+    console.log(`[StockVisual] Background "${backgroundName}" là visual resource stock — tải từ YouTube...`);
+    const result = await prepareStockVisualClip(audioDurationAfterTempo);
+    if (!result.hasStock) {
+      throw new Error(`[StockVisual] Không thể tải/xử lý video stock từ visual resource "${backgroundName}".`);
+    }
+    stockTempDir = result.stockTempDir;
+    stockSegments = [{ path: result.stockClipPath, duration: stockRenderTarget, slowmoFactor: 1.0, isFlip: false }];
+  } else {
+    const videoPaths = getStockVideos(backgroundsDir);
+    console.log(`Đã nạp danh sách ${videoPaths.length} stock video từ thư mục (sẽ chọn ngẫu nhiên để ghép).`);
+    stockSegments = await buildStockSegmentPlan(videoPaths, stockRenderTarget);
+    updateStockUsage(stockSegments, backgroundsDir);
+  }
 
   // 3. Xử lý phụ đề (scale timestamps nếu SPEED != 1)
   let subtitlePath = getSubtitleFile(downloadsDir);
@@ -299,12 +346,7 @@ export async function processStockVideo(bgNameArg, options = {}) {
   const tempSubPath = subtitlePath ? path.join(OUTPUT_DIR, 'temp_sub.ass') : null;
   const outputPath = path.join(OUTPUT_DIR, `${baseName}-with-bg.mp4`);
 
-  const stockRenderTarget = audioDurationAfterTempo + STOCK_VIDEO.RENDER_EXTRA_SEC;
-  const stockSegments = await buildStockSegmentPlan(videoPaths, stockRenderTarget);
-
   console.log(`Đang dựng video Single-Pass Pipeline (${stockSegments.length} clip stock, encode: ${GPU_INFO.encoderLabel})...`);
-
-  updateStockUsage(stockSegments, backgroundsDir);
 
   const logoPathOriginal = logoPathOpt != null && String(logoPathOpt).trim() && fs.existsSync(logoPathOpt) ? logoPathOpt : null;
   const prebakedLogo = logoPathOriginal ? await getPrebakedLogoPng(logoPathOriginal, LOGO.SIZE) : null;
@@ -343,7 +385,7 @@ export async function processStockVideo(bgNameArg, options = {}) {
   const stockDecodeArgs = Array.isArray(GPU_INFO.stockDecodeArgs) ? GPU_INFO.stockDecodeArgs : [];
 
   for (const s of stockSegments) {
-    if (stockDecodeArgs.length > 0) mergeArgs.push(...stockDecodeArgs);
+    if (!useVisualStock && stockDecodeArgs.length > 0) mergeArgs.push(...stockDecodeArgs);
     if (stockSegments.length === 1 && s.duration < stockRenderTarget - 0.01) {
       mergeArgs.push('-stream_loop', '-1', '-i', s.path);
     } else {
@@ -357,7 +399,9 @@ export async function processStockVideo(bgNameArg, options = {}) {
     overlayIndex = inputIdx++;
     mergeArgs.push('-stream_loop', '-1', '-i', pathForOverlayInput);
     console.log(
-      `[overlay] Lớp phủ: ${path.basename(stockOverlaySourcePath)} (merge: ${usePrebakedOverlay ? 'cache ProRes' : 'single-pass trên bản gốc'})`,
+      `[overlay] Lớp phủ: ${path.basename(stockOverlaySourcePath)} (merge: ${
+        usePrebakedOverlay ? 'cache ProRes' : 'single-pass trên bản gốc'
+      })`
     );
   }
 
@@ -369,7 +413,9 @@ export async function processStockVideo(bgNameArg, options = {}) {
     chartIndex = inputIdx++;
     mergeArgs.push('-stream_loop', '-1', '-i', chartPathForMerge);
     console.log(
-      `[chart] Góc phải trên: ${path.basename(chartSourcePath)} (max ${CHART_CORNER_MAX_WIDTH}px rộng, lặp theo hết video, ${chartIsPrebaked ? 'cache ProRes' : 'realtime'})`,
+      `[chart] Góc phải trên: ${path.basename(chartSourcePath)} (max ${CHART_CORNER_MAX_WIDTH}px rộng, lặp theo hết video, ${
+        chartIsPrebaked ? 'cache ProRes' : 'realtime'
+      })`
     );
   }
 
@@ -385,7 +431,7 @@ export async function processStockVideo(bgNameArg, options = {}) {
   if (hasCenterImg) {
     centerImgIndex = inputIdx++;
     mergeArgs.push('-loop', '1', '-i', centerImageOverlayPath);
-    console.log(`[overlay] Ảnh nền trung tâm: ${path.basename(centerImageOverlayPath)} (60% video, opacity 0.7)`);
+    console.log(`[overlay] Ảnh nền trung tâm: ${path.basename(centerImageOverlayPath)} (80% video, opacity 0.8)`);
   }
 
   const filterParts = [];
@@ -435,8 +481,8 @@ export async function processStockVideo(bgNameArg, options = {}) {
   }
 
   if (hasCenterImg && centerImgIndex >= 0) {
-    const targetW = Math.round(STOCK_VIDEO.CANVAS_W * 0.6);
-    filterParts.push(`[${centerImgIndex}:v]fps=${STOCK_VIDEO.FPS},scale=${targetW}:-1,format=rgba,colorchannelmixer=aa=0.7[center_img]`);
+    const targetW = Math.round(STOCK_VIDEO.CANVAS_W * 0.8);
+    filterParts.push(`[${centerImgIndex}:v]fps=${STOCK_VIDEO.FPS},scale=${targetW}:-1,format=rgba,colorchannelmixer=aa=0.8[center_img]`);
     filterParts.push(`[${currentVLabel}][center_img]overlay=(main_w-overlay_w)/2:(main_h-overlay_h)/2:shortest=1[v_centered_img]`);
     currentVLabel = 'v_centered_img';
   }
@@ -455,11 +501,6 @@ export async function processStockVideo(bgNameArg, options = {}) {
 
     filterParts.push(`[${currentVLabel}]${drawboxFilter},${subFilter}[v_subbed]`);
 
-    if (useJaSubtitleStyle) {
-      console.log('Phụ đề (JA): Chữ cyan / viền đen dày, có hộp nền.');
-    } else {
-      console.log('Phụ đề: Có hộp nền.');
-    }
     currentVLabel = 'v_subbed';
   } else {
     filterParts.push(`[${currentVLabel}]null[vpadded]`);
@@ -478,7 +519,7 @@ export async function processStockVideo(bgNameArg, options = {}) {
       filterParts.push(`[${chartIndex}:v]null[chartvid]`);
     } else {
       filterParts.push(
-        `[${chartIndex}:v]scale=${wCap}:-2:flags=fast_bilinear,colorkey=0x000000:0.1:0.1,format=yuva420p,fps=${f}[chartvid]`,
+        `[${chartIndex}:v]scale=${wCap}:-2:flags=fast_bilinear,colorkey=0x000000:0.1:0.1,format=yuva420p,fps=${f}[chartvid]`
       );
     }
     filterParts.push(`[${currentVLabel}][chartvid]overlay=main_w-overlay_w-${mr}:${boxY}-overlay_h[v_charted]`);
@@ -493,7 +534,7 @@ export async function processStockVideo(bgNameArg, options = {}) {
       const r = Math.floor(LOGO.SIZE / 2);
       const geqExpr = `if(lte(hypot(X-W/2,Y-H/2),${r}),255,0)`;
       filterParts.push(
-        `[${logoIndex}:v]scale=${LOGO.SIZE}:${LOGO.SIZE}:flags=fast_bilinear,format=rgba,geq=r='r(X,Y)':g='g(X,Y)':b='b(X,Y)':a='${geqExpr}'[logo]`,
+        `[${logoIndex}:v]scale=${LOGO.SIZE}:${LOGO.SIZE}:flags=fast_bilinear,format=rgba,geq=r='r(X,Y)':g='g(X,Y)':b='b(X,Y)':a='${geqExpr}'[logo]`
       );
     }
     filterParts.push(`[${currentVLabel}][logo]overlay=main_w-overlay_w-${LOGO.MARGIN_RIGHT}:${LOGO.MARGIN_TOP}[vout_final]`);
@@ -506,14 +547,20 @@ export async function processStockVideo(bgNameArg, options = {}) {
   fs.writeFileSync(filterScriptPath, fullGraph, 'utf-8');
 
   mergeArgs.push(
-    '-filter_complex_script', filterScriptPath,
-    '-map', '[vout_final]',
-    '-map', '[aout]',
+    '-filter_complex_script',
+    filterScriptPath,
+    '-map',
+    '[vout_final]',
+    '-map',
+    '[aout]',
     ...GPU_INFO.videoEncodeArgs,
-    '-c:a', 'aac',
-    '-b:a', '128k',
-    '-t', String(audioDurationAfterTempo),
-    outputPath,
+    '-c:a',
+    'aac',
+    '-b:a',
+    '128k',
+    '-t',
+    String(audioDurationAfterTempo),
+    outputPath
   );
 
   console.log(`Đang merge nội dung Single-Pass Pipeline...`);
@@ -522,6 +569,11 @@ export async function processStockVideo(bgNameArg, options = {}) {
   if (fs.existsSync(filterScriptPath)) fs.unlinkSync(filterScriptPath);
   if (tempSubPath && fs.existsSync(tempSubPath)) fs.unlinkSync(tempSubPath);
   if (scaledSrtPath && fs.existsSync(scaledSrtPath)) fs.unlinkSync(scaledSrtPath);
+
+  if (stockTempDir && fs.existsSync(stockTempDir)) {
+    fs.rmSync(stockTempDir, { recursive: true, force: true });
+    console.log(`[StockVisual] Đã xóa thư mục tạm: ${stockTempDir}`);
+  }
 
   console.log(`\nĐã tạo: ${outputPath}`);
 

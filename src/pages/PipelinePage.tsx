@@ -65,7 +65,7 @@ export function PipelinePage({ runningScript, setRunningScript, appendErrorLog, 
     setShowVideoAudioPopup(false);
     const def = scriptDefs.find(s => s.id === VIDEO_FROM_AUDIO_SCRIPT_ID);
     if (def) {
-      const bgList = await window.runner.listBackgrounds().catch(() => [] as string[]);
+      const bgList = await window.runner.listBackgrounds().catch(() => [] as import('@/types').BackgroundOption[]);
       const extraEnv = buildMavidEnvForVideoFromAudio(config, bgList);
       await runScript(def.id, def.npmScript, extraEnv);
     }

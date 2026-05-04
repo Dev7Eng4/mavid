@@ -13,10 +13,7 @@
 import fs from 'fs';
 import os from 'os';
 import path from 'path';
-import { exec, spawn } from 'child_process';
-import { promisify } from 'util';
 import { v4 as uuidv4 } from 'uuid';
-import youtubedl from 'youtube-dl-exec';
 
 import { DEFAULT_PROMPT_LANG, STOCK_VIDEO, SUBTITLE, LOGO } from '../constants/index.js';
 import { parseSrtToObjects, objectsToIdTextFormat, srtToPlainText } from '../utils/srt.util.js';
@@ -51,6 +48,7 @@ import {
   SUBTITLE_MARGIN_BOTTOM_PX,
 } from './subtitle.js';
 import { VIDEO_MAKE_OPTION } from '../constant/index.js';
+import { prepareNarratorReactionClip, REACTION_CROP_W, REACTION_CROP_H } from './narratorReaction.js';
 
 /** Số object mỗi lần gửi cho Gemini */
 const CHUNK_SIZE = 300;
@@ -120,7 +118,7 @@ function normalizeChapterArray(chapters) {
       console.warn(
         `[normalizeChapter] Sửa "${numericValues[0].key}" → id_start: ${fixed.id_start}, "${
           numericValues[numericValues.length - 1].key
-        }" → id_end: ${fixed.id_end}`,
+        }" → id_end: ${fixed.id_end}`
       );
     } else if (fixed.id_start == null) {
       fixed.id_start = numericValues[0].val;
@@ -158,12 +156,12 @@ function deduplicateChapters(chapters) {
       const currRange = Number(curr.id_end) - currStart;
       if (currRange > prevRange) {
         console.warn(
-          `[deduplicateChapters] Thay chapter [${prev.id_start}-${prev.id_end}] bằng [${curr.id_start}-${curr.id_end}] (range rộng hơn)`,
+          `[deduplicateChapters] Thay chapter [${prev.id_start}-${prev.id_end}] bằng [${curr.id_start}-${curr.id_end}] (range rộng hơn)`
         );
         result[result.length - 1] = curr;
       } else {
         console.warn(
-          `[deduplicateChapters] Bỏ chapter trùng [${curr.id_start}-${curr.id_end}] (nằm trong [${prev.id_start}-${prev.id_end}])`,
+          `[deduplicateChapters] Bỏ chapter trùng [${curr.id_start}-${curr.id_end}] (nằm trong [${prev.id_start}-${prev.id_end}])`
         );
       }
     } else {
@@ -173,7 +171,7 @@ function deduplicateChapters(chapters) {
 
   if (result.length < chapters.length) {
     console.log(
-      `[deduplicateChapters] Đã loại ${chapters.length - result.length} chapters trùng lặp (${chapters.length} → ${result.length}).`,
+      `[deduplicateChapters] Đã loại ${chapters.length - result.length} chapters trùng lặp (${chapters.length} → ${result.length}).`
     );
   }
   return result;
@@ -240,7 +238,7 @@ function enforceSequentialScenes(scenes) {
       console.warn(
         `[enforceSequentialScenes] Loại scene [${curr.start_index}-${curr.end_index}]: ` +
           `start_index (${curr.start_index}) <= end_index của scene trước (${prev.end_index}) ` +
-          `[${prev.start_index}-${prev.end_index}].`,
+          `[${prev.start_index}-${prev.end_index}].`
       );
       continue;
     }
@@ -250,7 +248,7 @@ function enforceSequentialScenes(scenes) {
 
   if (result.length < scenes.length) {
     console.log(
-      `[enforceSequentialScenes] Đã loại ${scenes.length - result.length} scenes vi phạm thứ tự (${scenes.length} → ${result.length}).`,
+      `[enforceSequentialScenes] Đã loại ${scenes.length - result.length} scenes vi phạm thứ tự (${scenes.length} → ${result.length}).`
     );
   }
   return result;
@@ -408,7 +406,7 @@ async function generateChapters(allObjects, globalNiche, prompts) {
   const activeConcurrency = Math.min(PROFILE_IDS.length, totalChunks);
 
   console.log(
-    `[Option 2] Mở ${activeConcurrency} Chrome profile (${PROFILE_IDS.slice(0, activeConcurrency).join(',')}) cho ${totalChunks} đoạn...`,
+    `[Option 2] Mở ${activeConcurrency} Chrome profile (${PROFILE_IDS.slice(0, activeConcurrency).join(',')}) cho ${totalChunks} đoạn...`
   );
 
   let nextChunkIndex = 0;
@@ -461,7 +459,7 @@ async function generateChapters(allObjects, globalNiche, prompts) {
             console.log(
               `[Option 2] Đoạn ${i + 1}/${totalChunks}: Đã nhận ${
                 Array.isArray(chapterResults[i]) ? chapterResults[i].length : 1
-              } chapter(s).`,
+              } chapter(s).`
             );
           } catch (parseErr) {
             console.error(`[Option 2] Đoạn ${i + 1}/${totalChunks}: Không parse được JSON:`, parseErr.message);
@@ -627,7 +625,7 @@ async function generateScenePrompts(allChapters, allObjects, visualBible, prompt
                 transcript: transcriptLines,
               },
               null,
-              2,
+              2
             ),
           });
 
@@ -676,7 +674,7 @@ async function generateScenePrompts(allChapters, allObjects, visualBible, prompt
 
   console.log(
     `\n[Option 2] Bước 5 hoàn thành: Tổng cộng ${chapterImagePrompts.length} scenes hợp lệ ` +
-      `(từ ${flatScenePrompts.length} scenes thô) qua ${totalChaptersForScene} chapters.`,
+      `(từ ${flatScenePrompts.length} scenes thô) qua ${totalChaptersForScene} chapters.`
   );
 
   return { chapterImagePrompts, sceneResults };
@@ -772,107 +770,15 @@ async function generateImagesFromScenePrompts(chapterImagePrompts, downloadsDir)
   console.log(`\n[AGI Bước 7] Hoàn thành: ${successCount}/${allScenes.length} images tạo thành công tại ${imagesDir}`);
 }
 
-const execAsync = promisify(exec);
-
-/** URL video YouTube dùng làm reaction overlay */
-const REACTION_VIDEO_URL = 'https://www.youtube.com/watch?v=SB9mlwQmBHw';
-/** Bỏ bao nhiêu giây đầu video reaction */
-const REACTION_SKIP_SEC = 120;
-/** Kích thước crop reaction overlay (px) */
-const REACTION_CROP_W = 300;
-const REACTION_CROP_H = 300;
-/** Margin trái của reaction overlay */
-const REACTION_MARGIN_LEFT = 20;
-
-/**
- * Tải video YouTube (chỉ video, không audio) ở chất lượng HD.
- * @param {string} url
- * @param {string} outputDir
- * @returns {Promise<string>} Đường dẫn file video đã tải
- */
-async function downloadYoutubeVideoOnly(url, outputDir) {
-  fs.mkdirSync(outputDir, { recursive: true });
-  const outputTemplate = path.join(outputDir, 'reaction_raw.%(ext)s');
-
-  console.log('[Reaction] Đang tải video reaction (video only, HD)...');
-
-  const subprocess = youtubedl.exec(url, {
-    output: outputTemplate,
-    format: 'bestvideo[height<=720][vcodec^=avc1]/bestvideo[height<=720]/bestvideo[vcodec^=avc1]/bestvideo',
-    noCheckCertificates: true,
-    noWarnings: true,
-    addHeader: ['referer:youtube.com', 'user-agent:googlebot'],
-  });
-
-  subprocess.stderr?.on('data', chunk => {
-    const text = chunk.toString();
-    const match = text.match(/(\d+\.?\d*)%/);
-    if (match) process.stdout.write(`\r[Reaction] Đang tải: ${parseFloat(match[1]).toFixed(1)}%`);
-  });
-
-  await subprocess;
-  process.stdout.write('\n');
-  console.log('[Reaction] Tải video reaction xong!');
-
-  // Tìm file vừa tải
-  const files = fs.readdirSync(outputDir).filter(f => f.startsWith('reaction_raw.'));
-  if (files.length === 0) throw new Error('[Reaction] Không tìm thấy file reaction sau khi tải.');
-  return path.join(outputDir, files[0]);
-}
-
-/**
- * Chuẩn bị clip reaction overlay:
- * 1. Cắt bỏ 2 phút đầu
- * 2. Cắt chỉ lấy đủ thời gian video cần tạo
- * 3. Crop 300×300 từ phần giữa dưới video
- *
- * @param {string} rawVideoPath - Đường dẫn video reaction gốc
- * @param {number} targetDuration - Thời lượng video cần tạo (giây)
- * @param {string} outputDir - Thư mục lưu file tạm
- * @returns {Promise<string>} Đường dẫn file clip đã xử lý
- */
-async function prepareReactionOverlay(rawVideoPath, targetDuration, outputDir) {
-  const overlayPath = path.join(outputDir, 'reaction_overlay.mp4');
-
-  console.log(
-    `[Reaction] Chuẩn bị overlay: bỏ ${REACTION_SKIP_SEC}s đầu, lấy ${targetDuration.toFixed(1)}s, crop ${REACTION_CROP_W}x${REACTION_CROP_H} giữa dưới...`,
-  );
-
-  // Sử dụng 1 lệnh ffmpeg duy nhất: seek → crop bottom center → trim duration
-  const cmd = [
-    'ffmpeg',
-    '-hide_banner',
-    '-loglevel',
-    'error',
-    '-y',
-    '-ss',
-    String(REACTION_SKIP_SEC),
-    '-i',
-    rawVideoPath,
-    '-t',
-    String(targetDuration),
-    '-vf',
-    `crop=${REACTION_CROP_W}:${REACTION_CROP_H}:(iw-${REACTION_CROP_W})/2:ih-${REACTION_CROP_H}`,
-    '-an',
-    '-c:v',
-    'libx264',
-    '-preset',
-    'fast',
-    '-crf',
-    '23',
-    overlayPath,
-  ].map(String);
-
-  await execAsync(cmd.join(' '), { maxBuffer: 64 * 1024 * 1024 });
-  console.log(`[Reaction] Đã tạo overlay clip: ${overlayPath}`);
-  return overlayPath;
-}
-
 /**
  * Xử lý tạo video dành riêng cho chế độ `imageNoise`:
- * Ảnh nền toàn màn hình + video noise bỏ nền đen + audio + phụ đề + reaction overlay.
+ * Ảnh nền toàn màn hình + video noise bỏ nền đen + audio + phụ đề.
+ * Nếu `showNarrator = true` → thêm reaction overlay (narrator webcam).
  *
  * Lưu ý: hàm xoá `bgImgPath` ở cuối — nếu test với ảnh thật cần copy ra file tạm trước khi gọi.
+ *
+ * @param {object} [options]
+ * @param {boolean} [options.showNarrator=false] - Hiển thị narrator reaction overlay
  */
 export async function processImageNoiseVideo(options = {}, bgImgPath) {
   const {
@@ -886,6 +792,7 @@ export async function processImageNoiseVideo(options = {}, bgImgPath) {
     logoPath: logoPathOpt,
     downloadsDir = DOWNLOADS_DIR,
     videoLanguage,
+    showNarrator = false,
   } = options;
 
   const speed = speedIn != null && Number.isFinite(Number(speedIn)) && Number(speedIn) > 0 ? Number(speedIn) : resolveAudioSpeed({});
@@ -898,7 +805,7 @@ export async function processImageNoiseVideo(options = {}, bgImgPath) {
   const originalAudioDuration = await getAudioDurationSeconds(audioPath);
   const audioDurationAfterTempo = originalAudioDuration / speed;
   console.log(
-    `Thời lượng audio: ${originalAudioDuration.toFixed(1)}s, sau atempo (SPEED=${speed}): ${formatClockDuration(audioDurationAfterTempo)}`,
+    `Thời lượng audio: ${originalAudioDuration.toFixed(1)}s, sau atempo (SPEED=${speed}): ${formatClockDuration(audioDurationAfterTempo)}`
   );
 
   let subtitlePath = getSubtitleFile(downloadsDir);
@@ -928,21 +835,16 @@ export async function processImageNoiseVideo(options = {}, bgImgPath) {
   const noiseInputPath = prebakedNoise || noisePath;
   const noiseIsPrebaked = Boolean(prebakedNoise);
 
-  // ─── Reaction overlay: download + prepare ───
+  // ─── Narrator reaction overlay: chỉ tải + chuẩn bị khi showNarrator = true ───
   let reactionOverlayPath = null;
-  const reactionTempDir = path.join(OUTPUT_DIR, '_reaction_tmp');
-  try {
-    fs.mkdirSync(reactionTempDir, { recursive: true });
-    const rawReactionPath = await downloadYoutubeVideoOnly(REACTION_VIDEO_URL, reactionTempDir);
-    console.log('🚀 ~ processImageNoiseVideo ~ rawReactionPath:', rawReactionPath);
-    reactionOverlayPath = await prepareReactionOverlay(rawReactionPath, audioDurationAfterTempo, reactionTempDir);
-    console.log('🚀 ~ processImageNoiseVideo ~ reactionOverlayPath:', reactionOverlayPath);
-  } catch (err) {
-    console.warn(`[Reaction] Không thể chuẩn bị reaction overlay — bỏ qua: ${err.message}`);
-    reactionOverlayPath = null;
+  let reactionTempDir = null;
+  let hasReaction = false;
+  if (showNarrator) {
+    const result = await prepareNarratorReactionClip(audioDurationAfterTempo);
+    reactionOverlayPath = result.reactionOverlayPath;
+    reactionTempDir = result.reactionTempDir;
+    hasReaction = result.hasReaction;
   }
-  const hasReaction = reactionOverlayPath && fs.existsSync(reactionOverlayPath);
-  console.log('🚀 ~ processImageNoiseVideo ~ hasReaction:', hasReaction);
 
   const mergeArgs = ['-y'];
   let inputIdx = 0;
@@ -1015,7 +917,7 @@ export async function processImageNoiseVideo(options = {}, bgImgPath) {
       `crop=${zpW}:${zpH},` +
       `zoompan=z='${zoomExpr}':` +
       `d=${totalFrames}:x='${panX}':y='${panY}':s=${w}x${h}:fps=${fps},` +
-      `format=yuv420p,setsar=1[bg]`,
+      `format=yuv420p,setsar=1[bg]`
   );
 
   let currentVLabel = 'bg';
@@ -1025,7 +927,7 @@ export async function processImageNoiseVideo(options = {}, bgImgPath) {
       filterParts.push(`[${noiseIndex}:v]null[noise]`);
     } else {
       filterParts.push(
-        `[${noiseIndex}:v]fps=${fps},scale=${w}:${h}:flags=fast_bilinear,format=yuva420p,colorkey=0x000000:0.1:0.1,colorchannelmixer=aa=${NOISE_ALPHA}[noise]`,
+        `[${noiseIndex}:v]fps=${fps},scale=${w}:${h}:flags=fast_bilinear,format=yuva420p,colorkey=0x000000:0.1:0.1,colorchannelmixer=aa=${NOISE_ALPHA}[noise]`
       );
     }
     filterParts.push(`[${currentVLabel}][noise]overlay=0:0:shortest=1[v_noised]`);
@@ -1058,7 +960,7 @@ export async function processImageNoiseVideo(options = {}, bgImgPath) {
     const rRadius = Math.floor(REACTION_CROP_W / 2);
     const circleGeq = `if(lte(hypot(X-W/2,Y-H/2),${rRadius}),255,0)`;
     filterParts.push(
-      `[${reactionIndex}:v]fps=${fps},scale=${REACTION_CROP_W}:${REACTION_CROP_H}:flags=fast_bilinear,format=rgba,geq=r='r(X,Y)':g='g(X,Y)':b='b(X,Y)':a='${circleGeq}'[reaction]`,
+      `[${reactionIndex}:v]fps=${fps},scale=${REACTION_CROP_W}:${REACTION_CROP_H}:flags=fast_bilinear,format=rgba,geq=r='r(X,Y)':g='g(X,Y)':b='b(X,Y)':a='${circleGeq}'[reaction]`
     );
     filterParts.push(`[${currentVLabel}][reaction]overlay=${reactionX}:${reactionY}:shortest=1[v_reaction]`);
     currentVLabel = 'v_reaction';
@@ -1072,7 +974,7 @@ export async function processImageNoiseVideo(options = {}, bgImgPath) {
       const r = Math.floor(LOGO.SIZE / 2);
       const geqExpr = `if(lte(hypot(X-W/2,Y-H/2),${r}),255,0)`;
       filterParts.push(
-        `[${logoIndex}:v]scale=${LOGO.SIZE}:${LOGO.SIZE}:flags=fast_bilinear,format=rgba,geq=r='r(X,Y)':g='g(X,Y)':b='b(X,Y)':a='${geqExpr}'[logo]`,
+        `[${logoIndex}:v]scale=${LOGO.SIZE}:${LOGO.SIZE}:flags=fast_bilinear,format=rgba,geq=r='r(X,Y)':g='g(X,Y)':b='b(X,Y)':a='${geqExpr}'[logo]`
       );
     }
     filterParts.push(`[${currentVLabel}][logo]overlay=main_w-overlay_w-${LOGO.MARGIN_RIGHT}:${LOGO.MARGIN_TOP}[vout_final]`);
@@ -1107,7 +1009,7 @@ export async function processImageNoiseVideo(options = {}, bgImgPath) {
     '128k',
     '-t',
     String(audioDurationAfterTempo),
-    outputPath,
+    outputPath
   );
 
   console.log(`Đang merge nội dung Image Noise Pipeline...`);
@@ -1118,9 +1020,9 @@ export async function processImageNoiseVideo(options = {}, bgImgPath) {
   if (scaledSrtPath && fs.existsSync(scaledSrtPath)) fs.unlinkSync(scaledSrtPath);
 
   // Dọn temp reaction
-  if (fs.existsSync(reactionTempDir)) {
+  if (reactionTempDir && fs.existsSync(reactionTempDir)) {
     fs.rmSync(reactionTempDir, { recursive: true, force: true });
-    console.log(`[Reaction] Đã xóa thư mục tạm: ${reactionTempDir}`);
+    console.log(`[Narrator] Đã xóa thư mục tạm: ${reactionTempDir}`);
   }
 
   console.log(`\nĐã tạo: ${outputPath}`);

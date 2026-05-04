@@ -1,6 +1,6 @@
 import { AppButton } from '@/components/ui/AppButton';
 import { CustomSelect } from '@/components/ui/CustomSelect';
-import type { ChannelRow, Group } from '@/types';
+import type { BackgroundOption, ChannelRow, Group } from '@/types';
 import { OPTIONS_CONTENT } from '@contents/makeFromAudio/constant.js';
 import { PROMPTS_CREATE_THUMBNAIL_OPTIONS } from '@contents/prompts/index.js';
 import { useCallback, useEffect, useMemo, useState } from 'react';
@@ -77,7 +77,7 @@ export interface ChannelAddSavePayload {
 
 export interface ChannelAddDialogProps {
   channels?: ChannelRow[];
-  backgroundOptions: string[];
+  backgroundOptions: BackgroundOption[];
   onClose: () => void;
   onMapping: (payload: ChannelAddSavePayload) => Promise<void>;
   /** Khi có — mở form sửa dòng; URL kênh chỉ đọc. */
@@ -115,10 +115,9 @@ export function ChannelAddDialog({ backgroundOptions, channels = [], onClose, on
 
   const resolvedBackground = useMemo(() => {
     const pick = background.trim();
-    if (backgroundOptions.length === 0) return pick;
-    if (pick && backgroundOptions.includes(pick)) return pick;
-    if (pick) return pick;
-    return backgroundOptions[0] ?? '';
+    if (!pick) return '';
+    if (backgroundOptions.some(bg => bg.id === pick)) return pick;
+    return '';
   }, [backgroundOptions, background]);
 
   const reupOverlayOptionsList = useMemo(() => {
@@ -215,7 +214,7 @@ export function ChannelAddDialog({ backgroundOptions, channels = [], onClose, on
 
   const durationMinuteOptions = CHANNEL_ADD_DURATION_SELECT_OPTIONS;
 
-  const bgOptions = backgroundOptions.map(bg => ({ value: bg, label: bg }));
+  const bgOptions = [{ value: '', label: 'Random' }, ...backgroundOptions.map(bg => ({ value: bg.id, label: bg.label }))];
 
   const showBackgroundField = videoType === 'from_audio';
   const showReupOverlayField = true; // Luôn hiển thị Option reup cho cả 2 loại video
@@ -406,7 +405,7 @@ export function ChannelAddDialog({ backgroundOptions, channels = [], onClose, on
 
               <CustomSelect
                 value={resolvedBackground}
-                options={backgroundOptions.map(bg => ({ value: bg, label: bg }))}
+                options={bgOptions}
                 onChange={v => setForm(f => ({ ...f, background: v }))}
                 placeholder='Chọn background'
                 menuZIndex={100}

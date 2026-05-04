@@ -195,6 +195,13 @@ export interface ChannelFolderDataResult extends ChannelData {
   channelFolder: string;
 }
 
+export interface BackgroundOption {
+  id: string;
+  label: string;
+  /** 'local' = folder trong MaVidMedia/backgrounds, 'stock' = channel từ assets/visual-resource/stock */
+  source: 'local' | 'stock';
+}
+
 /** Nguồn nền: chọn folder stock cố định, hoặc tự động (số clip theo độ dài audio, folder mặc định). */
 export type VideoFromAudioBackgroundSource = 'stock' | 'auto';
 
@@ -364,7 +371,7 @@ declare global {
       }) => Promise<{ ok: boolean }>;
       setChannelFolderStartFromRow: (channelFolder: string, dataRowIndex: number) => Promise<{ ok: boolean; fileName?: string }>;
       listVisualResources: () => Promise<{ channelId: string; channelName: string; type: string }[]>;
-      listBackgrounds: () => Promise<string[]>;
+      listBackgrounds: () => Promise<BackgroundOption[]>;
       listChannelFolders: () => Promise<string[]>;
       /** Email đã có trong index.xlsx hoặc file kênh con (tránh trùng khi thêm kênh). */
       listRegisteredChannelEmails: () => Promise<string[]>;

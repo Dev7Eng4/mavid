@@ -76,7 +76,7 @@ function ChannelsPage() {
   const [detailActionError, setDetailActionError] = useState<string | null>(null);
   const [detailUploadPrepBusy, setDetailUploadPrepBusy] = useState(false);
 
-  const [indexBackgrounds, setIndexBackgrounds] = useState<string[]>([]);
+  const [indexBackgrounds, setIndexBackgrounds] = useState<import('@/types').BackgroundOption[]>([]);
   const [indexBatchVideo, setIndexBatchVideo] = useState<{
     current: number;
     total: number;
