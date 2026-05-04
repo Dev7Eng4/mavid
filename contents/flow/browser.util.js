@@ -84,7 +84,7 @@ async function setupFlow(page) {
   }
 }
 
-async function attachImage(page) {
+export async function attachImage(page) {
   try {
     if (fs.existsSync(FLOW_DOWNLOADS_DIR)) {
       console.log('🔄 Đang attach ảnh thumbnail...');
@@ -125,13 +125,77 @@ async function attachImage(page) {
   }
 }
 
-async function generateImage(page, prompt) {
-  try {
-    console.log('🔄 Đang check file exists...', isNeedImage, fs.existsSync(FLOW_DOWNLOADS_DIR));
-  } catch (error) {
-    console.error('❌ Lỗi: Generate image:', error);
-    throw error;
-  }
+export async function generateImage(page, prompt) {
+  await clickElement(page, FLOW_SELECTOR.textbox);
+  await delay(1000);
+  await page.keyboard.insertText(prompt);
+
+  await page.keyboard.press('Enter');
+}
+
+async function getResponseGenerateImage({ page, projectId, folder, exportName }) {
+  const [response] = await Promise.all([
+    page.waitForResponse(
+      async res => {
+        const isMatch = res.url().includes(`https://aisandbox-pa.googleapis.com/v1/projects/${projectId}/flowMedia:batchGenerateImages`);
+
+        if (isMatch) {
+          if (res.status() === 403) {
+            await superClear(page, context);
+            throw new Error('Lỗi 403: Bạn không có quyền truy cập hoặc bị chặn!');
+          }
+          if (res.status() === 400) {
+            throw new Error(`Lỗi vi phạm chính sách tạo ảnh`);
+          }
+          if (res.status() > 400) {
+            throw new Error(`Server trả lỗi: ${res.status()}`);
+          }
+          return true;
+        }
+        return false;
+      },
+      { timeout: 3 * 60 * 1000 },
+    ),
+  ]);
+
+  return response;
+}
+
+async function getResponseThumbnail({ page, projectId, folder, exportName }) {
+  const [response] = await Promise.all([
+    page.waitForResponse(
+      async res => {
+        const isMatch = res.url().includes(`https://aisandbox-pa.googleapis.com/v1/projects/${projectId}/flowMedia:batchGenerateImages`);
+
+        if (isMatch) {
+          if (res.status() === 403) {
+            await superClear(page, context);
+            throw new Error('Lỗi 403: Bạn không có quyền truy cập hoặc bị chặn!');
+          }
+          if (res.status() === 400) {
+            throw new Error(`Lỗi vi phạm chính sách tạo ảnh`);
+          }
+          if (res.status() > 400) {
+            throw new Error(`Server trả lỗi: ${res.status()}`);
+          }
+          return true;
+        }
+        return false;
+      },
+      { timeout: 3 * 60 * 1000 },
+    ),
+  ]);
+
+  const data = await response.json();
+  const imageUrl = data?.media[0]?.image?.generatedImage?.fifeUrl;
+  if (!imageUrl) throw new Error('Không lấy được ảnh từ flow', response);
+
+  const imageData = await fetch(imageUrl);
+  const imageBuffer = await imageData.arrayBuffer();
+  const imageBase64 = Buffer.from(imageBuffer).toString('base64');
+  const base64OutputPath = path.join(folder, `${exportName}.jpg`);
+  fs.mkdirSync(folder, { recursive: true });
+  fs.writeFileSync(base64OutputPath, imageBase64, 'base64');
 }
 
 /**
@@ -151,52 +215,8 @@ export async function generateImageWithFlow(prompt, pathSave, exportName, settin
 
   try {
     await attachImage(page);
-
-    // await generateImage(page, prompt);
-
-    await clickElement(page, FLOW_SELECTOR.textbox);
-    await delay(1000);
-    await page.keyboard.insertText(prompt);
-
-    await page.keyboard.press('Enter');
-
-    const [response] = await Promise.all([
-      page.waitForResponse(
-        async res => {
-          const isMatch = res
-            .url()
-            .includes(`https://aisandbox-pa.googleapis.com/v1/projects/${cfg.FLOW_PROJECT_ID}/flowMedia:batchGenerateImages`);
-
-          if (isMatch) {
-            if (res.status() === 403) {
-              await superClear(page, context);
-              throw new Error('Lỗi 403: Bạn không có quyền truy cập hoặc bị chặn!');
-            }
-            if (res.status() === 400) {
-              throw new Error(`Lỗi vi phạm chính sách tạo ảnh`);
-            }
-            if (res.status() > 400) {
-              throw new Error(`Server trả lỗi: ${res.status()}`);
-            }
-            return true;
-          }
-          return false;
-        },
-        { timeout: 3 * 60 * 1000 },
-      ),
-    ]);
-
-    const data = await response.json();
-    if (!data?.media[0]?.image?.generatedImage?.fifeUrl) throw new Error('Không lấy được ảnh từ flow', response);
-
-    const imageUrl = data?.media[0].image.generatedImage.fifeUrl;
-    const imageData = await fetch(imageUrl);
-    const imageBuffer = await imageData.arrayBuffer();
-    const imageBase64 = Buffer.from(imageBuffer).toString('base64');
-    const base64OutputPath = path.join(pathSave, `${exportName}.jpg`);
-    fs.mkdirSync(pathSave, { recursive: true });
-    fs.writeFileSync(base64OutputPath, imageBase64, 'base64');
-    console.log('✅ Đã lưu ảnh vào file:', base64OutputPath);
+    await generateImage(page, prompt);
+    await getResponseThumbnail({ page, projectId: cfg.FLOW_PROJECT_ID, folder: pathSave, exportName });
   } catch (error) {
     console.error('❌ Lỗi: Tạo thumbnail flow:', error);
     throw error;

@@ -13,7 +13,10 @@
 import fs from 'fs';
 import os from 'os';
 import path from 'path';
+import { exec, spawn } from 'child_process';
+import { promisify } from 'util';
 import { v4 as uuidv4 } from 'uuid';
+import youtubedl from 'youtube-dl-exec';
 
 import { DEFAULT_PROMPT_LANG, STOCK_VIDEO, SUBTITLE, LOGO } from '../constants/index.js';
 import { parseSrtToObjects, objectsToIdTextFormat, srtToPlainText } from '../utils/srt.util.js';
@@ -47,6 +50,7 @@ import {
   SUBTITLE_FONT_FILE,
   SUBTITLE_MARGIN_BOTTOM_PX,
 } from './subtitle.js';
+import { VIDEO_MAKE_OPTION } from '../constant/index.js';
 
 /** Số object mỗi lần gửi cho Gemini */
 const CHUNK_SIZE = 300;
@@ -704,7 +708,7 @@ async function generateBackground(globalMasterShotPrompt, downloadsDir) {
  * Bước 7: Tạo video từ video stock + layer background hoặc image + noise
  */
 async function generateVideo(options, bgImgPath) {
-  if (options.imageNoiseMode) {
+  if (options.visualOption === VIDEO_MAKE_OPTION.IN) {
     console.log(`\n[Option 2] Bước 7: Gọi processImageNoiseVideo tạo video từ image background + noise overlay...`);
     if (!fs.existsSync(bgImgPath)) {
       throw new Error(`[Option 2] Không tìm thấy ảnh background: ${bgImgPath}`);
@@ -768,9 +772,105 @@ async function generateImagesFromScenePrompts(chapterImagePrompts, downloadsDir)
   console.log(`\n[AGI Bước 7] Hoàn thành: ${successCount}/${allScenes.length} images tạo thành công tại ${imagesDir}`);
 }
 
+const execAsync = promisify(exec);
+
+/** URL video YouTube dùng làm reaction overlay */
+const REACTION_VIDEO_URL = 'https://www.youtube.com/watch?v=SB9mlwQmBHw';
+/** Bỏ bao nhiêu giây đầu video reaction */
+const REACTION_SKIP_SEC = 120;
+/** Kích thước crop reaction overlay (px) */
+const REACTION_CROP_W = 300;
+const REACTION_CROP_H = 300;
+/** Margin trái của reaction overlay */
+const REACTION_MARGIN_LEFT = 20;
+
+/**
+ * Tải video YouTube (chỉ video, không audio) ở chất lượng HD.
+ * @param {string} url
+ * @param {string} outputDir
+ * @returns {Promise<string>} Đường dẫn file video đã tải
+ */
+async function downloadYoutubeVideoOnly(url, outputDir) {
+  fs.mkdirSync(outputDir, { recursive: true });
+  const outputTemplate = path.join(outputDir, 'reaction_raw.%(ext)s');
+
+  console.log('[Reaction] Đang tải video reaction (video only, HD)...');
+
+  const subprocess = youtubedl.exec(url, {
+    output: outputTemplate,
+    format: 'bestvideo[height<=720][vcodec^=avc1]/bestvideo[height<=720]/bestvideo[vcodec^=avc1]/bestvideo',
+    noCheckCertificates: true,
+    noWarnings: true,
+    addHeader: ['referer:youtube.com', 'user-agent:googlebot'],
+  });
+
+  subprocess.stderr?.on('data', chunk => {
+    const text = chunk.toString();
+    const match = text.match(/(\d+\.?\d*)%/);
+    if (match) process.stdout.write(`\r[Reaction] Đang tải: ${parseFloat(match[1]).toFixed(1)}%`);
+  });
+
+  await subprocess;
+  process.stdout.write('\n');
+  console.log('[Reaction] Tải video reaction xong!');
+
+  // Tìm file vừa tải
+  const files = fs.readdirSync(outputDir).filter(f => f.startsWith('reaction_raw.'));
+  if (files.length === 0) throw new Error('[Reaction] Không tìm thấy file reaction sau khi tải.');
+  return path.join(outputDir, files[0]);
+}
+
+/**
+ * Chuẩn bị clip reaction overlay:
+ * 1. Cắt bỏ 2 phút đầu
+ * 2. Cắt chỉ lấy đủ thời gian video cần tạo
+ * 3. Crop 300×300 từ phần giữa dưới video
+ *
+ * @param {string} rawVideoPath - Đường dẫn video reaction gốc
+ * @param {number} targetDuration - Thời lượng video cần tạo (giây)
+ * @param {string} outputDir - Thư mục lưu file tạm
+ * @returns {Promise<string>} Đường dẫn file clip đã xử lý
+ */
+async function prepareReactionOverlay(rawVideoPath, targetDuration, outputDir) {
+  const overlayPath = path.join(outputDir, 'reaction_overlay.mp4');
+
+  console.log(
+    `[Reaction] Chuẩn bị overlay: bỏ ${REACTION_SKIP_SEC}s đầu, lấy ${targetDuration.toFixed(1)}s, crop ${REACTION_CROP_W}x${REACTION_CROP_H} giữa dưới...`,
+  );
+
+  // Sử dụng 1 lệnh ffmpeg duy nhất: seek → crop bottom center → trim duration
+  const cmd = [
+    'ffmpeg',
+    '-hide_banner',
+    '-loglevel',
+    'error',
+    '-y',
+    '-ss',
+    String(REACTION_SKIP_SEC),
+    '-i',
+    rawVideoPath,
+    '-t',
+    String(targetDuration),
+    '-vf',
+    `crop=${REACTION_CROP_W}:${REACTION_CROP_H}:(iw-${REACTION_CROP_W})/2:ih-${REACTION_CROP_H}`,
+    '-an',
+    '-c:v',
+    'libx264',
+    '-preset',
+    'fast',
+    '-crf',
+    '23',
+    overlayPath,
+  ].map(String);
+
+  await execAsync(cmd.join(' '), { maxBuffer: 64 * 1024 * 1024 });
+  console.log(`[Reaction] Đã tạo overlay clip: ${overlayPath}`);
+  return overlayPath;
+}
+
 /**
  * Xử lý tạo video dành riêng cho chế độ `imageNoise`:
- * Ảnh nền toàn màn hình + video noise bỏ nền đen + audio + phụ đề.
+ * Ảnh nền toàn màn hình + video noise bỏ nền đen + audio + phụ đề + reaction overlay.
  *
  * Lưu ý: hàm xoá `bgImgPath` ở cuối — nếu test với ảnh thật cần copy ra file tạm trước khi gọi.
  */
@@ -828,6 +928,22 @@ export async function processImageNoiseVideo(options = {}, bgImgPath) {
   const noiseInputPath = prebakedNoise || noisePath;
   const noiseIsPrebaked = Boolean(prebakedNoise);
 
+  // ─── Reaction overlay: download + prepare ───
+  let reactionOverlayPath = null;
+  const reactionTempDir = path.join(OUTPUT_DIR, '_reaction_tmp');
+  try {
+    fs.mkdirSync(reactionTempDir, { recursive: true });
+    const rawReactionPath = await downloadYoutubeVideoOnly(REACTION_VIDEO_URL, reactionTempDir);
+    console.log('🚀 ~ processImageNoiseVideo ~ rawReactionPath:', rawReactionPath);
+    reactionOverlayPath = await prepareReactionOverlay(rawReactionPath, audioDurationAfterTempo, reactionTempDir);
+    console.log('🚀 ~ processImageNoiseVideo ~ reactionOverlayPath:', reactionOverlayPath);
+  } catch (err) {
+    console.warn(`[Reaction] Không thể chuẩn bị reaction overlay — bỏ qua: ${err.message}`);
+    reactionOverlayPath = null;
+  }
+  const hasReaction = reactionOverlayPath && fs.existsSync(reactionOverlayPath);
+  console.log('🚀 ~ processImageNoiseVideo ~ hasReaction:', hasReaction);
+
   const mergeArgs = ['-y'];
   let inputIdx = 0;
 
@@ -858,6 +974,13 @@ export async function processImageNoiseVideo(options = {}, bgImgPath) {
   if (hasLogo) {
     mergeArgs.push('-i', logoPathForMerge);
     logoIndex = inputIdx++;
+  }
+
+  // Input 4: Reaction overlay
+  let reactionIndex = -1;
+  if (hasReaction) {
+    mergeArgs.push('-stream_loop', '-1', '-i', reactionOverlayPath);
+    reactionIndex = inputIdx++;
   }
 
   const filterParts = [];
@@ -910,11 +1033,11 @@ export async function processImageNoiseVideo(options = {}, bgImgPath) {
   }
 
   // Subtitle filter (gộp 1 chain — bỏ split/crop/overlay)
+  const subtitleBoxHeight = Math.floor(h / 3);
   if (subtitlePath) {
     convertSrtToAss(subtitlePath, tempSubPath, useJaSubtitleStyle);
     const subPathEscaped = escapePathForFfmpegSubtitles(tempSubPath);
     const fontsDirEscaped = escapePathForFfmpegSubtitles(SUBTITLE_FONT_DIR);
-    const subtitleBoxHeight = Math.floor(h / 3);
     const boxY = h - subtitleBoxHeight - SUBTITLE_MARGIN_BOTTOM_PX;
     const drawboxFilter = `drawbox=x=0:y=${boxY}:w=iw:h=${subtitleBoxHeight}:color=black@${SUBTITLE.BOX_OPACITY}:t=fill`;
     const subFilter = fs.existsSync(SUBTITLE_FONT_FILE)
@@ -926,6 +1049,19 @@ export async function processImageNoiseVideo(options = {}, bgImgPath) {
   } else {
     filterParts.push(`[${currentVLabel}]null[vpadded]`);
     currentVLabel = 'vpadded';
+  }
+
+  // Reaction overlay: đặt góc top-left, cách mép 50px (hình tròn)
+  if (hasReaction && reactionIndex >= 0) {
+    const reactionX = 50;
+    const reactionY = 50;
+    const rRadius = Math.floor(REACTION_CROP_W / 2);
+    const circleGeq = `if(lte(hypot(X-W/2,Y-H/2),${rRadius}),255,0)`;
+    filterParts.push(
+      `[${reactionIndex}:v]fps=${fps},scale=${REACTION_CROP_W}:${REACTION_CROP_H}:flags=fast_bilinear,format=rgba,geq=r='r(X,Y)':g='g(X,Y)':b='b(X,Y)':a='${circleGeq}'[reaction]`,
+    );
+    filterParts.push(`[${currentVLabel}][reaction]overlay=${reactionX}:${reactionY}:shortest=1[v_reaction]`);
+    currentVLabel = 'v_reaction';
   }
 
   // Logo filter
@@ -980,6 +1116,12 @@ export async function processImageNoiseVideo(options = {}, bgImgPath) {
   if (fs.existsSync(filterScriptPath)) fs.unlinkSync(filterScriptPath);
   if (tempSubPath && fs.existsSync(tempSubPath)) fs.unlinkSync(tempSubPath);
   if (scaledSrtPath && fs.existsSync(scaledSrtPath)) fs.unlinkSync(scaledSrtPath);
+
+  // Dọn temp reaction
+  if (fs.existsSync(reactionTempDir)) {
+    fs.rmSync(reactionTempDir, { recursive: true, force: true });
+    console.log(`[Reaction] Đã xóa thư mục tạm: ${reactionTempDir}`);
+  }
 
   console.log(`\nĐã tạo: ${outputPath}`);
 
