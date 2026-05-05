@@ -4,6 +4,7 @@
  * - Meta (title, desc, tags): dùng profile 1.
  */
 
+import { MAIN_PLAYWRIGHT_PROFILE } from '../constants/playwright-profile.js';
 import { openChromeProfile } from '../scripts/makeChromeProfile.js';
 import { internalUpdateVideoMeta } from './metaPipeline.js';
 import { internalUpdateTranscript } from './transcriptPipeline.js';
@@ -13,7 +14,7 @@ import { internalUpdateTranscript } from './transcriptPipeline.js';
  * Dùng profile 1.
  */
 export async function updateVideoMeta(options = {}) {
-  const { context, page } = await openChromeProfile({ profile: 1, visible: true });
+  const { context, page } = await openChromeProfile({ profile: MAIN_PLAYWRIGHT_PROFILE, visible: true });
   try {
     return await internalUpdateVideoMeta(page, options);
   } finally {

@@ -8,7 +8,7 @@
  *     - Mặc định: `build(title, summary)`.
  *     - `thumbnailPromptKey === 'jaFulLText'`: Gemini (profile 4) chạy
  *       `promptToCreateTextForThumbnail` để lấy JSON `{ lines, colors }`, rồi render
- *       ảnh bằng Playwright (`thumbnail.cli.js` → `thumbnailFullText.html`), không gọi Flow.
+ *       ảnh bằng Playwright (`jaFullText/thumbnail.cli.js` → `jaFullText/thumbnailFullText.html`), không gọi Flow.
  *  4. Các style khác: `runCreateThumbnailFlow(...)` — Flow lưu `outputDir/flow-thumbnail.jpg`.
  *  5. `optimizeFlowThumbnailJpegIfLarge(...)` — re-encode JPG nếu vượt ngưỡng kích thước.
  *
@@ -18,12 +18,10 @@ import path from 'path';
 import { openGeminiPage, sendPromptToGeminiWithRetry, stripJsonCodeFence } from '../gemini/browser.util.js';
 import { loadPromptByLanguage, resolveThumbnailPromptBuilder } from '../prompts/index.js';
 import { openChromeProfile } from '../scripts/makeChromeProfile.js';
-import { renderThumbnailFullTextToPath } from './thumbnail.cli.js';
+import { renderThumbnailFullTextToPath } from './jaFullText/thumbnail.cli.js';
 import { runCreateThumbnailFlow } from './runCreateThumbnailFlow.js';
 import { optimizeFlowThumbnailJpegIfLarge } from './thumbnailOptimize.util.js';
-
-/** Profile Chrome dùng cho bước Gemini của jaFulLText. */
-const JA_FULLTEXT_GEMINI_PROFILE = 2;
+import { PLAYWRIGHT_PROFILES } from '../constants/playwright-profile.js';
 
 /**
  * Validator cho sendPromptToGeminiWithRetry: phải parse được JSON và có đủ
@@ -67,8 +65,7 @@ async function generateFulLTextLinesColorsViaGemini({ prompts, title, summary, l
   }
   const geminiPrompt = prompts.promptToCreateTextForThumbnail(title, summary);
 
-  console.log(`[${logTag}] jaFulLText → mở Chrome profile ${JA_FULLTEXT_GEMINI_PROFILE} để chạy Gemini lấy lines/colors...`);
-  const { context: ctx, page: pg } = await openChromeProfile({ profile: JA_FULLTEXT_GEMINI_PROFILE, visible: true });
+  const { context: ctx, page: pg } = await openChromeProfile({ profile: PLAYWRIGHT_PROFILES[0], visible: true });
   try {
     await openGeminiPage(pg);
     const rawResponse = await sendPromptToGeminiWithRetry(pg, geminiPrompt, {

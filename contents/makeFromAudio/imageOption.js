@@ -49,13 +49,13 @@ import {
 } from './subtitle.js';
 import { VIDEO_MAKE_OPTION } from '../constant/index.js';
 import { prepareNarratorReactionClip, REACTION_CROP_W, REACTION_CROP_H } from './narratorReaction.js';
+import { PLAYWRIGHT_PROFILES } from '../constants/playwright-profile.js';
 
 /** Số object mỗi lần gửi cho Gemini */
 const CHUNK_SIZE = 300;
 /** Số object context từ đoạn trước để đảm bảo tính liên tục */
 const PREV_CONTEXT_SIZE = 20;
 /** Profile IDs dùng cho xử lý song song (profile 4 → 8) */
-const PROFILE_IDS = [2, 3];
 /** Số timeline đầu transcript dùng cho headTranscript khi detect niche */
 const NICHE_HEAD_TIMELINE_LIMIT = 1000;
 /** Số timeline cuối transcript dùng cho tailTranscript khi detect niche */
@@ -375,16 +375,12 @@ async function generateChapters(allObjects, globalNiche, prompts) {
   const chapterResults = new Array(totalChunks).fill(null);
 
   // Số profile song song = min(5, totalChunks)
-  const activeConcurrency = Math.min(PROFILE_IDS.length, totalChunks);
-
-  console.log(
-    `[Option 2] Mở ${activeConcurrency} Chrome profile (${PROFILE_IDS.slice(0, activeConcurrency).join(',')}) cho ${totalChunks} đoạn...`
-  );
+  const activeConcurrency = Math.min(PLAYWRIGHT_PROFILES.length, totalChunks);
 
   let nextChunkIndex = 0;
 
   async function workerProfile(workerIndex) {
-    const profileNum = PROFILE_IDS[workerIndex];
+    const profileNum = PLAYWRIGHT_PROFILES[workerIndex];
     /** @type {import('playwright').BrowserContext | null} */
     let ctx = null;
     try {
@@ -537,11 +533,11 @@ async function generateScenePrompts(allChapters, allObjects, visualBible, prompt
   /** @type {(object[]|null)[]} Kết quả scene cho mỗi chapter */
   const sceneResults = new Array(totalChaptersForScene).fill(null);
 
-  const sceneActiveConcurrency = Math.min(PROFILE_IDS.length, totalChaptersForScene);
+  const sceneActiveConcurrency = Math.min(PLAYWRIGHT_PROFILES.length, totalChaptersForScene);
   let nextChapterIndex = 0;
 
   async function sceneWorkerProfile(workerIndex) {
-    const profileNum = PROFILE_IDS[workerIndex];
+    const profileNum = PLAYWRIGHT_PROFILES[workerIndex];
     /** @type {import('playwright').BrowserContext | null} */
     let ctx = null;
     try {

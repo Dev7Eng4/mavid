@@ -1,21 +1,13 @@
-/**
- * Download video YouTube sử dụng youtube-dl-exec
- * Xử lý: lấy thông tin video + tải video
- */
-
-import youtubedl from 'youtube-dl-exec';
+import fs, { promises as fsp } from 'fs';
 import path from 'path';
-import fs from 'fs';
-import { promises as fsp } from 'fs';
-import { fileURLToPath } from 'url';
+import youtubedl from 'youtube-dl-exec';
 import { detectVideoLang, getLanguageOptions } from './utils/detectLanguage.util.js';
 
-import { MAKE_VIDEO_MODE, LANGUAGES_NEED_UPDATE_TRANSCRIPT } from './constants/index.js';
+import { LANGUAGES_NEED_UPDATE_TRANSCRIPT, MAKE_VIDEO_MODE } from './constants/index.js';
+import { PATHS } from './constants/paths.js';
 
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const DEFAULT_OUTPUT_DIR = path.join(__dirname, '..', 'downloads');
-const INPUT_FILE = path.join(__dirname, '..', 'input.txt');
-const OUTPUT_FILE = path.join(DEFAULT_OUTPUT_DIR, 'output.json');
+const INPUT_FILE = path.join(PATHS.ROOT, 'input.txt');
+const OUTPUT_FILE = path.join(PATHS.DOWNLOADS, 'output.json');
 
 /** Một số mã lỗi khi xóa file trên Windows (khoá bởi AV/Explorer/tiến trình khác) — nên thử lại. */
 const RETRYABLE_FS_REMOVE_CODES = new Set(['EBUSY', 'EPERM', 'EACCES', 'EMFILE', 'EAGAIN']);
@@ -110,8 +102,9 @@ async function getVideoInfo(url) {
  * @param {string} options.format - Format video (mặc định: best)
  * @returns {Promise<string>} - Đường dẫn file đã tải
  */
+
 async function downloadVideo(url, options = {}) {
-  const { outputDir = DEFAULT_OUTPUT_DIR, format = 'best', maxHeight = 0 } = options;
+  const { outputDir = PATHS.DOWNLOADS, format = 'best', maxHeight = 0 } = options;
 
   if (!fs.existsSync(outputDir)) {
     fs.mkdirSync(outputDir, { recursive: true });
@@ -139,7 +132,7 @@ async function downloadVideo(url, options = {}) {
         FORMAT_H264_MP4
       : null;
 
-  const actualFormat = format !== 'best' ? format : (FORMAT_H264_MP4_CAPPED ?? FORMAT_H264_MP4);
+  const actualFormat = format !== 'best' ? format : FORMAT_H264_MP4_CAPPED ?? FORMAT_H264_MP4;
 
   if (maxHeight > 0) {
     console.log(`[DL] maxHeight=${maxHeight} → ưu tiên tải ≤${maxHeight}p để giảm I/O`);
@@ -154,20 +147,20 @@ async function downloadVideo(url, options = {}) {
     addHeader: ['referer:youtube.com', 'user-agent:googlebot'],
   });
 
-  let lastPercent = -1;
-  const updateProgress = chunk => {
-    const text = chunk.toString();
-    const match = text.match(/(\d+\.?\d*)%/);
-    if (match) {
-      const percent = parseFloat(match[1]);
-      if (percent >= 0 && percent <= 100 && Math.floor(percent) !== Math.floor(lastPercent)) {
-        lastPercent = percent;
-        // process.stdout.write(`\rĐang tải: ${percent.toFixed(1)}%`);
-      }
-    }
-  };
-  subprocess.stderr?.on('data', updateProgress);
-  subprocess.stdout?.on('data', updateProgress);
+  // let lastPercent = -1;
+  // const updateProgress = chunk => {
+  //   const text = chunk.toString();
+  //   const match = text.match(/(\d+\.?\d*)%/);
+  //   if (match) {
+  //     const percent = parseFloat(match[1]);
+  //     if (percent >= 0 && percent <= 100 && Math.floor(percent) !== Math.floor(lastPercent)) {
+  //       lastPercent = percent;
+  //       process.stdout.write(`\rĐang tải: ${percent.toFixed(1)}%`);
+  //     }
+  //   }
+  // };
+  // subprocess.stderr?.on('data', updateProgress);
+  // subprocess.stdout?.on('data', updateProgress);
 
   await subprocess;
 
@@ -177,13 +170,71 @@ async function downloadVideo(url, options = {}) {
   return outputDir;
 }
 
+/**
+ * Download video-only (không audio) từ URL, ưu tiên chất lượng HD.
+ * Lưu ý: do chỉ lấy video stream, một số nguồn có thể là DASH (không có audio).
+ * @param {string} url - Link video YouTube
+ * @param {object} options - Tùy chọn
+ * @param {string} options.outputDir - Thư mục lưu file (mặc định: ./downloads)
+ * @param {string} options.format - Format yt-dlp (nếu truyền khác 'best' sẽ dùng trực tiếp)
+ * @param {number} options.maxHeight - Giới hạn height (0 = không giới hạn)
+ * @param {number} options.hdMinHeight - Ngưỡng "HD" tối thiểu (mặc định 720)
+ * @returns {Promise<string>} - Đường dẫn thư mục đã tải
+ */
+async function downloadVideoVisual(url, options = {}) {
+  const { outputDir = PATHS.DOWNLOADS, format = 'best', maxHeight = 0, hdMinHeight = 720 } = options;
+
+  if (!fs.existsSync(outputDir)) {
+    fs.mkdirSync(outputDir, { recursive: true });
+  }
+
+  const outputTemplate = path.join(outputDir, '%(title)s-%(id)s.%(ext)s');
+
+  console.log('Đang tải video (visual-only, không audio)...');
+
+  const minH = Math.max(0, Number(hdMinHeight) || 0);
+
+  const FORMAT_VIDEO_ONLY_H264_MP4 =
+    `bestvideo[height>=1080][vcodec^=avc1][ext=mp4]/` +
+    `bestvideo[height>=${minH}][vcodec^=avc1][ext=mp4]/` +
+    `bestvideo[vcodec^=avc1][ext=mp4]/` +
+    `bestvideo[ext=mp4]/` +
+    `bestvideo`;
+
+  const FORMAT_VIDEO_ONLY_H264_MP4_CAPPED =
+    maxHeight > 0
+      ? `bestvideo[height<=${maxHeight}][height>=1080][vcodec^=avc1][ext=mp4]/` +
+        `bestvideo[height<=${maxHeight}][height>=${minH}][vcodec^=avc1][ext=mp4]/` +
+        `bestvideo[height<=${maxHeight}][vcodec^=avc1][ext=mp4]/` +
+        `bestvideo[height<=${maxHeight}][ext=mp4]/` +
+        FORMAT_VIDEO_ONLY_H264_MP4
+      : null;
+
+  const actualFormat = format !== 'best' ? format : FORMAT_VIDEO_ONLY_H264_MP4_CAPPED ?? FORMAT_VIDEO_ONLY_H264_MP4;
+
+  if (maxHeight > 0) {
+    console.log(`[DL] (visual-only) maxHeight=${maxHeight} → ưu tiên tải ≤${maxHeight}p`);
+  }
+
+  await youtubedl.exec(url, {
+    output: outputTemplate,
+    format: actualFormat,
+    mergeOutputFormat: 'mp4',
+    noCheckCertificates: true,
+    noWarnings: true,
+    addHeader: ['referer:youtube.com', 'user-agent:googlebot'],
+  });
+
+  console.log('Tải video (visual-only) xong!');
+  return outputDir;
+}
+
 async function downloadThumbnail(url, options = {}) {
-  const { outputDir = DEFAULT_OUTPUT_DIR } = options;
+  const { outputDir = PATHS.DOWNLOADS } = options;
 
   if (!fs.existsSync(outputDir)) fs.mkdirSync(outputDir, { recursive: true });
 
   const outputTemplate = path.join(outputDir, 'thumbnail.%(ext)s');
-  console.log('Đang tải thumbnail...');
 
   await youtubedl(url, {
     output: outputTemplate,
@@ -193,7 +244,6 @@ async function downloadThumbnail(url, options = {}) {
     noWarnings: true,
     addHeader: ['referer:youtube.com', 'user-agent:googlebot'],
   });
-  console.log('Tải thumbnail xong!');
 }
 
 async function cleanVttTranscriptsToSrt(outputDir) {
@@ -219,7 +269,7 @@ async function processVttTranscriptsWithGemini(
     thumbnailFlowOutputDir = null,
     generateThumbnailWithFlow = true,
     thumbnailPrompt = null,
-  },
+  }
 ) {
   const { cleanSrt } = await import('./utils/srt.util.js');
   const { updateVideoInfo } = await import('./video-info/updateContent.js');
@@ -262,7 +312,7 @@ async function processVttTranscriptsWithGemini(
               description: geminiOut.description ?? '',
               tags: geminiOut.tags ?? '',
               summary: geminiOut.summary ?? '',
-            }),
+            })
           );
           console.log('✅ Đã gửi title/description/tags/summary (Gemini) qua callback.');
         } catch (cbErr) {
@@ -321,7 +371,7 @@ async function finalizeDownloadedTranscript(url, downloadResult, options = {}) {
   const { transcriptLang } = downloadResult;
   const {
     updateTranscript = true,
-    outputDir = DEFAULT_OUTPUT_DIR,
+    outputDir = PATHS.DOWNLOADS,
     subFormat = 'vtt',
     videoTitle = '',
     description = '',
@@ -362,7 +412,7 @@ async function finalizeDownloadedTranscript(url, downloadResult, options = {}) {
 }
 
 async function downloadTranscript(url, options = {}) {
-  const { outputDir = DEFAULT_OUTPUT_DIR, subFormat = 'vtt', videoTitle = '' } = options;
+  const { outputDir = PATHS.DOWNLOADS, subFormat = 'vtt', videoTitle = '' } = options;
   if (!fs.existsSync(outputDir)) fs.mkdirSync(outputDir, { recursive: true });
 
   const outputTemplate = path.join(outputDir, '%(title)s-%(id)s.%(ext)s');
@@ -375,7 +425,6 @@ async function downloadTranscript(url, options = {}) {
 
   for (const lang of langOrder) {
     try {
-      console.log(`Đang tải transcript (${lang.toUpperCase()}${lang === detectedLang ? ' - detected' : ''})...`);
       await youtubedl(url, {
         output: outputTemplate,
         skipDownload: true,
@@ -399,20 +448,14 @@ async function downloadTranscript(url, options = {}) {
 
   if (lastErr) throw lastErr;
 
-  console.log('Tải transcript xong!');
   return { transcriptLang, outputDir };
 }
 
-/**
- * Tải audio (extract từ video)
- */
 async function downloadAudio(url, options = {}) {
-  const { outputDir = DEFAULT_OUTPUT_DIR, audioFormat = 'mp3' } = options;
+  const { outputDir = PATHS.DOWNLOADS, audioFormat = 'mp3' } = options;
   if (!fs.existsSync(outputDir)) fs.mkdirSync(outputDir, { recursive: true });
 
   const outputTemplate = path.join(outputDir, '%(title)s-%(id)s.%(ext)s');
-
-  console.log('Đang tải audio...');
 
   const subprocess = youtubedl.exec(url, {
     output: outputTemplate,
@@ -423,24 +466,7 @@ async function downloadAudio(url, options = {}) {
     addHeader: ['referer:youtube.com', 'user-agent:googlebot'],
   });
 
-  let lastPercent = -1;
-  const updateProgress = chunk => {
-    const text = chunk.toString();
-    const match = text.match(/(\d+\.?\d*)%/);
-    if (match) {
-      const percent = parseFloat(match[1]);
-      if (percent >= 0 && percent <= 100 && Math.floor(percent) !== Math.floor(lastPercent)) {
-        lastPercent = percent;
-        // process.stdout.write(`\rĐang tải audio: ${percent.toFixed(1)}%`);
-      }
-    }
-  };
-  subprocess.stderr?.on('data', updateProgress);
-  subprocess.stdout?.on('data', updateProgress);
-
   await subprocess;
-  if (lastPercent >= 0) process.stdout.write('\n');
-  console.log('Tải audio xong!');
   return outputDir;
 }
 
@@ -460,7 +486,7 @@ async function downloadSingleVideo(url, options = {}) {
     thumbnailChannelRoot = null,
     generateThumbnailWithFlow = true,
     thumbnailPrompt = null,
-    outputDir = DEFAULT_OUTPUT_DIR,
+    outputDir = PATHS.DOWNLOADS,
     downloadMaxHeight = 0,
   } = options;
 
@@ -474,7 +500,6 @@ async function downloadSingleVideo(url, options = {}) {
 
   try {
     const result = await getVideoInfo(url);
-    console.log('🚀 ~ downloadSingleVideo ~ result:', result);
 
     let thumbnailFlowOutputDir = null;
     if (generateThumbnailWithFlow && thumbnailChannelRoot && result.metadata?.id) {
@@ -572,10 +597,10 @@ async function main() {
   console.log(`Đang xử lý: ${url}`);
 
   try {
-    if (fs.existsSync(DEFAULT_OUTPUT_DIR)) {
-      const entries = fs.readdirSync(DEFAULT_OUTPUT_DIR, { withFileTypes: true });
+    if (fs.existsSync(PATHS.DOWNLOADS)) {
+      const entries = fs.readdirSync(PATHS.DOWNLOADS, { withFileTypes: true });
       for (const entry of entries) {
-        const fullPath = path.join(DEFAULT_OUTPUT_DIR, entry.name);
+        const fullPath = path.join(PATHS.DOWNLOADS, entry.name);
         if (entry.isFile()) {
           fs.unlinkSync(fullPath);
         } else {
@@ -584,7 +609,7 @@ async function main() {
       }
       console.log('Đã xóa file cũ trong downloads/');
     } else {
-      fs.mkdirSync(DEFAULT_OUTPUT_DIR, { recursive: true });
+      fs.mkdirSync(PATHS.DOWNLOADS, { recursive: true });
     }
 
     const result = await getVideoInfo(url);
@@ -626,12 +651,13 @@ async function main() {
 
 export default downloadVideo;
 export {
-  main,
-  getVideoInfo,
-  downloadThumbnail,
-  downloadTranscript,
-  finalizeDownloadedTranscript,
   cleanVttTranscriptsToSrt,
   downloadAudio,
   downloadSingleVideo,
+  downloadThumbnail,
+  downloadTranscript,
+  downloadVideoVisual,
+  finalizeDownloadedTranscript,
+  getVideoInfo,
+  main,
 };
