@@ -30,6 +30,7 @@ import {
   ffmpegSpawnAsync,
   getPrebakedLogoPng,
   getPrebakedChartVideo,
+  getPrebakedNoiseMov,
 } from './shared.js';
 import { prepareStockVisualClip } from './getStockVisual.js';
 
@@ -431,7 +432,21 @@ export async function processStockVideo(bgNameArg, options = {}) {
   if (hasCenterImg) {
     centerImgIndex = inputIdx++;
     mergeArgs.push('-loop', '1', '-i', centerImageOverlayPath);
-    console.log(`[overlay] Ảnh nền trung tâm: ${path.basename(centerImageOverlayPath)} (80% video, opacity 0.8)`);
+    console.log(`[overlay] Ảnh nền trung tâm: ${path.basename(centerImageOverlayPath)} (90% video, opacity 0.8)`);
+  }
+
+  // Noise overlay cho SI mode (chỉ khi có center image)
+  const siNoisePath = path.join(ROOT, 'assets', 'noise', 'noise.mp4');
+  const hasSiNoise = hasCenterImg && fs.existsSync(siNoisePath);
+  const SI_NOISE_ALPHA = 0.6;
+  let siNoiseIndex = -1;
+  let prebakedSiNoise = null;
+  if (hasSiNoise) {
+    prebakedSiNoise = await getPrebakedNoiseMov(siNoisePath, STOCK_VIDEO.CANVAS_W, STOCK_VIDEO.CANVAS_H, STOCK_VIDEO.FPS, SI_NOISE_ALPHA);
+    const siNoiseInputPath = prebakedSiNoise || siNoisePath;
+    siNoiseIndex = inputIdx++;
+    mergeArgs.push('-stream_loop', '-1', '-i', siNoiseInputPath);
+    console.log(`[SI noise] Noise overlay: ${path.basename(siNoisePath)} (alpha ${SI_NOISE_ALPHA})`);
   }
 
   const filterParts = [];
@@ -480,11 +495,30 @@ export async function processStockVideo(bgNameArg, options = {}) {
     currentVLabel = 'v_plated';
   }
 
+  // SI mode: giảm opacity stock video xuống 0.8
+  if (hasCenterImg) {
+    filterParts.push(`[${currentVLabel}]lut=r='val*0.8':g='val*0.8':b='val*0.8'[v_dimmed]`);
+    currentVLabel = 'v_dimmed';
+  }
+
   if (hasCenterImg && centerImgIndex >= 0) {
-    const targetW = Math.round(STOCK_VIDEO.CANVAS_W * 0.8);
+    const targetW = Math.round(STOCK_VIDEO.CANVAS_W * 0.9);
     filterParts.push(`[${centerImgIndex}:v]fps=${STOCK_VIDEO.FPS},scale=${targetW}:-1,format=rgba,colorchannelmixer=aa=0.8[center_img]`);
     filterParts.push(`[${currentVLabel}][center_img]overlay=(main_w-overlay_w)/2:(main_h-overlay_h)/2:shortest=1[v_centered_img]`);
     currentVLabel = 'v_centered_img';
+  }
+
+  // SI noise overlay (sau center image)
+  if (hasSiNoise && siNoiseIndex >= 0) {
+    if (prebakedSiNoise) {
+      filterParts.push(`[${siNoiseIndex}:v]null[si_noise]`);
+    } else {
+      filterParts.push(
+        `[${siNoiseIndex}:v]fps=${STOCK_VIDEO.FPS},scale=${STOCK_VIDEO.CANVAS_W}:${STOCK_VIDEO.CANVAS_H}:flags=fast_bilinear,format=yuva420p,colorkey=0x000000:0.1:0.1,colorchannelmixer=aa=${SI_NOISE_ALPHA}[si_noise]`
+      );
+    }
+    filterParts.push(`[${currentVLabel}][si_noise]overlay=0:0:shortest=1[v_si_noised]`);
+    currentVLabel = 'v_si_noised';
   }
 
   // Drawbox + Subtitles Graph (gộp 1 chain — bỏ split/crop/overlay)
@@ -507,24 +541,24 @@ export async function processStockVideo(bgNameArg, options = {}) {
     currentVLabel = 'vpadded';
   }
 
-  // Bar chart (assets/chart)
-  if (hasChart && chartIndex >= 0) {
-    const wCap = CHART_CORNER_MAX_WIDTH;
-    const mr = CHART_MARGIN_RIGHT;
-    const h_box = Math.floor(STOCK_VIDEO.CANVAS_H / 3);
-    const boxY = STOCK_VIDEO.CANVAS_H - h_box - SUBTITLE_MARGIN_BOTTOM_PX;
-    const f = STOCK_VIDEO.FPS;
-
-    if (chartIsPrebaked) {
-      filterParts.push(`[${chartIndex}:v]null[chartvid]`);
-    } else {
-      filterParts.push(
-        `[${chartIndex}:v]scale=${wCap}:-2:flags=fast_bilinear,colorkey=0x000000:0.1:0.1,format=yuva420p,fps=${f}[chartvid]`
-      );
-    }
-    filterParts.push(`[${currentVLabel}][chartvid]overlay=main_w-overlay_w-${mr}:${boxY}-overlay_h[v_charted]`);
-    currentVLabel = 'v_charted';
-  }
+  // Bar chart (assets/chart) — TẠM THỜI TẮT
+  // if (hasChart && chartIndex >= 0) {
+  //   const wCap = CHART_CORNER_MAX_WIDTH;
+  //   const mr = CHART_MARGIN_RIGHT;
+  //   const h_box = Math.floor(STOCK_VIDEO.CANVAS_H / 3);
+  //   const boxY = STOCK_VIDEO.CANVAS_H - h_box - SUBTITLE_MARGIN_BOTTOM_PX;
+  //   const f = STOCK_VIDEO.FPS;
+  //
+  //   if (chartIsPrebaked) {
+  //     filterParts.push(`[${chartIndex}:v]null[chartvid]`);
+  //   } else {
+  //     filterParts.push(
+  //       `[${chartIndex}:v]scale=${wCap}:-2:flags=fast_bilinear,colorkey=0x000000:0.1:0.1,format=yuva420p,fps=${f}[chartvid]`
+  //     );
+  //   }
+  //   filterParts.push(`[${currentVLabel}][chartvid]overlay=main_w-overlay_w-${mr}:${boxY}-overlay_h[v_charted]`);
+  //   currentVLabel = 'v_charted';
+  // }
 
   // Logo Graph
   if (hasLogo) {
