@@ -2,10 +2,10 @@
  * Tính lịch publish YouTube Studio từ preset + `publishTimes` trong mavid-channel-config.
  */
 import {
-  readMavidChannelConfigFile,
+  readChannelConfigSync,
   findChannelRowByEmail,
   pickPublishFieldsFromChannelRow,
-} from './channelConfig.util.js';
+} from '../channel/index.js';
 
 function parseVideosPerDayPreset(raw) {
   const s = String(raw ?? '')
@@ -202,7 +202,7 @@ export function getYoutubePublishPlan({ channelFolder, email, uploadCount }) {
     throw new Error('uploadCount phải là số nguyên ≥ 0.');
   }
 
-  const config = readMavidChannelConfigFile(channelFolder);
+  const config = readChannelConfigSync({ channelFolder });
   const row = findChannelRowByEmail(config, email);
   if (!row) throw new Error(`Không tìm thấy email «${String(email).trim()}» trong mavid-channel-config.json.`);
 

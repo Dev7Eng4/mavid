@@ -20,7 +20,7 @@ import { parseSrtToObjects, objectsToIdTextFormat, srtToPlainText } from '../uti
 import { loadPromptByLanguage } from '../prompts/index.js';
 import { openChromeProfile } from '../scripts/makeChromeProfile.js';
 import { openGeminiPage, sendPromptToGeminiWithRetry } from '../gemini/browser.util.js';
-import { runCreateThumbnailFlow } from '../thumbnail/runCreateThumbnailFlow.js';
+import { runCreateThumbnailFlow } from '../video-info/thumbnail/runCreateThumbnailFlow.js';
 
 import {
   DOWNLOADS_DIR,

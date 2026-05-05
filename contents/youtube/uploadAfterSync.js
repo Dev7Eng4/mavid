@@ -8,10 +8,10 @@
 import fs from 'fs';
 import path from 'path';
 import { resolveChannelsDir } from '../utils/channelsStoragePath.js';
-import { readMavidChannelConfigFile } from './channelConfig.util.js';
+import { readChannelConfigSync, CHANNEL_CONFIG_FILENAME } from '../channel/index.js';
 import { pickChronologicallyLatestSlot } from './publishScheduleByDuration.util.js';
 
-export const MAVID_CHANNEL_CONFIG_FILENAME = 'mavid-channel-config.json';
+export const MAVID_CHANNEL_CONFIG_FILENAME = CHANNEL_CONFIG_FILENAME;
 
 /** Giá trị ghi vào cột STATUS (khớp validation list trong file kênh). */
 export const STATUS_DA_DANG_VIDEO = 'Đã đăng video';
@@ -248,7 +248,7 @@ export async function syncChannelAfterYoutubeUpload(p) {
   const email = String(p.email || '').trim();
 
   try {
-    const cfg = readMavidChannelConfigFile(p.channelFolder);
+    const cfg = readChannelConfigSync({ channelFolder: p.channelFolder });
     const { idx, label } = resolveChannelRowIndexForAfterUpload(cfg, email);
     if (idx < 0) {
       throw new Error(

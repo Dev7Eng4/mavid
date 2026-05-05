@@ -3,8 +3,8 @@
  */
 import path from 'path';
 import fs from 'fs';
-import { flowSettings } from '../constants/index.js';
-import { generateImageWithFlow } from '../flow/browser.util.js';
+import { flowSettings } from '../../constants/index.js';
+import { generateImageWithFlow } from '../../flow/browser.util.js';
 
 /**
  * @param {object} opts
@@ -31,3 +31,4 @@ export async function runCreateThumbnailFlow({
   fs.mkdirSync(abs, { recursive: true });
   await generateImageWithFlow(prompt, abs, exportName, { ...flowSettings, ...flowExtraSettings }, isNeedImage);
 }
+

@@ -4,11 +4,7 @@
  */
 export { YOUTUBE_SELECTOR } from './studioSelectors.js';
 export { assertSafeChannelFolder } from './channelFolder.util.js';
-export {
-  readMavidChannelConfigFile,
-  findChannelRowByEmail,
-  pickPublishFieldsFromChannelRow,
-} from './channelConfig.util.js';
+export { findChannelRowByEmail, pickPublishFieldsFromChannelRow, readChannelConfigSync } from '../channel/index.js';
 export { getYoutubePublishPlan } from './publishSchedule.util.js';
 export {
   syncChannelAfterYoutubeUpload,

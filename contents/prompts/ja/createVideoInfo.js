@@ -853,155 +853,6 @@ Summary: ${chapterData.summary}
 ${transcriptLines}
 `;
 
-export const promptToCreateTextForThumbnailOld = (title, summary) => `
-You are a Japanese YouTube thumbnail copywriter.
-Given a video title and summary, output JSON with
-5 Japanese text lines and their colors.
- 
- 
-## ─── STEP 1: DETECT NICHE (internal only) ───
-Do NOT include niche in output. Use it only to guide
-your text and color decisions.
- 
-Choose ONE primary niche:
- 
-  REVENGE_SUKATTO     → 仕返し・スカッと系
-  FAMILY_DRAMA        → 嫁姑・兄弟・親族トラブル
-  ROMANCE_BETRAYAL    → 浮気・別れ・再会
-  POVERTY_STRUGGLE    → 貧困・借金・生活苦
-  HORROR_GHOST        → 怪談・心霊・恐怖
-  MYSTERY_URBAN       → 都市伝説・謎・不思議
-  TRUE_CRIME          → 詐欺・犯罪・事件
-  WORKPLACE_DRAMA     → パワハラ・解雇・職場いじめ
-  PARENTING           → 子育て・反抗期・育児失敗
-  INHERITANCE         → 遺産・相続・財産トラブル
-  ILLNESS_SACRIFICE   → 病気・介護・自己犠牲
-  CONFESSION          → 告白・秘密・暴露
-  HEARTWARMING        → 感動・再生・救い
- 
- 
-## ─── STEP 2: GENERATE 5 LINES ───
- 
-L1 — SETUP (10–15文字)
-  状況設定。登場人物・関係性・年数などを示す。
-  数字があれば必ず入れる（例: 結婚17年目の夫が）
- 
-L2 — TRIGGER (13–19文字)
-  事件・裏切り・問題の発生。動詞で終わること推奨。
- 
-L3 — REVELATION (13–18文字) ★最大インパクト行
-  衝撃の事実・証拠の暴露。必ず具体的な情報ショックを入れる。
-  推奨パターン:
-    「〜が判明」「実は〜だった」「〜が発覚」
-    「〜の正体は〜」「〜年間の嘘」「〜万円の真実」
-    「〜が露わに」「〜円を横領」
-  ✗ FORBIDDEN: 「衝撃の事実」「信じられない真相」だけはNG（抽象NG）
- 
-L4 — REACTION (13–18文字)
-  必ず「 」括弧で台詞を入れること。
-  台詞の発話者（誰が言ったか）を文脈から明確にすること。
-  文末は「…」または疑問形でcliffhangerにする。
-  例: 夫「それって本当に私の子？…」
- 
-L5 — RESOLUTION (8–12文字) ※必ず12文字以下
-  最終結果。体言止め推奨。数字があれば入れる。
-  ✗ FORBIDDEN: 疑問形・cliffhanger（L5は断言で締める）
- 
-CTR RULES:
-  ✓ 具体的な数字を使う (借金480万円 / 結婚23年目 / 3人の子供)
-  ✓ L3に最大の情報ショックを入れる（曖昧表現禁止）
-  ✓ L4は発話者を明確にしてcliffhangerで終わる
-  ✓ L5は短く断言的に、疑問形禁止
-  ✗ FORBIDDEN: 死ぬ・殺す・自殺 → 代替: 消えた・崩壊・終わった・去った
- 
- 
-## ─── STEP 3: CHOOSE COLORS ───
- 
-All text renders on dark canvas. No background per line.
-Text color is the only visual element — make it count.
- 
-ANCHOR COLOR (assign to L1 and L5):
-  REVENGE_SUKATTO / FAMILY_DRAMA / POVERTY_STRUGGLE
-  HEARTWARMING / PARENTING
-    → #FFD700
- 
-  HORROR_GHOST
-    → #FF3333
- 
-  ROMANCE_BETRAYAL / CONFESSION
-    → #FF69B4
- 
-  MYSTERY_URBAN / TRUE_CRIME
-    → #00FFFF
- 
-  WORKPLACE_DRAMA / INHERITANCE
-    → #FF8C00
- 
-  ILLNESS_SACRIFICE
-    → #87CEEB
- 
-L2, L4 → always #FFFFFF
- 
-L3 (Revelation — maximum contrast):
-  REVENGE / FAMILY / HORROR / ROMANCE / WORKPLACE / PARENTING
-    → #FF4444
-  MYSTERY / TRUE_CRIME
-    → #AAAAFF
-  POVERTY / INHERITANCE / ILLNESS
-    → #FFD700
-  CONFESSION / HEARTWARMING
-    → #FF69B4
- 
-VISUAL HIERARCHY RULE:
-  L1 and L5 share the same anchor color.
-  L3 must visually stand out from L2 (#FFF) and L4 (#FFF).
-  Never assign #FFFFFF to L3.
- 
-CANVAS GRADIENT by niche:
-  REVENGE / FAMILY / ROMANCE / POVERTY / HEARTWARMING
-  CONFESSION / PARENTING / WORKPLACE / INHERITANCE / ILLNESS
-    → canvas_from: #1a1a2e   canvas_to: #16213e
- 
-  HORROR / MYSTERY / TRUE_CRIME
-    → canvas_from: #000000   canvas_to: #0a0a1e
- 
- 
-## ─── OUTPUT FORMAT (STRICT) ───
- 
-* Wrap the entire output in a single Markdown code block (triple backticks)
-* The first character of your response MUST be \`\`\`
-* The last character of your response MUST be \`\`\`
-* Do NOT write anything before or after the code block
-* Inside the code block: valid JSON only, no comments
- 
-{
-  "niche": "String — one of the niche keys above",
-  "lines": {
-    "L1": "...",
-    "L2": "...",
-    "L3": "...",
-    "L4": "...",
-    "L5": "..."
-  },
-  "colors": {
-    "L1": "#HEX",
-    "L2": "#FFFFFF",
-    "L3": "#HEX",
-    "L4": "#FFFFFF",
-    "L5": "#HEX",
-    "canvas_from": "#HEX",
-    "canvas_to": "#HEX"
-  }
-}
- 
-═══════════════════════════════════════════════════
-USER PROMPT
-═══════════════════════════════════════════════════
- 
-Title: ${title}
-Summary: ${summary}
-`;
-
 export const promptToCreateTextForThumbnail = (title, summary) => `
 You are a top-performing Japanese YouTube thumbnail copywriter specialized in HIGH CTR drama content.
 
@@ -1252,6 +1103,206 @@ USER PROMPT
 
 Title: ${title}
 Summary: ${summary}
+`;
+
+export const promptToCreateTextForThumbnailText = (title, summary) => `
+# THE ULTIMATE JAPANESE DRAMA CTR PROMPT (FINAL VERSION - COMPLETE)
+
+You are a top-performing Japanese YouTube thumbnail copywriter specialized in HIGH CTR drama content.
+Your goal is to MAXIMIZE clicks using psychological hooks, emotional shock, and curiosity gaps.
+
+═══════════════════════════════════════════════════
+## ─── STEP 0: INPUT ───
+═══════════════════════════════════════════════════
+
+You will be given:
+
+Title: ${title}  
+Summary: ${summary}
+
+Use BOTH to extract key details, relationships, conflict, and hidden truth.
+
+---
+
+## ─── STEP 1: DETECT NICHE (internal only) ───
+
+Choose ONE:
+REVENGE_SUKATTO / FAMILY_DRAMA / ROMANCE_BETRAYAL / POVERTY_STRUGGLE / HORROR_GHOST / MYSTERY_URBAN / TRUE_CRIME / WORKPLACE_DRAMA / PARENTING / INHERITANCE / ILLNESS_SACRIFICE / CONFESSION / HEARTWARMING
+
+Do NOT explain.
+
+---
+
+## ─── GLOBAL CTR RULES (CRITICAL) ───
+
+✓ **MOBILE FIRST:** 10–14 characters per line  
+✓ **STRONG VERBS:** 暴露 / 発覚 / 崩壊 / 強奪 / 裏切り / 消失 / 転落  
+✓ **SPECIFICITY:** numbers, duration, concrete people  
+✓ **CONTRAST:** L1 (normal) → L3 (dark truth)  
+✓ **VISUAL FOCUS:** L3 must be the most eye-catching  
+
+✗ FORBIDDEN:  
+曖昧表現（衝撃の事実 / 信じられない真相）  
+汎用ワード（まさかの展開 / 驚きの結果）  
+説明的すぎる文章  
+
+---
+
+## ─── STEP 2: GENERATE 5 LINES ───
+
+### L1 — SETUP (10–12文字)
+Situation + relationship
+
+REQUIRED:
+- character (夫 / 妻 / 義母 / 上司 etc.)
+- number (結婚5年 / 子供2人)
+
+---
+
+### L2 — TRIGGER (10–14文字)
+
+Start of conflict with STRONG VERB
+
+REQUIRED:
+- include **abnormal pattern or unusual behavior**
+
+Examples:
+毎晩3時に夫のスマホが鳴る  
+妻が金曜だけ外泊し始める  
+
+---
+
+### L3 — REVELATION (10–14文字) ★ MAIN HOOK
+
+REQUIRED:
+- wrap with 【 】
+- must include at least **TWO of the following**:
+  ① number（3人 / 500万 / 12年）  
+  ② specific person（親友 / 実の妹 / 上司）  
+  ③ concrete wrongdoing（不倫 / 横領 / 二重生活）  
+
+Examples:
+【不倫相手は親友3人】  
+【借金500万を義母が横領】  
+
+---
+
+### L4 — REACTION (10–14文字)
+
+FORMAT:
+[誰が]「台詞」
+
+REQUIRED:
+- must be ONE of:
+  ・accusation（断定）  
+  ・denial（全面否定）  
+  ・blame（責任転嫁）  
+
+Examples:
+妻「全部あなたの嘘よね？」  
+夫「お前が全部壊したんだ！」  
+
+---
+
+### L5 — RESOLUTION (8–10文字)
+
+REQUIRED:
+- clear outcome
+- must include ONE:
+  ・転落（downfall）  
+  ・喪失（losing everything）  
+  ・逆転（comeback）  
+  ・因果応報（karma）  
+
+Examples:
+夫、全て失う  
+妻の完全逆転  
+義母、孤立確定  
+
+---
+
+## ─── STEP 3: COLORS & CANVAS (PSYCHOLOGICAL) ───
+
+### 🧩 ANCHOR COLOR (L1 & L5)
+
+REVENGE / FAMILY / POVERTY → #FFD700  
+HORROR / GHOST → #FF3333  
+ROMANCE / CONFESSION → #FF69B4  
+MYSTERY → #00FFFF  
+TRUE_CRIME → #8A2BE2  
+WORKPLACE / INHERITANCE → #FF8C00  
+
+---
+
+### ⚡ L2 & L4
+→ ALWAYS #FFFFFF
+
+---
+
+### 🔥 L3 — SHOCK COLOR (MOST IMPORTANT)
+
+RULE:
+Must be the most visually dominant
+
+Use based on content:
+
+- Betrayal / anger → #FF0000  
+- Money gain → #FFD700  
+- Money loss → #FFB300  
+- Crime / psychological → #8A2BE2  
+- Mystery → #66CCFF  
+
+If L3 contains numbers → prefer brighter tone
+
+---
+
+### 🎨 CANVAS GRADIENT (NICHE-SPECIFIC)
+
+REVENGE / ROMANCE_BETRAYAL:
+→ #1a0505 → #000000  
+
+HORROR / TRUE_CRIME / MYSTERY:
+→ #0a0015 → #050510  
+
+OTHERS:
+→ #121212 → #000000  
+
+---
+
+### ⚠️ FINAL VISUAL RULES
+
+- L3 must dominate visually  
+- L1 and L5 must match color  
+- Avoid similar colors between L1 and L3  
+- Ensure readability on mobile  
+
+If weak → regenerate
+
+---
+
+## ─── OUTPUT FORMAT (STRICT) ───
+
+Output ONLY valid JSON. No explanation.
+
+{
+  "niche": "",
+  "lines": {
+    "L1": "",
+    "L2": "",
+    "L3": "",
+    "L4": "",
+    "L5": ""
+  },
+  "colors": {
+    "L1": "",
+    "L2": "#FFFFFF",
+    "L3": "",
+    "L4": "#FFFFFF",
+    "L5": "",
+    "canvas_from": "",
+    "canvas_to": ""
+  }
+}
 `;
 
 export const promptToDetectNiche = (headTranscript, tailTranscript) => `

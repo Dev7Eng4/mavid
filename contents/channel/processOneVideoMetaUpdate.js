@@ -8,7 +8,7 @@ import { downloadTranscript, finalizeDownloadedTranscript } from '../video-info/
 import { readVideoMetaFile, writeVideoMetaFile, geminiMetaFieldsIncomplete, mergeGeminiIntoVideoMeta } from './videoMetaFile.util.js';
 import { hasRasterThumbnailInFolder } from './videoFolderThumbnail.util.js';
 import { extractYoutubeVideoId } from './youtubeUrl.util.js';
-import { generateFlowThumbnailFromGemini } from '../thumbnail/generateFlowThumbnail.js';
+import { generateFlowThumbnailFromGemini } from '../video-info/thumbnail/generateFlowThumbnail.js';
 import { FLOW_DOWNLOADS_DIR } from '../flow/paths.util.js';
 import { detectVideoLang } from '../utils/detectLanguage.util.js';
 
@@ -104,16 +104,18 @@ export async function processOneVideoMetaUpdate({ videoDir, url, thumbnailPrompt
     const summaryG = String(meta?.summaryGemini || '').trim();
 
     if (needThumb) {
-      if (titleG && summaryG) {
-        const srcThumbWebp = path.join(videoDir, 'thumbnail.webp');
-        if (fs.existsSync(srcThumbWebp)) {
-          fs.mkdirSync(FLOW_DOWNLOADS_DIR, { recursive: true });
-          fs.copyFileSync(srcThumbWebp, path.join(FLOW_DOWNLOADS_DIR, 'thumbnail.webp'));
-          console.log('[update-meta] Đã copy thumbnail.webp từ thư mục video → downloads/ (chuẩn bị Flow).');
-        } else {
-          console.warn('[update-meta] Không có thumbnail.webp trong thư mục video — Flow có thể không đính kèm ảnh gốc.');
-        }
+      const srcThumbWebp = path.join(videoDir, 'thumbnail.webp');
+      if (fs.existsSync(srcThumbWebp)) {
+        fs.mkdirSync(FLOW_DOWNLOADS_DIR, { recursive: true });
+        fs.copyFileSync(srcThumbWebp, path.join(FLOW_DOWNLOADS_DIR, 'thumbnail.webp'));
+        console.log('[update-meta] Đã copy thumbnail.webp từ thư mục video → downloads/ (chuẩn bị Flow).');
+      } else {
+        console.warn('[update-meta] Không có thumbnail.webp trong thư mục video — Flow có thể không đính kèm ảnh gốc.');
+      }
 
+      if (!titleG || !summaryG) {
+        console.warn('[update-meta] Thiếu titleGemini/summaryGemini — bỏ qua Flow thumbnail.');
+      } else {
         try {
           await generateFlowThumbnailFromGemini({
             title: titleG,
@@ -128,8 +130,6 @@ export async function processOneVideoMetaUpdate({ videoDir, url, thumbnailPrompt
           console.warn(`[update-meta] Flow thumbnail: ${msg}`);
           return { ok: false, reason: msg };
         }
-      } else {
-        console.warn('[update-meta] Bỏ qua Flow: thiếu titleGemini hoặc summaryGemini.');
       }
     } else {
       console.log('[update-meta] Đã có thumbnail raster — bỏ qua Flow.');

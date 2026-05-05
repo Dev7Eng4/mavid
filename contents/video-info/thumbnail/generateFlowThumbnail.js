@@ -15,13 +15,13 @@
  * Caller chịu trách nhiệm bao try/catch nếu muốn không dừng pipeline khi Flow lỗi.
  */
 import path from 'path';
-import { openGeminiPage, sendPromptToGeminiWithRetry, stripJsonCodeFence } from '../gemini/browser.util.js';
-import { loadPromptByLanguage, resolveThumbnailPromptBuilder } from '../prompts/index.js';
-import { openChromeProfile } from '../scripts/makeChromeProfile.js';
+import { openGeminiPage, sendPromptToGeminiWithRetry, stripJsonCodeFence } from '../../gemini/browser.util.js';
+import { loadPromptByLanguage, resolveThumbnailPromptBuilder } from '../../prompts/index.js';
+import { openChromeProfile } from '../../scripts/makeChromeProfile.js';
 import { renderThumbnailFullTextToPath } from './jaFullText/thumbnail.cli.js';
 import { runCreateThumbnailFlow } from './runCreateThumbnailFlow.js';
 import { optimizeFlowThumbnailJpegIfLarge } from './thumbnailOptimize.util.js';
-import { PLAYWRIGHT_PROFILES } from '../constants/playwright-profile.js';
+import { PLAYWRIGHT_PROFILES } from '../../constants/playwright-profile.js';
 
 /**
  * Validator cho sendPromptToGeminiWithRetry: phải parse được JSON và có đủ
@@ -115,10 +115,11 @@ export async function generateFlowThumbnailFromGemini({
       prompt: flowPrompt,
       pathSave: outputDir,
       exportName: 'flow-thumbnail',
-      isNeedImage: false,
+      isNeedImage: Boolean(isNeedImage),
     });
   }
   const flowThumbPath = path.join(outputDir, 'flow-thumbnail.jpg');
   await optimizeFlowThumbnailJpegIfLarge(flowThumbPath);
   console.log(`[${logTag}] Đã lưu flow-thumbnail.jpg`);
 }
+

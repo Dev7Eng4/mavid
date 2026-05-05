@@ -2,13 +2,14 @@ import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { resolveChannelsDir } from '../utils/channelsStoragePath.js';
+import { CHANNEL_CONFIG_FILENAME, readChannelConfigFromFolderSync } from '../channel/index.js';
 import { testEncoder } from '../utils/hardware.util.js';
 import { VIDEO_MAKE_MODE } from '../constant/index.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.join(__dirname, '..', '..');
 const CHANNELS_DIR = resolveChannelsDir();
-const MAVID_CHANNEL_CONFIG_FILENAME = 'mavid-channel-config.json';
+const MAVID_CHANNEL_CONFIG_FILENAME = CHANNEL_CONFIG_FILENAME;
 
 /**
  * Mặc định: chỉ chọn video có độ dài (cột DURATION) lớn hơn N phút (giây > N×60).
@@ -478,23 +479,6 @@ export async function readVideoUrlsFromFile(inputFile = null, options = {}) {
   return finalizeVideoItemsOrder(items, filePath, options);
 }
 
-/**
- * Đọc JSON cấu hình kênh trong thư mục channel (Electron/UI cùng format).
- * @param {string} folderPath
- * @returns {Record<string, unknown>|null}
- */
-function readMavidChannelConfigFromFolder(folderPath) {
-  const p = path.join(folderPath, MAVID_CHANNEL_CONFIG_FILENAME);
-  if (!fs.existsSync(p)) return null;
-  try {
-    const raw = fs.readFileSync(p, 'utf-8');
-    return JSON.parse(raw);
-  } catch (e) {
-    console.warn(`[MaVid] Không đọc được ${MAVID_CHANNEL_CONFIG_FILENAME}: ${e.message}`);
-    return null;
-  }
-}
-
 function normalizeEmailForMatch(s) {
   return String(s ?? '')
     .trim()
@@ -651,7 +635,7 @@ async function main(props = {}) {
   if (channelParam) {
     const folderPath = path.join(CHANNELS_DIR, channelParam);
     if (fs.existsSync(folderPath)) {
-      const cfg = readMavidChannelConfigFromFolder(folderPath);
+      const cfg = readChannelConfigFromFolderSync(folderPath);
       let configItem = null;
       if (cfg) {
         configItem = pickChannelConfigItem(cfg, mappingParam);
@@ -700,7 +684,7 @@ async function main(props = {}) {
     if (selectedFolder) {
       effectiveChannelName = selectedFolder;
       const folderPath = path.join(CHANNELS_DIR, selectedFolder);
-      const cfgPick = readMavidChannelConfigFromFolder(folderPath);
+      const cfgPick = readChannelConfigFromFolderSync(folderPath);
       const itemPick = cfgPick ? pickChannelConfigItem(cfgPick, mappingParam) : null;
       const pick = pickChannelDataFileForBatch(folderPath, cfgPick, itemPick);
       if (pick.absPath) {

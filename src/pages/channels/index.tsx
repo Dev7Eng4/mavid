@@ -146,9 +146,17 @@ function ChannelsPage() {
   }, [groups]);
 
   const fetchChannels = useCallback(async () => {
+    console.log('fetchChannels');
     setLoading(true);
     try {
+      if (!window.runner?.readChannelData) {
+        setChannels([]);
+        setSelectedRows(new Set());
+        return;
+      }
+
       const d = await window.runner.readChannelData(INDEX_FILE);
+      console.log('🚀 ~ ChannelsPage ~ d:', d);
       setChannels(convertIndexRowToChannel(d.rows));
       setSelectedRows(new Set());
     } catch {
@@ -167,12 +175,13 @@ function ChannelsPage() {
 
   useEffect(() => {
     window.runner
-      .listBackgrounds()
+      ?.listBackgrounds()
       .then(setIndexBackgrounds)
       .catch(() => setIndexBackgrounds([]));
   }, []);
 
   useEffect(() => {
+    console.log('fetchChannels');
     void fetchChannels();
   }, [fetchChannels]);
 
@@ -182,6 +191,8 @@ function ChannelsPage() {
       setDetailLoading(true);
       setChannelVideos([]);
       try {
+        if (!window.runner?.readChannelFolderData) return;
+
         const selectedChannelFolder = channels.find(r => r.id === id)?.channelId;
         if (!selectedChannelFolder) return;
 
@@ -731,6 +742,7 @@ function ChannelsPage() {
       if (!selectedChannel) return;
 
       try {
+        if (!window.runner?.readMavidChannelConfig) return;
         const cfg = await window.runner.readMavidChannelConfig(selectedChannel.channelId);
         if (!cfg || typeof cfg !== 'object' || !Array.isArray(cfg.channels)) return;
 

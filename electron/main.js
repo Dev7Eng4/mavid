@@ -324,7 +324,7 @@ const SCRIPT_MAP = {
   downloadVideo: '../contents/video-info/downloadVideo.js',
   createBatchVideo: '../contents/scripts/createBatchVideo.js',
   makeChromeProfile: '../contents/scripts/makeChromeProfile.js',
-  createThumbnailFlow: '../contents/thumbnail/createThumbnailFlow.js',
+  createThumbnailFlow: '../contents/video-info/thumbnail/createThumbnailFlow.js',
   summaryMetaFromTranscript: '../contents/scripts/summaryMetaFromTranscript.js',
   uploadYoutubeViaGpm: '../contents/youtube/uploadViaGpm.js',
   updateChannelVideosMeta: '../contents/scripts/updateChannelVideosMeta.js',

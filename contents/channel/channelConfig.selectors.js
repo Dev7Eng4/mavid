@@ -1,41 +1,14 @@
 /**
- * Đọc / tra cứu `mavid-channel-config.json` trong thư mục kênh.
- */
-import fs from 'fs';
-import path from 'path';
-import { resolveChannelsDir } from '../utils/channelsStoragePath.js';
-import { CHANNEL_CONFIG_FILE } from '../constants/channel.js';
-import { assertSafeChannelFolder } from './channelFolder.util.js';
-
-/**
- * @param {string} channelFolder
- * @returns {object}
- */
-export function readMavidChannelConfigFile(channelFolder) {
-  const safe = assertSafeChannelFolder(channelFolder);
-  const p = path.join(resolveChannelsDir(), safe, CHANNEL_CONFIG_FILE);
-  if (!fs.existsSync(p)) throw new Error(`Không tìm thấy ${CHANNEL_CONFIG_FILE} trong thư mục kênh «${safe}».`);
-  let data;
-  try {
-    data = JSON.parse(fs.readFileSync(p, 'utf-8'));
-  } catch {
-    throw new Error(`File ${CHANNEL_CONFIG_FILE} không đọc được (JSON hỏng).`);
-  }
-  if (!data || typeof data !== 'object') throw new Error('Cấu hình kênh không hợp lệ.');
-  return data;
-}
-
-/**
- * @param {object} config
+ * @param {Record<string, any>} config
  * @param {string} email
- * @returns {object | null}
+ * @returns {Record<string, any> | null}
  */
 export function findChannelRowByEmail(config, email) {
   const want = String(email ?? '')
     .trim()
     .toLowerCase();
   if (!want) return null;
-  const list = Array.isArray(config.channels) ? config.channels : [];
+  const list = Array.isArray(config?.channels) ? config.channels : [];
   return (
     list.find(
       ch =>
@@ -48,7 +21,7 @@ export function findChannelRowByEmail(config, email) {
 
 /**
  * Trích các trường lịch/upload từ một phần tử `channels[]`.
- * @param {object} row
+ * @param {Record<string, any>} row
  */
 export function pickPublishFieldsFromChannelRow(row) {
   if (!row || typeof row !== 'object') {
@@ -63,3 +36,4 @@ export function pickPublishFieldsFromChannelRow(row) {
     latestUploadTime: row.latestUploadTime != null ? String(row.latestUploadTime).trim() : '',
   };
 }
+

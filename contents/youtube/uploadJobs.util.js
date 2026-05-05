@@ -4,6 +4,7 @@
 import fs from 'fs';
 import path from 'path';
 import { GPM_API_DEFAULT_ORIGIN } from '../constants/gpmApi.js';
+import { readChannelConfigFromFolderSync } from '../channel/index.js';
 
 /**
  * Chuẩn hóa base GPM → origin cho Playwright (bỏ hậu tố /api/v3 nếu có).
@@ -61,35 +62,30 @@ export function assertSafeSubfolderName(name) {
  * @returns {{ durationMinuteFrom: number, durationMinuteTo: number | null } | null}
  */
 function getDurationBoundsFromConfig(channelAbs, email) {
-  const cfgPath = path.join(channelAbs, 'mavid-channel-config.json');
-  if (!fs.existsSync(cfgPath)) return null;
-  try {
-    const cfg = JSON.parse(fs.readFileSync(cfgPath, 'utf-8'));
-    const list = Array.isArray(cfg.channels) ? cfg.channels : [];
-    const norm = String(email || '')
-      .trim()
-      .toLowerCase();
-    let item = null;
-    if (norm && list.length > 0) {
-      item = list.find(
-        c =>
-          c &&
-          String(c.email || '')
-            .trim()
-            .toLowerCase() === norm,
-      );
-    }
-    if (!item && list.length > 0) item = list[0];
-    if (!item) return null;
-    const from = Number(item.durationMinuteFrom);
-    const to = item.durationMinuteTo != null ? Number(item.durationMinuteTo) : null;
-    return {
-      durationMinuteFrom: Number.isFinite(from) && from > 0 ? from : 0,
-      durationMinuteTo: to != null && Number.isFinite(to) && to > 0 ? to : null,
-    };
-  } catch {
-    return null;
+  const cfg = readChannelConfigFromFolderSync(channelAbs);
+  if (!cfg) return null;
+  const list = Array.isArray(cfg.channels) ? cfg.channels : [];
+  const norm = String(email || '')
+    .trim()
+    .toLowerCase();
+  let item = null;
+  if (norm && list.length > 0) {
+    item = list.find(
+      c =>
+        c &&
+        String(c.email || '')
+          .trim()
+          .toLowerCase() === norm,
+    );
   }
+  if (!item && list.length > 0) item = list[0];
+  if (!item) return null;
+  const from = Number(item.durationMinuteFrom);
+  const to = item.durationMinuteTo != null ? Number(item.durationMinuteTo) : null;
+  return {
+    durationMinuteFrom: Number.isFinite(from) && from > 0 ? from : 0,
+    durationMinuteTo: to != null && Number.isFinite(to) && to > 0 ? to : null,
+  };
 }
 
 /**

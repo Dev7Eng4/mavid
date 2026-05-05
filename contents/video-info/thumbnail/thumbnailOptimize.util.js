@@ -49,3 +49,4 @@ export async function optimizeFlowThumbnailJpegIfLarge(filePath) {
     console.warn('[thumbnail-flow] Lỗi tối ưu kích thước thumbnail:', e.message);
   }
 }
+

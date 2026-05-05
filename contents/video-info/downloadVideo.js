@@ -290,22 +290,16 @@ async function emitGeminiMetaCallback({ url, geminiOut, callback }) {
   }
 }
 
-async function maybeGenerateFlowThumbnailFromGeminiOut({
-  geminiOut,
-  thumbnailFlowOutputDir,
-  generateThumbnailWithFlow,
-  language,
-  thumbnailPrompt,
-}) {
-  if (!generateThumbnailWithFlow || !thumbnailFlowOutputDir || !geminiOut) return { ok: false, reason: 'disabled-or-missing-input' };
+async function maybeGenerateFlowThumbnailFromGeminiOut({ geminiOut, thumbnailFlowOutputDir, generateThumbnailWithFlow, language, thumbnailPrompt }) {
+  if (!generateThumbnailWithFlow) return { ok: false, reason: 'disabled' };
+  if (!thumbnailFlowOutputDir) return { ok: false, reason: 'missing-outputDir' };
 
-  const titleG = String(geminiOut.title ?? '').trim();
-  const summaryG = String(geminiOut.summary ?? '').trim();
+  const titleG = String(geminiOut?.title ?? '').trim();
+  const summaryG = String(geminiOut?.summary ?? '').trim();
   if (!titleG || !summaryG) return { ok: false, reason: 'missing-title-or-summary' };
 
-  console.log('[thumbnail-flow] Tạo thumbnail từ title/summary Gemini →', path.basename(thumbnailFlowOutputDir));
+  const { generateFlowThumbnailFromGemini } = await import('./thumbnail/generateFlowThumbnail.js');
   try {
-    const { generateFlowThumbnailFromGemini } = await import('../thumbnail/generateFlowThumbnail.js');
     await generateFlowThumbnailFromGemini({
       title: titleG,
       summary: summaryG,
@@ -315,8 +309,9 @@ async function maybeGenerateFlowThumbnailFromGeminiOut({
       logTag: 'thumbnail-flow',
     });
     return { ok: true };
-  } catch (thumbErr) {
-    return { ok: false, reason: thumbErr?.message ?? String(thumbErr) };
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    return { ok: false, reason: msg };
   }
 }
 
