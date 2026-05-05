@@ -22,7 +22,6 @@ import { processStockVideo } from './stockVideoOption.js';
 import { processVideoWithImage } from './imageOption.js';
 import { OPTIONS_CONTENT } from './constant.js';
 
-// Re-export cho backward compatibility (convertAudio.js, v.v.)
 export { randomPlaybackSpeed, resolveAudioSpeed, SPEED };
 
 const CHANNELS_ROOT = resolveChannelsDir();
@@ -66,8 +65,8 @@ export async function testMakeVideoFromDownloads(options = {}) {
   const runLogoPath = explicitLogo
     ? options.logoPath
     : wantLogo
-      ? resolveLogoFromChannelFolder(options, options.logoSearchDir || path.dirname(downloadsDir))
-      : null;
+    ? resolveLogoFromChannelFolder(options, options.logoSearchDir || path.dirname(downloadsDir))
+    : null;
   if (wantLogo && runLogoPath) {
     console.log(`[logo] ${runLogoPath}`);
   } else if (wantLogo && !runLogoPath) {
@@ -138,7 +137,7 @@ async function main(options = {}) {
 
   const processedFolderNames = [];
 
-  const { downloadSingleVideo } = await import('../downloadVideo.js');
+  const { downloadSingleVideo } = await import('../video-info/downloadVideo.js');
 
   const defaultStockFolder = resolveDefaultStockFolder(options);
   const batchAudioSpeedOverride =
@@ -247,7 +246,7 @@ async function main(options = {}) {
 
     if (i + 1 < items.length) {
       console.log(
-        `\n>>> [Pipeline] Bắt đầu tải trước video [${i + 2}/${items.length}] trong lúc đang render video [${i + 1}/${items.length}]...`,
+        `\n>>> [Pipeline] Bắt đầu tải trước video [${i + 2}/${items.length}] trong lúc đang render video [${i + 1}/${items.length}]...`
       );
       nextDownloadPromise = startDownload(i + 1);
     } else {

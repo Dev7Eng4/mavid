@@ -49,7 +49,6 @@ export async function updateVideoInfo(rawSrtContent, options = {}) {
     console.log('Đã xong transcript.');
   }
 
-  // === Meta: dùng profile 1 ===
   console.log('Đang mở Chrome profile 1 để xử lý metadata (title/description/tags)...');
   const { context, page } = await openChromeProfile({ profile: 1, visible: true });
 

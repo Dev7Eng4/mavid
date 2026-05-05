@@ -18,7 +18,7 @@ import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 
-import { getVideoInfo, downloadTranscript, cleanVttTranscriptsToSrt } from '../downloadVideo.js';
+import { getVideoInfo, downloadTranscript, cleanVttTranscriptsToSrt } from '../video-info/downloadVideo.js';
 import { updateVideoMeta } from '../video-info/updateContent.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));

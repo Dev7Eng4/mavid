@@ -11,12 +11,12 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import ExcelJS from 'exceljs';
 import { v4 as uuidv4 } from 'uuid';
-import { resolveChannelsDir } from './utils/channelsStoragePath.js';
-import { CHANNEL_CONFIG_FILE, CHANNEL_DETAIL, CHANNELS, MIN_DURATION_VIDEO, VIDEO_STATUS_OPTIONS } from './constants/channel.js';
+import { resolveChannelsDir, resolveStockBackgroundsDir } from '../utils/channelsStoragePath.js';
+import { CHANNEL_CONFIG_FILE, CHANNEL_DETAIL, CHANNELS, MIN_DURATION_VIDEO, VIDEO_STATUS_OPTIONS } from '../constants/channel.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const DEFAULT_OUTPUT_DIR = resolveChannelsDir();
-const INPUT_FILE = path.join(__dirname, '..', 'input.txt');
+const INPUT_FILE = path.join(__dirname, '..', '..', 'input.txt');
 const INDEX_FILE = path.join(DEFAULT_OUTPUT_DIR, 'index.xlsx');
 
 const IDX_CHANNELS = CHANNELS.reduce((acc, item) => {
@@ -154,19 +154,6 @@ async function updateIndexFile(channelData) {
     await workbook.xlsx.readFile(INDEX_FILE);
     sheet = workbook.worksheets[0];
 
-    // Đồng bộ dòng tiêu đề nếu lệch INDEX_HEADERS (sau migrate hoặc file chỉnh tay)
-    // const r1 = sheet.getRow(1);
-    // let headerMismatch = false;
-    // for (let c = 1; c <= INDEX_HEADERS.length; c++) {
-    //   if (String(r1.getCell(c).value || '').trim() !== INDEX_HEADERS[c - 1]) {
-    //     headerMismatch = true;
-    //     break;
-    //   }
-    // }
-    // if (headerMismatch) {
-    //   r1.values = [undefined, ...INDEX_HEADERS];
-    // }
-
     // Tìm xem channel đã tồn tại chưa (mặc định theo ID - cột 3)
     let existingRowIndex = -1;
     for (let i = 1; i <= sheet.rowCount; i++) {
@@ -181,18 +168,11 @@ async function updateIndexFile(channelData) {
     if (existingRowIndex > 0) {
       // Cập nhật row hiện có
       const row = sheet.getRow(existingRowIndex);
-
-      // row.getCell(IDX_CHANNELS.LINK).value = link;
-      // row.getCell(IDX_CHANNELS.ID).value = id;
-      // row.getCell(IDX_CHANNELS.LASTUPLOAD).value = lastUpload;
-      // if ('email' in channelData) {
       row.getCell(IDX_CHANNELS.EMAIL).value = meta.colEmail;
       row.getCell(IDX_CHANNELS.MYCHANNEL).value = meta.colMyChannel;
       row.getCell(IDX_CHANNELS.VIDEOTYPE).value = meta.colVideoType;
       row.getCell(IDX_CHANNELS.DURATIONMINUTES).value = meta.colDurationMinutes;
       row.getCell(IDX_CHANNELS.GROUP).value = meta.colGroup;
-      // row.getCell(IDX_CHANNELS.STATUS).value = meta.colStatus;
-      // }
       console.log(`Đã cập nhật channel "${name}" trong index.xlsx`);
     } else {
       // Thêm row mới
@@ -579,7 +559,7 @@ export async function addChannelFromForm(options = {}) {
         : String(formData.background ?? '').trim(),
     channelStatus: String(formData.email ?? '').trim() ? 'LIVE' : 'INIT',
   });
-  console.log(`[ADD CHANNEL] Đã cập nhật ${path.relative(path.join(__dirname, '..'), INDEX_FILE)}`);
+  console.log(`[ADD CHANNEL] Đã cập nhật ${path.relative(path.join(__dirname, '..', '..'), INDEX_FILE)}`);
 
   return {
     success: true,
@@ -618,6 +598,9 @@ const handleAddChannel = async url => {
   const videoLinks = [...(result.video_links || [])].reverse();
 
   // Thư mục lưu kết quả: MaVidMedia/channels/<Tên người dùng>/
+  const excelFilename = channelId;
+  const results = [];
+
   const channelDir = path.join(DEFAULT_OUTPUT_DIR, excelFilename);
   const outputExcelPath = path.join(channelDir, `${excelFilename}.xlsx`);
 
@@ -722,7 +705,7 @@ const handleAddChannel = async url => {
 
   results.push({
     url,
-    type: urlType,
+    type: detectUrlType(url),
     channelName: result.name,
     channelId: excelFilename,
     channelLink,

@@ -1,7 +1,7 @@
 import path from 'path';
 import fs from 'fs';
 import { fileURLToPath } from 'url';
-import { downloadSingleVideo } from '../downloadVideo.js';
+import { downloadSingleVideo } from '../video-info/downloadVideo.js';
 import { processImageOption } from './imageOption.js';
 import { MAKE_VIDEO_MODE } from '../constants/index.js';
 

@@ -5,10 +5,7 @@ import fs from 'fs';
 import { fileURLToPath, pathToFileURL } from 'url';
 import { resolveGpmChromiumExecutable } from '../contents/scripts/openGpmPlaywright.js';
 import { getDefaultVideoStorageRoot, MAVID_MEDIA_FOLDER } from '../contents/constants/defaultVideoStorageRoot.js';
-import {
-  mergeAppSettingsObjects,
-  normalizeUserConstantsOverlay,
-} from '../contents/constants/mergeConstantsOverlay.js';
+import { mergeAppSettingsObjects, normalizeUserConstantsOverlay } from '../contents/constants/mergeConstantsOverlay.js';
 import { OVERLAY_KEYS } from '../contents/constants/constantsExportKeys.js';
 import { buildConstantsModuleBase, expandAppSettingsIntoModule } from '../contents/constants/constantsModuleBase.js';
 import { getAppSettingsUserJsonPath } from '../contents/constants/userConstantsPaths.js';
@@ -322,9 +319,9 @@ ipcMain.handle('run-npm-script', async (_event, { npmScript, extraEnv }) => {
 // --------------- Direct Script Runner ---------------
 
 const SCRIPT_MAP = {
-  getInfoChannel: '../contents/getInfoChannel.js',
-  addChannelFromForm: '../contents/addChannelFromForm.js',
-  downloadVideo: '../contents/downloadVideo.js',
+  getInfoChannel: '../contents/video-info/getInfoChannel.js',
+  addChannelFromForm: '../contents/scripts/addChannel.js',
+  downloadVideo: '../contents/video-info/downloadVideo.js',
   createBatchVideo: '../contents/scripts/createBatchVideo.js',
   makeChromeProfile: '../contents/scripts/makeChromeProfile.js',
   createThumbnailFlow: '../contents/thumbnail/createThumbnailFlow.js',

@@ -174,8 +174,8 @@ export async function internalUpdateTranscript(rawSrtContent, options = {}) {
   const chunkResults = new Array(totalChunks).fill(null);
 
   // Profile IDs: < 30 phút → [2,3,4] (tối đa 3), >= 30 phút → [2,3,4,5,6] (tối đa 5)
-  const maxProfiles = durationMin < 30 ? 3 : 5;
-  const profileIds = Array.from({ length: maxProfiles }, (_, i) => i + 2); // [2,3,4] hoặc [2,3,4,5,6]
+  const maxProfiles = durationMin < 30 ? 3 : 3;
+  const profileIds = Array.from({ length: maxProfiles }, (_, i) => i + 1);
   const activeConcurrency = Math.min(PLAYWRIGHT_PROFILES.length, totalChunks);
 
   console.log(

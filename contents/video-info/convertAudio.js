@@ -12,11 +12,10 @@ import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { execSync } from 'child_process';
-import { randomPlaybackSpeed } from './makeVideoFromAudio.js';
+import { randomPlaybackSpeed } from '../makeVideoFromAudio.js';
+import { PATHS } from '../constants/paths.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const ROOT = path.join(__dirname, '..');
-const DOWNLOADS_DIR = path.join(ROOT, 'downloads');
 
 /**
  * Convert audio file với tốc độ cho trước (atempo).
@@ -39,36 +38,23 @@ export function convertAudioFile(inputPath, outputPath, speed) {
 }
 
 export default async function main() {
-  if (!fs.existsSync(DOWNLOADS_DIR)) {
+  if (!fs.existsSync(PATHS.DOWNLOADS)) {
     console.error('Không tìm thấy thư mục downloads/.');
     return;
   }
 
-  const audioFiles = fs.readdirSync(DOWNLOADS_DIR).filter(f => /\.(mp3|m4a|wav|aac)$/i.test(f));
+  const audioFiles = fs.readdirSync(PATHS.DOWNLOADS).filter(f => /\.(mp3|m4a|wav|aac)$/i.test(f));
   if (audioFiles.length === 0) {
     console.error('Không tìm thấy file audio trong downloads/.');
     return;
   }
 
-  const inquirer = (await import('inquirer')).default;
+  const audioFile = audioFiles[0];
 
-  let audioFile = audioFiles[0];
-  if (audioFiles.length > 1) {
-    const { picked } = await inquirer.prompt([
-      {
-        type: 'list',
-        name: 'picked',
-        message: 'Chọn file audio:',
-        choices: audioFiles.map(f => ({ name: f, value: f })),
-      },
-    ]);
-    audioFile = picked;
-  }
-
-  const inputPath = path.join(DOWNLOADS_DIR, audioFile);
+  const inputPath = path.join(PATHS.DOWNLOADS, audioFile);
   const ext = path.extname(audioFile);
   const baseName = path.basename(audioFile, ext);
-  const outputPath = path.join(DOWNLOADS_DIR, `${baseName}_slow${ext}`);
+  const outputPath = path.join(PATHS.DOWNLOADS, `${baseName}_slow${ext}`);
 
   convertAudioFile(inputPath, outputPath, randomPlaybackSpeed());
 }

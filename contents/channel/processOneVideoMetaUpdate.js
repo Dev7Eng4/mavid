@@ -4,7 +4,7 @@
  */
 import path from 'path';
 import fs from 'fs';
-import { downloadTranscript, finalizeDownloadedTranscript } from '../downloadVideo.js';
+import { downloadTranscript, finalizeDownloadedTranscript } from '../video-info/downloadVideo.js';
 import { readVideoMetaFile, writeVideoMetaFile, geminiMetaFieldsIncomplete, mergeGeminiIntoVideoMeta } from './videoMetaFile.util.js';
 import { hasRasterThumbnailInFolder } from './videoFolderThumbnail.util.js';
 import { extractYoutubeVideoId } from './youtubeUrl.util.js';

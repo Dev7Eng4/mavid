@@ -1,7 +1,7 @@
 import path from 'path';
 import fs from 'fs';
 import ExcelJS from 'exceljs';
-import { getChannelInfo } from '../getInfoChannel.js';
+import { getChannelInfo } from '../video-info/getInfoChannel.js';
 import { ASSETS_DIR, ROOT_DIR, VISUAL_RESOURCE_TYPES } from './constant.js';
 
 const MIN_DURATION_SECONDS = 30 * 60;

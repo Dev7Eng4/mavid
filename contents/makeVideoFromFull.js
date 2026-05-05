@@ -282,7 +282,7 @@ async function main(options = {}) {
 
   const overlayRender = { imageOpacity, videoOpacity, overlayCacheDir, videoCropPercent, outputHeight };
 
-  const { downloadSingleVideo } = await import('./downloadVideo.js');
+  const { downloadSingleVideo } = await import('./video-info/downloadVideo.js');
 
   // Tìm file thực tế được dùng để lấy thư mục đích (folder channel)
   const actualInputFile = inputFile;
