@@ -1,7 +1,8 @@
 /**
  * Pipeline Gemini: tóm tắt SRT theo chunk → metadata (title, description, tags, summary).
  */
-import { DEFAULT_PROMPT_LANG, GEMINI_CHUNK_SIZE } from '../constants/index.js';
+import { DEFAULT_PROMPT_LANG } from '../constants/index.js';
+import { GEMINI_CHUNK_SIZE } from './geminiAppDefaults.js';
 import { loadPromptByLanguage } from '../prompts/index.js';
 import { srtToPlainText } from '../utils/srt.util.js';
 import { openGeminiPage, sendPromptToGemini } from './browser.util.js';

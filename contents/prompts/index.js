@@ -1,4 +1,4 @@
-import { DEFAULT_PROMPT_LANG } from '../constants/defaultPromptLang.js';
+import { DEFAULT_PROMPT_LANG } from '../constants/lang.js';
 
 /**
  * Tên hàm export trong createImage.js cần ảnh tham chiếu (Flow attach thumbnail).
@@ -45,7 +45,7 @@ export function resolveThumbnailPromptBuilder(prompts, styleKey) {
     };
   }
   console.warn(
-    `[thumbnail] Style "${raw}" (→ "${k}") không có trong gói createImage (hoặc không phải hàm) — dùng promptToCreateThumbnail (tự động).`,
+    `[thumbnail] Style "${raw}" (→ "${k}") không có trong gói createImage (hoặc không phải hàm) — dùng promptToCreateThumbnail (tự động).`
   );
   return { build: def, isNeedImage: false, usedStyleKey: '', didFallback: true };
 }

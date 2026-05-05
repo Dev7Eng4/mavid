@@ -1,6 +1,6 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
-import { MAX_SCHEDULED_DAYS, MAX_VIDEOS_PREPARE_AHEAD } from '@contents/constants/appSettings.js';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { AppButton } from '@/components/ui/AppButton';
+import { useResolvedVideoLimits } from '@/hooks/useResolvedVideoLimits';
 
 export interface ChannelCreateVideoConfirmPayload {
   maxVideosPerBatch: number;
@@ -31,6 +31,7 @@ export function ChannelCreateVideoDialog({
   eligibleQueueLength,
   targetChannelFolder,
 }: ChannelCreateVideoDialogProps) {
+  const { MAX_VIDEOS_PREPARE_AHEAD } = useResolvedVideoLimits();
   const [maxVideosInput, setMaxVideosInput] = useState<number | null>(MAX_VIDEOS_PREPARE_AHEAD);
   const [formError, setFormError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -44,6 +45,10 @@ export function ChannelCreateVideoDialog({
       mountedRef.current = false;
     };
   }, []);
+
+  useEffect(() => {
+    setMaxVideosInput(MAX_VIDEOS_PREPARE_AHEAD);
+  }, [MAX_VIDEOS_PREPARE_AHEAD]);
 
   useEffect(() => {
     if (!targetChannelFolder) {
@@ -84,7 +89,8 @@ export function ChannelCreateVideoDialog({
       return;
     }
 
-    const maxVideosPerBatch = maxVideosInput == null ? MAX_SCHEDULED_DAYS : clampInt(maxVideosInput, 1, MAX_VIDEOS_CAP);
+    const maxVideosPerBatch =
+      maxVideosInput == null ? MAX_VIDEOS_PREPARE_AHEAD : clampInt(maxVideosInput, 1, MAX_VIDEOS_CAP);
 
     setFormError(null);
     setBusy(true);
@@ -96,7 +102,20 @@ export function ChannelCreateVideoDialog({
     } finally {
       if (mountedRef.current) setBusy(false);
     }
-  }, [eligibleQueueLength, maxVideosInput, onClose, onConfirm, configEmails.length, selectedEmail]);
+  }, [
+    eligibleQueueLength,
+    maxVideosInput,
+    MAX_VIDEOS_PREPARE_AHEAD,
+    onClose,
+    onConfirm,
+    configEmails.length,
+    selectedEmail,
+  ]);
+
+  const defaultPlaceholderHint = useMemo(
+    () => `Mặc định ${MAX_VIDEOS_PREPARE_AHEAD} (để trống)`,
+    [MAX_VIDEOS_PREPARE_AHEAD]
+  );
 
   const skippedCount = Math.max(0, selectedRowCount - eligibleQueueLength);
   const canSubmit = eligibleQueueLength > 0;
@@ -162,7 +181,7 @@ export function ChannelCreateVideoDialog({
                 if (v === '') setMaxVideosInput(null);
                 else setMaxVideosInput(clampInt(parseInt(v, 10), 1, MAX_VIDEOS_CAP));
               }}
-              placeholder={`Mặc định ${MAX_SCHEDULED_DAYS} (để trống)`}
+              placeholder={defaultPlaceholderHint}
               className='w-full rounded-xl px-3 py-2.5 text-base outline-none border transition-colors duration-150'
               style={{
                 background: 'var(--code-bg)',

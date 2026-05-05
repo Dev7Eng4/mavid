@@ -3,7 +3,7 @@
  * map kết quả AI về objects → merge lại SRT.
  * < 30 phút: tối đa 3 Chrome profile (2,3,4). >= 30 phút: tối đa 5 Chrome profile (2,3,4,5,6).
  */
-import { GEMINI_CONFIG, GEMINI_CHUNK_SIZE } from '../constants/index.js';
+import { GEMINI_CONFIG, GEMINI_CHUNK_SIZE } from './geminiAppDefaults.js';
 import { loadPromptByLanguage } from '../prompts/index.js';
 import { openChromeProfile } from '../scripts/makeChromeProfile.js';
 import { openGeminiPage, sendPromptToGemini } from './browser.util.js';

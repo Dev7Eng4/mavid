@@ -1,18 +1,8 @@
-export type Page =
-  | 'pipeline'
-  | 'create-video'
-  | 'settings'
-  | 'channels'
-  | 'visual'
-  | 'groups'
-  | 'warnings'
-  | 'analyst'
-  | 'gpm'
-  | 'logs';
+export type Page = 'pipeline' | 'create-video' | 'settings' | 'channels' | 'visual' | 'groups' | 'warnings' | 'analyst' | 'gpm' | 'logs';
 
 export type ScriptId =
   | 'tao-chrome-profile'
-  | 'lay-thong-tin-youtube (video, channel)'
+  | 'lay-thong-tin-youtube'
   | 'tao-batch-video-tu-audio'
   | 'tao-batch-video-reup-full'
   | 'tao-thumbnail-flow'
@@ -33,10 +23,10 @@ export const scriptDefs: ScriptDef[] = [
     npmScript: 'tao-chrome-profile',
   },
   {
-    id: 'lay-thong-tin-youtube (video, channel)',
+    id: 'lay-thong-tin-youtube',
     title: 'Lấy thông tin YouTube',
     summary: 'Đọc URL từ input.txt, lấy info kênh/playlist, xuất Excel vào MaVidMedia/channels/.',
-    npmScript: 'lay-thong-tin-youtube (video, channel)',
+    npmScript: 'lay-thong-tin-youtube',
   },
   {
     id: 'tao-batch-video-tu-audio',
@@ -70,54 +60,19 @@ export interface AppStats {
   downloads: number;
 }
 
-export interface ConstantsUiModel {
-  flowSettings: { FLOW_URL: string; FLOW_PROJECT_ID: string };
-  GEMINI_CONFIG: {
-    URL: string;
-    MAX_CONCURRENT: number;
-    UPDATE_TRANSCRIPT_CHUNK_MAX_ATTEMPTS: number;
-    UPDATE_TRANSCRIPT_CHUNK_RETRY_BASE_DELAY_MS: number;
-    UPDATE_TRANSCRIPT_SRT_TIME_SHIFT_MS: number;
-  };
-  GEMINI_CHUNK_SIZE: {
-    UPDATE_TRANSCRIPT: number;
-    UPDATE_TRANSCRIPT_STEP2_CHUNK: number;
-    UPDATE_TRANSCRIPT_STEP2_OVERLAP: number;
-    SUMMARY_CONTENT: number;
-  };
-  LANGUAGES_NEED_UPDATE_TRANSCRIPT: string[];
-  META_DATA: { NICHE: string; TITLE: string; DESCRIPTION: string; TAGS: string };
-  DEFAULT_VIDEO: { BACKGROUND_VIDEO: string };
-  AUDIO_SPEED: number;
-  STOCK_VIDEO: {
-    CROSSFADE_SEC: number;
-    RENDER_EXTRA_SEC: number;
-    SLOWMO_FACTOR: number;
-    CANVAS_W: number;
-    CANVAS_H: number;
-    FPS: number;
-    BITRATE: string;
-    MAX_BITRATE: string;
-    BUFSIZE: string;
-  };
-  SUBTITLE: {
-    BOX_HEIGHT: number;
-    BOX_OPACITY: number;
-    FONT_SIZE: number;
-    PADDING_TOP: number;
-    PADDING_HORIZONTAL: number;
-    CHAR_SPACING: number;
-  };
-  LOGO: { SIZE: number; MARGIN_TOP: number; MARGIN_RIGHT: number };
+/** Phần chỉnh qua Settings / JSON user — khớp `APP_SETTINGS` trong contents/constants. */
+export interface AppSettingsModel {
+  FLOW: { PROJECT_ID: string; CHROME_PROFILE: number };
+  VIDEO: { MAX_SCHEDULED_DAYS: number; MAX_VIDEOS_PREPARE_AHEAD: number };
   /**
    * Thư mục `MaVidMedia`: bên trong có `backgrounds/`, `videos/`, `channels/`.
-   * Rỗng trong file → app gợi ý mặc định (Windows: ổ không C:; macOS: volume ngoài hoặc HOME).
+   * Rỗng → app gợi ý mặc định (Windows: ổ không C:; macOS: volume ngoài hoặc HOME).
    */
-  VIDEO_STORAGE_ROOT: string;
-  /** Số ngày lên lịch trước tối đa (cùng lúc / mỗi đợt — tùy luồng dùng hằng này). */
-  MAX_SCHEDULED_DAYS: number;
-  /** Số video tạo / chuẩn bị trước tối đa (buffer trước khi đăng). */
-  MAX_VIDEOS_PREPARE_AHEAD: number;
+  STORAGE: string;
+}
+
+export interface ConstantsUiModel {
+  APP_SETTINGS: AppSettingsModel;
 }
 
 export interface ChannelFile {

@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { ChannelData, ChannelFolderDataResult, ChannelRow, Group } from '@/types';
 import { scriptDefs } from '@/types';
-import { MAX_VIDEOS_PREPARE_AHEAD } from '@contents/constants/appSettings.js';
+import { useResolvedVideoLimits } from '@/hooks/useResolvedVideoLimits';
 import { useClientPagination } from '@/hooks/useClientPagination';
 import { CustomSelect } from '@/components/ui/CustomSelect';
 import { PageHeader } from '@/components/ui/PageHeader';
@@ -101,6 +101,8 @@ function ChannelsPage() {
   const [mappingStatus, setMappingStatus] = useState<{ type: 'edit' | 'add'; data: ChannelRow | null } | null>(null);
 
   const canRunNpmScript = typeof window.runner?.runNpmScript === 'function';
+
+  const { MAX_VIDEOS_PREPARE_AHEAD } = useResolvedVideoLimits();
 
   const selectedChannelRow = useMemo(() => {
     if (!selectedChannel) return null;
@@ -632,7 +634,7 @@ function ChannelsPage() {
     const n = Number(MAX_VIDEOS_PREPARE_AHEAD);
     if (!Number.isFinite(n)) return 1;
     return Math.min(100, Math.max(1, Math.trunc(n)));
-  }, []);
+  }, [MAX_VIDEOS_PREPARE_AHEAD]);
 
   const runDetailCreateVideoForSelection = useCallback(async () => {
     if (!selectedChannel || !channelVideos?.length) return;

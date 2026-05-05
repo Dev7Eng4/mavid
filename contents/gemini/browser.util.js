@@ -1,7 +1,7 @@
 /**
  * Tương tác Playwright với giao diện web Gemini.
  */
-import { GEMINI_CONFIG } from '../constants/index.js';
+import { GEMINI_CONFIG } from './geminiAppDefaults.js';
 import { clearContent, clickElement, getRandomNumber } from '../utils/dom.util.js';
 import { GEMINI_SELECTOR } from './selectors.js';
 

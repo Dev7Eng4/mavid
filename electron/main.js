@@ -5,9 +5,12 @@ import fs from 'fs';
 import { fileURLToPath, pathToFileURL } from 'url';
 import { resolveGpmChromiumExecutable } from '../contents/scripts/openGpmPlaywright.js';
 import { getDefaultVideoStorageRoot, MAVID_MEDIA_FOLDER } from '../contents/constants/defaultVideoStorageRoot.js';
-import { mergeConstantsBaseWithUserOverlay } from '../contents/constants/mergeConstantsOverlay.js';
-import { CONSTANT_EXPORT_KEYS } from '../contents/constants/constantsExportKeys.js';
-import { buildConstantsModuleBase } from '../contents/constants/constantsModuleBase.js';
+import {
+  mergeAppSettingsObjects,
+  normalizeUserConstantsOverlay,
+} from '../contents/constants/mergeConstantsOverlay.js';
+import { OVERLAY_KEYS } from '../contents/constants/constantsExportKeys.js';
+import { buildConstantsModuleBase, expandAppSettingsIntoModule } from '../contents/constants/constantsModuleBase.js';
 import { getAppSettingsUserJsonPath } from '../contents/constants/userConstantsPaths.js';
 import { mapIndexDataToProps, mapIndexDataToHeaders, mapPropToHeader } from '../contents/constants/indexColumnMapping.js';
 import { GPM_API_DEFAULT_ORIGIN } from '../contents/constants/gpmApi.js';
@@ -29,7 +32,7 @@ let mainWindow = null;
 
 const ALLOWED_NPM_SCRIPTS = new Set([
   'tao-chrome-profile',
-  'lay-thong-tin-youtube (video, channel)',
+  'lay-thong-tin-youtube',
   'tao-batch-video-tu-audio',
   'tao-batch-video-reup-full',
   'tao-thumbnail-flow',
@@ -882,19 +885,18 @@ function getDefaultConstantsModule() {
 }
 
 function constantsModToUiModel(mod) {
-  const model = {};
-  for (const key of CONSTANT_EXPORT_KEYS) {
-    model[key] = mod[key];
-  }
-  return model;
+  return { APP_SETTINGS: mod.APP_SETTINGS };
 }
 
 function applyDefaultVideoStorageRootToUiModel(model) {
   const m = { ...model };
-  const root = m.VIDEO_STORAGE_ROOT;
+  const prev = m.APP_SETTINGS && typeof m.APP_SETTINGS === 'object' ? m.APP_SETTINGS : {};
+  const AS = { ...prev };
+  const root = AS.STORAGE;
   if (typeof root !== 'string' || !root.trim()) {
-    m.VIDEO_STORAGE_ROOT = getDefaultVideoStorageRoot();
+    AS.STORAGE = getDefaultVideoStorageRoot();
   }
+  m.APP_SETTINGS = AS;
   return m;
 }
 
@@ -974,16 +976,20 @@ async function importConstantsFresh() {
     );
     mod = getDefaultConstantsModule();
   }
+  const plain = { ...mod };
   if (app.isPackaged) {
     const overlay = loadUserConstantsOverlay();
-    if (overlay) mod = mergeConstantsBaseWithUserOverlay(mod, overlay, CONSTANT_EXPORT_KEYS);
+    const norm = normalizeUserConstantsOverlay(overlay);
+    if (norm?.APP_SETTINGS) {
+      plain.APP_SETTINGS = mergeAppSettingsObjects(plain.APP_SETTINGS, norm.APP_SETTINGS);
+    }
   }
-  return mod;
+  return expandAppSettingsIntoModule(plain);
 }
 
 async function writeConstantsFiles(nextValues) {
   const payload = {};
-  for (const key of CONSTANT_EXPORT_KEYS) {
+  for (const key of OVERLAY_KEYS) {
     if (nextValues[key] !== undefined) payload[key] = nextValues[key];
   }
 
@@ -1018,8 +1024,12 @@ ipcMain.handle('save-constants-ui-model', async (_event, { modelPatch }) => {
   const mod = await importConstantsFresh();
   const nextValues = { ...mod };
   for (const key of Object.keys(modelPatch)) {
-    if (!CONSTANT_EXPORT_KEYS.includes(key)) continue;
-    nextValues[key] = modelPatch[key];
+    if (!OVERLAY_KEYS.includes(key)) continue;
+    if (key === 'APP_SETTINGS' && modelPatch.APP_SETTINGS && typeof modelPatch.APP_SETTINGS === 'object') {
+      nextValues.APP_SETTINGS = mergeAppSettingsObjects(mod.APP_SETTINGS, modelPatch.APP_SETTINGS);
+    } else {
+      nextValues[key] = modelPatch[key];
+    }
   }
 
   await writeConstantsFiles(nextValues);
@@ -1028,7 +1038,7 @@ ipcMain.handle('save-constants-ui-model', async (_event, { modelPatch }) => {
 
 /**
  * Chọn thư mục cha (vd. ổ D:\\); tạo `MaVidMedia/backgrounds`, `MaVidMedia/videos`, `MaVidMedia/channels`;
- * ghi `VIDEO_STORAGE_ROOT` = đường dẫn tới `MaVidMedia`.
+ * ghi `APP_SETTINGS.STORAGE` = đường dẫn tới `MaVidMedia`.
  */
 ipcMain.handle('select-video-storage-folder', async (_event, { currentPath } = {}) => {
   const win = BrowserWindow.getFocusedWindow() || mainWindow;
@@ -1063,7 +1073,10 @@ ipcMain.handle('select-video-storage-folder', async (_event, { currentPath } = {
     fs.mkdirSync(path.join(root, sub), { recursive: true });
   }
   const mod = await importConstantsFresh();
-  const nextValues = { ...mod, VIDEO_STORAGE_ROOT: root };
+  const nextValues = {
+    ...mod,
+    APP_SETTINGS: { ...mod.APP_SETTINGS, STORAGE: root },
+  };
   await writeConstantsFiles(nextValues);
   return { ok: true, path: root };
 });

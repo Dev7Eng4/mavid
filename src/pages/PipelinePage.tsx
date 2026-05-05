@@ -9,7 +9,7 @@ import { YouTubeLinkPopup } from '@/components/pipeline/YouTubeLinkPopup';
 import { VideoFromAudioPopup } from '@/components/pipeline/VideoFromAudioPopup';
 import type { ScriptStatus } from '@/components/pipeline/ScriptCard';
 
-const YOUTUBE_SCRIPT_ID: ScriptId = 'lay-thong-tin-youtube (video, channel)';
+const YOUTUBE_SCRIPT_ID: ScriptId = 'lay-thong-tin-youtube';
 const VIDEO_FROM_AUDIO_SCRIPT_ID: ScriptId = 'tao-batch-video-tu-audio';
 
 interface Props {

@@ -5,7 +5,7 @@
  * @see https://docs.gpmloginapp.com/api-document/mo-profile
  */
 
-import { GPM_API_DEFAULT_ORIGIN, GPM_API_VERSION } from '../../contents/constants/gpmApi.js';
+import { GPM_API_DEFAULT_ORIGIN, GPM_API_VERSION } from '@contents/constants/gpmApi.js';
 
 export const GPM_API_V3_DEFAULT_BASE = GPM_API_DEFAULT_ORIGIN;
 
