@@ -24,7 +24,7 @@ import { runCreateThumbnailFlow } from './runCreateThumbnail.js';
 import { optimizeFlowThumbnailJpegIfLarge } from './thumbnailOptimize.util.js';
 
 /** Profile Chrome dùng cho bước Gemini của jaFulLText. */
-const JA_FULLTEXT_GEMINI_PROFILE = 4;
+const JA_FULLTEXT_GEMINI_PROFILE = 2;
 
 /**
  * Bỏ fence ```/```json bao quanh response JSON của Gemini.

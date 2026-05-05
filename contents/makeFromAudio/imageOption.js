@@ -55,7 +55,7 @@ const CHUNK_SIZE = 300;
 /** Số object context từ đoạn trước để đảm bảo tính liên tục */
 const PREV_CONTEXT_SIZE = 20;
 /** Profile IDs dùng cho xử lý song song (profile 4 → 8) */
-const PROFILE_IDS = [4, 5, 6, 7, 8];
+const PROFILE_IDS = [2, 3];
 /** Số timeline đầu transcript dùng cho headTranscript khi detect niche */
 const NICHE_HEAD_TIMELINE_LIMIT = 1000;
 /** Số timeline cuối transcript dùng cho tailTranscript khi detect niche */
@@ -362,7 +362,7 @@ async function generateGlobalNiche(allObjects, prompts) {
 
   const prompt = prompts.promptToDetectNiche(headTranscript, tailTranscript);
 
-  const { context: ctx, page: pg } = await openChromeProfile({ profile: 4, visible: true });
+  const { context: ctx, page: pg } = await openChromeProfile({ profile: 2, visible: true });
   let globalNiche = null;
   try {
     await openGeminiPage(pg);
@@ -511,7 +511,7 @@ async function generateVisualBible(globalNiche, allChapters, prompts) {
     summary: mergedSummary,
   });
 
-  const { context: vbCtx, page: vbPage } = await openChromeProfile({ profile: 4, visible: true });
+  const { context: vbCtx, page: vbPage } = await openChromeProfile({ profile: 2, visible: true });
 
   let visualBible;
   let globalMasterShotPrompt;
