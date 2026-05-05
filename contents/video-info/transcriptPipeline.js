@@ -1,63 +1,13 @@
 /**
- * Pipeline Gemini: parse SRT (đã clean, vd. sau cleanSrt) → gửi [id] text cho AI fix →
+ * Pipeline video-info: parse SRT (đã clean, vd. sau cleanSrt) → gửi [id] text cho AI fix →
  * map kết quả AI về objects → merge lại SRT.
  * < 30 phút: tối đa 3 Chrome profile (2,3,4). >= 30 phút: tối đa 5 Chrome profile (2,3,4,5,6).
  */
-import { GEMINI_CONFIG, GEMINI_CHUNK_SIZE } from './geminiAppDefaults.js';
+import { VIDEO_INFO_CONFIG, VIDEO_INFO_CHUNK_SIZE } from './videoInfoDefaults.js';
 import { loadPromptByLanguage } from '../prompts/index.js';
 import { openChromeProfile } from '../scripts/makeChromeProfile.js';
-import { openGeminiPage, sendPromptToGemini } from './browser.util.js';
-import { getSrtDurationInMinutes } from './srtTiming.util.js';
-
-// ─── Helpers ────────────────────────────────────────────────────────────────
-
-/** Bỏ fence markdown nếu Gemini bọc ``` / ```srt. */
-function stripSrtCodeFence(text) {
-  let t = String(text ?? '').trim();
-  t = t
-    .replace(/^```[^\n]*\n?/i, '')
-    .replace(/\n?```\s*$/i, '')
-    .trim();
-  return t;
-}
-
-/**
- * Parse chuỗi SRT thành mảng objects { id, timeline, text }.
- * @param {string} srtContent
- * @returns {{ id: string, timeline: string, text: string }[]}
- */
-function parseSrtToObjects(srtContent) {
-  const raw = String(srtContent ?? '').replace(/\r/g, '').trim();
-  if (!raw) return [];
-
-  const blocks = raw.split(/\n\n+/).map(b => b.trim()).filter(Boolean);
-  const result = [];
-
-  const timelineRe = /^\d{2}:\d{2}:\d{2}[.,]\d{3}\s*-->\s*\d{2}:\d{2}:\d{2}[.,]\d{3}/;
-
-  for (const block of blocks) {
-    const lines = block.split('\n').map(l => l.trim()).filter(Boolean);
-    if (lines.length < 3) continue;
-
-    const id = lines[0];
-    const timeline = lines[1];
-    if (!/^\d+$/.test(id) || !timelineRe.test(timeline)) continue;
-
-    const text = lines.slice(2).join('\n').trim();
-    result.push({ id, timeline, text });
-  }
-
-  return result;
-}
-
-/**
- * Chuyển mảng objects thành dạng "[id] text" để gửi cho AI.
- * @param {{ id: string, timeline: string, text: string }[]} objects
- * @returns {string}
- */
-function objectsToIdTextFormat(objects) {
-  return objects.map(o => `[${o.id}] ${o.text}`).join('\n');
-}
+import { openGeminiPage, sendPromptToGeminiWithRetry, stripJsonCodeFence } from '../gemini/browser.util.js';
+import { getSrtDurationInMinutes, objectsToIdTextFormat, parseSrtToObjects } from '../utils/srt.util.js';
 
 /**
  * Parse phản hồi AI dạng "[id] fixed text", map về mảng objects gốc để cập nhật text.
@@ -67,8 +17,11 @@ function objectsToIdTextFormat(objects) {
  * @returns {{ id: string, timeline: string, text: string }[]}  Mảng đã cập nhật text
  */
 function applyAiResponseToObjects(objects, aiResponse) {
-  const cleaned = stripSrtCodeFence(aiResponse ?? '');
-  const lines = cleaned.split('\n').map(l => l.trim()).filter(Boolean);
+  const cleaned = stripJsonCodeFence(aiResponse ?? '');
+  const lines = cleaned
+    .split('\n')
+    .map(l => l.trim())
+    .filter(Boolean);
 
   // Parse mỗi dòng [id] text
   /** @type {Map<string, string>} */
@@ -128,41 +81,28 @@ function splitObjectsIntoChunks(objects, chunkSize) {
  * @param {number} totalChunks
  */
 async function sendUpdateTranscriptChunkWithRetry(page, prompt, chunkIndex, totalChunks) {
-  const maxAttempts = Math.max(1, GEMINI_CONFIG.UPDATE_TRANSCRIPT_CHUNK_MAX_ATTEMPTS);
-  const baseDelayMs = Math.max(0, GEMINI_CONFIG.UPDATE_TRANSCRIPT_CHUNK_RETRY_BASE_DELAY_MS);
-  let lastRaw = '';
+  const maxAttempts = Math.max(1, VIDEO_INFO_CONFIG.UPDATE_TRANSCRIPT_CHUNK_MAX_ATTEMPTS);
+  const baseDelayMs = Math.max(0, VIDEO_INFO_CONFIG.UPDATE_TRANSCRIPT_CHUNK_RETRY_BASE_DELAY_MS);
+  const label = `[update-transcript] Chunk ${chunkIndex + 1}/${totalChunks}`;
 
-  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
-    try {
-      lastRaw = await sendPromptToGemini(page, prompt);
-      if (stripSrtCodeFence(lastRaw)) return lastRaw;
-      if (attempt < maxAttempts) {
-        const waitMs = baseDelayMs * attempt;
-        console.warn(
-          `[update-transcript] Chunk ${
-            chunkIndex + 1
-          }/${totalChunks} — lần ${attempt}/${maxAttempts}: phản hồi rỗng; chờ ${waitMs}ms rồi thử lại.`
-        );
-        await page.waitForTimeout(waitMs);
-      }
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : String(err);
-      if (attempt < maxAttempts) {
-        const waitMs = baseDelayMs * attempt;
-        console.warn(
-          `[update-transcript] Chunk ${
-            chunkIndex + 1
-          }/${totalChunks} — lần ${attempt}/${maxAttempts} lỗi: ${msg}; chờ ${waitMs}ms rồi thử lại.`
-        );
-        await page.waitForTimeout(waitMs);
-      } else {
-        console.warn(`[update-transcript] Chunk ${chunkIndex + 1}/${totalChunks} — thất bại sau ${maxAttempts} lần: ${msg}`);
-        return '';
-      }
-    }
+  try {
+    return await sendPromptToGeminiWithRetry(page, prompt, {
+      // Transcript update trả "[id] text" plain; không yêu cầu code block.
+      requireCodeBlock: false,
+      // Validate đơn giản: response (sau strip fence) không được rỗng.
+      validate: raw => {
+        const cleaned = stripJsonCodeFence(raw).trim();
+        if (!cleaned) throw new Error('Gemini trả về response rỗng.');
+      },
+      maxRetries: Math.max(0, maxAttempts - 1),
+      retryDelayMs: baseDelayMs,
+      label,
+    });
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    console.warn(`${label} — thất bại sau ${maxAttempts} lần: ${msg}`);
+    return '';
   }
-
-  return lastRaw;
 }
 
 // ─── Main Pipeline ──────────────────────────────────────────────────────────
@@ -181,7 +121,7 @@ async function processChunkOnPage(page, chunkObjects, chunkIndex, totalChunks, p
   const prompt = prompts.promptUpdateTranscript(idTextInput);
   const raw = await sendUpdateTranscriptChunkWithRetry(page, prompt, chunkIndex, totalChunks);
 
-  if (!raw || !stripSrtCodeFence(raw).trim()) {
+  if (!raw || !stripJsonCodeFence(raw).trim()) {
     console.warn(`[update-transcript] Chunk ${chunkIndex + 1}/${totalChunks}: AI trả về rỗng, giữ nguyên.`);
     return chunkObjects;
   }
@@ -218,7 +158,7 @@ export async function internalUpdateTranscript(rawSrtContent, options = {}) {
     throw new Error('Thiếu promptUpdateTranscript trong bundle prompt ngôn ngữ.');
   }
 
-  const chunkSize = Math.max(1, Number(GEMINI_CHUNK_SIZE.UPDATE_TRANSCRIPT) || 100);
+  const chunkSize = Math.max(1, Number(VIDEO_INFO_CHUNK_SIZE.UPDATE_TRANSCRIPT) || 100);
   const chunks = splitObjectsIntoChunks(allObjects, chunkSize);
   const totalChunks = chunks.length;
 
@@ -238,7 +178,9 @@ export async function internalUpdateTranscript(rawSrtContent, options = {}) {
   const activeConcurrency = Math.min(profileIds.length, totalChunks);
 
   console.log(
-    `[update-transcript] Video ${durationMin < 30 ? '< 30' : '>= 30'} phút → mở ${activeConcurrency} Chrome profile (${profileIds.slice(0, activeConcurrency).join(',')}) cho ${totalChunks} chunk...`
+    `[update-transcript] Video ${durationMin < 30 ? '< 30' : '>= 30'} phút → mở ${activeConcurrency} Chrome profile (${profileIds
+      .slice(0, activeConcurrency)
+      .join(',')}) cho ${totalChunks} chunk...`
   );
 
   let nextChunkIndex = 0;
@@ -289,4 +231,3 @@ export async function internalUpdateTranscript(rawSrtContent, options = {}) {
 
   return resultSrt;
 }
-

@@ -1,10 +1,10 @@
 /**
  * Entry `run-script` (Electron): default export nhận `params` giống `runCreateThumbnailFlow`.
- * Không chạy CLI khi import — CLI dùng `createThumbnail.cli.js`.
+ * Không chạy CLI khi import — CLI dùng `createThumbnailFlow.cli.js`.
  */
-import { runCreateThumbnailFlow } from './runCreateThumbnail.js';
+import { runCreateThumbnailFlow } from './runCreateThumbnailFlow.js';
 
-export { runCreateThumbnailFlow } from './runCreateThumbnail.js';
+export { runCreateThumbnailFlow } from './runCreateThumbnailFlow.js';
 
 /**
  * @param {Record<string, unknown>} params

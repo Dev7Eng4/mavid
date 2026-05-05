@@ -20,7 +20,7 @@ import { parseSrtToObjects, objectsToIdTextFormat, srtToPlainText } from '../uti
 import { loadPromptByLanguage } from '../prompts/index.js';
 import { openChromeProfile } from '../scripts/makeChromeProfile.js';
 import { openGeminiPage, sendPromptToGeminiWithRetry } from '../gemini/browser.util.js';
-import { runCreateThumbnailFlow } from '../flow/runCreateThumbnail.js';
+import { runCreateThumbnailFlow } from '../thumbnail/runCreateThumbnailFlow.js';
 
 import {
   DOWNLOADS_DIR,
@@ -60,33 +60,6 @@ const PROFILE_IDS = [2, 3];
 const NICHE_HEAD_TIMELINE_LIMIT = 1000;
 /** Số timeline cuối transcript dùng cho tailTranscript khi detect niche */
 const NICHE_TAIL_TIMELINE_LIMIT = 1000;
-
-/**
- * Bỏ fence markdown nếu Gemini bọc ``` / ```json.
- * @param {string} text
- * @returns {string}
- */
-function stripJsonCodeFence(text) {
-  let t = String(text ?? '').trim();
-  t = t
-    .replace(/^```[^\n]*\n?/i, '')
-    .replace(/\n?```\s*$/i, '')
-    .trim();
-  return t;
-}
-
-/**
- * Validator cho sendPromptToGeminiWithRetry: response phải parse được JSON sau khi strip code fence.
- * Throw nếu không hợp lệ → trigger retry.
- * @param {string} raw
- */
-function validateGeminiJsonResponse(raw) {
-  const cleaned = stripJsonCodeFence(raw);
-  if (!cleaned) {
-    throw new Error('Gemini trả về response rỗng.');
-  }
-  JSON.parse(cleaned);
-}
 
 /**
  * Normalize mảng chapter từ Gemini: sửa trường hợp AI trả key số (vd "353": 353) thay vì "id_end".
@@ -368,7 +341,6 @@ async function generateGlobalNiche(allObjects, prompts) {
     await openGeminiPage(pg);
     const rawResponse = await sendPromptToGeminiWithRetry(pg, prompt, {
       maxRetries: 2,
-      validate: validateGeminiJsonResponse,
       label: 'Global Niche',
     });
     const jsonStr = stripJsonCodeFence(rawResponse);
@@ -449,7 +421,6 @@ async function generateChapters(allObjects, globalNiche, prompts) {
           });
           const rawResponse = await sendPromptToGeminiWithRetry(pg, prompt, {
             maxRetries: 2,
-            validate: validateGeminiJsonResponse,
             label: `Chapter ${i + 1}/${totalChunks} (profile ${profileNum})`,
           });
 
@@ -519,7 +490,6 @@ async function generateVisualBible(globalNiche, allChapters, prompts) {
     await openGeminiPage(vbPage);
     const rawVbResponse = await sendPromptToGeminiWithRetry(vbPage, visualBiblePrompt, {
       maxRetries: 2,
-      validate: validateGeminiJsonResponse,
       label: 'Visual Bible',
     });
 
@@ -631,7 +601,6 @@ async function generateScenePrompts(allChapters, allObjects, visualBible, prompt
 
           const rawSceneResponse = await sendPromptToGeminiWithRetry(pg, scenePrompt, {
             maxRetries: 2,
-            validate: validateGeminiJsonResponse,
             label: `Scene chapter ${ci + 1}/${totalChaptersForScene} (profile ${profileNum})`,
           });
 

@@ -15,29 +15,15 @@
  * Caller chịu trách nhiệm bao try/catch nếu muốn không dừng pipeline khi Flow lỗi.
  */
 import path from 'path';
-import { THUMBNAIL_PROMPTS } from '../constant/index.js';
-import { openGeminiPage, sendPromptToGeminiWithRetry } from '../gemini/browser.util.js';
+import { openGeminiPage, sendPromptToGeminiWithRetry, stripJsonCodeFence } from '../gemini/browser.util.js';
 import { loadPromptByLanguage, resolveThumbnailPromptBuilder } from '../prompts/index.js';
 import { openChromeProfile } from '../scripts/makeChromeProfile.js';
-import { renderThumbnailFullTextToPath } from '../thumbnail/thumbnail.cli.js';
-import { runCreateThumbnailFlow } from './runCreateThumbnail.js';
+import { renderThumbnailFullTextToPath } from './thumbnail.cli.js';
+import { runCreateThumbnailFlow } from './runCreateThumbnailFlow.js';
 import { optimizeFlowThumbnailJpegIfLarge } from './thumbnailOptimize.util.js';
 
 /** Profile Chrome dùng cho bước Gemini của jaFulLText. */
 const JA_FULLTEXT_GEMINI_PROFILE = 2;
-
-/**
- * Bỏ fence ```/```json bao quanh response JSON của Gemini.
- * @param {string} text
- * @returns {string}
- */
-function stripJsonCodeFence(text) {
-  return String(text ?? '')
-    .trim()
-    .replace(/^```[^\n]*\n?/i, '')
-    .replace(/\n?```\s*$/i, '')
-    .trim();
-}
 
 /**
  * Validator cho sendPromptToGeminiWithRetry: phải parse được JSON và có đủ

@@ -2,6 +2,7 @@
  * Parse phản hồi theo format prompt tạo meta (niche / title / description / tags).
  */
 import { META_DATA } from '../constants/index.js';
+import { stripJsonCodeFence } from '../gemini/browser.util.js';
 
 /**
  * Parse phản hồi đúng theo # Output Format trong promptCreateVideoMeta:
@@ -9,10 +10,7 @@ import { META_DATA } from '../constants/index.js';
  */
 export function parseCreateMetaInfoResponse(metaRaw) {
   let text = String(metaRaw || '').trim();
-  text = text
-    .replace(/^```[^\n]*\n?/i, '')
-    .replace(/\n?```\s*$/i, '')
-    .trim();
+  text = stripJsonCodeFence(text);
 
   const L = META_DATA;
   const labels = [

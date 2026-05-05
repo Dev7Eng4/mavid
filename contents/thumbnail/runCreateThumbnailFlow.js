@@ -4,7 +4,7 @@
 import path from 'path';
 import fs from 'fs';
 import { flowSettings } from '../constants/index.js';
-import { generateImageWithFlow } from './browser.util.js';
+import { generateImageWithFlow } from '../flow/browser.util.js';
 
 /**
  * @param {object} opts

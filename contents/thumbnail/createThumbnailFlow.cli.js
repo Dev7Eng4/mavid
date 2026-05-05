@@ -3,7 +3,7 @@
  */
 import path from 'path';
 import { fileURLToPath } from 'url';
-import { runCreateThumbnailFlow } from './runCreateThumbnail.js';
+import { runCreateThumbnailFlow } from './runCreateThumbnailFlow.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.join(__dirname, '..', '..');

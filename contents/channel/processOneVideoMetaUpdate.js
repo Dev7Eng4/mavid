@@ -8,7 +8,7 @@ import { downloadTranscript, finalizeDownloadedTranscript } from '../downloadVid
 import { readVideoMetaFile, writeVideoMetaFile, geminiMetaFieldsIncomplete, mergeGeminiIntoVideoMeta } from './videoMetaFile.util.js';
 import { hasRasterThumbnailInFolder } from './videoFolderThumbnail.util.js';
 import { extractYoutubeVideoId } from './youtubeUrl.util.js';
-import { generateFlowThumbnailFromGemini } from '../flow/generateFlowThumbnail.js';
+import { generateFlowThumbnailFromGemini } from '../thumbnail/generateFlowThumbnail.js';
 import { FLOW_DOWNLOADS_DIR } from '../flow/paths.util.js';
 import { detectVideoLang } from '../utils/detectLanguage.util.js';
 

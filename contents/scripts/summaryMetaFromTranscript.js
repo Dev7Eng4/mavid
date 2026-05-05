@@ -19,7 +19,7 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 
 import { getVideoInfo, downloadTranscript, cleanVttTranscriptsToSrt } from '../downloadVideo.js';
-import { updateVideoMeta } from '../gemini/updateContent.js';
+import { updateVideoMeta } from '../video-info/updateContent.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.join(__dirname, '..', '..');

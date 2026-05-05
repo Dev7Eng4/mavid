@@ -222,7 +222,7 @@ async function processVttTranscriptsWithGemini(
   },
 ) {
   const { cleanSrt } = await import('./utils/srt.util.js');
-  const { updateVideoInfo } = await import('./gemini/updateContent.js');
+  const { updateVideoInfo } = await import('./video-info/updateContent.js');
 
   const vttFiles = fs.readdirSync(outputDir).filter(f => f.endsWith('.vtt'));
   console.log('🚀 ~ processVttTranscriptsWithGemini ~ vttFiles:', vttFiles);
@@ -276,7 +276,7 @@ async function processVttTranscriptsWithGemini(
         if (titleG && summaryG) {
           console.log('[thumbnail-flow] Tạo thumbnail từ title/summary Gemini →', path.basename(thumbnailFlowOutputDir));
           try {
-            const { generateFlowThumbnailFromGemini } = await import('./flow/generateFlowThumbnail.js');
+            const { generateFlowThumbnailFromGemini } = await import('./thumbnail/generateFlowThumbnail.js');
             await generateFlowThumbnailFromGemini({
               title: titleG,
               summary: summaryG,

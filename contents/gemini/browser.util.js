@@ -1,38 +1,36 @@
-/**
- * Tương tác Playwright với giao diện web Gemini.
- */
 import { GEMINI_CONFIG } from './geminiAppDefaults.js';
 import { clearContent, clickElement, getRandomNumber } from '../utils/dom.util.js';
 import { GEMINI_SELECTOR } from './selectors.js';
 
-// export async function waitForGeminiResponse(page, timeoutMs = 120000) {
-//   await page.waitForSelector('.model-response-text, .response-content, .message-content', {
-//     timeout: timeoutMs,
-//   });
+/**
+ * Bỏ fence markdown nếu Gemini bọc ``` / ```json.
+ * @param {string} text
+ * @returns {string}
+ */
+export function stripJsonCodeFence(text) {
+  return String(text ?? '')
+    .trim()
+    .replace(/^```[^\n]*\n?/i, '')
+    .replace(/\n?```\s*$/i, '')
+    .trim();
+}
 
-//   const startTime = Date.now();
-//   while (Date.now() - startTime < timeoutMs) {
-//     const isStreaming = await page.evaluate(() => {
-//       const stopBtn = document.querySelector('button[aria-label="Stop response"], mat-icon[data-mat-icon-name="stop_circle"]');
-//       if (stopBtn) {
-//         const rect = stopBtn.getBoundingClientRect();
-//         return rect.width > 0 && rect.height > 0;
-//       }
-//       return false;
-//     });
+/**
+ * Validator mặc định cho sendPromptToGeminiWithRetry khi kỳ vọng Gemini trả JSON.
+ * Throw nếu không parse được JSON (sau khi strip code fence) → trigger retry.
+ * @param {string} raw
+ */
+export function validateGeminiJsonResponse(raw) {
+  const cleaned = stripJsonCodeFence(raw);
+  if (!cleaned) {
+    throw new Error('Gemini trả về response rỗng.');
+  }
+  JSON.parse(cleaned);
+}
 
-//     if (!isStreaming) break;
-//     await page.waitForTimeout(1000);
-//   }
-
-//   await page.waitForTimeout(2000);
-// }
-
-export async function waitForGeminiResponse(page, timeoutMs = 150000) {
-  // 1. Lấy phần tử chứa câu trả lời cuối cùng (mới nhất)
+export async function waitForGeminiResponseOld(page, timeoutMs = 150000) {
   const responseLocator = page.locator('.model-response-text, .response-content, .message-content').last();
 
-  // Đợi phần tử bắt đầu xuất hiện
   await responseLocator.waitFor({ state: 'visible', timeout: timeoutMs });
 
   let previousLength = -1;
@@ -63,6 +61,67 @@ export async function waitForGeminiResponse(page, timeoutMs = 150000) {
   }
 }
 
+export async function waitForGeminiResponse(page, timeoutMs = 150000) {
+  // Bước 1: Chờ response element xuất hiện
+  const responseLocator = page.locator(GEMINI_SELECTOR.responseBlock).last();
+  await responseLocator.waitFor({ state: 'visible', timeout: timeoutMs });
+
+  // Bước 2: Inject MutationObserver vào browser, không poll từ bên ngoài
+  const finalText = await page.evaluate(
+    ({ selector, timeout, stableMs }) => {
+      return new Promise((resolve, reject) => {
+        const timer = setTimeout(() => reject(new Error('Timeout')), timeout);
+
+        // Lấy element cuối cùng khớp selector
+        const getTarget = () => {
+          const els = document.querySelectorAll(selector);
+          return els[els.length - 1] || null;
+        };
+
+        let target = getTarget();
+        if (!target) {
+          clearTimeout(timer);
+          return reject(new Error('Element not found'));
+        }
+
+        let stableTimer = null;
+
+        const resetStable = () => {
+          if (stableTimer) clearTimeout(stableTimer);
+          stableTimer = setTimeout(() => {
+            // Text đã ổn định đủ lâu → xong
+            clearTimeout(timer);
+            resolve(target.innerText);
+          }, stableMs);
+        };
+
+        // Observe mutations thay vì poll
+        const observer = new MutationObserver(() => {
+          // Kiểm tra nếu element bị thay mới (re-render)
+          const newTarget = getTarget();
+          if (newTarget && newTarget !== target) {
+            observer.observe(newTarget, { childList: true, subtree: true, characterData: true });
+            target = newTarget;
+          }
+          resetStable();
+        });
+
+        observer.observe(target, { childList: true, subtree: true, characterData: true });
+
+        // Khởi động đếm ngay (phòng case text đã có sẵn)
+        resetStable();
+      });
+    },
+    {
+      selector: '.model-response-text, .response-content, .message-content',
+      timeout: timeoutMs,
+      stableMs: 4000,
+    }
+  );
+
+  return finalText;
+}
+
 /**
  * Trích xuất response từ Gemini.
  * @param {import('playwright').Page} page
@@ -73,12 +132,10 @@ export async function waitForGeminiResponse(page, timeoutMs = 150000) {
  */
 export async function extractGeminiResponse(page) {
   // await page.waitForTimeout(1500);
-  const responseLocator = page
-    .locator('.model-response-text, .response-content, .message-content, div[data-message-author-role="model"]')
-    .last();
+  const responseLocator = page.locator(GEMINI_SELECTOR.responseBlock).last();
   await responseLocator.waitFor({ state: 'attached', timeout: 15000 });
 
-  const specificCodeLocator = responseLocator.locator('code[data-test-id="code-content"]');
+  const specificCodeLocator = responseLocator.locator(GEMINI_SELECTOR.responseCodeBlock);
   if ((await specificCodeLocator.count()) > 0) {
     return { text: (await specificCodeLocator.last().innerText()).trim(), hasCodeBlock: true };
   }
@@ -91,29 +148,6 @@ export async function extractGeminiResponse(page) {
 
   // 4. Fallback cuối cùng: Lấy toàn bộ text — coi như không có code block.
   return { text: (await responseLocator.innerText()).trim(), hasCodeBlock: false };
-
-  // return page.evaluate(() => {
-  //   const responses = Array.from(
-  //     document.querySelectorAll('.model-response-text, .response-content, .message-content, div[data-message-author-role="model"]')
-  //   );
-
-  //   if (responses.length === 0) return '';
-
-  //   const lastResponse = responses[responses.length - 1];
-
-  //   const codeBlocks = lastResponse.querySelectorAll('code[data-test-id="code-content"]');
-
-  //   if (codeBlocks.length > 0) {
-  //     return (codeBlocks[codeBlocks.length - 1].innerText || codeBlocks[codeBlocks.length - 1].textContent || '').trim();
-  //   }
-
-  //   const anyCode = lastResponse.querySelectorAll('code');
-  //   if (anyCode.length > 0) {
-  //     return (anyCode[anyCode.length - 1].innerText || anyCode[anyCode.length - 1].textContent || '').trim();
-  //   }
-
-  //   return (lastResponse.innerText || lastResponse.textContent || '').trim();
-  // });
 }
 
 export async function chooseThinkingMode(page) {
@@ -122,29 +156,17 @@ export async function chooseThinkingMode(page) {
   await clickElement(page, GEMINI_SELECTOR.thinkingMode);
 }
 
-/**
- * Gửi prompt tới Gemini và lấy response text.
- *
- * @param {import('playwright').Page} page
- * @param {string} prompt
- * @param {object} [options]
- * @param {boolean} [options.requireCodeBlock=false]
- *   Nếu `true`, throw error khi response không chứa thẻ `<code>` (ví dụ Gemini hiển thị
- *   "You stopped this response" hoặc chỉ trả về text thường) — dùng để trigger retry
- *   ở `sendPromptToGeminiWithRetry`. Mặc định `false` để giữ tương thích với caller cũ.
- * @returns {Promise<string>}
- */
 export async function sendPromptToGemini(page, prompt, options = {}) {
   const { requireCodeBlock = false } = options;
 
   await page.keyboard.press('Escape');
 
   await clickElement(page, GEMINI_SELECTOR.editor);
-  await page.waitForTimeout(500);
+  await page.waitForTimeout(getRandomNumber(500, 500));
   await clearContent(page);
-  await page.waitForTimeout(500);
+  await page.waitForTimeout(getRandomNumber(500, 300));
   await page.keyboard.insertText(prompt);
-  await page.waitForTimeout(300);
+  await page.waitForTimeout(getRandomNumber(300, 300));
   await page.keyboard.press('Enter');
 
   await waitForGeminiResponse(page, 150000);
@@ -167,9 +189,10 @@ export async function sendPromptToGemini(page, prompt, options = {}) {
  * @param {object} [options]
  * @param {number} [options.maxRetries=2] Số lần retry tối đa (tổng số lần thử = maxRetries + 1).
  * @param {number} [options.retryDelayMs=2000] Delay cơ bản giữa các lần retry (sẽ tăng dần theo attempt).
- * @param {(raw: string) => any | Promise<any>} [options.validate]
+ * @param {(raw: string) => any | Promise<any> | null} [options.validate]
  *   Hàm validate response — nếu throw thì xem như fail và retry.
- *   Ví dụ: validate JSON parse hợp lệ.
+ *   Mặc định: `validateGeminiJsonResponse` (parse JSON sau khi strip code fence).
+ *   Nếu muốn tắt validate (hành vi cũ), truyền `validate: null`.
  * @param {string} [options.label='Gemini'] Nhãn dùng để log.
  * @param {boolean} [options.requireCodeBlock=true]
  *   Nếu `true` (mặc định), response phải chứa thẻ `<code>` — nếu không sẽ retry
@@ -177,7 +200,7 @@ export async function sendPromptToGemini(page, prompt, options = {}) {
  * @returns {Promise<string>} Raw response từ Gemini sau khi pass validate.
  */
 export async function sendPromptToGeminiWithRetry(page, prompt, options = {}) {
-  const { maxRetries = 2, retryDelayMs = 2000, validate = null, label = 'Gemini', requireCodeBlock = true } = options;
+  const { maxRetries = 2, retryDelayMs = 2000, validate = validateGeminiJsonResponse, label = 'Gemini', requireCodeBlock = true } = options;
   const totalAttempts = Math.max(1, maxRetries + 1);
   let lastErr = null;
 
@@ -187,9 +210,11 @@ export async function sendPromptToGeminiWithRetry(page, prompt, options = {}) {
       if (typeof validate === 'function') {
         await validate(raw);
       }
+
       if (attempt > 1) {
         console.log(`[${label} retry] Lần ${attempt}/${totalAttempts} thành công.`);
       }
+
       return raw;
     } catch (err) {
       lastErr = err;
@@ -213,7 +238,7 @@ export async function sendPromptToGeminiWithRetry(page, prompt, options = {}) {
 export async function openGeminiPage(page, thinkingMode = false) {
   await page.goto(GEMINI_CONFIG.URL, { waitUntil: 'domcontentloaded', timeout: 30000 });
 
-  await page.waitForTimeout(getRandomNumber(1000));
+  await page.waitForTimeout(getRandomNumber(500));
 
   if (thinkingMode) {
     await chooseThinkingMode(page);

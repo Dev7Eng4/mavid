@@ -38,3 +38,13 @@ SUBTITLE LENGTH CONSTRAINT:
 // retry của tạo scene chưa dc
 // sau khi có scene phải validate thứ tự start, end index dung chưa, nếu cái nào ko đúng thì bỏ
 // edge case -> không lấy dc response
+
+### ISSUES
+
+## GEMINI
+
+Bạn đã dừng truy vấn này
+
+Response rỗng
+
+Không login -> button loading không có

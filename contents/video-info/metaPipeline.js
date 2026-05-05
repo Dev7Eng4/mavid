@@ -1,11 +1,11 @@
 /**
- * Pipeline Gemini: tóm tắt SRT theo chunk → metadata (title, description, tags, summary).
+ * Pipeline video-info: tóm tắt SRT theo chunk → metadata (title, description, tags, summary).
  */
 import { DEFAULT_PROMPT_LANG } from '../constants/index.js';
-import { GEMINI_CHUNK_SIZE } from './geminiAppDefaults.js';
+import { VIDEO_INFO_CHUNK_SIZE } from './videoInfoDefaults.js';
 import { loadPromptByLanguage } from '../prompts/index.js';
 import { srtToPlainText } from '../utils/srt.util.js';
-import { openGeminiPage, sendPromptToGemini } from './browser.util.js';
+import { openGeminiPage, sendPromptToGemini } from '../gemini/browser.util.js';
 import { parseCreateMetaInfoResponse } from './metaParser.util.js';
 
 /**
@@ -26,11 +26,11 @@ export async function runGeminiVideoMetaPrompts(page, { srtContent, language }) 
     .filter(Boolean);
 
   const summaries = [];
-  const totalChunks = Math.ceil(cues.length / GEMINI_CHUNK_SIZE.SUMMARY_CONTENT) || 1;
+  const totalChunks = Math.ceil(cues.length / VIDEO_INFO_CHUNK_SIZE.SUMMARY_CONTENT) || 1;
 
-  for (let i = 0; i < cues.length; i += GEMINI_CHUNK_SIZE.SUMMARY_CONTENT) {
-    const chunk = cues.slice(i, i + GEMINI_CHUNK_SIZE.SUMMARY_CONTENT).join('\n\n');
-    const chunkIndex = Math.floor(i / GEMINI_CHUNK_SIZE.SUMMARY_CONTENT) + 1;
+  for (let i = 0; i < cues.length; i += VIDEO_INFO_CHUNK_SIZE.SUMMARY_CONTENT) {
+    const chunk = cues.slice(i, i + VIDEO_INFO_CHUNK_SIZE.SUMMARY_CONTENT).join('\n\n');
+    const chunkIndex = Math.floor(i / VIDEO_INFO_CHUNK_SIZE.SUMMARY_CONTENT) + 1;
 
     console.log(`Đang tóm tắt phần ${chunkIndex}/${totalChunks}...`);
 
@@ -42,7 +42,7 @@ export async function runGeminiVideoMetaPrompts(page, { srtContent, language }) 
     const cleanResult = result.trim();
     summaries.push(cleanResult);
 
-    if (i + GEMINI_CHUNK_SIZE.SUMMARY_CONTENT < cues.length) {
+    if (i + VIDEO_INFO_CHUNK_SIZE.SUMMARY_CONTENT < cues.length) {
       await page.waitForTimeout(2000);
     }
   }

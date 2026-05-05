@@ -28,7 +28,7 @@ const __filename = fileURLToPath(import.meta.url);
  */
 export async function testSendPromptToGemini(options = {}) {
   const envProfile = Number.parseInt(process.env.GEMINI_TEST_PROFILE ?? '', 10);
-  const { prompt = promptToDetectNiche('test', 'test'), profile = 4, visible = true, thinkingMode = false, closeBrowser = true } = options;
+  const { prompt = promptToDetectNiche('test', 'test'), profile = 1, visible = true, thinkingMode = false, closeBrowser = true } = options;
 
   const { context, page } = await openChromeProfile({ profile, visible });
 
