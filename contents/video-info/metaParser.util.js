@@ -2,7 +2,7 @@
  * Parse phản hồi theo format prompt tạo meta (niche / title / description / tags).
  */
 import { META_DATA } from '../constants/index.js';
-import { stripJsonCodeFence } from '../gemini/browser.util.js';
+import { stripJsonCodeFence } from '../llm/index.js';
 
 /**
  * Parse phản hồi đúng theo # Output Format trong promptCreateVideoMeta:

@@ -6,7 +6,7 @@
 import { VIDEO_INFO_CONFIG, VIDEO_INFO_CHUNK_SIZE } from './videoInfoDefaults.js';
 import { loadPromptByLanguage } from '../prompts/index.js';
 import { openChromeProfile } from '../scripts/makeChromeProfile.js';
-import { openGeminiPage, sendPromptToGeminiWithRetry, stripJsonCodeFence } from '../gemini/browser.util.js';
+import { openChatPage, sendPromptWithRetry, stripJsonCodeFence } from '../llm/index.js';
 import { getSrtDurationInMinutes, objectsToIdTextFormat, parseSrtToObjects } from '../utils/srt.util.js';
 import { PLAYWRIGHT_PROFILES } from '../constants/playwright-profile.js';
 
@@ -87,7 +87,7 @@ async function sendUpdateTranscriptChunkWithRetry(page, prompt, chunkIndex, tota
   const label = `[update-transcript] Chunk ${chunkIndex + 1}/${totalChunks}`;
 
   try {
-    return await sendPromptToGeminiWithRetry(page, prompt, {
+    return await sendPromptWithRetry(page, prompt, {
       // Transcript update trả "[id] text" plain; không yêu cầu code block.
       requireCodeBlock: false,
       // Validate đơn giản: response (sau strip fence) không được rỗng.
@@ -206,7 +206,7 @@ export async function internalUpdateTranscript(rawSrtContent, options = {}) {
         try {
           console.log(`\n--- Chunk ${i + 1}/${totalChunks} (profile ${profileNum}) ---`);
           if (!primingDone) {
-            await openGeminiPage(pg);
+            await openChatPage(pg);
           }
           chunkResults[i] = await processChunkOnPage(pg, chunks[i], i, totalChunks, prompts);
           primingDone = true;

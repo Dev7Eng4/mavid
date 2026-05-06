@@ -15,7 +15,7 @@
  * Caller chịu trách nhiệm bao try/catch nếu muốn không dừng pipeline khi Flow lỗi.
  */
 import path from 'path';
-import { openGeminiPage, sendPromptToGeminiWithRetry, stripJsonCodeFence } from '../../gemini/browser.util.js';
+import { openChatPage, sendPromptWithRetry, stripJsonCodeFence } from '../../llm/index.js';
 import { loadPromptByLanguage, resolveThumbnailPromptBuilder } from '../../prompts/index.js';
 import { openChromeProfile } from '../../scripts/makeChromeProfile.js';
 import { renderThumbnailFullTextToPath } from './jaFullText/thumbnail.cli.js';
@@ -24,7 +24,7 @@ import { optimizeFlowThumbnailJpegIfLarge } from './thumbnailOptimize.util.js';
 import { PLAYWRIGHT_PROFILES } from '../../constants/playwright-profile.js';
 
 /**
- * Validator cho sendPromptToGeminiWithRetry: phải parse được JSON và có đủ
+ * Validator cho sendPromptWithRetry: phải parse được JSON và có đủ
  * lines.L1..L5 + colors.canvas_from / canvas_to.
  * @param {string} raw
  */
@@ -67,8 +67,8 @@ async function generateFulLTextLinesColorsViaGemini({ prompts, title, summary, l
 
   const { context: ctx, page: pg } = await openChromeProfile({ profile: PLAYWRIGHT_PROFILES[0], visible: true });
   try {
-    await openGeminiPage(pg);
-    const rawResponse = await sendPromptToGeminiWithRetry(pg, geminiPrompt, {
+    await openChatPage(pg);
+    const rawResponse = await sendPromptWithRetry(pg, geminiPrompt, {
       maxRetries: 2,
       validate: validateThumbnailFulLTextJson,
       label: `${logTag} jaFulLText lines/colors`,

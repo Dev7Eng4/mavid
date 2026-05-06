@@ -19,7 +19,7 @@ import { DEFAULT_PROMPT_LANG, STOCK_VIDEO, SUBTITLE, LOGO } from '../constants/i
 import { parseSrtToObjects, objectsToIdTextFormat, srtToPlainText } from '../utils/srt.util.js';
 import { loadPromptByLanguage } from '../prompts/index.js';
 import { openChromeProfile } from '../scripts/makeChromeProfile.js';
-import { openGeminiPage, sendPromptToGeminiWithRetry } from '../gemini/browser.util.js';
+import { openChatPage, sendPromptWithRetry, stripJsonCodeFence } from '../llm/index.js';
 import { runCreateThumbnailFlow } from '../video-info/thumbnail/runCreateThumbnailFlow.js';
 
 import {
@@ -91,7 +91,7 @@ function normalizeChapterArray(chapters) {
       console.warn(
         `[normalizeChapter] Sửa "${numericValues[0].key}" → id_start: ${fixed.id_start}, "${
           numericValues[numericValues.length - 1].key
-        }" → id_end: ${fixed.id_end}`
+        }" → id_end: ${fixed.id_end}`,
       );
     } else if (fixed.id_start == null) {
       fixed.id_start = numericValues[0].val;
@@ -129,12 +129,12 @@ function deduplicateChapters(chapters) {
       const currRange = Number(curr.id_end) - currStart;
       if (currRange > prevRange) {
         console.warn(
-          `[deduplicateChapters] Thay chapter [${prev.id_start}-${prev.id_end}] bằng [${curr.id_start}-${curr.id_end}] (range rộng hơn)`
+          `[deduplicateChapters] Thay chapter [${prev.id_start}-${prev.id_end}] bằng [${curr.id_start}-${curr.id_end}] (range rộng hơn)`,
         );
         result[result.length - 1] = curr;
       } else {
         console.warn(
-          `[deduplicateChapters] Bỏ chapter trùng [${curr.id_start}-${curr.id_end}] (nằm trong [${prev.id_start}-${prev.id_end}])`
+          `[deduplicateChapters] Bỏ chapter trùng [${curr.id_start}-${curr.id_end}] (nằm trong [${prev.id_start}-${prev.id_end}])`,
         );
       }
     } else {
@@ -144,7 +144,7 @@ function deduplicateChapters(chapters) {
 
   if (result.length < chapters.length) {
     console.log(
-      `[deduplicateChapters] Đã loại ${chapters.length - result.length} chapters trùng lặp (${chapters.length} → ${result.length}).`
+      `[deduplicateChapters] Đã loại ${chapters.length - result.length} chapters trùng lặp (${chapters.length} → ${result.length}).`,
     );
   }
   return result;
@@ -211,7 +211,7 @@ function enforceSequentialScenes(scenes) {
       console.warn(
         `[enforceSequentialScenes] Loại scene [${curr.start_index}-${curr.end_index}]: ` +
           `start_index (${curr.start_index}) <= end_index của scene trước (${prev.end_index}) ` +
-          `[${prev.start_index}-${prev.end_index}].`
+          `[${prev.start_index}-${prev.end_index}].`,
       );
       continue;
     }
@@ -221,7 +221,7 @@ function enforceSequentialScenes(scenes) {
 
   if (result.length < scenes.length) {
     console.log(
-      `[enforceSequentialScenes] Đã loại ${scenes.length - result.length} scenes vi phạm thứ tự (${scenes.length} → ${result.length}).`
+      `[enforceSequentialScenes] Đã loại ${scenes.length - result.length} scenes vi phạm thứ tự (${scenes.length} → ${result.length}).`,
     );
   }
   return result;
@@ -338,8 +338,8 @@ async function generateGlobalNiche(allObjects, prompts) {
   const { context: ctx, page: pg } = await openChromeProfile({ profile: 2, visible: true });
   let globalNiche = null;
   try {
-    await openGeminiPage(pg);
-    const rawResponse = await sendPromptToGeminiWithRetry(pg, prompt, {
+    await openChatPage(pg);
+    const rawResponse = await sendPromptWithRetry(pg, prompt, {
       maxRetries: 2,
       label: 'Global Niche',
     });
@@ -396,7 +396,7 @@ async function generateChapters(allObjects, globalNiche, prompts) {
           console.log(`\n--- [Option 2] Đoạn ${i + 1}/${totalChunks} chunk ${chunks[i]} objects ---`);
 
           if (!primingDone) {
-            await openGeminiPage(pg);
+            await openChatPage(pg);
           }
 
           let previousContext = '';
@@ -415,7 +415,7 @@ async function generateChapters(allObjects, globalNiche, prompts) {
             transcript: transcriptText,
             previousContext,
           });
-          const rawResponse = await sendPromptToGeminiWithRetry(pg, prompt, {
+          const rawResponse = await sendPromptWithRetry(pg, prompt, {
             maxRetries: 2,
             label: `Chapter ${i + 1}/${totalChunks} (profile ${profileNum})`,
           });
@@ -426,7 +426,7 @@ async function generateChapters(allObjects, globalNiche, prompts) {
             console.log(
               `[Option 2] Đoạn ${i + 1}/${totalChunks}: Đã nhận ${
                 Array.isArray(chapterResults[i]) ? chapterResults[i].length : 1
-              } chapter(s).`
+              } chapter(s).`,
             );
           } catch (parseErr) {
             console.error(`[Option 2] Đoạn ${i + 1}/${totalChunks}: Không parse được JSON:`, parseErr.message);
@@ -483,8 +483,8 @@ async function generateVisualBible(globalNiche, allChapters, prompts) {
   let visualBible;
   let globalMasterShotPrompt;
   try {
-    await openGeminiPage(vbPage);
-    const rawVbResponse = await sendPromptToGeminiWithRetry(vbPage, visualBiblePrompt, {
+    await openChatPage(vbPage);
+    const rawVbResponse = await sendPromptWithRetry(vbPage, visualBiblePrompt, {
       maxRetries: 2,
       label: 'Visual Bible',
     });
@@ -554,7 +554,7 @@ async function generateScenePrompts(allChapters, allObjects, visualBible, prompt
           console.log(`\n--- [Option 2 Bước 5] Chapter ${ci + 1}/${totalChaptersForScene} "${chapter.title}" (profile ${profileNum}) ---`);
 
           if (!primingDone) {
-            await openGeminiPage(pg);
+            await openChatPage(pg);
           }
 
           const idStart = Number(chapter.id_start);
@@ -591,11 +591,11 @@ async function generateScenePrompts(allChapters, allObjects, visualBible, prompt
                 transcript: transcriptLines,
               },
               null,
-              2
+              2,
             ),
           });
 
-          const rawSceneResponse = await sendPromptToGeminiWithRetry(pg, scenePrompt, {
+          const rawSceneResponse = await sendPromptWithRetry(pg, scenePrompt, {
             maxRetries: 2,
             label: `Scene chapter ${ci + 1}/${totalChaptersForScene} (profile ${profileNum})`,
           });
@@ -639,7 +639,7 @@ async function generateScenePrompts(allChapters, allObjects, visualBible, prompt
 
   console.log(
     `\n[Option 2] Bước 5 hoàn thành: Tổng cộng ${chapterImagePrompts.length} scenes hợp lệ ` +
-      `(từ ${flatScenePrompts.length} scenes thô) qua ${totalChaptersForScene} chapters.`
+      `(từ ${flatScenePrompts.length} scenes thô) qua ${totalChaptersForScene} chapters.`,
   );
 
   return { chapterImagePrompts, sceneResults };
@@ -770,7 +770,7 @@ export async function processImageNoiseVideo(options = {}, bgImgPath) {
   const originalAudioDuration = await getAudioDurationSeconds(audioPath);
   const audioDurationAfterTempo = originalAudioDuration / speed;
   console.log(
-    `Thời lượng audio: ${originalAudioDuration.toFixed(1)}s, sau atempo (SPEED=${speed}): ${formatClockDuration(audioDurationAfterTempo)}`
+    `Thời lượng audio: ${originalAudioDuration.toFixed(1)}s, sau atempo (SPEED=${speed}): ${formatClockDuration(audioDurationAfterTempo)}`,
   );
 
   let subtitlePath = getSubtitleFile(downloadsDir);
@@ -882,7 +882,7 @@ export async function processImageNoiseVideo(options = {}, bgImgPath) {
       `crop=${zpW}:${zpH},` +
       `zoompan=z='${zoomExpr}':` +
       `d=${totalFrames}:x='${panX}':y='${panY}':s=${w}x${h}:fps=${fps},` +
-      `format=yuv420p,setsar=1[bg]`
+      `format=yuv420p,setsar=1[bg]`,
   );
 
   let currentVLabel = 'bg';
@@ -892,7 +892,7 @@ export async function processImageNoiseVideo(options = {}, bgImgPath) {
       filterParts.push(`[${noiseIndex}:v]null[noise]`);
     } else {
       filterParts.push(
-        `[${noiseIndex}:v]fps=${fps},scale=${w}:${h}:flags=fast_bilinear,format=yuva420p,colorkey=0x000000:0.1:0.1,colorchannelmixer=aa=${NOISE_ALPHA}[noise]`
+        `[${noiseIndex}:v]fps=${fps},scale=${w}:${h}:flags=fast_bilinear,format=yuva420p,colorkey=0x000000:0.1:0.1,colorchannelmixer=aa=${NOISE_ALPHA}[noise]`,
       );
     }
     filterParts.push(`[${currentVLabel}][noise]overlay=0:0:shortest=1[v_noised]`);
@@ -925,7 +925,7 @@ export async function processImageNoiseVideo(options = {}, bgImgPath) {
     const rRadius = Math.floor(REACTION_CROP_W / 2);
     const circleGeq = `if(lte(hypot(X-W/2,Y-H/2),${rRadius}),255,0)`;
     filterParts.push(
-      `[${reactionIndex}:v]fps=${fps},scale=${REACTION_CROP_W}:${REACTION_CROP_H}:flags=fast_bilinear,format=rgba,geq=r='r(X,Y)':g='g(X,Y)':b='b(X,Y)':a='${circleGeq}'[reaction]`
+      `[${reactionIndex}:v]fps=${fps},scale=${REACTION_CROP_W}:${REACTION_CROP_H}:flags=fast_bilinear,format=rgba,geq=r='r(X,Y)':g='g(X,Y)':b='b(X,Y)':a='${circleGeq}'[reaction]`,
     );
     filterParts.push(`[${currentVLabel}][reaction]overlay=${reactionX}:${reactionY}:shortest=1[v_reaction]`);
     currentVLabel = 'v_reaction';
@@ -939,7 +939,7 @@ export async function processImageNoiseVideo(options = {}, bgImgPath) {
       const r = Math.floor(LOGO.SIZE / 2);
       const geqExpr = `if(lte(hypot(X-W/2,Y-H/2),${r}),255,0)`;
       filterParts.push(
-        `[${logoIndex}:v]scale=${LOGO.SIZE}:${LOGO.SIZE}:flags=fast_bilinear,format=rgba,geq=r='r(X,Y)':g='g(X,Y)':b='b(X,Y)':a='${geqExpr}'[logo]`
+        `[${logoIndex}:v]scale=${LOGO.SIZE}:${LOGO.SIZE}:flags=fast_bilinear,format=rgba,geq=r='r(X,Y)':g='g(X,Y)':b='b(X,Y)':a='${geqExpr}'[logo]`,
       );
     }
     filterParts.push(`[${currentVLabel}][logo]overlay=main_w-overlay_w-${LOGO.MARGIN_RIGHT}:${LOGO.MARGIN_TOP}[vout_final]`);
@@ -974,7 +974,7 @@ export async function processImageNoiseVideo(options = {}, bgImgPath) {
     '128k',
     '-t',
     String(audioDurationAfterTempo),
-    outputPath
+    outputPath,
   );
 
   console.log(`Đang merge nội dung Image Noise Pipeline...`);

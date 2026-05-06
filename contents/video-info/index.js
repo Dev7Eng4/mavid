@@ -1,5 +1,5 @@
 /**
- * Nghiệp vụ video (transcript + metadata) — gọi xuống `contents/gemini/` cho tương tác Gemini.
+ * Nghiệp vụ video (transcript + metadata) — gọi xuống `contents/llm/` (Gemini hoặc ChatGPT tùy `LLM_PROVIDER`).
  */
 export { updateVideoMeta, updateTranscript, updateVideoInfo } from './updateContent.js';
 export { internalUpdateVideoMeta, runGeminiVideoMetaPrompts } from './metaPipeline.js';

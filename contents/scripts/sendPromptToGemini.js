@@ -1,52 +1,51 @@
 /**
- * Test nhanh: mở Gemini trong Chrome profile đã đăng nhập, gửi prompt, lấy text trả về.
- *
+ * Test nhanh: mở chat LLM (Gemini hoặc ChatGPT tùy `LLM_PROVIDER`) trong Chrome profile đã
+ * đăng nhập, gửi prompt, lấy text trả về.
+ *
  *   node contents/scripts/sendPromptToGemini.js "Câu hỏi của bạn"
- *   GEMINI_TEST_PROFILE=2 node contents/scripts/sendPromptToGemini.js
+ *   LLM_PROVIDER=gpt GEMINI_TEST_PROFILE=2 node contents/scripts/sendPromptToGemini.js
  *
- * Yêu cầu: đã chạy `npm run tao-chrome-profile` (hoặc tương đương) và đăng nhập Google
- * trên profile đó để Gemini hoạt động.
- */
-import path from 'path';
-import { fileURLToPath } from 'url';
-import { openGeminiPage, sendPromptToGemini } from '../gemini/browser.util.js';
-import { openChromeProfile } from './makeChromeProfile.js';
-import { promptToDetectNiche } from '../prompts/ja/createVideoInfo.js';
-
-const __filename = fileURLToPath(import.meta.url);
-
-// const DEFAULT_PROMPT = 'Trả lời ngắn gọn: 2 + 2 bằng mấy?';
-
-/**
- * @param {object} [options]
- * @param {string} [options.prompt] — Nội dung gửi lên Gemini
- * @param {number} [options.profile=1] — Số Chrome profile (`chrome-profile/profileN`)
- * @param {boolean} [options.visible=true] — Hiển thị cửa sổ trình duyệt
- * @param {boolean} [options.thinkingMode=false] — Bật chế độ Thinking trong UI Gemini
- * @param {boolean} [options.closeBrowser=true] — Đóng browser sau khi có kết quả
- * @returns {Promise<string>} — Text phản hồi (plain hoặc trích từ khối code nếu có)
- */
-export async function testSendPromptToGemini(options = {}) {
-  const envProfile = Number.parseInt(process.env.GEMINI_TEST_PROFILE ?? '', 10);
-  const { prompt = promptToDetectNiche('test', 'test'), profile = 1, visible = true, thinkingMode = false, closeBrowser = true } = options;
-
-  const { context, page } = await openChromeProfile({ profile, visible });
-
-  try {
-    await openGeminiPage(page, thinkingMode);
-    // Test thường không cần JSON trong code fence — tắt requireCodeBlock
-    return await sendPromptToGemini(page, prompt, { requireCodeBlock: false });
-  } finally {
-    if (closeBrowser) {
-      await context.close().catch(() => {});
-    }
-  }
-}
-
-async function main() {
-  const argvPrompt = process.argv.slice(2).join(' ').trim();
-  const prompt =
-    argvPrompt ||
+ * Yêu cầu: profile đã đăng nhập đúng dịch vụ tương ứng.
+ */
+import path from 'path';
+import { fileURLToPath } from 'url';
+import { openChatPage, sendPrompt } from '../llm/index.js';
+import { openChromeProfile } from './makeChromeProfile.js';
+import { promptToDetectNiche } from '../prompts/ja/createVideoInfo.js';
+
+const __filename = fileURLToPath(import.meta.url);
+
+/**
+ * @param {object} [options]
+ * @param {string} [options.prompt]
+ * @param {number} [options.profile=2] — `chrome-profile/profileN`
+ * @param {boolean} [options.visible=true]
+ * @param {boolean} [options.thinkingMode=false] — Chỉ khi `LLM_PROVIDER=gemini`
+ * @param {boolean} [options.closeBrowser=true]
+ * @returns {Promise<string>}
+ */
+export async function testSendPromptToLlm(options = {}) {
+  const { prompt = promptToDetectNiche('test', 'test'), profile = 2, visible = true, thinkingMode = false, closeBrowser = true } = options;
+
+  const { context, page } = await openChromeProfile({ profile, visible });
+
+  try {
+    await openChatPage(page, { thinkingMode });
+    return await sendPrompt(page, prompt, { requireCodeBlock: false });
+  } finally {
+    if (closeBrowser) {
+      await context.close().catch(() => {});
+    }
+  }
+}
+
+/** @deprecated Dùng `testSendPromptToLlm`. */
+export const testSendPromptToGemini = testSendPromptToLlm;
+
+async function main() {
+  const argvPrompt = process.argv.slice(2).join(' ').trim();
+  const prompt =
+    argvPrompt ||
     promptToDetectNiche(
       `朝、目が覚めると、カーテンの隙間からやわらかな光が差し込んでいた。外では鳥のさえずりが聞こえ、まるで一日の始まりを優しく知らせてくれているようだった。私はゆっくりとベッドから起き上がり、温かいコーヒーを入れる。湯気が立ち上るカップを手にすると、不思議と心が落ち着く。忙しい毎日の中で、こうした何気ない時間こそが、本当の幸せなのかもしれない。
 
@@ -57,24 +56,24 @@ async function main() {
 
 時には、自分の選択に迷い、不安になることもある。他人と比べてしまい、自分の道が正しいのか疑問に思うこともあるだろう。それでも、自分自身の気持ちに正直でいることが、最終的には後悔の少ない人生につながるはずだ。他人の期待ではなく、自分の価値観に基づいて選ぶこと。それは簡単なようで、とても難しい。
 
-失敗することもあるだろう。しかし、その経験こそが次の選択をより良いものにしてくれる。重要なのは、立ち止まらずに前へ進み続けることだ。どんなに遠回りに見えても、その道には必ず意味がある。人生において無駄な経験など一つもない。そう信じて、一歩一歩、自分のペースで歩んでいけばいいのだ。`
+失敗することもあるだろう。しかし、その経験こそが次の選択をより良いものにしてくれる。重要なのは、立ち止まらずに前へ進み続けることだ。どんなに遠回りに見えても、その道には必ず意味がある。人生において無駄な経験など一つもない。そう信じて、一歩一歩、自分のペースで歩んでいけばいいのだ。`,
     );
-
-  console.log('Prompt:', prompt);
-
-  try {
-    const result = await testSendPromptToGemini({ prompt });
-    console.log('\n--- Kết quả Gemini ---\n');
-    console.log(result);
-    console.log('\n--- Hết ---\n');
-  } catch (err) {
-    console.error(err);
-    process.exitCode = 1;
-  }
-}
-
-const isDirectRun = process.argv[1] != null && path.resolve(process.argv[1]) === path.resolve(__filename);
-
-if (isDirectRun) {
-  main();
-}
+
+  console.log('Prompt:', prompt);
+
+  try {
+    const result = await testSendPromptToLlm({ prompt });
+    console.log('\n--- Kết quả LLM ---\n');
+    console.log(result);
+    console.log('\n--- Hết ---\n');
+  } catch (err) {
+    console.error(err);
+    process.exitCode = 1;
+  }
+}
+
+const isDirectRun = process.argv[1] != null && path.resolve(process.argv[1]) === path.resolve(__filename);
+
+if (isDirectRun) {
+  main();
+}

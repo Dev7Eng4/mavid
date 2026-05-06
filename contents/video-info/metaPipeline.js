@@ -5,11 +5,11 @@ import { DEFAULT_PROMPT_LANG } from '../constants/index.js';
 import { VIDEO_INFO_CHUNK_SIZE } from './videoInfoDefaults.js';
 import { loadPromptByLanguage } from '../prompts/index.js';
 import { srtToPlainText } from '../utils/srt.util.js';
-import { openGeminiPage, sendPromptToGemini } from '../gemini/browser.util.js';
+import { openChatPage, sendPrompt } from '../llm/index.js';
 import { parseCreateMetaInfoResponse } from './metaParser.util.js';
 
 /**
- * Trên cùng một tab Gemini: tóm tắt SRT theo chunk → metadata tổng hợp.
+ * Trên cùng một tab chat (LLM): tóm tắt SRT theo chunk → metadata tổng hợp.
  * @param {import('playwright').Page} page
  * @param {{ srtContent: string, language?: string }} opts
  */
@@ -37,7 +37,7 @@ export async function runGeminiVideoMetaPrompts(page, { srtContent, language }) 
     const plainChunk = srtToPlainText(chunk);
 
     const prompt = prompts.promptCreateSummaryChunk(plainChunk);
-    const result = await sendPromptToGemini(page, prompt);
+    const result = await sendPrompt(page, prompt);
 
     const cleanResult = result.trim();
     summaries.push(cleanResult);
@@ -51,13 +51,13 @@ export async function runGeminiVideoMetaPrompts(page, { srtContent, language }) 
 
   if (summaries.length >= 2) {
     const mergePrompt = prompts.promptCreateFinalSummary(finalSummaryForMeta);
-    finalSummaryForMeta = await sendPromptToGemini(page, mergePrompt);
+    finalSummaryForMeta = await sendPrompt(page, mergePrompt);
     await page.waitForTimeout(1500);
   }
 
   console.log('\nĐang tạo metadata từ bản tóm tắt tổng hợp...');
 
-  const metaRaw = await sendPromptToGemini(page, prompts.promptCreateVideoMeta(finalSummaryForMeta));
+  const metaRaw = await sendPrompt(page, prompts.promptCreateVideoMeta(finalSummaryForMeta));
 
   const parsed = parseCreateMetaInfoResponse(metaRaw);
 
@@ -75,7 +75,7 @@ export async function runGeminiVideoMetaPrompts(page, { srtContent, language }) 
 export async function internalUpdateVideoMeta(page, options = {}) {
   const { srtContent = '', language } = options;
 
-  await openGeminiPage(page);
+  await openChatPage(page);
 
   const meta = await runGeminiVideoMetaPrompts(page, { srtContent, language });
   return meta;
