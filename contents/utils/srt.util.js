@@ -210,6 +210,9 @@ function cleanSrt(vttPath) {
     .replace(/&[a-z]+;/g, '')
     .trim();
 
+  // SRT chuẩn dùng dấu phẩy trước ms; VTT dùng chấm — chuẩn hoá để tách block (cùng regex)
+  // text = text.replace(/(\d{2}:\d{2}:\d{2}),(\d{3})/g, '$1.$2');
+
   // Chia thành khối (mỗi khối phụ đề)
   const blocks = text
     .split(/(?=\d{2}:\d{2}:\d{2}\.\d{3} --> \d{2}:\d{2}:\d{2}\.\d{3})/)
@@ -565,75 +568,6 @@ export default async function runCleanSrt() {
 
   const vttPath = path.join(DOWNLOADS_DIR, vttFiles[0]);
   cleanSrt(vttPath);
-}
-
-/**
- * Làm sạch nội dung VTT/SRT dạng chuỗi (không đọc/ghi file).
- * Trả về chuỗi SRT đã clean.
- * @param {string} textContent  Nội dung VTT hoặc SRT dạng chuỗi
- * @returns {string}  Chuỗi SRT đã clean
- */
-export function cleanSrtContent(textContent) {
-  let text = String(textContent ?? '').replace(/\r/g, '');
-
-  // Bỏ header + timestamp + thẻ HTML
-  text = text
-    .replace(/^WEBVTT[\s\S]*?\n\n/, '')
-    .replace(/align:start position:\d+%/g, '')
-    .replace(/<\d{2}:\d{2}:\d{2}\.\d{3}>/g, '')
-    .replace(/<\/?c[^>]*>/g, '')
-    .replace(/\[.*?\]/g, '') // bỏ [nhạc], [vỗ tay] v.v.
-    .replace(/&[a-z]+;/g, '')
-    .trim();
-
-  // Chia thành khối (mỗi khối phụ đề)
-  const blocks = text
-    .split(/(?=\d{2}:\d{2}:\d{2}\.\d{3} --> \d{2}:\d{2}:\d{2}\.\d{3})/)
-    .map(b => b.trim())
-    .filter(Boolean);
-
-  let cleanedBlocks = [];
-  let prevLines = [];
-
-  for (const block of blocks) {
-    const [timeLine, ...lines] = block
-      .split('\n')
-      .map(l => l.trim())
-      .filter(Boolean);
-
-    if (!timeLine || !timeLine.includes('-->') || lines.join(' ').trim() === '') continue;
-
-    const parts = timeLine.split('-->').map(p => p.trim());
-    const rawStart = parts[0];
-    const rawEnd = parts[1];
-
-    const newLines = lines.filter(line => !prevLines.includes(line));
-
-    if (newLines.length > 0) {
-      const cleanedText = newLines.join('\n');
-      if (cleanedBlocks.length > 0) {
-        cleanedBlocks[cleanedBlocks.length - 1].rawEnd = rawStart;
-      }
-      cleanedBlocks.push({ rawStart, rawEnd, text: cleanedText });
-    }
-
-    prevLines = lines;
-  }
-
-  const finalBlocks = processSubtitles(cleanedBlocks);
-
-  const srt = finalBlocks
-    .map((b, i) => {
-      const normalize = t => t.replace(/\./g, ',');
-
-      const start = normalize(b.rawStart);
-      const end = normalize(b.rawEnd);
-
-      return `${i + 1}\n${start} --> ${end}\n${b.text}\n`;
-    })
-    .join('\n');
-
-  return srt.trim();
 }
 
 export { cleanSrt };

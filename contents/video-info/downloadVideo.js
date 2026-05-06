@@ -239,14 +239,6 @@ async function downloadThumbnail(url, options = {}) {
   });
 }
 
-async function cleanVttTranscriptsToSrt(outputDir) {
-  const vttFiles = listSubtitleVttFiles(outputDir);
-  for (const file of vttFiles) {
-    const vttPath = path.join(outputDir, file);
-    await convertVttToSrtAndCleanup(vttPath);
-  }
-}
-
 function listSubtitleVttFiles(outputDir) {
   return fs
     .readdirSync(outputDir)
@@ -254,14 +246,33 @@ function listSubtitleVttFiles(outputDir) {
     .sort((a, b) => a.localeCompare(b));
 }
 
-async function convertVttToSrtAndCleanup(vttPath) {
-  const { cleanSrt } = await import('../utils/srt.util.js');
-  cleanSrt(vttPath);
-  fs.unlinkSync(vttPath);
+function listSubtitleSrtFiles(outputDir) {
+  return fs
+    .readdirSync(outputDir)
+    .filter(f => f.endsWith('.srt'))
+    .sort((a, b) => a.localeCompare(b));
+}
 
-  const srtPath = vttPath.replace(/\.vtt$/i, '.srt');
-  if (!fs.existsSync(srtPath)) return null;
-  return srtPath;
+/**
+ * Sau khi yt-dlp ghi file phụ đề: VTT → cleanSrt + xóa .vtt; SRT → cleanSrt (ghi đè cùng file).
+ * @param {string} outputDir
+ * @param {'vtt'|'srt'} targetFormat
+ */
+async function cleanTranscriptFilesAfterDownload(outputDir, targetFormat) {
+  const { cleanSrt } = await import('../utils/srt.util.js');
+
+  if (targetFormat === 'vtt') {
+    for (const file of listSubtitleVttFiles(outputDir)) {
+      const vttPath = path.join(outputDir, file);
+      cleanSrt(vttPath);
+      fs.unlinkSync(vttPath);
+    }
+    return;
+  }
+
+  for (const file of listSubtitleSrtFiles(outputDir)) {
+    cleanSrt(path.join(outputDir, file));
+  }
 }
 
 function backupCleanedSrt(srtPath) {
@@ -327,18 +338,16 @@ async function processVttTranscriptsWithGemini(
   { updateTranscript = true, videoTitle, description, tags, callback, language }
 ) {
   const { updateVideoInfo } = await import('./updateContent.js');
-  const vttFiles = listSubtitleVttFiles(outputDir);
-  console.log('🚀 ~ processVttTranscriptsWithGemini ~ vttFiles:', vttFiles);
+  const srtFiles = listSubtitleSrtFiles(outputDir);
+  console.log('🚀 ~ processVttTranscriptsWithGemini ~ srtFiles:', srtFiles);
 
   let processedCount = 0;
   /** Dùng để tạo thumbnail 1 lần/video theo yêu cầu “once-last”: lấy meta của subtitle cuối cùng xử lý thành công. */
   let lastGeminiOut = null;
 
-  for (const file of vttFiles) {
-    const vttPath = path.join(outputDir, file);
-
-    const srtPath = await convertVttToSrtAndCleanup(vttPath);
-    if (!srtPath) continue;
+  for (const file of srtFiles) {
+    const srtPath = path.join(outputDir, file);
+    if (!fs.existsSync(srtPath)) continue;
 
     backupCleanedSrt(srtPath);
 
@@ -371,8 +380,8 @@ async function processVttTranscriptsWithGemini(
 }
 
 /**
- * Sau khi `downloadTranscript` tải xong: clean VTT→SRT và/hoặc pipeline Gemini + thumbnail Flow (khi `subFormat: 'vtt'`).
- * Với `subFormat: 'srt'` không làm gì thêm (file .srt đã nằm trong outputDir).
+ * Sau khi `downloadTranscript` tải xong (đã clean SRT trong `downloadTranscript`): pipeline Gemini + thumbnail Flow khi `subFormat: 'vtt'`.
+ * Với `subFormat: 'srt'` không chạy Gemini ở đây (file .srt đã clean trong `downloadTranscript`).
  * @param {string} url
  * @param {{ transcriptLang: string | null }} downloadResult — kết quả từ `downloadTranscript`
  * @param {object} [options]
@@ -420,15 +429,16 @@ async function finalizeDownloadedTranscript(url, downloadResult, options = {}) {
       language: transcriptLang,
     });
     return { transcriptLang, ...res };
-  } else {
-    await cleanVttTranscriptsToSrt(outputDir);
-    return { transcriptLang, processedCount: 0, lastGeminiOut: undefined };
   }
+
+  return { transcriptLang, processedCount: 0, lastGeminiOut: undefined };
 }
 
 async function downloadTranscript(url, options = {}) {
   const { outputDir = PATHS.DOWNLOADS, subFormat = 'vtt', videoTitle = '' } = options;
+
   if (!fs.existsSync(outputDir)) fs.mkdirSync(outputDir, { recursive: true });
+
   const targetFormat = subFormat === 'vtt' ? 'vtt' : 'srt';
 
   const outputTemplate = path.join(outputDir, '%(title)s-%(id)s.%(ext)s');
@@ -465,6 +475,8 @@ async function downloadTranscript(url, options = {}) {
   }
 
   if (lastErr) throw lastErr;
+
+  await cleanTranscriptFilesAfterDownload(outputDir, targetFormat);
 
   return { transcriptLang, outputDir };
 }
@@ -715,7 +727,6 @@ async function main() {
 export default downloadVideo;
 
 export {
-  cleanVttTranscriptsToSrt,
   downloadAudio,
   downloadSingleVideo,
   downloadThumbnail,
