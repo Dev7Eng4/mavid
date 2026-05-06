@@ -290,7 +290,13 @@ async function emitGeminiMetaCallback({ url, geminiOut, callback }) {
   }
 }
 
-async function maybeGenerateFlowThumbnailFromGeminiOut({ geminiOut, thumbnailFlowOutputDir, generateThumbnailWithFlow, language, thumbnailPrompt }) {
+async function maybeGenerateFlowThumbnailFromGeminiOut({
+  geminiOut,
+  thumbnailFlowOutputDir,
+  generateThumbnailWithFlow,
+  language,
+  thumbnailPrompt,
+}) {
   if (!generateThumbnailWithFlow) return { ok: false, reason: 'disabled' };
   if (!thumbnailFlowOutputDir) return { ok: false, reason: 'missing-outputDir' };
 
@@ -318,14 +324,7 @@ async function maybeGenerateFlowThumbnailFromGeminiOut({ geminiOut, thumbnailFlo
 async function processVttTranscriptsWithGemini(
   url,
   outputDir,
-  {
-    updateTranscript = true,
-    videoTitle,
-    description,
-    tags,
-    callback,
-    language,
-  }
+  { updateTranscript = true, videoTitle, description, tags, callback, language }
 ) {
   const { updateVideoInfo } = await import('./updateContent.js');
   const vttFiles = listSubtitleVttFiles(outputDir);
@@ -487,6 +486,27 @@ async function downloadAudio(url, options = {}) {
 
   await subprocess;
   return outputDir;
+}
+
+async function downloadSingVideo(url, options = {}) {
+  const { mode = MAKE_VIDEO_MODE.REUP_FULL, outputDir = PATHS.DOWNLOADS, downloadMaxHeight = 0 } = options;
+
+  const actualOutputDir = outputDir;
+
+  if (!fs.existsSync(actualOutputDir)) {
+    fs.mkdirSync(actualOutputDir, { recursive: true });
+  } else {
+    await clearOutputDirResilient(actualOutputDir);
+  }
+
+  const result = await Promise.allSettled([
+    downloadTranscript(url, { outputDir, videoTitle: result.title }),
+    downloadAudio(url, { outputDir }),
+    downloadVideo(url, { outputDir, maxHeight: downloadMaxHeight }),
+    downloadThumbnail(url, { outputDir }),
+  ]);
+
+  return result;
 }
 
 /**

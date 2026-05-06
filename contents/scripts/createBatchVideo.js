@@ -794,7 +794,7 @@ async function main(props = {}) {
         ...buildMakeVideoFromAudioOptions(mergedProps, effectiveChannelName),
       });
     } else if (videoType === VIDEO_MAKE_MODE.FROM_VIDEO) {
-      const { default: makeVideoFromFull } = await import('../makeVideoFromFull.js');
+      const { default: makeVideoFromFull } = await import('../makeFromVideo/makeVideoFromFull.js');
       result = await makeVideoFromFull({
         inputFile,
         items,

@@ -33,6 +33,7 @@ import {
   type ChannelItem,
   type ChannelUploadVideoPayload,
 } from './channelUploadVideoHelpers';
+import { getChannelsIndexCache, prefetchChannelsIndex } from './channelsPrefetch';
 
 const INDEX_FILE = 'channels/index.xlsx';
 
@@ -62,8 +63,9 @@ type IndexCreateVideoQueueEntry = {
 };
 
 function ChannelsPage() {
-  const [channels, setChannels] = useState<ChannelRow[]>([]);
-  const [loading, setLoading] = useState(true);
+  const cachedIndex = getChannelsIndexCache();
+  const [channels, setChannels] = useState<ChannelRow[]>(() => cachedIndex?.channels ?? []);
+  const [loading, setLoading] = useState(() => !cachedIndex);
   const [selectedChannel, setSelectedChannel] = useState<string | null>(null);
   const [selectedRows, setSelectedRows] = useState<Set<string>>(new Set<string>());
   const [detail, setDetail] = useState<ChannelFolderDataResult | null>(null);
@@ -94,7 +96,7 @@ function ChannelsPage() {
   const [addChannelOpen, setAddChannelOpen] = useState(false);
   const [_addChannelInfo, setAddChannelInfo] = useState<string | null>(null);
   const [googleDriveSyncInfo, setGoogleDriveSyncInfo] = useState<string | null>(null);
-  const [groups, setGroups] = useState<Group[]>([]);
+  const [groups, setGroups] = useState<Group[]>(() => cachedIndex?.groups ?? []);
   /** Lọc danh sách kênh (bảng index): email + nhóm. */
   const [indexListEmailFilter, setIndexListEmailFilter] = useState('');
   const [indexListGroupFilter, setIndexListGroupFilter] = useState('__all__');
@@ -145,9 +147,8 @@ function ChannelsPage() {
     return base;
   }, [groups]);
 
-  const fetchChannels = useCallback(async () => {
-    console.log('fetchChannels');
-    setLoading(true);
+  const fetchChannels = useCallback(async (opts?: { background?: boolean }) => {
+    if (!opts?.background) setLoading(true);
     try {
       if (!window.runner?.readChannelData) {
         setChannels([]);
@@ -156,14 +157,13 @@ function ChannelsPage() {
       }
 
       const d = await window.runner.readChannelData(INDEX_FILE);
-      console.log('🚀 ~ ChannelsPage ~ d:', d);
       setChannels(convertIndexRowToChannel(d.rows));
       setSelectedRows(new Set());
     } catch {
       setChannels([]);
       setSelectedRows(new Set());
     } finally {
-      setLoading(false);
+      if (!opts?.background) setLoading(false);
     }
     try {
       const r = await window.runner?.getMavidGroups?.();
@@ -181,8 +181,29 @@ function ChannelsPage() {
   }, []);
 
   useEffect(() => {
-    console.log('fetchChannels');
-    void fetchChannels();
+    // Nếu app đã prefetch thì dùng cache ngay; sau đó refresh ngầm.
+    const c = getChannelsIndexCache();
+    if (c) {
+      setChannels(c.channels);
+      setGroups(c.groups);
+      setLoading(false);
+      void fetchChannels({ background: true });
+      return;
+    }
+
+    // Fallback: tự prefetch khi vào trang (lần đầu mở trang).
+    void (async () => {
+      await prefetchChannelsIndex();
+      const cc = getChannelsIndexCache();
+      if (cc) {
+        setChannels(cc.channels);
+        setGroups(cc.groups);
+        setLoading(false);
+        void fetchChannels({ background: true });
+      } else {
+        void fetchChannels();
+      }
+    })();
   }, [fetchChannels]);
 
   const loadDetail = useCallback(

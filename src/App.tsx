@@ -11,11 +11,17 @@ import { WarningsPage } from '@/pages/WarningsPage';
 import AnalystPage from '@/pages/analyst';
 import { GpmPage } from '@/pages/GpmPage';
 import { LogsPage } from '@/pages/LogsPage';
+import { ensureChannelsIndexPrefetched } from '@/pages/channels/channelsPrefetch';
 
 export default function App() {
   const [activePage, setActivePage] = useState<Page>('pipeline');
   const [runningScript, setRunningScript] = useState<ScriptId | null>(null);
   const [errorLogs, setErrorLogs] = useState<string[]>([]);
+
+  useEffect(() => {
+    // Prefetch ngầm để trang Channels mở nhanh hơn (không chặn UI).
+    void ensureChannelsIndexPrefetched();
+  }, []);
 
   const appendErrorLog = useCallback(async (line: string) => {
     try {

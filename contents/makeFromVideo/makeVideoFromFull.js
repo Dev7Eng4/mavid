@@ -2,14 +2,14 @@ import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { spawn, execSync } from 'child_process';
-import { MAKE_VIDEO_MODE } from './constants/index.js';
-import { GPU_INFO } from './utils/hardware.util.js';
-import { OVERLAY_OPTIONS } from './constants/overlayOptions.js';
-import { resolveChannelsDir } from './utils/channelsStoragePath.js';
-import { unlinkProgressSidecarForSpreadsheet } from './syncProgressToSpreadsheet.js';
+import { MAKE_VIDEO_MODE } from '../constants/index.js';
+import { GPU_INFO } from '../utils/hardware.util.js';
+import { OVERLAY_OPTIONS } from '../constants/overlayOptions.js';
+import { resolveChannelsDir } from '../utils/channelsStoragePath.js';
+import { unlinkProgressSidecarForSpreadsheet } from '../syncProgressToSpreadsheet.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const ROOT = path.join(__dirname, '..');
+const ROOT = path.join(__dirname, '..', '..');
 const CHANNELS_DIR = resolveChannelsDir();
 
 const DOWNLOADS_DIR = path.join(ROOT, 'downloads');
@@ -282,7 +282,7 @@ async function main(options = {}) {
 
   const overlayRender = { imageOpacity, videoOpacity, overlayCacheDir, videoCropPercent, outputHeight };
 
-  const { downloadSingleVideo } = await import('./video-info/downloadVideo.js');
+  const { downloadSingleVideo } = await import('../video-info/downloadVideo.js');
 
   // Tìm file thực tế được dùng để lấy thư mục đích (folder channel)
   const actualInputFile = inputFile;
@@ -308,7 +308,7 @@ async function main(options = {}) {
     if (!actualInputFile) return;
     try {
       if (!syncProgressModule) {
-        syncProgressModule = await import('./syncProgressToSpreadsheet.js');
+        syncProgressModule = await import('../syncProgressToSpreadsheet.js');
       }
       await syncProgressModule.syncProgressStatusToSpreadsheet(actualInputFile, progressData);
     } catch (e) {
@@ -444,3 +444,4 @@ if (process.argv[1] && fileURLToPath(import.meta.url) === path.resolve(process.a
 }
 
 export default main;
+

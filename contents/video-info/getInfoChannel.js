@@ -11,7 +11,8 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import ExcelJS from 'exceljs';
 import { v4 as uuidv4 } from 'uuid';
-import { resolveChannelsDir, resolveStockBackgroundsDir } from '../utils/channelsStoragePath.js';
+import { resolveChannelsDir } from '../utils/channelsStoragePath.js';
+import { resolveStockBackgroundsDir } from '../utils/stockBackgroundsPath.js';
 import { CHANNEL_CONFIG_FILE, CHANNEL_DETAIL, CHANNELS, MIN_DURATION_VIDEO, VIDEO_STATUS_OPTIONS } from '../constants/channel.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
