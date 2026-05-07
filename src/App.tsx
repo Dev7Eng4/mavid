@@ -1,6 +1,7 @@
 import { useState, useCallback, useEffect } from 'react';
 import type { Page, ScriptId } from './types';
 import { Sidebar } from './components/layout/Sidebar';
+import { AppTopBar } from './components/layout/AppTopBar';
 import { PipelinePage } from '@/pages/PipelinePage';
 import CreateVideoPage from '@/pages/create-video';
 import { SettingsPage } from '@/pages/SettingsPage';
@@ -79,7 +80,9 @@ export default function App() {
         isRunning={runningScript !== null}
         onStopRunningJob={runningScript !== null ? () => void stopRunningNpmJob() : undefined}
       />
-      <main className='ml-56 flex-1 min-h-screen min-w-0 w-full overflow-auto p-4'>
+      <div className='ml-56 flex min-h-screen min-w-0 flex-1 flex-col'>
+        <AppTopBar activePage={activePage} />
+        <main className='min-h-0 flex-1 w-full overflow-auto p-4'>
         {activePage === 'pipeline' && (
           <PipelinePage
             runningScript={runningScript}
@@ -106,7 +109,8 @@ export default function App() {
         {activePage === 'analyst' && <AnalystPage key='analyst' />}
         {activePage === 'gpm' && <GpmPage key='gpm' />}
         {activePage === 'logs' && <LogsPage errorLogs={errorLogs} clearErrorLogs={clearErrorLogs} />}
-      </main>
+        </main>
+      </div>
     </div>
   );
 }

@@ -88,16 +88,11 @@ export function ChannelAddDialog({ backgroundOptions, channels = [], onClose, on
   const isEditMode = initialRow != null;
 
   const [formError, setFormError] = useState<string | null>(null);
-  console.log('🚀 ~ ChannelAddDialog ~ formError:', formError);
   const [saving, setSaving] = useState(false);
-  /** Chế độ sửa: đã thử đọc `mavid-channel-config.json` trong thư mục kênh (để không ghi đè form bằng fetch muộn). */
-  const [configHydrated, setConfigHydrated] = useState(!isEditMode);
 
-  console.log('🚀 ~ ChannelAddDialog ~ initialRow:', initialRow);
   const [form, setForm] = useState<ChannelAddDialogInitialFields>(() => {
     return isEditMode ? (initialRow as any) : ADD_FORM_DEFAULT;
   });
-  console.log('🚀 ~ ChannelAddDialog ~ form:', form);
 
   const {
     channelLink,

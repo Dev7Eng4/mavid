@@ -2,15 +2,15 @@
 @import 'tailwindcss';
 
 :root {
-  /* OLED Dark Mode Color System */
+  /* OLED Dark Mode Color System — gần mockup dashboard enterprise */
   --text: #94a3b8;
   --text-h: #f8fafc;
   --text-muted: #64748b;
-  --bg: #0a0a0f;
-  --sidebar-bg: #0f0f14;
-  --border: #1e1e2e;
+  --bg: #0b0e14;
+  --sidebar-bg: #161b22;
+  --border: #30363d;
   --code-bg: #12121a;
-  --card-bg: #14141e;
+  --card-bg: #161b22;
   --hover-bg: rgba(148, 163, 184, 0.08);
 
   /* Accent — xanh dương (nút chính, link, sidebar active) */

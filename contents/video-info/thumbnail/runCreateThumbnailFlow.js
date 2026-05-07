@@ -27,8 +27,8 @@ export async function runCreateThumbnailFlow({
   if (!pathSave || typeof pathSave !== 'string') {
     throw new Error('runCreateThumbnailFlow: thiếu pathSave');
   }
+
   const abs = path.resolve(pathSave);
   fs.mkdirSync(abs, { recursive: true });
   await generateImageWithFlow(prompt, abs, exportName, { ...flowSettings, ...flowExtraSettings }, isNeedImage);
 }
-

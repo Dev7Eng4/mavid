@@ -142,8 +142,8 @@ export async function internalUpdateTranscript(rawSrtContent, options = {}) {
     typeof rawSrtContent === 'string'
       ? rawSrtContent
       : Array.isArray(rawSrtContent)
-      ? rawSrtContent.join('\n\n')
-      : String(rawSrtContent ?? '');
+        ? rawSrtContent.join('\n\n')
+        : String(rawSrtContent ?? '');
 
   const cleanedSrt = srtString.trim();
   const allObjects = parseSrtToObjects(cleanedSrt);
@@ -181,7 +181,7 @@ export async function internalUpdateTranscript(rawSrtContent, options = {}) {
   console.log(
     `[update-transcript] Video ${durationMin < 30 ? '< 30' : '>= 30'} phút → mở ${activeConcurrency} Chrome profile (${profileIds
       .slice(0, activeConcurrency)
-      .join(',')}) cho ${totalChunks} chunk...`
+      .join(',')}) cho ${totalChunks} chunk...`,
   );
 
   let nextChunkIndex = 0;

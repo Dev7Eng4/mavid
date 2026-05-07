@@ -31,7 +31,7 @@ export function Sidebar({ activePage, onNavigate, isRunning, onStopRunningJob }:
     >
       <div className='px-5 py-5 flex items-center gap-3'>
         <div
-          className='w-9 h-9 rounded-xl flex items-center justify-center text-sm font-bold shadow-lg'
+          className='w-9 h-9 rounded-xl flex items-center justify-center text-sm font-bold shadow-lg shrink-0'
           style={{
             background: 'var(--accent)',
             color: '#fff',
@@ -39,9 +39,14 @@ export function Sidebar({ activePage, onNavigate, isRunning, onStopRunningJob }:
         >
           <VideoIcon className='w-5 h-5' />
         </div>
-        <span className='text-lg font-semibold tracking-tight' style={{ color: 'var(--text-h)' }}>
-          MaVid
-        </span>
+        <div className='min-w-0 flex flex-col gap-0.5'>
+          <span className='text-lg font-semibold tracking-tight leading-tight' style={{ color: 'var(--text-h)' }}>
+            MaVid
+          </span>
+          <span className='text-[11px] font-medium leading-tight tracking-wide' style={{ color: 'var(--text-muted)' }}>
+            Pipeline và kênh video
+          </span>
+        </div>
       </div>
 
       <nav className='flex-1 px-3 mt-4 space-y-1'>
@@ -51,7 +56,7 @@ export function Sidebar({ activePage, onNavigate, isRunning, onStopRunningJob }:
             <button
               key={item.id}
               onClick={() => onNavigate(item.id)}
-              className='w-full flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm cursor-pointer transition-all duration-200'
+              className='relative w-full flex items-center gap-3 rounded-xl pl-3 pr-3 py-2.5 text-sm cursor-pointer transition-all duration-200 overflow-hidden'
               style={{
                 background: active ? 'var(--accent-bg)' : 'transparent',
                 color: active ? 'var(--accent)' : 'var(--text)',
@@ -71,7 +76,17 @@ export function Sidebar({ activePage, onNavigate, isRunning, onStopRunningJob }:
                 }
               }}
             >
-              <span className='w-5 flex items-center justify-center opacity-80'>{item.icon}</span>
+              <span
+                aria-hidden
+                className='absolute left-0 top-1/2 -translate-y-1/2 w-[3px] rounded-r-full transition-opacity duration-200'
+                style={{
+                  height: active ? '60%' : '40%',
+                  opacity: active ? 1 : 0,
+                  background: 'var(--accent)',
+                  boxShadow: active ? '0 0 12px var(--accent-glow)' : 'none',
+                }}
+              />
+              <span className='w-5 flex items-center justify-center opacity-80 shrink-0'>{item.icon}</span>
               {item.label}
               {item.id === 'pipeline' && isRunning && (
                 <span

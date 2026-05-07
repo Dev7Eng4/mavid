@@ -1,6 +1,6 @@
 import { AppButton } from '@/components/ui/AppButton';
 import { CustomSelect } from '@/components/ui/CustomSelect';
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { VISUAL_RESOURCE_TYPE } from '../constants';
 
 interface AddResourceProps {

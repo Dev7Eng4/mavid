@@ -1,22 +1,36 @@
 import fs from 'fs';
 import path from 'path';
 
-import { PLAYWRIGHT_PROFILES } from '../constants/playwright-profile.js';
 import { PATHS } from '../constants/paths.js';
-import { openChatPage, sendPromptWithRetry, stripJsonCodeFence, validateJsonResponse } from '../llm/index.js';
+import { PLAYWRIGHT_PROFILES } from '../constants/playwright-profile.js';
+import { openChatPage, sendPromptWithRetry, stripJsonCodeFence } from '../llm/index.js';
 import {
-  promptCreateSummaryFromTranscript,
-  promptCreateFinalSummary,
-  promptMergeSummaryToSection,
-  promptMergeSectionToFinal,
-  promptCreateVisualBible,
+  promptCreateFinalSynthesis,
   promptCreateScenePromptsForChapter,
+  promptCreateSummaryFromTranscript,
+  promptCreateVisualBible,
+  promptMergeSummaryToSection,
 } from '../prompts/new/createVideoInfo.js';
 import { openChromeProfile } from '../scripts/makeChromeProfile.js';
 import { objectsToIdTextFormat, parseSrtToObjects } from '../utils/srt.util.js';
+import downloadVideo, {
+  clearOutputDirResilient,
+  downloadAudio,
+  downloadThumbnail,
+  downloadTranscript,
+  getVideoInfo,
+} from './downloadVideo.js';
+import { generateFlowThumbnailFromGemini } from './thumbnail/generateFlowThumbnail.js';
+import { runCreateThumbnailFlow } from './thumbnail/runCreateThumbnailFlow.js';
+import { MAKE_VIDEO_MODE } from '../constants/index.js';
+import { internalUpdateTranscript } from './transcriptPipeline.js';
 
 const MERGE_SECTION_BATCH_SIZE = 12;
-const MERGE_SECTION_MAX_PROFILES = 3;
+const MERGE_SECTION_MAX_PROFILES = 4;
+const PREVIOUS_CONTEXT_CHUNKS = 10;
+const CHUNK_SIZE = 150;
+const GENERAL_IMAGE_NAME = 'background';
+const VIDEO_META_FILE = 'video-meta.json';
 
 const VISUAL_STYLE_PRESETS = {
   cinematic: {
@@ -43,8 +57,6 @@ const VISUAL_STYLE_PRESETS = {
   },
 };
 
-const visualStyle = VISUAL_STYLE_PRESETS.cinematic;
-
 /**
  * Chia mảng thành batch 12 phần tử; nếu batch cuối < 6 thì gộp vào batch trước.
  * @template T
@@ -63,14 +75,79 @@ function splitIntoBatches(arr) {
   return batches;
 }
 
+function getSegmentsForChapter(microSegments, chapter) {
+  return microSegments.filter(segment => {
+    return segment.line_start <= chapter.line_end && segment.line_end >= chapter.line_start;
+  });
+}
+
+function buildChapterSceneInput(globalVisualBible, microSegments, chapterIndex) {
+  const chapters = globalVisualBible.chapter_visual_plan;
+  const currentChapter = chapters[chapterIndex];
+  const previousChapter = chapters[chapterIndex - 1] || null;
+  const nextChapter = chapters[chapterIndex + 1] || null;
+
+  return {
+    video_id: globalVisualBible.video_id,
+    style: globalVisualBible.style,
+    visual_bible: globalVisualBible.visual_bible,
+    character_designs: globalVisualBible.character_designs,
+    environment_design: globalVisualBible.environment_design,
+
+    current_chapter: currentChapter,
+
+    chapter_source_segments: getSegmentsForChapter(microSegments, currentChapter),
+
+    previous_chapter_context: previousChapter
+      ? {
+          chapter_id: previousChapter.chapter_id,
+          line_start: previousChapter.line_start,
+          line_end: previousChapter.line_end,
+          visual_goal: previousChapter.visual_goal,
+          emotion_to_show: previousChapter.emotion_to_show,
+        }
+      : null,
+
+    next_chapter_context: nextChapter
+      ? {
+          chapter_id: nextChapter.chapter_id,
+          line_start: nextChapter.line_start,
+          line_end: nextChapter.line_end,
+          visual_goal: nextChapter.visual_goal,
+          emotion_to_show: nextChapter.emotion_to_show,
+        }
+      : null,
+
+    scene_options: {
+      max_scenes_for_this_chapter: getMaxScenesForChapter(currentChapter),
+      aspect_ratio: '16:9',
+      prompt_language: 'en',
+      include_negative_prompt: true,
+      require_line_ranges: true,
+      require_character_ids: true,
+    },
+  };
+}
+
+function sanitizeFilenameBase(name) {
+  return String(name)
+    .replace(/[<>:"/\\|?*\x00-\x1f]/g, '_')
+    .slice(0, 120);
+}
+
 /**
  * Đọc transcript (.srt) trong outputDir → chunk LLM → merge thành final summary (JSON).
- * @param {{ url?: string, options?: { outputDir?: string, chunkSize?: number } }} args
+ * @param {{ options?: { outputDir?: string, chunkSize?: number } }} options
  * @returns {Promise<{ finalSummary: Record<string, unknown> | null, visualBible: Record<string, unknown> | null, normalizedScenes: unknown[] } | Record<string, unknown> | null | unknown[]>}
  */
-export const createVideoInfoWithLLM = async ({ url: _url, options = {} } = {}) => {
-  const { outputDir = PATHS.DOWNLOADS, chunkSize = 150 } = options;
-  const previousContextChunks = 10;
+export const createVideoInfoWithLLM = async (options = {}) => {
+  const {
+    outputDir = PATHS.DOWNLOADS,
+    chunkSize = CHUNK_SIZE,
+    visualStyle = VISUAL_STYLE_PRESETS.cinematic,
+    generateGeneralImage = false,
+    generateSceneImages = false,
+  } = options;
 
   if (!fs.existsSync(outputDir)) {
     throw new Error(`createVideoInfoWithLLM: outputDir không tồn tại: ${outputDir}`);
@@ -86,20 +163,18 @@ export const createVideoInfoWithLLM = async ({ url: _url, options = {} } = {}) =
   const allObjects = parseSrtToObjects(fs.readFileSync(srtPath, 'utf-8'));
   if (allObjects.length === 0) {
     console.warn('[createVideoInfoWithLLM] Không parse được cue SRT, trả về [].');
-    return null;
+    return { finalSummary: null };
   }
 
-  const size = Math.max(1, Number(chunkSize) || 150);
-  /** @type {{ id: string, timeline: string, text: string }[][]} */
   const chunks = [];
-  for (let i = 0; i < allObjects.length; i += size) {
-    chunks.push(allObjects.slice(i, i + size));
+  for (let i = 0; i < allObjects.length; i += chunkSize) {
+    chunks.push(allObjects.slice(i, i + chunkSize));
   }
 
-  // Nếu chunk cuối quá nhỏ (< 50% size) thì gộp vào chunk trước
+  // Nếu chunk cuối quá nhỏ (< 50% chunkSize) thì gộp vào chunk trước
   if (chunks.length >= 2) {
     const last = chunks[chunks.length - 1];
-    if (last.length < size * 0.5) {
+    if (last.length < chunkSize * 0.5) {
       chunks[chunks.length - 2].push(...last);
       chunks.pop();
     }
@@ -132,20 +207,17 @@ export const createVideoInfoWithLLM = async ({ url: _url, options = {} } = {}) =
           }
           const transcript = objectsToIdTextFormat(chunks[i]);
 
-          const previousContext =
-            i > 0
-              ? chunks
-                  .slice(Math.max(0, i - previousContextChunks), i)
-                  .map(c => objectsToIdTextFormat(c))
-                  .join('\n')
-              : '';
+          let previousContext = '';
+          if (i > 0) {
+            const startIdx = i * chunkSize - PREVIOUS_CONTEXT_CHUNKS;
+            const endIdx = i * chunkSize;
+            const prevObjects = allObjects.slice(Math.max(0, startIdx), endIdx);
+            previousContext = objectsToIdTextFormat(prevObjects);
+          }
 
-          const prompt = promptCreateSummaryFromTranscript({ transcript, previousContext });
+          const prompt = promptCreateSummaryFromTranscript(transcript, previousContext);
           const raw = await sendPromptWithRetry(pg, prompt, {
             requireCodeBlock: false,
-            validate: validateJsonResponse,
-            maxRetries: 2,
-            retryDelayMs: 2000,
             label: `[create-video-info] Chunk ${i + 1}/${totalChunks}`,
           });
           chunkAnalyses[i] = JSON.parse(stripJsonCodeFence(raw));
@@ -154,8 +226,9 @@ export const createVideoInfoWithLLM = async ({ url: _url, options = {} } = {}) =
           console.warn(`[create-video-info] Chunk ${i + 1}/${totalChunks} lỗi profile ${profileNum}: ${msg}`);
           chunkAnalyses[i] = null;
         }
+
         if (nextChunkIndex < totalChunks) {
-          await pg.waitForTimeout(2000);
+          await pg.waitForTimeout(1000);
         }
       }
     } finally {
@@ -165,10 +238,7 @@ export const createVideoInfoWithLLM = async ({ url: _url, options = {} } = {}) =
 
   await Promise.all(Array.from({ length: activeConcurrency }, (_, w) => workerProfile(w)));
 
-  const sortedChunkAnalyses = chunkAnalyses.sort((a, b) => {
-    if (!a && !b) return 0;
-    if (!a) return 1;
-    if (!b) return -1;
+  const sortedChunkAnalyses = chunkAnalyses.filter(Boolean).sort((a, b) => {
     const aStart = Number(a.line_start);
     const bStart = Number(b.line_start);
     if (aStart !== bStart) return aStart - bStart;
@@ -178,24 +248,29 @@ export const createVideoInfoWithLLM = async ({ url: _url, options = {} } = {}) =
   });
 
   // step 2
-  const validAnalyses = sortedChunkAnalyses.filter(Boolean);
+  const validAnalyses = sortedChunkAnalyses.map(a => a.micro_segments).flat();
+
   const N = validAnalyses.length;
+
   if (N === 0) {
     console.warn('[createVideoInfoWithLLM] Không có chunkAnalyses hợp lệ.');
-    return null;
+    return { finalSummary: null };
   }
 
   const sendRetryOpts = {
     requireCodeBlock: false,
-    validate: validateJsonResponse,
-    maxRetries: 2,
-    retryDelayMs: 2000,
   };
 
   /** @type {Record<string, unknown> | null} */
   let finalSummary = null;
 
+  /** @type {(Record<string, unknown> | null)[] | null} */
+  let batchSectionResults = null;
+  /** @type {'direct' | 'sections_single_batch' | 'sections_multi_batch' | null} */
+  let mergeStrategy = null;
+
   if (N <= 12) {
+    mergeStrategy = 'direct';
     /** @type {import('playwright').BrowserContext | null} */
     let ctx = null;
     try {
@@ -203,7 +278,7 @@ export const createVideoInfoWithLLM = async ({ url: _url, options = {} } = {}) =
       ctx = opened.context;
       const pg = opened.page;
       await openChatPage(pg);
-      const prompt = promptCreateFinalSummary(JSON.stringify(validAnalyses));
+      const prompt = promptCreateFinalSynthesis(JSON.stringify(validAnalyses));
       const raw = await sendPromptWithRetry(pg, prompt, {
         ...sendRetryOpts,
         label: '[create-video-info] FinalSummary (direct)',
@@ -213,10 +288,10 @@ export const createVideoInfoWithLLM = async ({ url: _url, options = {} } = {}) =
       if (ctx) await ctx.close().catch(() => {});
     }
   } else {
+    mergeStrategy = N <= 23 ? 'sections_single_batch' : 'sections_multi_batch';
     const batches = N <= 23 ? [validAnalyses] : splitIntoBatches(validAnalyses);
     const batchCount = batches.length;
-    /** @type {(Record<string, unknown> | null)[]} */
-    const batchSectionResults = new Array(batchCount).fill(null);
+    batchSectionResults = new Array(batchCount).fill(null);
 
     const mergeProfiles = PLAYWRIGHT_PROFILES.slice(0, MERGE_SECTION_MAX_PROFILES);
     let nextBatchIndex = 0;
@@ -240,6 +315,7 @@ export const createVideoInfoWithLLM = async ({ url: _url, options = {} } = {}) =
               await openChatPage(wPg);
               primingDone = true;
             }
+
             const prompt = promptMergeSummaryToSection(JSON.stringify(batches[i]));
             const raw = await sendPromptWithRetry(wPg, prompt, {
               ...sendRetryOpts,
@@ -266,6 +342,7 @@ export const createVideoInfoWithLLM = async ({ url: _url, options = {} } = {}) =
 
     if (allSections.length === 0) {
       console.warn('[createVideoInfoWithLLM] Không có sections sau merge batch — không gọi promptMergeSectionToFinal.');
+
       return null;
     }
 
@@ -276,7 +353,7 @@ export const createVideoInfoWithLLM = async ({ url: _url, options = {} } = {}) =
       ctx = opened.context;
       const pg = opened.page;
       await openChatPage(pg);
-      const prompt = promptMergeSectionToFinal({ sections: JSON.stringify(allSections) });
+      const prompt = promptCreateFinalSynthesis(JSON.stringify(allSections));
       const raw = await sendPromptWithRetry(pg, prompt, {
         ...sendRetryOpts,
         label: '[create-video-info] FinalSummary (sections)',
@@ -287,8 +364,15 @@ export const createVideoInfoWithLLM = async ({ url: _url, options = {} } = {}) =
     }
   }
 
-  // step 3
-  if (!finalSummary) return null;
+  console.log('🚀 ~ createVideoInfoWithLLM ~ finalSummary:', finalSummary);
+  console.log('🚀 ~ createVideoInfoWithLLM ~ mergeStrategy:', !generateGeneralImage && !generateSceneImages);
+  console.log('🚀 ~ createVideoInfoWithLLM ~ generateGeneralImage:', !finalSummary || (!generateGeneralImage && !generateSceneImages));
+
+  // step 3 — visual bible khi cần hero và/hoặc scene images
+  if (!finalSummary || (!generateGeneralImage && !generateSceneImages)) {
+    return { finalSummary };
+  }
+  console.log('call visual bible');
 
   /** @type {Record<string, unknown> | null} */
   let visualBible = null;
@@ -312,11 +396,20 @@ export const createVideoInfoWithLLM = async ({ url: _url, options = {} } = {}) =
   }
 
   // step 4
-  if (!visualBible || !Array.isArray(visualBible.chapter_visual_plan) || visualBible.chapter_visual_plan.length === 0) {
-    return { finalSummary, visualBible, normalizedScenes: [] };
+  if (
+    !generateSceneImages ||
+    !visualBible ||
+    !Array.isArray(visualBible.chapter_visual_plan) ||
+    visualBible.chapter_visual_plan.length === 0
+  ) {
+    return {
+      finalSummary,
+      visualBible,
+      generalPrompt: visualBible?.hero_image_package?.prompt ?? '',
+    };
   }
 
-  const chapterInputs = createAllScenePromptInputs(visualBible);
+  const chapterInputs = createAllScenePromptInputs(visualBible, validAnalyses);
   const totalChapterInputs = chapterInputs.length;
 
   /** @type {(Record<string, unknown> | null)[]} */
@@ -414,66 +507,112 @@ export const getMaxScenesForChapter = chapter => {
   return 1;
 };
 
-const buildChapterSceneInput = (globalVisualBible, chapterIndex) => {
-  const chapters = globalVisualBible.chapter_visual_plan;
-
-  const currentChapter = chapters[chapterIndex];
-  const previousChapter = chapters[chapterIndex - 1] || null;
-  const nextChapter = chapters[chapterIndex + 1] || null;
-
-  return {
-    video_id: globalVisualBible.video_id,
-    style: globalVisualBible.style,
-    visual_bible: globalVisualBible.visual_bible,
-    character_designs: globalVisualBible.character_designs,
-    environment_design: globalVisualBible.environment_design,
-
-    current_chapter: currentChapter,
-
-    previous_chapter_context: previousChapter
-      ? {
-          chapter_id: previousChapter.chapter_id,
-          visual_goal: previousChapter.visual_goal,
-          scene_description: previousChapter.scene_description,
-          emotion_to_show: previousChapter.emotion_to_show,
-          visual_keywords: previousChapter.visual_keywords,
-        }
-      : null,
-
-    next_chapter_context: nextChapter
-      ? {
-          chapter_id: nextChapter.chapter_id,
-          visual_goal: nextChapter.visual_goal,
-          scene_description: nextChapter.scene_description,
-          emotion_to_show: nextChapter.emotion_to_show,
-          visual_keywords: nextChapter.visual_keywords,
-        }
-      : null,
-
-    scene_options: {
-      max_scenes_for_this_chapter: getMaxScenesForChapter(currentChapter),
-      aspect_ratio: '16:9',
-      prompt_language: 'en',
-      include_negative_prompt: true,
-    },
-  };
+const createAllScenePromptInputs = (globalVisualBible, microSegments) => {
+  return globalVisualBible.chapter_visual_plan.map((chapter, index) => buildChapterSceneInput(globalVisualBible, microSegments, index));
 };
 
-export const createAllScenePromptInputs = globalVisualBible => {
-  return globalVisualBible.chapter_visual_plan.map((_, index) => buildChapterSceneInput(globalVisualBible, index));
-};
+async function runFlowImagesAfterVideoInfo({ actualOutputDir, generalPrompt }) {
+  if (generalPrompt) {
+    try {
+      await runCreateThumbnailFlow({
+        prompt: generalPrompt,
+        pathSave: actualOutputDir,
+        exportName: GENERAL_IMAGE_NAME,
+        isNeedImage: false,
+      });
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      console.warn(`[prepareVideoInfo] Flow hero: ${msg}`);
+    }
+  }
+
+  // if (generateSceneImages && Array.isArray(normalizedScenes) && normalizedScenes.length > 0) {
+  //   const imagesDir = path.join(actualOutputDir, 'generated-images');
+  //   fs.mkdirSync(imagesDir, { recursive: true });
+  //   flowOut.sceneDir = imagesDir;
+  //   flowOut.sceneTotal = normalizedScenes.length;
+
+  //   for (let i = 0; i < normalizedScenes.length; i++) {
+  //     const scene = normalizedScenes[i];
+  //     const flowPrompt = buildImageFlowPrompt(scene?.prompt, scene?.negative_prompt);
+  //     if (!flowPrompt) {
+  //       console.warn(`[prepareVideoInfo] Scene ${i + 1}: bỏ qua — không có prompt.`);
+  //       continue;
+  //     }
+  //     const idx = scene.global_scene_index ?? i + 1;
+  //     const exportName = `scene_${idx}`;
+  //     try {
+  //       await runCreateThumbnailFlow({
+  //         prompt: flowPrompt,
+  //         pathSave: imagesDir,
+  //         exportName,
+  //         isNeedImage: false,
+  //       });
+  //       flowOut.sceneSuccessCount += 1;
+  //     } catch (e) {
+  //       const msg = e instanceof Error ? e.message : String(e);
+  //       console.warn(`[prepareVideoInfo] Flow ${exportName}: ${msg}`);
+  //     }
+  //   }
+  // }
+}
 
 const prepareVideoInfo = async ({ url, options = {} }) => {
   const {
     mode = MAKE_VIDEO_MODE.FROM_AUDIO,
     outputDir = PATHS.DOWNLOADS,
     downloadMaxHeight = 0,
-    thumbnailChannelRoot,
-    thumbnailPrompt,
-    callback,
+    thumbnailOptions = {
+      prompt: '',
+      needImage: false,
+    },
+    generateGeneralImage = false,
+    generateSceneImages = false,
+    visualStyle = VISUAL_STYLE_PRESETS.cinematic,
+    onlyUpdateInfo = false,
   } = options;
 
   const actualOutputDir = outputDir;
+
+  if (onlyUpdateInfo) {
+    if (!fs.existsSync(actualOutputDir)) {
+      console.warn(`[prepareVideoInfo] onlyUpdateInfo: outputDir không tồn tại: ${actualOutputDir}`);
+      return { url, onlyUpdateInfo: true };
+    }
+    const metaPath = path.join(actualOutputDir, VIDEO_META_FILE);
+    if (!fs.existsSync(metaPath)) {
+      console.warn(`[prepareVideoInfo] onlyUpdateInfo: không tìm thấy ${metaPath}`);
+      return { url, onlyUpdateInfo: true };
+    }
+    /** @type {Record<string, unknown>} */
+    let meta;
+    try {
+      meta = JSON.parse(fs.readFileSync(metaPath, 'utf-8'));
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      console.warn(`[prepareVideoInfo] onlyUpdateInfo: không đọc được video-meta.json: ${msg}`);
+      return { url, onlyUpdateInfo: true };
+    }
+    let generalPromptFromMeta = meta.generalPrompt;
+
+    if (!generalPromptFromMeta) {
+      console.warn(
+        '[prepareVideoInfo] onlyUpdateInfo: không có generalPrompt (hoặc visualBible.hero_image_package.prompt) trong video-meta.json.',
+      );
+      return { url, onlyUpdateInfo: true, generalPrompt: '' };
+    }
+
+    await runFlowImagesAfterVideoInfo({
+      actualOutputDir,
+      generalPrompt: generalPromptFromMeta,
+    });
+
+    return {
+      url,
+      onlyUpdateInfo: true,
+      generalPrompt: generalPromptFromMeta,
+    };
+  }
 
   if (!fs.existsSync(actualOutputDir)) {
     fs.mkdirSync(actualOutputDir, { recursive: true });
@@ -481,12 +620,109 @@ const prepareVideoInfo = async ({ url, options = {} }) => {
     await clearOutputDirResilient(actualOutputDir);
   }
 
-  const result = await Promise.allSettled([
-    downloadVideo(url, { outputDir, maxHeight: downloadMaxHeight }),
-    downloadTranscript(url, { outputDir, videoTitle: result.title }),
-    downloadAudio(url, { outputDir }),
-    downloadThumbnail(url, { outputDir }),
+  const videoMeta = await getVideoInfo(url);
+  const videoTitle = String(videoMeta?.title ?? '');
+
+  const downloadResults = await Promise.allSettled([
+    downloadTranscript(url, { outputDir: actualOutputDir, videoTitle }),
+    downloadThumbnail(url, { outputDir: actualOutputDir }),
+    mode === MAKE_VIDEO_MODE.REUP_FULL ? downloadVideo(url, { outputDir: actualOutputDir, maxHeight: downloadMaxHeight }) : null,
+    mode === MAKE_VIDEO_MODE.FROM_AUDIO ? downloadAudio(url, { outputDir: actualOutputDir }) : null,
   ]);
 
-  // handle update video meta with llm
+  if (mode === MAKE_VIDEO_MODE.FROM_AUDIO) {
+    const srts = fs
+      .readdirSync(actualOutputDir)
+      .filter(f => /\.srt$/i.test(f))
+      .sort((a, b) => a.localeCompare(b));
+    if (srts.length === 0) {
+      console.warn(`[prepareVideoInfo] FROM_AUDIO: không tìm thấy file .srt trong ${actualOutputDir}, bỏ qua internalUpdateTranscript.`);
+    } else {
+      const srtPath = path.join(actualOutputDir, srts[0]);
+      const rawSrtFromFile = fs.readFileSync(srtPath, 'utf-8');
+      const updatedTranscript = await internalUpdateTranscript(rawSrtFromFile, {
+        language: 'ja',
+      });
+      fs.writeFileSync(srtPath, updatedTranscript.trim() + '\n', 'utf-8');
+
+      const cleanedBackupPath = `${srtPath}.cleaned`;
+      if (fs.existsSync(cleanedBackupPath)) {
+        fs.unlinkSync(cleanedBackupPath);
+      }
+      for (const f of fs.readdirSync(actualOutputDir)) {
+        if (/\.vtt$/i.test(f)) {
+          const vttPath = path.join(actualOutputDir, f);
+          fs.unlinkSync(vttPath);
+        }
+      }
+    }
+  }
+
+  const transcriptLang = downloadResults[0]?.value?.transcriptLang ?? 'ja';
+
+  const llmResult = await createVideoInfoWithLLM({
+    outputDir: actualOutputDir,
+    visualStyle,
+    generateGeneralImage,
+    generateSceneImages,
+  });
+  // console.log('🚀 ~ prepareVideoInfo ~ llmResult:', llmResult);
+  // fs.writeFileSync(path.join(actualOutputDir, VIDEO_META_FILE), JSON.stringify(llmResult, null, 2), 'utf-8');
+  // return;
+
+  const finalSummary = 'finalSummary' in llmResult ? llmResult.finalSummary : null;
+  const visualBible = 'visualBible' in llmResult ? llmResult.visualBible : null;
+  const generalPrompt = 'generalPrompt' in llmResult ? llmResult.generalPrompt : undefined;
+  const title = finalSummary?.metadata?.title || '';
+  const summary = finalSummary?.final_summary?.overview || '';
+
+  // save video info to video-meta.json
+  const videoMetaData = {
+    title: videoMeta.title,
+    description: videoMeta.description,
+    tags: videoMeta.tags,
+    seoTitle: title,
+    seoDescription: finalSummary?.metadata?.description || '',
+    seoTags: finalSummary?.metadata?.tags || '',
+    summary,
+    visualBible,
+    generalPrompt,
+  };
+  fs.writeFileSync(path.join(actualOutputDir, VIDEO_META_FILE), JSON.stringify(videoMetaData, null, 2), 'utf-8');
+
+  const flowImages = await runFlowImagesAfterVideoInfo({
+    actualOutputDir,
+    generalPrompt: generateGeneralImage && generalPrompt ? generalPrompt : '',
+    // generateSceneImages,
+    // normalizedScenes,
+  });
+
+  if (title && summary) {
+    try {
+      await generateFlowThumbnailFromGemini({
+        title,
+        summary,
+        outputDir: actualOutputDir,
+        language: transcriptLang,
+        thumbnailPromptKey: thumbnailOptions.prompt ?? '',
+        logTag: 'prepare-video-info',
+      });
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      console.warn(`[prepareVideoInfo] Thumbnail Flow (title/summary): ${msg}`);
+    }
+  }
+
+  return {
+    url,
+    videoMeta,
+    downloadResults,
+    finalSummary,
+    visualBible,
+    generalPrompt,
+    flowImages,
+    // thumbnailFlowOk,
+  };
 };
+
+export default prepareVideoInfo;

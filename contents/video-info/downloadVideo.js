@@ -125,7 +125,7 @@ async function downloadVideo(url, options = {}) {
         FORMAT_H264_MP4
       : null;
 
-  const actualFormat = format !== 'best' ? format : FORMAT_H264_MP4_CAPPED ?? FORMAT_H264_MP4;
+  const actualFormat = format !== 'best' ? format : (FORMAT_H264_MP4_CAPPED ?? FORMAT_H264_MP4);
 
   if (maxHeight > 0) {
     console.log(`[DL] maxHeight=${maxHeight} → ưu tiên tải ≤${maxHeight}p để giảm I/O`);
@@ -203,7 +203,7 @@ async function downloadVideoVisual(url, options = {}) {
         FORMAT_VIDEO_ONLY_H264_MP4
       : null;
 
-  const actualFormat = format !== 'best' ? format : FORMAT_VIDEO_ONLY_H264_MP4_CAPPED ?? FORMAT_VIDEO_ONLY_H264_MP4;
+  const actualFormat = format !== 'best' ? format : (FORMAT_VIDEO_ONLY_H264_MP4_CAPPED ?? FORMAT_VIDEO_ONLY_H264_MP4);
 
   if (maxHeight > 0) {
     console.log(`[DL] (visual-only) maxHeight=${maxHeight} → ưu tiên tải ≤${maxHeight}p`);
@@ -293,7 +293,7 @@ async function emitGeminiMetaCallback({ url, geminiOut, callback }) {
         description: geminiOut.description ?? '',
         tags: geminiOut.tags ?? '',
         summary: geminiOut.summary ?? '',
-      })
+      }),
     );
     console.log('✅ Đã gửi title/description/tags/summary (Gemini) qua callback.');
   } catch (cbErr) {
@@ -335,7 +335,7 @@ async function maybeGenerateFlowThumbnailFromGeminiOut({
 async function processVttTranscriptsWithGemini(
   url,
   outputDir,
-  { updateTranscript = true, videoTitle, description, tags, callback, language }
+  { updateTranscript = true, videoTitle, description, tags, callback, language },
 ) {
   const { updateVideoInfo } = await import('./updateContent.js');
   const srtFiles = listSubtitleSrtFiles(outputDir);
@@ -727,6 +727,7 @@ async function main() {
 export default downloadVideo;
 
 export {
+  clearOutputDirResilient,
   downloadAudio,
   downloadSingleVideo,
   downloadThumbnail,

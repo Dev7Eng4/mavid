@@ -65,8 +65,8 @@ export async function testMakeVideoFromDownloads(options = {}) {
   const runLogoPath = explicitLogo
     ? options.logoPath
     : wantLogo
-    ? resolveLogoFromChannelFolder(options, options.logoSearchDir || path.dirname(downloadsDir))
-    : null;
+      ? resolveLogoFromChannelFolder(options, options.logoSearchDir || path.dirname(downloadsDir))
+      : null;
   if (wantLogo && runLogoPath) {
     console.log(`[logo] ${runLogoPath}`);
   } else if (wantLogo && !runLogoPath) {
@@ -209,28 +209,39 @@ async function main(options = {}) {
     const { url } = items[itemIndex];
     const isolatedDownloadsDir = path.join(ROOT, 'downloads', `job_${Date.now()}_${itemIndex}`);
 
-    return downloadSingleVideo(url, {
-      mode: VIDEO_MAKE_MODE.FROM_AUDIO,
-      thumbnailChannelRoot: destFolder,
-      thumbnailPrompt: options.thumbnailPrompt,
-      outputDir: isolatedDownloadsDir,
-      overlay: options.overlay,
-      callback: ({ title: gemTitle, description: gemDesc, tags: gemTags, summary: gemSummary }) => {
-        const tagsStr = typeof gemTags === 'string' ? gemTags : Array.isArray(gemTags) ? gemTags.join(', ') : '';
-        geminiByUrl[url] = {
-          title: gemTitle || '',
-          description: gemDesc || '',
-          tags: tagsStr,
-          summary: gemSummary || '',
-        };
-        console.log('Đã nhận title/description/tags/summary từ Gemini (sẽ ghi video-meta.json sau khi render).');
+    const { default: prepareVideoInfo } = await import('../video-info/prepareVideoInfo.js');
+
+    return prepareVideoInfo({
+      url,
+      options: {
+        mode: VIDEO_MAKE_MODE.FROM_AUDIO,
+        thumbnailPrompt: options.thumbnailPrompt,
+        outputDir: isolatedDownloadsDir,
       },
-    })
-      .then(result => ({ result, isolatedDownloadsDir }))
-      .catch(err => {
-        console.error(`Lỗi tải video ${url}:`, err.message);
-        return { result: null, isolatedDownloadsDir };
-      });
+    });
+
+    // return downloadSingleVideo(url, {
+    //   mode: VIDEO_MAKE_MODE.FROM_AUDIO,
+    //   thumbnailChannelRoot: destFolder,
+    //   thumbnailPrompt: options.thumbnailPrompt,
+    //   outputDir: isolatedDownloadsDir,
+    //   overlay: options.overlay,
+    //   callback: ({ title: gemTitle, description: gemDesc, tags: gemTags, summary: gemSummary }) => {
+    //     const tagsStr = typeof gemTags === 'string' ? gemTags : Array.isArray(gemTags) ? gemTags.join(', ') : '';
+    //     geminiByUrl[url] = {
+    //       title: gemTitle || '',
+    //       description: gemDesc || '',
+    //       tags: tagsStr,
+    //       summary: gemSummary || '',
+    //     };
+    //     console.log('Đã nhận title/description/tags/summary từ Gemini (sẽ ghi video-meta.json sau khi render).');
+    //   },
+    // })
+    //   .then(result => ({ result, isolatedDownloadsDir }))
+    //   .catch(err => {
+    //     console.error(`Lỗi tải video ${url}:`, err.message);
+    //     return { result: null, isolatedDownloadsDir };
+    //   });
   }
 
   if (items.length > 0) {
@@ -246,7 +257,7 @@ async function main(options = {}) {
 
     if (i + 1 < items.length) {
       console.log(
-        `\n>>> [Pipeline] Bắt đầu tải trước video [${i + 2}/${items.length}] trong lúc đang render video [${i + 1}/${items.length}]...`
+        `\n>>> [Pipeline] Bắt đầu tải trước video [${i + 2}/${items.length}] trong lúc đang render video [${i + 1}/${items.length}]...`,
       );
       nextDownloadPromise = startDownload(i + 1);
     } else {

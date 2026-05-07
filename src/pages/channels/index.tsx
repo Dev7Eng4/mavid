@@ -1,28 +1,23 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import type { ChannelData, ChannelFolderDataResult, ChannelRow, Group } from '@/types';
+import type { ChannelRow, Group } from '@/types';
 import { scriptDefs } from '@/types';
 import { useResolvedVideoLimits } from '@/hooks/useResolvedVideoLimits';
 import { useClientPagination } from '@/hooks/useClientPagination';
-import { CustomSelect } from '@/components/ui/CustomSelect';
 import { PageHeader } from '@/components/ui/PageHeader';
 import { ChannelAddDialog } from './components/ChannelAddDialog';
 import { ChannelCreateVideoDialog } from './components/ChannelCreateVideoDialog';
 import { ChannelUploadVideoDialog } from './components/ChannelUploadVideoDialog';
 import { fetchAllGpmProfileRows, resolveGpmProfileIdByEmail } from './utils/gpmProfileHelpers';
 import { ChannelsDetailSection } from './components/ChannelsDetailSection';
-import { DETAIL_TABLE_LOADING_HEADERS } from './models/channelsDetailSectionShared';
 import { ChannelsIndexSection } from './components/ChannelsIndexSection';
-import { CHANNELS_INDEX_VISIBLE_COLUMNS } from './models/channelsIndexSection.model';
+import { CHANNELS } from './models/channelsIndexSection.model';
 import { ChannelsPageHeaderActions } from './components/ChannelsPageHeaderActions';
 import { durationPresetToSecRange, parseDurationToSeconds } from './utils/channelDurationFormat';
 import { gpmApi } from '@/services';
 import {
   buildExtraEnvForIndexChannelRow,
   CHANNEL_ADD_DURATION_SELECT_OPTIONS,
-  channelFolderFromRow,
   extractYoutubeVideoIdFromUrl,
-  headerNorm,
-  resolveIndexRowVideoType,
   SCRIPT_FROM_AUDIO,
   SCRIPT_REUP_FULL,
 } from './utils/channelIndexHelpers';
@@ -30,14 +25,11 @@ import {
   convertChannelVideosRowToData,
   convertIndexRowToChannel,
   MAX_CONCURRENT_YOUTUBE_UPLOAD_CHANNELS,
-  type ChannelItem,
   type ChannelUploadVideoPayload,
 } from './channelUploadVideoHelpers';
 import { getChannelsIndexCache, prefetchChannelsIndex } from './channelsPrefetch';
 
 const INDEX_FILE = 'channels/index.xlsx';
-
-const indexListFilterInputClass = 'w-full rounded-xl px-3 py-2.5 text-sm outline-none border transition-colors duration-150';
 
 /** Khớp cột STATUS trong file chi tiết kênh (khi đã tạo file video). */
 const DETAIL_STATUS_VIDEO_CREATED = 'Đã tạo video';
@@ -53,22 +45,12 @@ function normalizeYoutubeUploadEmailKey(email: string): string {
   return email.trim().toLowerCase();
 }
 
-type IndexCreateVideoQueueEntry = {
-  row: ChannelRow;
-  folder: string;
-  email: string;
-  videoType: 'from_audio' | 'reup_full';
-  /** Chỉ số dòng trong `indexDraftRows` — khớp checkbox bảng index. */
-  draftRowIndex: number;
-};
-
 function ChannelsPage() {
   const cachedIndex = getChannelsIndexCache();
   const [channels, setChannels] = useState<ChannelRow[]>(() => cachedIndex?.channels ?? []);
   const [loading, setLoading] = useState(() => !cachedIndex);
   const [selectedChannel, setSelectedChannel] = useState<string | null>(null);
   const [selectedRows, setSelectedRows] = useState<Set<string>>(new Set<string>());
-  const [detail, setDetail] = useState<ChannelFolderDataResult | null>(null);
   const [channelVideos, setChannelVideos] = useState<ChannelRow[]>([]);
   const [detailLoading, setDetailLoading] = useState(false);
   const [detailLinkFilter, setDetailLinkFilter] = useState('');
@@ -85,7 +67,6 @@ function ChannelsPage() {
     channelLabel: string;
   } | null>(null);
 
-  const [indexEditRowIndex, setIndexEditRowIndex] = useState<string | null>(null);
   const [uploadVideoOpen, setUploadVideoOpen] = useState(false);
   /** Số luồng upload YouTube (runScript) đang chạy — hiển thị trên header / dialog. */
   const [youtubeUploadActiveThreads, setYoutubeUploadActiveThreads] = useState(0);
@@ -93,13 +74,11 @@ function ChannelsPage() {
   const uploadingYoutubeEmailsRef = useRef(new Set<string>());
   const [createVideoOpen, setCreateVideoOpen] = useState(false);
   const [uploadScheduleInfo, setUploadScheduleInfo] = useState<string | null>(null);
-  const [addChannelOpen, setAddChannelOpen] = useState(false);
-  const [_addChannelInfo, setAddChannelInfo] = useState<string | null>(null);
   const [googleDriveSyncInfo, setGoogleDriveSyncInfo] = useState<string | null>(null);
   const [groups, setGroups] = useState<Group[]>(() => cachedIndex?.groups ?? []);
-  /** Lọc danh sách kênh (bảng index): email + nhóm. */
-  const [indexListEmailFilter, setIndexListEmailFilter] = useState('');
+  const [indexMappingSearch, setIndexMappingSearch] = useState('');
   const [indexListGroupFilter, setIndexListGroupFilter] = useState('__all__');
+  const [indexChannelsFilterExpanded, setIndexChannelsFilterExpanded] = useState(false);
   const [mappingStatus, setMappingStatus] = useState<{ type: 'edit' | 'add'; data: ChannelRow | null } | null>(null);
 
   const canRunNpmScript = typeof window.runner?.runNpmScript === 'function';
@@ -111,14 +90,6 @@ function ChannelsPage() {
 
     return channels.find(r => r.id === selectedChannel);
   }, [selectedChannel, channels]);
-
-  const {
-    page: indexPage,
-    setPage: setIndexPage,
-    startIndex: indexStartIndex,
-    totalPages: indexTotalPages,
-    pageSize: indexPageSize,
-  } = useClientPagination(channels.length);
 
   const groupNameById = useMemo(() => {
     const m: Record<string, string> = {};
@@ -146,6 +117,34 @@ function ChannelsPage() {
     }
     return base;
   }, [groups]);
+
+  const indexFilteredChannels = useMemo(() => {
+    const q = indexMappingSearch.trim().toLowerCase();
+    const groupF = indexListGroupFilter;
+    return channels.filter(row => {
+      if (q) {
+        const email = String(row.email ?? '').toLowerCase();
+        const url = String(row.channelLink ?? row.link ?? '').toLowerCase();
+        const cid = String(row.channelId ?? '').toLowerCase();
+        if (!email.includes(q) && !url.includes(q) && !cid.includes(q)) return false;
+      }
+      const gid = String(row.mavidGroupId ?? row.group ?? '').trim();
+      if (groupF !== '__all__') {
+        if (groupF === '__empty__') {
+          if (gid) return false;
+        } else if (gid !== groupF) return false;
+      }
+      return true;
+    });
+  }, [channels, indexMappingSearch, indexListGroupFilter]);
+
+  const {
+    page: indexPage,
+    setPage: setIndexPage,
+    startIndex: indexStartIndex,
+    totalPages: indexTotalPages,
+    pageSize: indexPageSize,
+  } = useClientPagination(indexFilteredChannels.length);
 
   const fetchChannels = useCallback(async (opts?: { background?: boolean }) => {
     if (!opts?.background) setLoading(true);
@@ -208,7 +207,6 @@ function ChannelsPage() {
 
   const loadDetail = useCallback(
     async (id: string) => {
-      console.log('🚀 ~ ChannelsPage ~ id:', id);
       setDetailLoading(true);
       setChannelVideos([]);
       try {
@@ -246,8 +244,8 @@ function ChannelsPage() {
     setDetailSelectedRowIndices(new Set());
   }, [selectedChannel]);
 
-  /** Checkbox + các cột cố định (`CHANNELS_INDEX_VISIBLE_COLUMNS`) trên bảng index. */
-  const indexColCount = 1 + CHANNELS_INDEX_VISIBLE_COLUMNS.length;
+  /** Checkbox + cột dữ liệu (`CHANNELS` có show) + ACTIONS */
+  const indexColCount = 1 + CHANNELS.filter(c => c.show).length + 1;
 
   const [detailSelectedRowIndices, setDetailSelectedRowIndices] = useState<Set<string>>(() => new Set());
 
@@ -329,34 +327,13 @@ function ChannelsPage() {
     });
   }, [channelVideos, detailLinkFilter, detailDurationPreset, detailStatusFilter]);
 
-  const indexFilteredIndices = useMemo(() => {
-    const emailQ = indexListEmailFilter.trim().toLowerCase();
-    const groupF = indexListGroupFilter;
-    const out: number[] = [];
-    for (let i = 0; i < channels.length; i++) {
-      const row = channels[i];
-      if (emailQ) {
-        const e = String(row.email ?? '').toLowerCase();
-        if (!e.includes(emailQ)) continue;
-      }
-      if (groupF !== '__all__') {
-        const gid = String(row.mavidGroupId ?? '').trim();
-        if (groupF === '__empty__') {
-          if (gid) continue;
-        } else if (gid !== groupF) continue;
-      }
-      out.push(i);
-    }
-    return out;
-  }, [channels, indexListEmailFilter, indexListGroupFilter]);
-
   useEffect(() => {
     setIndexPage(1);
-  }, [indexListEmailFilter, indexListGroupFilter, setIndexPage]);
+  }, [indexMappingSearch, indexListGroupFilter, setIndexPage]);
 
   const pageIndexRows = useMemo(
-    () => channels.slice(indexStartIndex, indexStartIndex + indexPageSize),
-    [channels, indexStartIndex, indexPageSize]
+    () => indexFilteredChannels.slice(indexStartIndex, indexStartIndex + indexPageSize),
+    [indexFilteredChannels, indexStartIndex, indexPageSize]
   );
 
   const indexPageSelectionFlags = useMemo(() => {
@@ -784,11 +761,42 @@ function ChannelsPage() {
     [channels]
   );
 
+  const handleExportChannelsCsv = useCallback(() => {
+    const rows = indexFilteredChannels;
+    const headerKeys = [
+      ['CHANNEL ID', 'channelId'],
+      ['CHANNEL LINK', 'channelLink'],
+      ['EMAIL', 'email'],
+      ['GROUP', 'group'],
+      ['LAST UPLOAD', 'lastUpload'],
+      ['STATUS', 'status'],
+      ['VIDEO TYPE', 'videoType'],
+      ['MY CHANNEL', 'myChannel'],
+    ] as const;
+    const escape = (v: unknown) => {
+      const s = String(v ?? '').replace(/"/g, '""');
+      return /[",\n\r]/.test(s) ? `"${s}"` : s;
+    };
+    const lines = [
+      headerKeys.map(([h]) => h).join(','),
+      ...rows.map(row => headerKeys.map(([, k]) => escape(row[k])).join(',')),
+    ];
+    const BOM = '\uFEFF';
+    const blob = new Blob([BOM + lines.join('\n')], { type: 'text/csv;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `channels-export-${new Date().toISOString().slice(0, 10)}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }, [indexFilteredChannels]);
+
   return (
     <div className='space-y-6 w-full min-w-0'>
       <PageHeader
         align='start'
-        title='Channels'
+        title='Ánh xạ kênh'
+        description='Quản lý và liên kết kênh video với pipeline xử lý nội bộ.'
         actions={
           <ChannelsPageHeaderActions
             selectedChannel={selectedChannel}
@@ -889,52 +897,11 @@ function ChannelsPage() {
 
       {!selectedChannelRow ? (
         <>
-          {/* <div
-            className='rounded-2xl p-4 w-full min-w-0 space-y-3'
-            style={{ background: 'var(--card-bg)', border: '1px solid var(--border)' }}
-          >
-            <div className='text-sm font-medium uppercase tracking-wider' style={{ color: 'var(--text-muted)' }}>
-              Tìm & lọc
-            </div>
-            <div className='grid grid-cols-1 md:grid-cols-2 gap-4 items-end'>
-              <label className='block min-w-0'>
-                <span className='block text-sm mb-2' style={{ color: 'var(--text-h)' }}>
-                  Email
-                </span>
-                <input
-                  type='search'
-                  value={indexListEmailFilter}
-                  onChange={e => setIndexListEmailFilter(e.target.value)}
-                  placeholder='Tìm trong email kênh…'
-                  autoComplete='off'
-                  className={indexListFilterInputClass}
-                  style={{
-                    background: 'var(--code-bg)',
-                    color: 'var(--text-h)',
-                    borderColor: 'var(--border)',
-                  }}
-                />
-              </label>
-              <div className='min-w-0'>
-                <div className='text-sm mb-2' style={{ color: 'var(--text-h)' }}>
-                  Nhóm
-                </div>
-                <CustomSelect
-                  value={indexListGroupFilter}
-                  options={indexGroupFilterOptions}
-                  onChange={setIndexListGroupFilter}
-                  placeholder='Nhóm'
-                  menuZIndex={100}
-                />
-              </div>
-            </div>
-          </div> */}
-
           <ChannelsIndexSection
             channels={channels}
             loading={loading}
             pageIndexRows={pageIndexRows}
-            indexFilteredCount={indexFilteredIndices.length}
+            indexFilteredCount={indexFilteredChannels.length}
             groupNameById={groupNameById}
             indexPag={{
               page: indexPage,
@@ -956,6 +923,14 @@ function ChannelsPage() {
             }}
             pageSelectAll={indexPageSelectionFlags.all}
             pageSelectSome={indexPageSelectionFlags.some}
+            toolbarSearch={indexMappingSearch}
+            onToolbarSearchChange={setIndexMappingSearch}
+            filterExpanded={indexChannelsFilterExpanded}
+            onToggleFilterExpanded={() => setIndexChannelsFilterExpanded(v => !v)}
+            groupFilter={indexListGroupFilter}
+            groupFilterOptions={indexGroupFilterOptions}
+            onGroupFilterChange={setIndexListGroupFilter}
+            onExportCsv={handleExportChannelsCsv}
           />
         </>
       ) : (
@@ -994,7 +969,7 @@ function ChannelsPage() {
           eligibleQueueLength={createVideoQueueFromSelection.length}
           targetChannelFolder={createVideoQueueFromSelection.length === 1 ? createVideoQueueFromSelection[0].folder : undefined}
           onClose={() => setCreateVideoOpen(false)}
-          onConfirm={async ({ maxVideosPerBatch, selectedEmail }) => {
+          onConfirm={async ({ maxVideosPerBatch }) => {
             if (typeof window.runner?.minimizeApp === 'function') {
               window.runner.minimizeApp();
             }

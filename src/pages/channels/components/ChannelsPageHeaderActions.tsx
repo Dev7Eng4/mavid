@@ -58,8 +58,8 @@ export function ChannelsPageHeaderActions({
   indexSelectedRowCount,
   indexCreateVideoEligibleSelectedCount,
   canRunIndexBatchVideo,
-  indexSingleSelectedRowIndex,
-  indexSingleSelectedFolder,
+  indexSingleSelectedRowIndex: _indexSingleSelectedRowIndex,
+  indexSingleSelectedFolder: _indexSingleSelectedFolder,
   uploadEligibleSelectedCount,
   youtubeUploadActiveThreads,
   refreshBusy,
@@ -72,10 +72,7 @@ export function ChannelsPageHeaderActions({
   detailUpdateMeta,
   detailBulkVideo,
 }: ChannelsPageHeaderActionsProps) {
-  console.log('🚀 ~ ChannelsPageHeaderActions ~ detailBulkVideo:', detailBulkVideo);
   const indexActionsLocked = loading || indexBatchVideo !== null;
-  const canEditSingleSelected = !indexActionsLocked && indexSingleSelectedRowIndex !== null;
-  const canOpenDetailSelected = canEditSingleSelected && Boolean(indexSingleSelectedFolder?.trim());
 
   return (
     <>
@@ -115,12 +112,12 @@ export function ChannelsPageHeaderActions({
           )}
           <AppButton
             type='button'
-            variant='secondary'
+            variant='primary'
             onClick={onOpenAddChannel}
             disabled={loading}
             title='Tạo thư mục kênh và tạo/cập nhật MaVidMedia/channels/index.xlsx (không cần có sẵn index)'
           >
-            Thêm channel
+            + Ánh xạ mới
           </AppButton>
           <AppButton
             type='button'

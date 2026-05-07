@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import type { MavidGroupRow } from '@/types';
+import type { Group as MavidGroupRow } from '@/types';
 import { AppButton } from '@/components/ui/AppButton';
 import { PageHeader } from '@/components/ui/PageHeader';
 import { SpinnerIcon } from '@/components/ui/Icons';

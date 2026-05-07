@@ -2,8 +2,6 @@ import type { ChannelRow, ScriptId } from '@/types';
 import { PROMPTS_CREATE_THUMBNAIL_OPTIONS } from '@contents/prompts/index.js';
 import { OPTIONS_CONTENT } from '@contents/makeFromAudio/constant.js';
 import { OVERLAY_OPTIONS } from '@contents/constants/overlayOptions.js';
-import { buildMavidEnvForVideoFromAudio, defaultBackgroundFolder } from '@/utils/videoFromAudioEnv';
-import { buildMavidEnvForReupFull } from '@/utils/reupFullEnv';
 
 /** Khớp dropdown trong getInfoChannel / electron write-channel-index */
 export const INDEX_VIDEO_TYPE_VALUES = ['from_audio', 'reup_full'] as const;
@@ -389,6 +387,7 @@ export function channelAddDialogInitialFromIndexRow(row: ChannelRow): ChannelAdd
     videosPerDayPreset,
     status: normalizeChannelIndexStatus(row.status),
     ...rest,
+    durationMinutes: convertedDurationMinutes,
   };
 }
 

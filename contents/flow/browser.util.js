@@ -125,7 +125,7 @@ export async function attachImage(page) {
   }
 }
 
-export async function generateImage(page, prompt) {
+export async function inputPromptCreateImage(page, prompt) {
   await clickElement(page, FLOW_SELECTOR.textbox);
   await delay(1000);
   await page.keyboard.insertText(prompt);
@@ -133,12 +133,11 @@ export async function generateImage(page, prompt) {
   await page.keyboard.press('Enter');
 }
 
-async function getResponseGenerateImage({ page, projectId, folder, exportName }) {
+async function getResponseImage({ page, projectId, folder, exportName }) {
   const [response] = await Promise.all([
     page.waitForResponse(
       async res => {
         const isMatch = res.url().includes(`https://aisandbox-pa.googleapis.com/v1/projects/${projectId}/flowMedia:batchGenerateImages`);
-
         if (isMatch) {
           if (res.status() === 403) {
             await superClear(page, context);
@@ -157,34 +156,7 @@ async function getResponseGenerateImage({ page, projectId, folder, exportName })
       { timeout: 3 * 60 * 1000 },
     ),
   ]);
-
-  return response;
-}
-
-async function getResponseThumbnail({ page, projectId, folder, exportName }) {
-  const [response] = await Promise.all([
-    page.waitForResponse(
-      async res => {
-        const isMatch = res.url().includes(`https://aisandbox-pa.googleapis.com/v1/projects/${projectId}/flowMedia:batchGenerateImages`);
-
-        if (isMatch) {
-          if (res.status() === 403) {
-            await superClear(page, context);
-            throw new Error('Lỗi 403: Bạn không có quyền truy cập hoặc bị chặn!');
-          }
-          if (res.status() === 400) {
-            throw new Error(`Lỗi vi phạm chính sách tạo ảnh`);
-          }
-          if (res.status() > 400) {
-            throw new Error(`Server trả lỗi: ${res.status()}`);
-          }
-          return true;
-        }
-        return false;
-      },
-      { timeout: 3 * 60 * 1000 },
-    ),
-  ]);
+  console.log('🚀 ~ getResponseThumbnail ~ response:', response);
 
   const data = await response.json();
   const imageUrl = data?.media[0]?.image?.generatedImage?.fifeUrl;
@@ -200,6 +172,7 @@ async function getResponseThumbnail({ page, projectId, folder, exportName }) {
 
 /**
  * @param {string} prompt
+ * @param {string} browser
  * @param {string} pathSave — thư mục lưu `{exportName}.jpg`
  * @param {string} exportName — không đuôi
  * @param {object} [setting] — merge lên flowSettings
@@ -207,6 +180,7 @@ async function getResponseThumbnail({ page, projectId, folder, exportName }) {
  */
 export async function generateImageWithFlow(prompt, pathSave, exportName, setting = {}, isNeedImage = false, pathOldImage) {
   const cfg = { ...flowSettings, ...setting };
+
   const chromeProfile = resolveFlowChromeProfile(cfg);
   console.log('🔄 Đang generate ảnh thumbnail từ Flow...');
 
@@ -214,11 +188,13 @@ export async function generateImageWithFlow(prompt, pathSave, exportName, settin
   const { context, page } = await openFlowPage({ profile: chromeProfile, projectId: cfg.FLOW_PROJECT_ID });
 
   try {
-    await attachImage(page);
-    await generateImage(page, prompt);
-    await getResponseThumbnail({ page, projectId: cfg.FLOW_PROJECT_ID, folder: pathSave, exportName });
+    if (isNeedImage) {
+      await attachImage(page);
+    }
+    await inputPromptCreateImage(page, prompt);
+    await getResponseImage({ page, projectId: cfg.FLOW_PROJECT_ID, folder: pathSave, exportName });
   } catch (error) {
-    console.error('❌ Lỗi: Tạo thumbnail flow:', error);
+    console.error('❌ Lỗi: Tạo ảnh flow:', error);
     throw error;
   } finally {
     if (context) {

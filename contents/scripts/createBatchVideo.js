@@ -616,10 +616,6 @@ async function main(props = {}) {
   const { MAKE_VIDEO_MODE } = await import('../constants/index.js');
   console.time('createBatchVideo');
 
-  testEncoder('h264_nvenc');
-  testEncoder('h264_amf');
-  testEncoder('h264_qsv');
-
   const channelParam = props.channel || process.env.MAVID_CHANNEL;
   const mappingParam = props.mapping || process.env.MAVID_MAPPING;
   const email = props.email || process.env.MAVID_EMAIL;

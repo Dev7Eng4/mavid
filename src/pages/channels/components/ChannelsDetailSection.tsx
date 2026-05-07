@@ -150,7 +150,7 @@ export function ChannelsDetailSection({
                   </td>
                 </tr>
               ) : detailRowsLength ? (
-                pageDetailRows.map((row, originalIndex) => (
+                pageDetailRows.map(row => (
                   <tr
                     key={row.link}
                     className='transition-colors duration-150 cursor-pointer'
