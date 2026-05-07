@@ -975,7 +975,7 @@ export async function testMakeVideoFromDownloads(options = {}) {
   downloadsDir = path.resolve(downloadsDir);
 
   const stockFolder = resolveDefaultStockFolder(options);
-  const wantLogo = shouldShowLogo(options);
+  const wantLogo = false;
   const explicitLogo = options.logoPath != null && String(options.logoPath).trim() && fs.existsSync(options.logoPath);
   const runLogoPath = explicitLogo
     ? options.logoPath

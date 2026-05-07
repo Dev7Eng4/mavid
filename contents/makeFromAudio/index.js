@@ -5,7 +5,7 @@ import { VIDEO_MAKE_MODE, VIDEO_MAKE_OPTION } from '../constant/index.js';
 import { resolveChannelsDir } from '../utils/channelsStoragePath.js';
 import { unlinkProgressSidecarForSpreadsheet } from '../syncProgressToSpreadsheet.js';
 
-import { OUTPUT_DIR, ROOT, shouldShowLogo, resolveLogoFromChannelFolder, resolveDefaultStockFolder } from './shared.js';
+import { OUTPUT_DIR, ROOT, resolveLogoFromChannelFolder, resolveDefaultStockFolder } from './shared.js';
 
 import { OPTIONS_CONTENT } from './constant.js';
 import { makeVideoWithImageNoise } from './optionVideo/makeVideoWithImageNoise.js';
