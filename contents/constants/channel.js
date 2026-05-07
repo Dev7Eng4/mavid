@@ -89,3 +89,5 @@ export const CHANNEL_DETAIL = [
   //   index: 5,
   // },
 ];
+
+export const MAX_VIDEOS_PER_BATCH = 15;

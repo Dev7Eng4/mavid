@@ -5,13 +5,7 @@ import { VIDEO_MAKE_MODE, VIDEO_MAKE_OPTION } from '../constant/index.js';
 import { resolveChannelsDir } from '../utils/channelsStoragePath.js';
 import { unlinkProgressSidecarForSpreadsheet } from '../syncProgressToSpreadsheet.js';
 
-import {
-  OUTPUT_DIR,
-  ROOT,
-  shouldShowLogo,
-  resolveLogoFromChannelFolder,
-  resolveDefaultStockFolder,
-} from './shared.js';
+import { OUTPUT_DIR, ROOT, shouldShowLogo, resolveLogoFromChannelFolder, resolveDefaultStockFolder } from './shared.js';
 
 import { OPTIONS_CONTENT } from './constant.js';
 import { makeVideoWithImageNoise } from './optionVideo/makeVideoWithImageNoise.js';
@@ -40,8 +34,8 @@ async function main(options = {}) {
   const syncProgressToSpreadsheet = options.syncProgressToSpreadsheet !== false;
   const inputFile = options.inputFile || null;
   const items = options.items || [];
+
   if (items.length === 0) {
-    console.log('Không có items để xử lý batch.');
     return { success: false, processedCount: 0, processedFolderNames: [] };
   }
 
@@ -86,7 +80,7 @@ async function main(options = {}) {
     }
   }
 
-  const wantLogo = shouldShowLogo(options);
+  const wantLogo = options.showLogo;
   const runLogoPath = wantLogo ? resolveLogoFromChannelFolder(options, destFolder) : null;
   if (wantLogo && runLogoPath) {
     console.log(`[logo] ${runLogoPath}`);
@@ -230,8 +224,6 @@ async function main(options = {}) {
 
   return {
     success: processedFolderNames.length > 0,
-    processedCount: processedFolderNames.length,
-    processedFolderNames,
   };
 }
 

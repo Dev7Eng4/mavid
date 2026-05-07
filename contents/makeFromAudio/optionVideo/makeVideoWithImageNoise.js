@@ -60,10 +60,6 @@ export async function makeVideoWithImageNoise(options = {}, bgImgPath) {
   const speed = speedIn != null && Number.isFinite(Number(speedIn)) && Number(speedIn) > 0 ? Number(speedIn) : resolveAudioSpeed({});
   const audioPath = getAudioFile(downloadsDir);
 
-  if (!fs.existsSync(OUTPUT_DIR)) {
-    fs.mkdirSync(OUTPUT_DIR, { recursive: true });
-  }
-
   const originalAudioDuration = await getAudioDurationSeconds(audioPath);
   const audioDurationAfterTempo = originalAudioDuration / speed;
   console.log(
@@ -321,18 +317,18 @@ export async function makeVideoWithImageNoise(options = {}, bgImgPath) {
       gem = geminiByUrl && url ? geminiByUrl[url] : {};
     }
 
-    const ytTagsStr = Array.isArray(tags) ? tags.join(', ') : tags || '';
-    const metaPayload = {
-      title: originalTitle || '',
-      description: description || '',
-      tags: ytTagsStr,
-      titleGemini: gem?.title || '',
-      descriptionGemini: gem?.description || '',
-      tagsGemini: gem?.tags || '',
-      summaryGemini: gem?.summary || '',
-    };
-    const metaPath = path.join(perVideoDir, 'video-meta.json');
-    fs.writeFileSync(metaPath, JSON.stringify(metaPayload, null, 2), 'utf8');
+    // const ytTagsStr = Array.isArray(tags) ? tags.join(', ') : tags || '';
+    // const metaPayload = {
+    //   title: originalTitle || '',
+    //   description: description || '',
+    //   tags: ytTagsStr,
+    //   titleGemini: gem?.title || '',
+    //   descriptionGemini: gem?.description || '',
+    //   tagsGemini: gem?.tags || '',
+    //   summaryGemini: gem?.summary || '',
+    // };
+    // const metaPath = path.join(perVideoDir, 'video-meta.json');
+    // fs.writeFileSync(metaPath, JSON.stringify(metaPayload, null, 2), 'utf8');
   }
 
   if (fs.existsSync(bgImgPath)) {

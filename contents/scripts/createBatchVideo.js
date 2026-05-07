@@ -3,8 +3,8 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import { resolveChannelsDir } from '../utils/channelsStoragePath.js';
 import { CHANNEL_CONFIG_FILENAME, readChannelConfigFromFolderSync } from '../channel/index.js';
-import { testEncoder } from '../utils/hardware.util.js';
 import { VIDEO_MAKE_MODE } from '../constant/index.js';
+import { MAX_VIDEOS_PER_BATCH } from '../constants/channel.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.join(__dirname, '..', '..');
@@ -17,16 +17,12 @@ const MAVID_CHANNEL_CONFIG_FILENAME = CHANNEL_CONFIG_FILENAME;
  */
 export const MIN_VIDEO_DURATION_MINUTES = 8;
 
-/**
- * Phút tối thiểu (suy ra ngưỡng lọc dưới) — 0 = không lọc theo tối thiểu.
- * Không ghi đè: dùng {@link MIN_VIDEO_DURATION_MINUTES}.
- * Env: MAVID_MIN_DURATION_MINUTES (0 = tắt lọc tối thiểu)
- */
 function resolveMinDurationMinutes(props = {}) {
   const raw = props.minDurationMinutes ?? process.env.MAVID_MIN_DURATION_MINUTES;
-  if (raw === undefined || raw === null || String(raw).trim() === '') {
+  if (!raw) {
     return MIN_VIDEO_DURATION_MINUTES;
   }
+
   const n = Number(raw);
   if (!Number.isFinite(n) || n < 0) return MIN_VIDEO_DURATION_MINUTES;
   if (n === 0) return 0;
@@ -49,43 +45,13 @@ function resolveMaxDurationMinutes(props = {}) {
  * Env: MAVID_MAX_VIDEOS_PER_BATCH; props.maxVideosPerBatch ưu tiên hơn env.
  */
 function resolveMaxVideosPerBatch(props = {}) {
-  const raw = props.maxVideosPerBatch ?? process.env.MAVID_MAX_VIDEOS_PER_BATCH;
-  if (raw === undefined || raw === null) return 0;
-  const s = String(raw).trim();
-  if (s === '') return 0;
-  const n = Number(s);
+  const raw = props.maxVideosPerBatch ?? MAX_VIDEOS_PER_BATCH;
+  if (!raw) return 0;
+
+  const n = Number(raw);
   if (!Number.isFinite(n) || n < 1) return 0;
+
   return Math.min(100, Math.floor(n));
-}
-
-/**
- * Tự động tìm GPM Profile ID bằng cách khớp Name Profile = Email trong config.
- * @param {string} email
- * @returns {Promise<string | null>}
- */
-async function resolveGpmProfileIdByEmail(email) {
-  if (!email || !email.trim()) return null;
-  const normEmail = email.trim().toLowerCase();
-  const apiBase = process.env.GPM_API_BASE || 'http://localhost:9495';
-  const url = apiBase.replace(/\/+$/, '') + '/api/v3/profiles?per_page=500';
-
-  try {
-    const res = await fetch(url, { headers: { Accept: 'application/json' } });
-    if (!res.ok) return null;
-    const json = await res.json();
-    if (json.success && Array.isArray(json.data)) {
-      const hit = json.data.find(
-        p =>
-          String(p.name || '')
-            .trim()
-            .toLowerCase() === normEmail,
-      );
-      return hit?.id || null;
-    }
-  } catch (e) {
-    console.warn(`[gpm] Không thể tự động lấy danh sách profiles từ GPM Local API: ${e.message}`);
-  }
-  return null;
 }
 
 /**
@@ -101,8 +67,8 @@ function resolveDurationFilterBounds(options = {}) {
     const t = minMin;
     minMin = maxMax;
     maxMax = t;
-    console.warn('[MaVid] minDuration > maxDuration — đã đổi chỗ khi lọc cột DURATION.');
   }
+
   return {
     hasMin,
     hasMax,
@@ -289,7 +255,7 @@ function tryGetUploadedVideosForSelection(channelsDir, filePath, options) {
           c &&
           String(c.email || '')
             .trim()
-            .toLowerCase() === want,
+            .toLowerCase() === want
       ) || null;
   }
   if (!item && list.length > 0) item = list[0];
@@ -328,6 +294,7 @@ function resolveUploadedVideosFromChannelEntry(cfg, configItem) {
 function pickChannelDataFileForBatch(folderPath, cfg, configItem) {
   const files = fs.readdirSync(folderPath).filter(f => f.endsWith('.xlsx'));
   if (files.length === 0) return { absPath: null, displayName: null, usedRandom: false };
+
   const uploaded = resolveUploadedVideosFromChannelEntry(cfg, configItem);
   if (files.length === 1 || uploaded < UPLOADED_VIDEOS_SPREAD_THRESHOLD) {
     const name = files[0];
@@ -352,8 +319,8 @@ function finalizeVideoItemsOrder(items, filePath, options) {
   console.log(
     `[MaVid] uploadedVideos=${uploaded} (≥${UPLOADED_VIDEOS_SPREAD_THRESHOLD}) — sắp ${Math.min(
       batchLimit,
-      items.length,
-    )} video đầu theo đầu/giữa/cuối danh sách file.`,
+      items.length
+    )} video đầu theo đầu/giữa/cuối danh sách file.`
   );
   return reordered;
 }
@@ -394,14 +361,14 @@ export async function readVideoUrlsFromFile(inputFile = null, options = {}) {
     const trangThaiIdx = headerRow.values.findIndex(v =>
       String(v || '')
         .toLowerCase()
-        .includes('status'),
+        .includes('status')
     );
     const bgIdx = headerRow.values.findIndex(v => String(v || '').toLowerCase() === 'background video');
     const durationIdx = headerRow.values.findIndex(
       v =>
         String(v || '')
           .trim()
-          .toLowerCase() === 'duration',
+          .toLowerCase() === 'duration'
     );
 
     const items = [];
@@ -477,12 +444,6 @@ export async function readVideoUrlsFromFile(inputFile = null, options = {}) {
     }
   }
   return finalizeVideoItemsOrder(items, filePath, options);
-}
-
-function normalizeEmailForMatch(s) {
-  return String(s ?? '')
-    .trim()
-    .toLowerCase();
 }
 
 /**
@@ -613,13 +574,11 @@ function buildMakeVideoFromAudioOptions(props, channelFolderName) {
  * @param {number} [props.maxVideosPerBatch] — tối đa N video mỗi lượt; env MAVID_MAX_VIDEOS_PER_BATCH; 0/không set = không giới hạn
  */
 async function main(props = {}) {
-  const { MAKE_VIDEO_MODE } = await import('../constants/index.js');
   console.time('createBatchVideo');
 
   const channelParam = props.channel || process.env.MAVID_CHANNEL;
   const mappingParam = props.mapping || process.env.MAVID_MAPPING;
   const email = props.email || process.env.MAVID_EMAIL;
-  const videoCropReup = props.videoCropPercent ?? process.env.MAVID_VIDEO_CROP_PERCENT;
 
   let mergedProps = { ...props };
   if (email != null && String(email).trim() !== '' && (mergedProps.email == null || String(mergedProps.email).trim() === '')) {
@@ -628,74 +587,27 @@ async function main(props = {}) {
   let inputFile = null;
   let effectiveChannelName = channelParam || null;
 
-  if (channelParam) {
-    const folderPath = path.join(CHANNELS_DIR, channelParam);
-    if (fs.existsSync(folderPath)) {
-      const cfg = readChannelConfigFromFolderSync(folderPath);
-      let configItem = null;
-      if (cfg) {
-        configItem = pickChannelConfigItem(cfg, mappingParam);
-        mergedProps = mergeChannelConfigIntoProps(mergedProps, configItem);
-        console.log(`[MaVid] Đã đọc ${MAVID_CHANNEL_CONFIG_FILENAME} trong folder "${channelParam}".`);
-      }
-      const pick = pickChannelDataFileForBatch(folderPath, cfg, configItem);
-      if (pick.absPath) {
-        inputFile = pick.absPath;
-        if (pick.usedRandom) {
-          console.log(
-            `[MaVid] Channel: ${channelParam} → ${pick.displayName} (chọn ngẫu nhiên — uploadedVideos≥${UPLOADED_VIDEOS_SPREAD_THRESHOLD})`,
-          );
-        } else {
-          console.log(`[MaVid] Channel: ${channelParam} → ${pick.displayName}`);
-        }
-      } else {
-        throw new Error(`Không tìm thấy file excel (.xlsx, .csv) trong folder: ${channelParam}`);
-      }
+  if (!channelParam) return;
+
+  const folderPath = path.join(CHANNELS_DIR, channelParam);
+  if (fs.existsSync(folderPath)) {
+    const cfg = readChannelConfigFromFolderSync(folderPath);
+    let configItem = null;
+
+    if (cfg) {
+      configItem = pickChannelConfigItem(cfg, mappingParam);
+      mergedProps = mergeChannelConfigIntoProps(mergedProps, configItem);
+      console.log(`[MaVid] Đã đọc ${MAVID_CHANNEL_CONFIG_FILENAME} trong folder "${channelParam}".`);
+    }
+
+    const pick = pickChannelDataFileForBatch(folderPath, cfg, configItem);
+    if (pick.absPath) {
+      inputFile = pick.absPath;
     } else {
-      throw new Error(`Không tìm thấy channel folder: ${channelParam}`);
+      throw new Error(`Không tìm thấy file excel (.xlsx, .csv) trong folder: ${channelParam}`);
     }
-  } else if (fs.existsSync(CHANNELS_DIR)) {
-    const entries = fs.readdirSync(CHANNELS_DIR, { withFileTypes: true });
-    const folders = entries.filter(e => e.isDirectory()).map(e => e.name);
-
-    let selectedFolder = null;
-
-    if (folders.length > 1) {
-      const inquirer = (await import('inquirer')).default;
-      const result = await inquirer.prompt([
-        {
-          type: 'list',
-          name: 'selectedFolder',
-          message: 'Chọn channel folder để chạy batch:',
-          choices: folders,
-        },
-      ]);
-      selectedFolder = result.selectedFolder;
-    } else if (folders.length === 1) {
-      selectedFolder = folders[0];
-    } else {
-      throw new Error('Không tìm thấy folder kênh nào trong MaVidMedia/channels');
-    }
-
-    if (selectedFolder) {
-      effectiveChannelName = selectedFolder;
-      const folderPath = path.join(CHANNELS_DIR, selectedFolder);
-      const cfgPick = readChannelConfigFromFolderSync(folderPath);
-      const itemPick = cfgPick ? pickChannelConfigItem(cfgPick, mappingParam) : null;
-      const pick = pickChannelDataFileForBatch(folderPath, cfgPick, itemPick);
-      if (pick.absPath) {
-        inputFile = pick.absPath;
-        if (pick.usedRandom) {
-          console.log(
-            `[MaVid] Channel: ${selectedFolder} → ${pick.displayName} (chọn ngẫu nhiên — uploadedVideos≥${UPLOADED_VIDEOS_SPREAD_THRESHOLD})`,
-          );
-        } else {
-          console.log(`[MaVid] Channel: ${selectedFolder} → ${pick.displayName}`);
-        }
-      } else {
-        throw new Error(`Không tìm thấy file excel (.xlsx, .csv) trong folder: ${selectedFolder}`);
-      }
-    }
+  } else {
+    throw new Error(`Không tìm thấy channel folder: ${channelParam}`);
   }
 
   if (!inputFile) {
@@ -756,7 +668,7 @@ async function main(props = {}) {
   items = filterItemsByOnlyLinksEnv(items);
   if (maxVideosThisRun > 0 && items.length > maxVideosThisRun) {
     console.log(
-      `[MaVid] Giới hạn ${maxVideosThisRun} video/lượt (MAVID_MAX_VIDEOS_PER_BATCH) — xử lý ${maxVideosThisRun}/${items.length} link.`,
+      `[MaVid] Giới hạn ${maxVideosThisRun} video/lượt (MAVID_MAX_VIDEOS_PER_BATCH) — xử lý ${maxVideosThisRun}/${items.length} link.`
     );
     items = items.slice(0, maxVideosThisRun);
   }
@@ -773,7 +685,7 @@ async function main(props = {}) {
         ? `Không có link video nào thỏa điều kiện độ dài (${minDurationMinutes > 0 ? `lớn hơn ${minDurationMinutes} phút` : ''}${
             minDurationMinutes > 0 && maxDurationMinutes > 0 ? ', ' : ''
           }${maxDurationMinutes > 0 ? `tối đa ${maxDurationMinutes} phút` : ''}) trong CSV/Excel.`
-        : 'Không có link video nào trong CSV/Excel.',
+        : 'Không có link video nào trong CSV/Excel.'
     );
   }
 
@@ -798,9 +710,6 @@ async function main(props = {}) {
         ...(mergedProps.overlay != null && String(mergedProps.overlay).trim() !== ''
           ? { overlay: String(mergedProps.overlay).trim() }
           : {}),
-        ...(videoCropReup !== undefined && videoCropReup !== null && String(videoCropReup).trim() !== ''
-          ? { videoCropPercent: Number(videoCropReup) }
-          : {}),
       });
     }
   } finally {
@@ -813,124 +722,6 @@ async function main(props = {}) {
   }
 
   console.timeEnd('createBatchVideo');
-
-  return {
-    success: true,
-    mode: 'batch',
-    videoType,
-    itemCount: items.length,
-    inputFile,
-    result,
-  };
-
-  console.log('result', result, mergedProps);
-  console.log('effectiveChannelName', effectiveChannelName);
-  console.log('email', mergedProps.email);
-
-  if (result && result.success && result.processedCount > 0 && mergedProps.email) {
-    try {
-      // ──────── Tính số ngày đã schedule trước ────────
-      let maxUploadsFromSchedule = result.processedCount; // mặc định = tất cả video vừa tạo
-      let skipUploadReason = '';
-
-      if (effectiveChannelName) {
-        const folderPath = path.join(CHANNELS_DIR, effectiveChannelName);
-        const cfg = readMavidChannelConfigFromFolder(folderPath);
-        const item = cfg ? pickChannelConfigItem(cfg, mergedProps.email) : null;
-
-        if (item) {
-          const { MAX_SCHEDULED_DAYS } = await import('../constants/index.js');
-          const latestUploadDateStr = String(item.latestUploadDate || '').trim();
-          const videosPerDayPresetRaw = String(item.videosPerDayPreset || '1').trim();
-
-          // Parse videosPerDayPreset → lấy số tối đa video/ngày
-          // '1' → 1, '2' → 2, '3' → 3, '1-2' → 2 (max)
-          let maxVideosPerDay = 1;
-          if (videosPerDayPresetRaw === '1-2') {
-            maxVideosPerDay = 2;
-          } else {
-            const parsed = parseInt(videosPerDayPresetRaw, 10);
-            if (Number.isFinite(parsed) && parsed > 0) maxVideosPerDay = parsed;
-          }
-
-          // Parse latestUploadDate (DD/MM/YYYY) → Date
-          let latestUploadDate = null;
-          if (latestUploadDateStr) {
-            const parts = latestUploadDateStr.split('/');
-            if (parts.length === 3) {
-              const [dd, mm, yyyy] = parts.map(Number);
-              if (dd > 0 && mm > 0 && yyyy > 0) {
-                latestUploadDate = new Date(yyyy, mm - 1, dd);
-              }
-            }
-          }
-
-          if (latestUploadDate && !isNaN(latestUploadDate.getTime())) {
-            const now = new Date();
-            // Chỉ tính theo ngày (bỏ giờ)
-            const nowDay = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-            const uploadDay = new Date(latestUploadDate.getFullYear(), latestUploadDate.getMonth(), latestUploadDate.getDate());
-
-            const diffMs = uploadDay.getTime() - nowDay.getTime();
-            const diffDays = Math.max(0, Math.floor(diffMs / (24 * 60 * 60 * 1000)));
-
-            // Số ngày đã schedule = diffDays / maxVideosPerDay (phần nguyên)
-            const scheduledDays = Math.floor(diffDays / maxVideosPerDay);
-            const remainingDays = MAX_SCHEDULED_DAYS - scheduledDays;
-
-            console.log(
-              `[schedule] latestUploadDate: ${latestUploadDateStr} | videosPerDayPreset: ${videosPerDayPresetRaw} (max ${maxVideosPerDay}/ngày)`,
-            );
-            console.log(
-              `[schedule] Ngày đã schedule trước: ${scheduledDays} | MAX_SCHEDULED_DAYS: ${MAX_SCHEDULED_DAYS} | Còn lại: ${remainingDays}`,
-            );
-
-            if (remainingDays <= 0) {
-              skipUploadReason = `Đã schedule đủ ${MAX_SCHEDULED_DAYS} ngày (latestUploadDate: ${latestUploadDateStr}). Bỏ qua upload.`;
-            } else {
-              // Số video upload = remainingDays × maxVideosPerDay, không vượt quá số video đã tạo
-              maxUploadsFromSchedule = Math.min(remainingDays * maxVideosPerDay, result.processedCount);
-              console.log(
-                `[schedule] Sẽ upload tối đa ${maxUploadsFromSchedule} video (${remainingDays} ngày × ${maxVideosPerDay} video/ngày).`,
-              );
-            }
-          } else {
-            console.log('[schedule] Không có latestUploadDate hợp lệ → upload tất cả video đã tạo.');
-          }
-        }
-      }
-
-      if (skipUploadReason) {
-        console.log(`\n[upload] ${skipUploadReason}`);
-      } else {
-        const gpmProfileId = await resolveGpmProfileIdByEmail(mergedProps.email);
-        if (gpmProfileId) {
-          console.log(
-            `\n[upload] Đã hoàn thành batch ${result.processedCount} video. Upload ${maxUploadsFromSchedule} video lên YouTube qua GPM profile: ${gpmProfileId}`,
-          );
-          const { default: uploadYoutubeViaGpm } = await import('../youtube/uploadViaGpm.js');
-
-          // Giới hạn uploadFolderNames theo maxUploadsFromSchedule
-          // let uploadFolderNames = Array.isArray(result.processedFolderNames) ? result.processedFolderNames : [];
-          // if (uploadFolderNames.length > maxUploadsFromSchedule) {
-          //   uploadFolderNames = uploadFolderNames.slice(0, maxUploadsFromSchedule);
-          // }
-
-          await uploadYoutubeViaGpm({
-            gpmProfileId,
-            channelFolder: effectiveChannelName,
-            email: mergedProps.email,
-            maxUploads: maxUploadsFromSchedule,
-            // ...(uploadFolderNames.length > 0 ? { uploadFolderNames } : {}),
-          });
-        } else {
-          console.warn(`[upload] Không tìm thấy Profile GPM có tên khớp với email «${mergedProps.email}». Bỏ qua tự động upload.`);
-        }
-      }
-    } catch (e) {
-      console.error('[upload] Lỗi trong quá trình tự động upload:', e.message);
-    }
-  }
 
   return {
     success: true,

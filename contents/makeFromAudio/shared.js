@@ -230,15 +230,6 @@ export const ffmpegSpawnAsync = args =>
 
 const CHANNELS_ROOT = resolveChannelsDir();
 
-/** Ưu tiên `options.showLogo`; sau đó MAVID_SHOW_LOGO. */
-export function shouldShowLogo(mainOptions) {
-  if (mainOptions.showLogo === false) return false;
-  if (mainOptions.showLogo === true) return true;
-  if (process.env.MAVID_SHOW_LOGO === '0') return false;
-  if (process.env.MAVID_SHOW_LOGO === '1') return true;
-  return false;
-}
-
 /**
  * Ảnh đầu tiên (png/jpg/…) trong `MaVidMedia/channels/{channel}`.
  * `channel` lấy từ options.channel hoặc MAVID_CHANNEL; không có thì dùng destFolder (thư mục chứa file Excel).
