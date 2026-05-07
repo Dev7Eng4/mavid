@@ -6,111 +6,20 @@ import { resolveChannelsDir } from '../utils/channelsStoragePath.js';
 import { unlinkProgressSidecarForSpreadsheet } from '../syncProgressToSpreadsheet.js';
 
 import {
-  DOWNLOADS_DIR,
   OUTPUT_DIR,
   ROOT,
-  randomPlaybackSpeed,
-  resolveAudioSpeed,
-  SPEED,
-  getLatestJobDownloadsDir,
   shouldShowLogo,
   resolveLogoFromChannelFolder,
   resolveDefaultStockFolder,
 } from './shared.js';
 
-import { processStockVideo } from './stockVideoOption.js';
-import { processVideoWithImage } from './imageOption.js';
 import { OPTIONS_CONTENT } from './constant.js';
-
-export { randomPlaybackSpeed, resolveAudioSpeed, SPEED };
+import { makeVideoWithImageNoise } from './optionVideo/makeVideoWithImageNoise.js';
+import { makeVideoWithOverlayImageNoise } from './optionVideo/makeVideoWithOverlayImageNoise.js';
 
 const CHANNELS_ROOT = resolveChannelsDir();
 
 const defaultOption = process.env.MAVID_VIDEO_OPTION || OPTIONS_CONTENT[0].value;
-
-// ==========================================
-// TEST: tạo video từ audio có sẵn trong downloads
-// ==========================================
-
-/**
- * Test nhanh: tạo video từ audio + phụ đề đã có trong một thư mục — không download, không Gemini, không pipeline transcript.
- *
- * @param {object} [options]
- * @param {string} [options.downloadsDir]
- * @param {boolean} [options.preferLatestJobFolder=true]
- * @param {string} [options.stockFolder]
- * @param {number} [options.audioSpeed]
- * @param {number} [options.stockVideoCount]
- * @param {boolean} [options.showLogo]
- * @param {string} [options.channel]
- * @param {string} [options.logoSearchDir]
- * @param {string|null} [options.logoPath]
- * @param {string} [options.perVideoDir]
- * @param {string} [options.title]
- * @param {string} [options.description]
- * @param {string|string[]} [options.tags]
- * @param {string} [options.videoLanguage]
- * @returns {Promise<{ downloadsDir: string, ok: true }>}
- */
-export async function testMakeVideoFromDownloads(options = {}) {
-  let downloadsDir = options.downloadsDir;
-  if (!downloadsDir) {
-    downloadsDir = options.preferLatestJobFolder !== false ? getLatestJobDownloadsDir() || DOWNLOADS_DIR : DOWNLOADS_DIR;
-  }
-  downloadsDir = path.resolve(downloadsDir);
-
-  const stockFolder = resolveDefaultStockFolder(options);
-  const wantLogo = shouldShowLogo(options);
-  const explicitLogo = options.logoPath != null && String(options.logoPath).trim() && fs.existsSync(options.logoPath);
-  const runLogoPath = explicitLogo
-    ? options.logoPath
-    : wantLogo
-      ? resolveLogoFromChannelFolder(options, options.logoSearchDir || path.dirname(downloadsDir))
-      : null;
-  if (wantLogo && runLogoPath) {
-    console.log(`[logo] ${runLogoPath}`);
-  } else if (wantLogo && !runLogoPath) {
-    console.warn('[logo] showLogo bật nhưng không có ảnh logo hợp lệ.');
-  }
-
-  const currentOption = options.option || defaultOption;
-
-  if (currentOption === 'IN' || currentOption === 'SI' || currentOption === 'AGI') {
-    await processVideoWithImage({
-      bgNameArg: stockFolder,
-      downloadsDir,
-      logoPath: runLogoPath,
-      audioSpeed: options.audioSpeed,
-      stockVideoCount: options.stockVideoCount,
-      perVideoDir: options.perVideoDir,
-      originalTitle: options.title,
-      description: options.description || '',
-      tags: options.tags || '',
-      url: undefined,
-      geminiByUrl: undefined,
-      videoLanguage: options.videoLanguage,
-      imageNoiseMode: currentOption === 'IN',
-      autoGenerateImage: currentOption === 'AGI',
-    });
-  } else {
-    // Mặc định dùng Option 1: Stock Video
-    await processStockVideo(stockFolder, {
-      downloadsDir,
-      logoPath: runLogoPath,
-      audioSpeed: options.audioSpeed,
-      stockVideoCount: options.stockVideoCount,
-      perVideoDir: options.perVideoDir,
-      originalTitle: options.title,
-      description: options.description || '',
-      tags: options.tags || '',
-      url: undefined,
-      geminiByUrl: undefined,
-      videoLanguage: options.videoLanguage,
-    });
-  }
-
-  return { downloadsDir, ok: true };
-}
 
 // ==========================================
 // BATCH: Main function
@@ -127,6 +36,7 @@ export async function testMakeVideoFromDownloads(options = {}) {
  * @param {boolean} [options.syncProgressToSpreadsheet=true]
  */
 async function main(options = {}) {
+  console.log('🚀 ~ main ~ options:', options);
   const syncProgressToSpreadsheet = options.syncProgressToSpreadsheet !== false;
   const inputFile = options.inputFile || null;
   const items = options.items || [];
@@ -135,9 +45,10 @@ async function main(options = {}) {
     return { success: false, processedCount: 0, processedFolderNames: [] };
   }
 
-  const processedFolderNames = [];
+  const generateGeneralImage = options.overlay === VIDEO_MAKE_OPTION.IN || options.overlay === VIDEO_MAKE_OPTION.SI;
+  const generateSceneImages = options.overlay === VIDEO_MAKE_OPTION.AGI;
 
-  const { downloadSingleVideo } = await import('../video-info/downloadVideo.js');
+  const processedFolderNames = [];
 
   const defaultStockFolder = resolveDefaultStockFolder(options);
   const batchAudioSpeedOverride =
@@ -215,33 +126,19 @@ async function main(options = {}) {
       url,
       options: {
         mode: VIDEO_MAKE_MODE.FROM_AUDIO,
-        thumbnailPrompt: options.thumbnailPrompt,
         outputDir: isolatedDownloadsDir,
+        thumbnailOptions: {
+          prompt: options.thumbnailPrompt,
+        },
+        generateGeneralImage,
+        generateSceneImages,
       },
-    });
-
-    // return downloadSingleVideo(url, {
-    //   mode: VIDEO_MAKE_MODE.FROM_AUDIO,
-    //   thumbnailChannelRoot: destFolder,
-    //   thumbnailPrompt: options.thumbnailPrompt,
-    //   outputDir: isolatedDownloadsDir,
-    //   overlay: options.overlay,
-    //   callback: ({ title: gemTitle, description: gemDesc, tags: gemTags, summary: gemSummary }) => {
-    //     const tagsStr = typeof gemTags === 'string' ? gemTags : Array.isArray(gemTags) ? gemTags.join(', ') : '';
-    //     geminiByUrl[url] = {
-    //       title: gemTitle || '',
-    //       description: gemDesc || '',
-    //       tags: tagsStr,
-    //       summary: gemSummary || '',
-    //     };
-    //     console.log('Đã nhận title/description/tags/summary từ Gemini (sẽ ghi video-meta.json sau khi render).');
-    //   },
-    // })
-    //   .then(result => ({ result, isolatedDownloadsDir }))
-    //   .catch(err => {
-    //     console.error(`Lỗi tải video ${url}:`, err.message);
-    //     return { result: null, isolatedDownloadsDir };
-    //   });
+    })
+      .then(result => ({ result, isolatedDownloadsDir }))
+      .catch(err => {
+        console.error(`Lỗi tải video ${url}:`, err.message);
+        return { result: null, isolatedDownloadsDir };
+      });
   }
 
   if (items.length > 0) {
@@ -257,7 +154,7 @@ async function main(options = {}) {
 
     if (i + 1 < items.length) {
       console.log(
-        `\n>>> [Pipeline] Bắt đầu tải trước video [${i + 2}/${items.length}] trong lúc đang render video [${i + 1}/${items.length}]...`,
+        `\n>>> [Pipeline] Bắt đầu tải trước video [${i + 2}/${items.length}] trong lúc đang render video [${i + 1}/${items.length}]...`
       );
       nextDownloadPromise = startDownload(i + 1);
     } else {
@@ -266,38 +163,32 @@ async function main(options = {}) {
 
     if (dlResult && dlResult.result) {
       const { result, isolatedDownloadsDir } = dlResult;
-      const videoId = result.metadata?.id || 'unknown_id';
-      const perVideoDir = resolveVideoOutputDir(videoId);
+      const perVideoDir = resolveVideoOutputDir(result.videoId);
 
       try {
-        const currentOption = result.overlay || options.overlay || options.option || defaultOption;
-        if (currentOption === VIDEO_MAKE_OPTION.IN || currentOption === VIDEO_MAKE_OPTION.SI || currentOption === VIDEO_MAKE_OPTION.AGI) {
-          await processVideoWithImage({
-            bgNameArg: background || defaultStockFolder,
-            logoPath: runLogoPath,
-            perVideoDir,
-            downloadsDir: isolatedDownloadsDir,
-            originalTitle: result.title,
-            description: result.description,
-            tags: result.tags,
-            url,
-            geminiByUrl,
-            audioSpeed: batchAudioSpeedOverride,
-            visualOption: currentOption,
-          });
+        const currentOption = options.overlay || defaultOption;
+        const perItemOptions = {
+          videoLanguage: result.lang,
+          logoPath: runLogoPath,
+          perVideoDir,
+          downloadsDir: isolatedDownloadsDir,
+          originalTitle: result.title,
+          description: result.description,
+          tags: result.tags,
+          url,
+          geminiByUrl,
+          audioSpeed: batchAudioSpeedOverride,
+        };
+
+        if (currentOption === VIDEO_MAKE_OPTION.IN) {
+          const bgImgPath = path.join(isolatedDownloadsDir, 'background.jpg');
+          await makeVideoWithImageNoise(perItemOptions, bgImgPath);
+        } else if (currentOption === VIDEO_MAKE_OPTION.SI) {
+          await makeVideoWithOverlayImageNoise(background || defaultStockFolder, perItemOptions);
         } else {
-          await processStockVideo(background || defaultStockFolder, {
-            logoPath: runLogoPath,
-            perVideoDir,
-            downloadsDir: isolatedDownloadsDir,
-            originalTitle: result.title,
-            description: result.description,
-            tags: result.tags,
-            url,
-            geminiByUrl,
-            audioSpeed: batchAudioSpeedOverride,
-          });
+          console.warn(`[main] Bỏ qua option không hỗ trợ: ${currentOption} (chỉ còn IN | SI).`);
         }
+
         console.log(`ĐÃ HOÀN THÀNH VIDEO: ${url}`);
 
         if (fs.existsSync(OUTPUT_DIR)) {
@@ -319,7 +210,7 @@ async function main(options = {}) {
         };
         fs.writeFileSync(progressFile, JSON.stringify(progressData, null, 2), 'utf8');
         await flushProgressToSpreadsheet();
-        processedFolderNames.push(String(videoId).trim() || 'unknown_id');
+        processedFolderNames.push(String(result.videoId).trim() || 'unknown_id');
       } catch (err) {
         console.error('Lỗi tạo video:', err.message);
       }

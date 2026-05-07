@@ -1,6 +1,6 @@
 /**
  * Shared utilities cho tất cả options tạo video từ audio.
- * Được dùng bởi index.js, stockVideoOption.js, subtitle.js, và các option khác trong tương lai.
+ * Được dùng bởi index.js, optionVideo/*.js, subtitle.js, và các option khác trong tương lai.
  */
 
 import fs from 'fs';
@@ -15,7 +15,6 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 export const ROOT = path.join(__dirname, '..', '..');
 export const DOWNLOADS_DIR = path.join(ROOT, 'downloads');
 export const OUTPUT_DIR = path.join(ROOT, 'outputs');
-export const ASSET_CHART_DIR = path.join(ROOT, 'assets', 'chart');
 export const DEFAULT_STOCK_FOLDER = 'nature';
 
 import { resolveStockBackgroundsDir } from '../utils/stockBackgroundsPath.js';
@@ -150,6 +149,18 @@ export function getImageFilesFromDir(dir) {
 }
 
 /**
+ * Liệt kê các file video (mp4/mov/mkv/webm, bỏ file ẩn) trong thư mục, đã sort theo tên.
+ */
+export function listVideoFilesInDir(dir) {
+  if (!dir || !fs.existsSync(dir)) return [];
+  return fs
+    .readdirSync(dir)
+    .filter(f => /\.(mp4|mov|mkv|webm)$/i.test(f) && !f.startsWith('.'))
+    .sort((a, b) => a.localeCompare(b))
+    .map(f => path.join(dir, f));
+}
+
+/**
  * Lấy file audio đầu tiên từ downloads
  */
 export function getAudioFile(dir = DOWNLOADS_DIR) {
@@ -212,108 +223,6 @@ export const ffmpegSpawnAsync = args =>
     });
     child.on('error', err => reject(err));
   });
-
-// ==========================================
-// PREBAKE HELPERS (logo PNG / chart MOV)
-// ==========================================
-
-/**
- * Pre-bake logo PNG đã scale + bo tròn (alpha mask). Cache theo size + mtime.
- * Bỏ filter `geq` per-pixel khỏi filter chính của render → chỉ chạy 1 lần ở đây.
- *
- * @param {string} sourcePath - File logo gốc (png/jpg/…)
- * @param {number} size - Cạnh ô vuông đầu ra (px)
- * @returns {Promise<string|null>} Đường dẫn PNG cache, hoặc `null` nếu thất bại.
- */
-export async function getPrebakedLogoPng(sourcePath, size) {
-  if (!sourcePath || !fs.existsSync(sourcePath)) return null;
-  const cacheDir = path.join(path.dirname(sourcePath), '.cache');
-  const st = fs.statSync(sourcePath);
-  const cacheKey = `logo_${path.parse(sourcePath).name}_${size}_${st.mtimeMs}.png`;
-  const cachePath = path.join(cacheDir, cacheKey);
-  if (fs.existsSync(cachePath)) return cachePath;
-  if (!fs.existsSync(cacheDir)) {
-    fs.mkdirSync(cacheDir, { recursive: true });
-  }
-  const r = Math.floor(size / 2);
-  const geqExpr = `if(lte(hypot(X-W/2,Y-H/2),${r}),255,0)`;
-  const vf = `scale=${size}:${size}:flags=fast_bilinear,format=rgba,geq=r='r(X,Y)':g='g(X,Y)':b='b(X,Y)':a='${geqExpr}'`;
-  const cmd = `ffmpeg -hide_banner -loglevel error -y -i "${sourcePath}" -vf "${vf}" -frames:v 1 "${cachePath}"`;
-  try {
-    await execAsync(cmd, { maxBuffer: 16 * 1024 * 1024 });
-  } catch (e) {
-    console.warn('[logo] Pre-bake PNG thất bại, fallback geq trong filter chính:', e.message);
-    return null;
-  }
-  console.log(`[logo] Đã tạo cache: ${path.basename(cachePath)}`);
-  return cachePath;
-}
-
-/**
- * Pre-bake noise overlay MOV: scale → colorkey (loại nền đen) → alpha α → fps + size đúng output.
- * Bỏ 4 filter per-frame (fps, scale, format yuva420p, colorkey, colorchannelmixer) khỏi pipeline chính.
- * Cache theo (w, h, fps, alpha, mtime).
- *
- * @param {string} sourcePath - File noise gốc (mp4)
- * @param {number} w - Bề rộng đầu ra (px)
- * @param {number} h - Chiều cao đầu ra (px)
- * @param {number} fps - FPS đầu ra
- * @param {number} alpha - Alpha 0..1 (vd 0.6)
- * @returns {Promise<string|null>} Đường dẫn .mov cache, hoặc `null` nếu thất bại.
- */
-export async function getPrebakedNoiseMov(sourcePath, w, h, fps, alpha) {
-  if (!sourcePath || !fs.existsSync(sourcePath)) return null;
-  const cacheDir = path.join(path.dirname(sourcePath), '.cache');
-  const st = fs.statSync(sourcePath);
-  const aTag = String(Math.round(alpha * 1000)).padStart(4, '0');
-  const cacheKey = `noise_${path.parse(sourcePath).name}_${w}x${h}_f${fps}_a${aTag}_${st.mtimeMs}.mov`;
-  const cachePath = path.join(cacheDir, cacheKey);
-  if (fs.existsSync(cachePath)) return cachePath;
-  if (!fs.existsSync(cacheDir)) {
-    fs.mkdirSync(cacheDir, { recursive: true });
-  }
-  const vf = `fps=${fps},scale=${w}:${h}:flags=fast_bilinear,format=yuva420p,colorkey=0x000000:0.1:0.1,colorchannelmixer=aa=${alpha}`;
-  const cmd = `ffmpeg -hide_banner -loglevel error -y -i "${sourcePath}" -vf "${vf}" -an -c:v prores_ks -profile:v 4 -pix_fmt yuva444p10le "${cachePath}"`;
-  try {
-    await execAsync(cmd, { maxBuffer: 64 * 1024 * 1024 });
-  } catch (e) {
-    console.warn('[noise] Pre-bake thất bại, fallback xử lý realtime:', e.message);
-    return null;
-  }
-  console.log(`[noise] Đã tạo cache: ${path.basename(cachePath)}`);
-  return cachePath;
-}
-
-/**
- * Pre-bake chart MOV đã scale + colorkey (loại nền đen) + format yuva420p + fps. Cache theo wCap + fps + mtime.
- * Bỏ chuỗi filter chart realtime trong filter chính → input thẳng vào overlay.
- *
- * @param {string} sourcePath - File chart gốc (mp4/mov/...)
- * @param {number} wCap - Bề rộng tối đa khi thu chart
- * @param {number} fps - FPS đầu ra
- * @returns {Promise<string|null>} Đường dẫn .mov cache, hoặc `null` nếu thất bại.
- */
-export async function getPrebakedChartVideo(sourcePath, wCap, fps) {
-  if (!sourcePath || !fs.existsSync(sourcePath)) return null;
-  const cacheDir = path.join(path.dirname(sourcePath), '.cache');
-  const st = fs.statSync(sourcePath);
-  const cacheKey = `chart_${path.parse(sourcePath).name}_w${wCap}_f${fps}_${st.mtimeMs}.mov`;
-  const cachePath = path.join(cacheDir, cacheKey);
-  if (fs.existsSync(cachePath)) return cachePath;
-  if (!fs.existsSync(cacheDir)) {
-    fs.mkdirSync(cacheDir, { recursive: true });
-  }
-  const vf = `scale=${wCap}:-2:flags=fast_bilinear,colorkey=0x000000:0.1:0.1,format=yuva420p,fps=${fps}`;
-  const cmd = `ffmpeg -hide_banner -loglevel error -y -i "${sourcePath}" -vf "${vf}" -c:v prores_ks -profile:v 4 -pix_fmt yuva444p10le "${cachePath}"`;
-  try {
-    await execAsync(cmd, { maxBuffer: 64 * 1024 * 1024 });
-  } catch (e) {
-    console.warn('[chart] Pre-bake thất bại, fallback xử lý realtime:', e.message);
-    return null;
-  }
-  console.log(`[chart] Đã tạo cache: ${path.basename(cachePath)}`);
-  return cachePath;
-}
 
 // ==========================================
 // LOGO / CHANNEL / STOCK FOLDER HELPERS

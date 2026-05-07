@@ -13,9 +13,9 @@ import { promisify } from 'util';
 import ExcelJS from 'exceljs';
 import youtubedl from 'youtube-dl-exec';
 
-import { OUTPUT_DIR, ROOT } from './shared.js';
-import { STOCK_VIDEO } from '../constants/index.js';
-import { GPU_INFO } from '../utils/hardware.util.js';
+import { OUTPUT_DIR, ROOT } from '../shared.js';
+import { STOCK_VIDEO } from '../../constants/index.js';
+import { GPU_INFO } from '../../utils/hardware.util.js';
 
 const execAsync = promisify(exec);
 
@@ -32,6 +32,17 @@ const ZOOM_FACTOR = 1.2;
 const CANVAS_W = STOCK_VIDEO.CANVAS_W;
 const CANVAS_H = STOCK_VIDEO.CANVAS_H;
 const FPS = STOCK_VIDEO.FPS;
+
+/**
+ * Kiểm tra tên background có phải channelId trong assets/visual-resource/stock/ hay không.
+ * @param {string} name
+ * @returns {boolean}
+ */
+export function isVisualResourceStock(name) {
+  if (!name) return false;
+  const configPath = path.join(ROOT, 'assets', 'visual-resource', 'stock', name, 'mavid-config.json');
+  return fs.existsSync(configPath);
+}
 
 /**
  * Parse chuỗi duration "HH:MM:SS" hoặc "MM:SS" thành giây.

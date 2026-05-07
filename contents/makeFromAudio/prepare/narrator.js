@@ -13,7 +13,7 @@ import { promisify } from 'util';
 import ExcelJS from 'exceljs';
 import youtubedl from 'youtube-dl-exec';
 
-import { OUTPUT_DIR, ROOT } from './shared.js';
+import { OUTPUT_DIR, ROOT } from '../shared.js';
 
 const execAsync = promisify(exec);
 
@@ -114,7 +114,7 @@ async function selectAndMarkNarratorVideo(targetDurationSec) {
   if (eligible.length === 0) {
     console.warn(
       `[Narrator] Không có video nào đủ dài (cần >= ${Math.ceil(minRequired / 60)} phút). ` +
-        `Tổng ${allVideos.length} video, dài nhất: ${Math.ceil(Math.max(...allVideos.map(v => v.durationSec)) / 60)} phút.`,
+        `Tổng ${allVideos.length} video, dài nhất: ${Math.ceil(Math.max(...allVideos.map(v => v.durationSec)) / 60)} phút.`
     );
     return null;
   }
@@ -124,7 +124,9 @@ async function selectAndMarkNarratorVideo(targetDurationSec) {
   const chosen = candidates[Math.floor(Math.random() * candidates.length)];
 
   console.log(
-    `[Narrator] Chọn video: ${chosen.link} (duration: ${Math.ceil(chosen.durationSec / 60)} phút, USED: ${chosen.used} → ${chosen.used + 1})`,
+    `[Narrator] Chọn video: ${chosen.link} (duration: ${Math.ceil(chosen.durationSec / 60)} phút, USED: ${chosen.used} → ${
+      chosen.used + 1
+    })`
   );
 
   // Update USED +1 trong excel
@@ -192,7 +194,9 @@ async function prepareReactionOverlay(rawVideoPath, targetDuration, outputDir) {
   const overlayPath = path.join(outputDir, 'reaction_overlay.mp4');
 
   console.log(
-    `[Reaction] Chuẩn bị overlay: bỏ ${REACTION_SKIP_SEC}s đầu, lấy ${targetDuration.toFixed(1)}s, crop ${REACTION_CROP_W}x${REACTION_CROP_H} giữa dưới...`,
+    `[Reaction] Chuẩn bị overlay: bỏ ${REACTION_SKIP_SEC}s đầu, lấy ${targetDuration.toFixed(
+      1
+    )}s, crop ${REACTION_CROP_W}x${REACTION_CROP_H} giữa dưới...`
   );
 
   const cmd = [

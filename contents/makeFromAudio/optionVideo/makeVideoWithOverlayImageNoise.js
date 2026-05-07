@@ -5,34 +5,24 @@
 
 import fs from 'fs';
 import path from 'path';
-import { exec } from 'child_process';
-import { promisify } from 'util';
-const execAsync = promisify(exec);
 
-import { STOCK_VIDEO, SUBTITLE, LOGO } from '../constants/index.js';
-import { resolveStockBackgroundsDir } from '../utils/stockBackgroundsPath.js';
-import { GPU_INFO } from '../utils/hardware.util.js';
+import { STOCK_VIDEO, SUBTITLE, LOGO } from '../../constants/index.js';
+import { resolveStockBackgroundsDir } from '../../utils/stockBackgroundsPath.js';
+import { GPU_INFO } from '../../utils/hardware.util.js';
 
 import {
   DOWNLOADS_DIR,
   OUTPUT_DIR,
-  ASSET_CHART_DIR,
   DEFAULT_STOCK_FOLDER,
   ROOT,
   resolveAudioSpeed,
-  getDuration,
   getAudioDurationSeconds,
   formatClockDuration,
   sanitizeFilename,
-  shuffleArray,
   getAudioFile,
   getSubtitleFile,
   ffmpegSpawnAsync,
-  getPrebakedLogoPng,
-  getPrebakedChartVideo,
-  getPrebakedNoiseMov,
-} from './shared.js';
-import { prepareStockVisualClip } from './getStockVisual.js';
+} from '../shared.js';
 
 import {
   SUBTITLE_MARGIN_BOTTOM_PX,
@@ -42,31 +32,26 @@ import {
   escapePathForFfmpegSubtitles,
   convertSrtToAss,
   resolveJapaneseSubtitleStyle,
-} from './subtitle.js';
+} from '../subtitle.js';
 
-/**
- * Kiểm tra tên background có phải channelId trong assets/visual-resource/stock/ hay không.
- * @param {string} name
- * @returns {boolean}
- */
-function isVisualResourceStock(name) {
-  if (!name) return false;
-  const configPath = path.join(ROOT, 'assets', 'visual-resource', 'stock', name, 'mavid-config.json');
-  return fs.existsSync(configPath);
-}
+import { getPrebakedLogoPng } from '../prepare/logo.js';
+import { getPrebakedNoiseMov } from '../prepare/noise.js';
+import { ASSET_CHART_DIR, getPrebakedChartVideo, pickFirstChartVideo, getChartVideoFiles } from '../prepare/chart.js';
+import {
+  STOCK_OVERLAY_DIR,
+  STOCK_OVERLAY_PTS_MULT,
+  pickFirstOverlayVideo,
+  getOverlayVideoFiles,
+  getPrebakedStockOverlayVideo,
+  stockOverlayScaleCropAlphaSubchain,
+} from '../prepare/stockOverlay.js';
+import { prepareStockVisualClip, isVisualResourceStock } from '../prepare/stockVisual.js';
+import { getStockVideos, buildStockSegmentPlan, updateStockUsage } from '../prepare/stockSegment.js';
 
 // ==========================================
-// STOCK VIDEO CONSTANTS
+// RENDER CONSTANTS (positioning, not prepare)
 // ==========================================
-const STOCK_VIDEO_HFLIP_PROBABILITY = 0.3;
 
-/** Tên thư mục con cạnh `backgrounds/<stock>/`: `backgrounds/overlay/`. Nếu có file video, trộn lên nền stock. */
-const STOCK_OVERLAY_DIR = 'overlay';
-/** Nhân `PTS` (3 = một lần phát gấp 3 thời lượng, tốc độ ~1/3). */
-const STOCK_OVERLAY_PTS_MULT = 3;
-/** Scale 1.2 (≈ zoom 20%) rồi `crop` về `CANVAS` — cạnh dưới lớp cắt trùng đáy nguồn (lấy vùng phía dưới). */
-const STOCK_OVERLAY_ZOOM = 1.4;
-const STOCK_OVERLAY_OPACITY = 0.5;
 /** Rộng tối đa (px) khi thu chart đặt góc phải trên. */
 const CHART_CORNER_MAX_WIDTH = 400;
 const CHART_MARGIN_TOP = 20;
@@ -89,155 +74,7 @@ function stockNormalizeFilterChain(inputLabel, outLabel, slowmoFactor, isFlip = 
 }
 
 // ==========================================
-// OVERLAY / CHART HELPERS
-// ==========================================
-
-function getOverlayVideoFiles(overlayDir) {
-  if (!overlayDir || !fs.existsSync(overlayDir)) return [];
-  return fs
-    .readdirSync(overlayDir)
-    .filter(f => /\.(mp4|mov|mkv|webm)$/i.test(f) && !f.startsWith('.'))
-    .sort((a, b) => a.localeCompare(b))
-    .map(f => path.join(overlayDir, f));
-}
-
-function pickFirstOverlayVideo(overlayDir) {
-  const v = getOverlayVideoFiles(overlayDir);
-  return v[0] || null;
-}
-
-function getChartVideoFiles(dir = ASSET_CHART_DIR) {
-  return getOverlayVideoFiles(dir);
-}
-
-function pickFirstChartVideo() {
-  const v = getChartVideoFiles(ASSET_CHART_DIR);
-  return v[0] || null;
-}
-
-function stockOverlayScaleCropAlphaSubchain() {
-  const w = STOCK_VIDEO.CANVAS_W;
-  const h = STOCK_VIDEO.CANVAS_H;
-  const z = STOCK_OVERLAY_ZOOM;
-  const a = STOCK_OVERLAY_OPACITY;
-  return `scale=w='iw*${z}':h='ih*${z}',crop=${w}:${h}:(iw-ow)/2:ih-oh,format=yuva420p,colorchannelmixer=aa=${a}`;
-}
-
-async function getPrebakedStockOverlayVideo(sourcePath, cacheDir) {
-  const w = STOCK_VIDEO.CANVAS_W;
-  const h = STOCK_VIDEO.CANVAS_H;
-  const st = fs.statSync(sourcePath);
-  const zTag = Math.round(STOCK_OVERLAY_ZOOM * 100);
-  const aTag = Math.round(STOCK_OVERLAY_OPACITY * 100);
-  const cacheKey = `ov_${path.parse(sourcePath).name}_${w}x${h}_s${STOCK_OVERLAY_PTS_MULT}_z${zTag}_a${aTag}_bot_${st.mtimeMs}.mov`;
-  const cachePath = path.join(cacheDir, cacheKey);
-  if (fs.existsSync(cachePath)) {
-    console.log(`[overlay] Dùng cache: ${path.basename(cachePath)}`);
-    return cachePath;
-  }
-  if (!fs.existsSync(cacheDir)) {
-    fs.mkdirSync(cacheDir, { recursive: true });
-  }
-  const vf = `setpts=${STOCK_OVERLAY_PTS_MULT}*PTS,${stockOverlayScaleCropAlphaSubchain()}`;
-  const cmd = `ffmpeg -hide_banner -loglevel error -y -i "${sourcePath}" -vf "${vf}" -c:v prores_ks -profile:v 4444 -pix_fmt yuva444p10le "${cachePath}"`;
-  try {
-    await execAsync(cmd, { maxBuffer: 32 * 1024 * 1024 });
-  } catch (e) {
-    console.warn('[overlay] Pre-cache thất bại, dùng bước trộn single-pass với bản gốc:', e.message);
-    return null;
-  }
-  console.log(`[overlay] Đã tạo cache: ${path.basename(cachePath)}`);
-  return cachePath;
-}
-
-// ==========================================
-// STOCK USAGE TRACKING
-// ==========================================
-
-function getStockUsage() {
-  try {
-    const rootDir = resolveStockBackgroundsDir();
-    const usageFile = path.join(rootDir, 'stock_usage.json');
-    if (fs.existsSync(usageFile)) {
-      return JSON.parse(fs.readFileSync(usageFile, 'utf8'));
-    }
-  } catch (e) {
-    console.warn('Không thể đọc stock_usage.json', e.message);
-  }
-  return {};
-}
-
-function updateStockUsage(usedSegments, backgroundsDir) {
-  try {
-    const rootDir = resolveStockBackgroundsDir();
-    const usageFile = path.join(rootDir, 'stock_usage.json');
-    const folderName = path.basename(backgroundsDir);
-    const usage = getStockUsage();
-
-    for (const seg of usedSegments) {
-      if (!seg || !seg.path) continue;
-      const fileName = path.basename(seg.path);
-      const key = `${folderName}/${fileName}`;
-      usage[key] = (usage[key] || 0) + 1;
-    }
-
-    fs.writeFileSync(usageFile, JSON.stringify(usage, null, 2), 'utf8');
-  } catch (e) {
-    console.warn('Không thể ghi stock_usage.json', e.message);
-  }
-}
-
-function getStockVideos(backgroundsDir) {
-  const files = fs.readdirSync(backgroundsDir).filter(f => /\.(mp4|mov|mkv|webm)$/i.test(f));
-  if (files.length === 0) {
-    throw new Error(`Không có video trong ${backgroundsDir}`);
-  }
-
-  const usage = getStockUsage();
-  const folderName = path.basename(backgroundsDir);
-
-  const shuffled = shuffleArray(files);
-
-  shuffled.sort((a, b) => {
-    const keyA = `${folderName}/${a}`;
-    const keyB = `${folderName}/${b}`;
-    const countA = usage[keyA] || 0;
-    const countB = usage[keyB] || 0;
-    return countA - countB;
-  });
-
-  return shuffled.map(f => path.join(backgroundsDir, f));
-}
-
-async function buildStockSegmentPlan(videoPaths, requiredOutputSec) {
-  const useXfade = STOCK_VIDEO.USE_XFADE === true;
-  const segments = [];
-  let accumulated = 0;
-  let idx = 0;
-  while (true) {
-    const i = idx % videoPaths.length;
-    const slowmoFactor = 1.4 + Math.random() * (1.7 - 1.4);
-    const baseDuration = await getDuration(videoPaths[i]);
-    const duration = baseDuration * slowmoFactor;
-    const isFlip = Math.random() < STOCK_VIDEO_HFLIP_PROBABILITY;
-    segments.push({ path: videoPaths[i], duration, slowmoFactor, isFlip });
-    accumulated += duration;
-    idx++;
-
-    let effectiveLen = accumulated;
-    if (useXfade && segments.length > 1) {
-      const minSegmentDur = Math.min(...segments.map(s => s.duration));
-      const fadeEst = Math.max(0.15, Math.min(STOCK_VIDEO.CROSSFADE_SEC, minSegmentDur * 0.45));
-      effectiveLen = accumulated - (segments.length - 1) * fadeEst;
-    }
-    if (effectiveLen >= requiredOutputSec) break;
-  }
-
-  return shuffleArray(segments);
-}
-
-// ==========================================
-// MAIN: processStockVideo (was processOne)
+// MAIN: makeVideoWithOverlayImageNoise
 // ==========================================
 
 /**
@@ -256,7 +93,7 @@ async function buildStockSegmentPlan(videoPaths, requiredOutputSec) {
  * @param {string} [options.downloadsDir]
  * @param {string} [options.videoLanguage]
  */
-export async function processStockVideo(bgNameArg, options = {}) {
+export async function makeVideoWithOverlayImageNoise(bgNameArg, options = {}) {
   const {
     perVideoDir,
     originalTitle,

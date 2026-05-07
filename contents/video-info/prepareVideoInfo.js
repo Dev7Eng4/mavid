@@ -597,7 +597,7 @@ const prepareVideoInfo = async ({ url, options = {} }) => {
 
     if (!generalPromptFromMeta) {
       console.warn(
-        '[prepareVideoInfo] onlyUpdateInfo: không có generalPrompt (hoặc visualBible.hero_image_package.prompt) trong video-meta.json.',
+        '[prepareVideoInfo] onlyUpdateInfo: không có generalPrompt (hoặc visualBible.hero_image_package.prompt) trong video-meta.json.'
       );
       return { url, onlyUpdateInfo: true, generalPrompt: '' };
     }
@@ -621,6 +621,7 @@ const prepareVideoInfo = async ({ url, options = {} }) => {
   }
 
   const videoMeta = await getVideoInfo(url);
+  console.log('🚀 ~ prepareVideoInfo ~ videoMeta:', videoMeta);
   const videoTitle = String(videoMeta?.title ?? '');
 
   const downloadResults = await Promise.allSettled([
@@ -666,9 +667,6 @@ const prepareVideoInfo = async ({ url, options = {} }) => {
     generateGeneralImage,
     generateSceneImages,
   });
-  // console.log('🚀 ~ prepareVideoInfo ~ llmResult:', llmResult);
-  // fs.writeFileSync(path.join(actualOutputDir, VIDEO_META_FILE), JSON.stringify(llmResult, null, 2), 'utf-8');
-  // return;
 
   const finalSummary = 'finalSummary' in llmResult ? llmResult.finalSummary : null;
   const visualBible = 'visualBible' in llmResult ? llmResult.visualBible : null;
@@ -679,7 +677,6 @@ const prepareVideoInfo = async ({ url, options = {} }) => {
   // save video info to video-meta.json
   const videoMetaData = {
     title: videoMeta.title,
-    description: videoMeta.description,
     tags: videoMeta.tags,
     seoTitle: title,
     seoDescription: finalSummary?.metadata?.description || '',
@@ -714,14 +711,8 @@ const prepareVideoInfo = async ({ url, options = {} }) => {
   }
 
   return {
-    url,
-    videoMeta,
-    downloadResults,
-    finalSummary,
-    visualBible,
-    generalPrompt,
-    flowImages,
-    // thumbnailFlowOk,
+    videoId: videoMeta.metadata?.id ?? '',
+    lang: transcriptLang,
   };
 };
 

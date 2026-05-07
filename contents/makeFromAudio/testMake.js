@@ -6,7 +6,7 @@
  *   - 1 file ảnh    (png/jpg/jpeg/webp) — ưu tiên `background.*`, nếu không có thì lấy file ảnh đầu tiên
  *   - (tuỳ chọn)   1 file phụ đề (.srt/.vtt) để burn‑in
  *
- * Pipeline: copy ảnh → file tạm → gọi `processImageNoiseVideo` (cùng hàm production dùng cho mode 'IN')
+ * Pipeline: copy ảnh → file tạm → gọi `makeVideoWithImageNoise` (cùng hàm production dùng cho mode 'IN')
  * → output `outputs/<title>-with-bg.mp4` + bản copy `outputs/test_in_<ts>/`.
  *
  * Chạy:
@@ -19,7 +19,7 @@ import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 
-import { processImageNoiseVideo } from './imageOption.js';
+import { makeVideoWithImageNoise } from './optionVideo/makeVideoWithImageNoise.js';
 import {
   DOWNLOADS_DIR,
   OUTPUT_DIR,
@@ -73,7 +73,7 @@ async function main() {
   console.log(`✓ image:    ${path.relative(ROOT, sourceImage)}`);
   console.log(`✓ subtitle: ${subtitlePath ? path.relative(ROOT, subtitlePath) : '(none)'}`);
 
-  // processImageNoiseVideo sẽ XOÁ bgImgPath khi xong → copy ảnh nguồn ra file tạm để giữ ảnh gốc.
+  // makeVideoWithImageNoise sẽ XOÁ bgImgPath khi xong → copy ảnh nguồn ra file tạm để giữ ảnh gốc.
   const tempBgPath = path.join(downloadsDir, `_test_bg${path.extname(sourceImage)}`);
   fs.copyFileSync(sourceImage, tempBgPath);
   console.log(`→ copy ảnh test: ${path.basename(tempBgPath)}`);
@@ -88,7 +88,7 @@ async function main() {
 
   const t0 = Date.now();
   try {
-    await processImageNoiseVideo(
+    await makeVideoWithImageNoise(
       {
         downloadsDir,
         perVideoDir,
