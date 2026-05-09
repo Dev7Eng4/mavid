@@ -7,7 +7,7 @@
  *  3. Build prompt cho Flow:
  *     - Mặc định: `build(title, summary)`.
  *     - `thumbnailPromptKey === 'jaFulLText'`: Gemini (profile 4) chạy
- *       `promptToCreateTextForThumbnail` để lấy JSON `{ lines, colors }`, rồi render
+ *       `promptToCreateTextForThumbnailFullText` để lấy JSON `{ lines, colors }`, rồi render
  *       ảnh bằng Playwright (`jaFullText/thumbnail.cli.js` → `jaFullText/thumbnailFullText.html`), không gọi Flow.
  *  4. Các style khác: `runCreateThumbnailFlow(...)` — Flow lưu `outputDir/flow-thumbnail.jpg`.
  *  5. `optimizeFlowThumbnailJpegIfLarge(...)` — re-encode JPG nếu vượt ngưỡng kích thước.
@@ -49,7 +49,7 @@ function validateThumbnailFulLTextJson(raw) {
 }
 
 /**
- * Mở Gemini (profile 4), chạy `promptToCreateTextForThumbnail` rồi parse JSON
+ * Mở Gemini (profile 4), chạy `promptToCreateTextForThumbnailFullText` rồi parse JSON
  * trả về object `{ lines, colors }` để render thumbnail (Playwright, không qua Flow).
  *
  * @param {object} params
@@ -60,10 +60,10 @@ function validateThumbnailFulLTextJson(raw) {
  * @returns {Promise<{ lines: Record<string,string>, colors: Record<string,string> }>}
  */
 async function generateFulLTextLinesColorsViaGemini({ prompts, title, summary, logTag }) {
-  if (typeof prompts.promptToCreateTextForThumbnail !== 'function') {
-    throw new Error('prompts.promptToCreateTextForThumbnail không có trong gói ngôn ngữ — không thể chạy jaFulLText.');
+  if (typeof prompts.promptToCreateTextForThumbnailFullText !== 'function') {
+    throw new Error('prompts.promptToCreateTextForThumbnailFullText không có trong gói ngôn ngữ — không thể chạy jaFulLText.');
   }
-  const geminiPrompt = prompts.promptToCreateTextForThumbnail(title, summary);
+  const geminiPrompt = prompts.promptToCreateTextForThumbnailFullText(title, summary);
 
   const { context: ctx, page: pg } = await openChromeProfile({ profile: PLAYWRIGHT_PROFILES[0], visible: true });
   try {
@@ -103,10 +103,11 @@ export async function generateFlowThumbnailFromGemini({
   const { build, isNeedImage } = resolveThumbnailPromptBuilder(prompts, thumbnailPromptKey);
 
   if (thumbnailPromptKey === 'jaFulLText') {
-    const { lines, colors } = await generateFulLTextLinesColorsViaGemini({ prompts, title, summary, logTag });
+    const { thumbnail_copy, text_styles, background } = await generateFulLTextLinesColorsViaGemini({ prompts, title, summary, logTag });
     await renderThumbnailFullTextToPath({
-      lines,
-      colors,
+      thumbnail_copy,
+      text_styles,
+      background,
       outPath: path.join(outputDir, 'flow-thumbnail.jpg'),
     });
   } else {
@@ -122,4 +123,3 @@ export async function generateFlowThumbnailFromGemini({
   await optimizeFlowThumbnailJpegIfLarge(flowThumbPath);
   console.log(`[${logTag}] Đã lưu flow-thumbnail.jpg`);
 }
-

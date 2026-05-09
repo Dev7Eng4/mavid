@@ -3,7 +3,7 @@
  *
  * Đọc danh sách video narrator từ các file excel trong assets/visual-resource/narrator,
  * chọn video phù hợp (duration >= audio + 10 phút, USED thấp nhất),
- * tải về, crop thành hình tròn, overlay lên video chính.
+ * tải về, cắt xen kẽ đoạn 5 phút + gap trên timeline, ghép đủ duration, crop vùng hiển thị.
  */
 
 import fs from 'fs';
@@ -18,15 +18,71 @@ import { OUTPUT_DIR, ROOT } from '../shared.js';
 const execAsync = promisify(exec);
 
 const NARRATOR_ASSETS_DIR = path.join(ROOT, 'assets', 'visual-resource', 'narrator');
+/** File trong `public/` để web/UI đọc URL narrator đã chọn */
+const NARRATOR_PUBLIC_TXT = path.join(ROOT, 'public', 'narrator.txt');
 /** Bỏ bao nhiêu giây đầu video reaction */
 const REACTION_SKIP_SEC = 120;
 /** Video narrator phải dài hơn audio ít nhất bao nhiêu giây */
 const MIN_EXTRA_DURATION_SEC = 10 * 60;
 /** Kích thước crop reaction overlay (px) */
-export const REACTION_CROP_W = 300;
-export const REACTION_CROP_H = 300;
+export const REACTION_CROP_W = 240;
+export const REACTION_CROP_H = 240;
 /** Margin trái của reaction overlay */
 export const REACTION_MARGIN_LEFT = 20;
+/** Mỗi lần lấy tối đa bao nhiêu giây liên tục từ source (mặc định 5 phút) */
+const REACTION_SEGMENT_SEC = 5 * 60;
+/** Khoảng thời gian trên timeline source bị bỏ qua giữa hai đoạn 5 phút (giây) */
+const REACTION_SEGMENT_GAP_SEC = 120;
+
+/**
+ * Điểm kết thúc (giây) trên timeline video gốc cần có để cắt đủ các đoạn + gap.
+ * @param {number} targetDurationSec
+ * @returns {number}
+ */
+function computeReactionSourceSpanEndSec(targetDurationSec) {
+  let srcPos = REACTION_SKIP_SEC;
+  let remaining = targetDurationSec;
+  let endSec = srcPos;
+  while (remaining > 0) {
+    const dur = Math.min(REACTION_SEGMENT_SEC, remaining);
+    endSec = srcPos + dur;
+    remaining -= dur;
+    if (remaining <= 0) break;
+    srcPos += REACTION_SEGMENT_SEC + REACTION_SEGMENT_GAP_SEC;
+  }
+  return endSec;
+}
+
+/**
+ * Danh sách các đoạn cần cắt từ raw reaction (start + độ dài trên source).
+ * @param {number} targetDurationSec
+ * @returns {Array<{ srcStartSec: number, durSec: number }>}
+ */
+function buildReactionSegmentCuts(targetDurationSec) {
+  let srcPos = REACTION_SKIP_SEC;
+  let remaining = targetDurationSec;
+  /** @type {Array<{ srcStartSec: number, durSec: number }>} */
+  const cuts = [];
+  while (remaining > 0) {
+    const durSec = Math.min(REACTION_SEGMENT_SEC, remaining);
+    cuts.push({ srcStartSec: srcPos, durSec });
+    remaining -= durSec;
+    if (remaining <= 0) break;
+    srcPos += REACTION_SEGMENT_SEC + REACTION_SEGMENT_GAP_SEC;
+  }
+  return cuts;
+}
+
+function ffmpegQuoteArg(p) {
+  const s = String(p);
+  if (/[\s"]/.test(s)) return `"${s.replace(/"/g, '\\"')}"`;
+  return s;
+}
+
+function concatFileLineForFfmpeg(absPath) {
+  const normalized = absPath.replace(/\\/g, '/').replace(/'/g, "'\\''");
+  return `file '${normalized}'`;
+}
 
 /**
  * Parse chuỗi duration "HH:MM:SS" hoặc "MM:SS" thành giây.
@@ -91,7 +147,7 @@ async function loadAllNarratorVideos() {
 
 /**
  * Chọn video narrator phù hợp nhất:
- * - Duration >= targetDuration + 10 phút (+ REACTION_SKIP_SEC vì bỏ đầu)
+ * - Duration đủ để lấy các đoạn 5 phút xen kẽ gap trên timeline (+ buffer MIN_EXTRA)
  * - Trong các video đủ dài, chọn video có USED thấp nhất
  * - Nếu nhiều video cùng USED thấp nhất → chọn ngẫu nhiên
  *
@@ -102,19 +158,21 @@ async function loadAllNarratorVideos() {
  */
 async function selectAndMarkNarratorVideo(targetDurationSec) {
   const allVideos = await loadAllNarratorVideos();
+  console.log('🚀 ~ selectAndMarkNarratorVideo ~ allVideos:', allVideos);
 
   if (allVideos.length === 0) {
     console.warn('[Narrator] Không tìm thấy video narrator nào trong assets.');
     return null;
   }
 
-  const minRequired = targetDurationSec + MIN_EXTRA_DURATION_SEC + REACTION_SKIP_SEC;
+  const sourceSpanEnd = computeReactionSourceSpanEndSec(targetDurationSec);
+  const minRequired = sourceSpanEnd + MIN_EXTRA_DURATION_SEC;
   const eligible = allVideos.filter(v => v.durationSec >= minRequired);
 
   if (eligible.length === 0) {
     console.warn(
-      `[Narrator] Không có video nào đủ dài (cần >= ${Math.ceil(minRequired / 60)} phút). ` +
-        `Tổng ${allVideos.length} video, dài nhất: ${Math.ceil(Math.max(...allVideos.map(v => v.durationSec)) / 60)} phút.`
+      `[Narrator] Không có video nào đủ dài (cần >= ~${Math.ceil(minRequired / 60)} phút trên timeline; span đến ~${Math.ceil(sourceSpanEnd / 60)} phút). ` +
+        `Tổng ${allVideos.length} video, dài nhất: ${Math.ceil(Math.max(...allVideos.map(v => v.durationSec)) / 60)} phút.`,
     );
     return null;
   }
@@ -126,7 +184,7 @@ async function selectAndMarkNarratorVideo(targetDurationSec) {
   console.log(
     `[Narrator] Chọn video: ${chosen.link} (duration: ${Math.ceil(chosen.durationSec / 60)} phút, USED: ${chosen.used} → ${
       chosen.used + 1
-    })`
+    })`,
   );
 
   // Update USED +1 trong excel
@@ -152,6 +210,19 @@ async function selectAndMarkNarratorVideo(targetDurationSec) {
  */
 async function downloadYoutubeVideoOnly(url, outputDir) {
   fs.mkdirSync(outputDir, { recursive: true });
+
+  // Tránh dùng nhầm file raw cũ: yt-dlp có thể tạo đuôi khác nhau (.mp4 / .webm),
+  // `readdir` không đảm bảo thứ tự → không được pick `files[0]` ngẫu nhiên.
+  for (const name of fs.readdirSync(outputDir)) {
+    if (name.startsWith('reaction_raw.')) {
+      try {
+        fs.unlinkSync(path.join(outputDir, name));
+      } catch {
+        /* ignore */
+      }
+    }
+  }
+
   const outputTemplate = path.join(outputDir, 'reaction_raw.%(ext)s');
 
   console.log('[Reaction] Đang tải video reaction (video only, HD)...');
@@ -176,14 +247,16 @@ async function downloadYoutubeVideoOnly(url, outputDir) {
 
   const files = fs.readdirSync(outputDir).filter(f => f.startsWith('reaction_raw.'));
   if (files.length === 0) throw new Error('[Reaction] Không tìm thấy file reaction sau khi tải.');
-  return path.join(outputDir, files[0]);
+  const newest = files.map(f => ({ f, mtimeMs: fs.statSync(path.join(outputDir, f)).mtimeMs })).sort((a, b) => b.mtimeMs - a.mtimeMs)[0];
+  return path.join(outputDir, newest.f);
 }
 
 /**
  * Chuẩn bị clip reaction overlay:
- * 1. Cắt bỏ REACTION_SKIP_SEC giây đầu
- * 2. Cắt chỉ lấy đủ thời gian video cần tạo
- * 3. Crop 300×300 từ phần giữa dưới video
+ * 1. Lần lượt lấy các đoạn tối đa REACTION_SEGMENT_SEC (5 phút) từ source,
+ *    sau mỗi đoạn đầy đủ 5 phút thì nhảy qua REACTION_SEGMENT_GAP_SEC trên timeline gốc.
+ * 2. Ghép các đoạn cho đủ targetDuration (đoạn cuối có thể ngắn hơn 5 phút).
+ * 3. Crop REACTION_CROP_W×REACTION_CROP_H giữa–dưới cho từng đoạn.
  *
  * @param {string} rawVideoPath - Đường dẫn video reaction gốc
  * @param {number} targetDuration - Thời lượng video cần tạo (giây)
@@ -192,27 +265,95 @@ async function downloadYoutubeVideoOnly(url, outputDir) {
  */
 async function prepareReactionOverlay(rawVideoPath, targetDuration, outputDir) {
   const overlayPath = path.join(outputDir, 'reaction_overlay.mp4');
+  const cropVf = `crop=${REACTION_CROP_W}:${REACTION_CROP_H}:(iw-${REACTION_CROP_W})/2:ih-${REACTION_CROP_H}`;
+  const cuts = buildReactionSegmentCuts(targetDuration);
+
+  for (const name of fs.readdirSync(outputDir)) {
+    if (name.startsWith('reaction_seg_') && name.endsWith('.mp4')) {
+      try {
+        fs.unlinkSync(path.join(outputDir, name));
+      } catch {
+        /* ignore */
+      }
+    }
+  }
+  const concatListPath = path.join(outputDir, 'reaction_concat_list.txt');
+  try {
+    fs.unlinkSync(concatListPath);
+  } catch {
+    /* ignore */
+  }
 
   console.log(
-    `[Reaction] Chuẩn bị overlay: bỏ ${REACTION_SKIP_SEC}s đầu, lấy ${targetDuration.toFixed(
-      1
-    )}s, crop ${REACTION_CROP_W}x${REACTION_CROP_H} giữa dưới...`
+    `[Reaction] Chuẩn bị overlay: ${cuts.length} đoạn (tối đa ${REACTION_SEGMENT_SEC}s/đoạn, gap ${REACTION_SEGMENT_GAP_SEC}s), ` +
+      `tổng ${targetDuration.toFixed(1)}s, crop ${REACTION_CROP_W}x${REACTION_CROP_H} giữa dưới...`,
   );
 
-  const cmd = [
+  /** @param {number} i */
+  async function extractOneSegment(i, srcStartSec, durSec) {
+    const segPath = path.join(outputDir, `reaction_seg_${i}.mp4`);
+    const cmd = [
+      'ffmpeg',
+      '-hide_banner',
+      '-loglevel',
+      'error',
+      '-y',
+      '-ss',
+      String(srcStartSec),
+      '-i',
+      ffmpegQuoteArg(rawVideoPath),
+      '-t',
+      String(durSec),
+      '-vf',
+      cropVf,
+      '-an',
+      '-c:v',
+      'libx264',
+      '-preset',
+      'fast',
+      '-crf',
+      '23',
+      ffmpegQuoteArg(segPath),
+    ].join(' ');
+    await execAsync(cmd, { maxBuffer: 64 * 1024 * 1024 });
+    return segPath;
+  }
+
+  if (cuts.length === 1) {
+    await extractOneSegment(0, cuts[0].srcStartSec, cuts[0].durSec);
+    const seg0 = path.join(outputDir, 'reaction_seg_0.mp4');
+    try {
+      if (fs.existsSync(overlayPath)) fs.unlinkSync(overlayPath);
+    } catch {
+      /* ignore */
+    }
+    fs.renameSync(seg0, overlayPath);
+    console.log(`[Reaction] Đã tạo overlay clip (1 đoạn): ${overlayPath}`);
+    return overlayPath;
+  }
+
+  const segmentPaths = [];
+  for (let i = 0; i < cuts.length; i++) {
+    const { srcStartSec, durSec } = cuts[i];
+    console.log(`[Reaction] Đoạn ${i + 1}/${cuts.length}: source @${srcStartSec}s, dài ${durSec}s`);
+    segmentPaths.push(await extractOneSegment(i, srcStartSec, durSec));
+  }
+
+  const listBody = segmentPaths.map(p => concatFileLineForFfmpeg(path.resolve(p))).join('\n');
+  fs.writeFileSync(concatListPath, `${listBody}\n`, 'utf8');
+
+  const concatCmd = [
     'ffmpeg',
     '-hide_banner',
     '-loglevel',
     'error',
     '-y',
-    '-ss',
-    String(REACTION_SKIP_SEC),
+    '-f',
+    'concat',
+    '-safe',
+    '0',
     '-i',
-    rawVideoPath,
-    '-t',
-    String(targetDuration),
-    '-vf',
-    `crop=${REACTION_CROP_W}:${REACTION_CROP_H}:(iw-${REACTION_CROP_W})/2:ih-${REACTION_CROP_H}`,
+    ffmpegQuoteArg(concatListPath),
     '-an',
     '-c:v',
     'libx264',
@@ -220,11 +361,25 @@ async function prepareReactionOverlay(rawVideoPath, targetDuration, outputDir) {
     'fast',
     '-crf',
     '23',
-    overlayPath,
-  ].map(String);
+    ffmpegQuoteArg(overlayPath),
+  ].join(' ');
 
-  await execAsync(cmd.join(' '), { maxBuffer: 64 * 1024 * 1024 });
-  console.log(`[Reaction] Đã tạo overlay clip: ${overlayPath}`);
+  await execAsync(concatCmd, { maxBuffer: 64 * 1024 * 1024 });
+
+  for (const p of segmentPaths) {
+    try {
+      fs.unlinkSync(p);
+    } catch {
+      /* ignore */
+    }
+  }
+  try {
+    fs.unlinkSync(concatListPath);
+  } catch {
+    /* ignore */
+  }
+
+  console.log(`[Reaction] Đã ghép overlay clip: ${overlayPath}`);
   return overlayPath;
 }
 
@@ -244,6 +399,9 @@ export async function prepareNarratorReactionClip(targetDuration) {
     if (!videoUrl) {
       return { reactionOverlayPath: null, reactionTempDir, hasReaction: false };
     }
+
+    fs.mkdirSync(path.dirname(NARRATOR_PUBLIC_TXT), { recursive: true });
+    fs.writeFileSync(NARRATOR_PUBLIC_TXT, `${videoUrl}\n`, 'utf8');
 
     fs.mkdirSync(reactionTempDir, { recursive: true });
     const rawReactionPath = await downloadYoutubeVideoOnly(videoUrl, reactionTempDir);

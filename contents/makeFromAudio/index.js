@@ -111,7 +111,7 @@ async function main(options = {}) {
 
   async function startDownload(itemIndex) {
     if (itemIndex >= items.length) return null;
-    const { url } = items[itemIndex];
+    const url = items[itemIndex];
     const isolatedDownloadsDir = path.join(ROOT, 'downloads', `job_${Date.now()}_${itemIndex}`);
 
     const { default: prepareVideoInfo } = await import('../video-info/prepareVideoInfo.js');
@@ -148,7 +148,7 @@ async function main(options = {}) {
 
     if (i + 1 < items.length) {
       console.log(
-        `\n>>> [Pipeline] Bắt đầu tải trước video [${i + 2}/${items.length}] trong lúc đang render video [${i + 1}/${items.length}]...`
+        `\n>>> [Pipeline] Bắt đầu tải trước video [${i + 2}/${items.length}] trong lúc đang render video [${i + 1}/${items.length}]...`,
       );
       nextDownloadPromise = startDownload(i + 1);
     } else {

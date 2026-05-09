@@ -101,8 +101,8 @@ async function renderThumbnailFromPayload({ outPath, payload }) {
  * @param {Record<string, string>} opts.colors
  * @param {string} opts.outPath — đường dẫn file đích (.png ghi trực tiếp; .jpg/.jpeg chuyển qua sharp)
  */
-export async function renderThumbnailFullTextToPath({ lines, colors, outPath }) {
-  return renderThumbnailFromPayload({ outPath, payload: { lines, colors } });
+export async function renderThumbnailFullTextToPath({ thumbnail_copy, text_styles, background, outPath }) {
+  return renderThumbnailFromPayload({ outPath, payload: { thumbnail_copy, text_styles, background } });
 }
 
 async function main() {
@@ -111,9 +111,7 @@ async function main() {
   await renderThumbnailFromPayload({ outPath, payload });
 }
 
-const isCliEntry =
-  process.argv[1] &&
-  pathToFileURL(path.resolve(process.argv[1])).href === import.meta.url;
+const isCliEntry = process.argv[1] && pathToFileURL(path.resolve(process.argv[1])).href === import.meta.url;
 
 if (isCliEntry) {
   main().catch(e => {
@@ -121,4 +119,3 @@ if (isCliEntry) {
     process.exit(1);
   });
 }
-

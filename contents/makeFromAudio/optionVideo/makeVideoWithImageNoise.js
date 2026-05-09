@@ -30,12 +30,15 @@ import {
 
 import { getPrebakedLogoPng } from '../prepare/logo.js';
 import { getPrebakedNoiseMov } from '../prepare/noise.js';
-import { prepareNarratorReactionClip, REACTION_CROP_W, REACTION_CROP_H } from '../prepare/narrator.js';
+import { prepareNarratorReactionClip } from '../prepare/narrator.js';
+
+/** Kích thước hiển thị narrator (vuông), nằm dưới lớp noise */
+const NARRATOR_DISPLAY_PX = 240;
 
 /**
  * Xử lý tạo video dành riêng cho chế độ `imageNoise`:
  * Ảnh nền toàn màn hình + video noise bỏ nền đen + audio + phụ đề.
- * Nếu `showNarrator = true` → thêm reaction overlay (narrator webcam).
+ * Nếu `showNarrator = true` → thêm narrator 240×240 dưới lớp noise (góc trái-trên).
  *
  * Lưu ý: hàm xoá `bgImgPath` ở cuối — nếu test với ảnh thật cần copy ra file tạm trước khi gọi.
  *
@@ -63,7 +66,7 @@ export async function makeVideoWithImageNoise(options = {}, bgImgPath) {
   const originalAudioDuration = await getAudioDurationSeconds(audioPath);
   const audioDurationAfterTempo = originalAudioDuration / speed;
   console.log(
-    `Thời lượng audio: ${originalAudioDuration.toFixed(1)}s, sau atempo (SPEED=${speed}): ${formatClockDuration(audioDurationAfterTempo)}`
+    `Thời lượng audio: ${originalAudioDuration.toFixed(1)}s, sau atempo (SPEED=${speed}): ${formatClockDuration(audioDurationAfterTempo)}`,
   );
 
   let subtitlePath = getSubtitleFile(downloadsDir);
@@ -175,17 +178,31 @@ export async function makeVideoWithImageNoise(options = {}, bgImgPath) {
       `crop=${zpW}:${zpH},` +
       `zoompan=z='${zoomExpr}':` +
       `d=${totalFrames}:x='${panX}':y='${panY}':s=${w}x${h}:fps=${fps},` +
-      `format=yuv420p,setsar=1[bg]`
+      `format=yuv420p,setsar=1[bg]`,
   );
 
   let currentVLabel = 'bg';
+
+  // Narrator trước noise → noise phủ lên trên; kích thước cố định NARRATOR_DISPLAY_PX
+  if (hasReaction && reactionIndex >= 0) {
+    const reactionX = 50;
+    const reactionY = 50;
+    const n = NARRATOR_DISPLAY_PX;
+    const rRadius = n / 2;
+    const circleGeq = `if(lte(hypot(X-W/2,Y-H/2),${rRadius}),255,0)`;
+    filterParts.push(
+      `[${reactionIndex}:v]setpts=3*PTS,fps=${fps},scale=${n}:${n}:flags=fast_bilinear,format=rgba,geq=r='r(X,Y)':g='g(X,Y)':b='b(X,Y)':a='${circleGeq}'[reaction]`,
+    );
+    filterParts.push(`[${currentVLabel}][reaction]overlay=${reactionX}:${reactionY}:shortest=1[v_under_noise]`);
+    currentVLabel = 'v_under_noise';
+  }
 
   if (hasNoise && noiseIndex >= 0) {
     if (noiseIsPrebaked) {
       filterParts.push(`[${noiseIndex}:v]null[noise]`);
     } else {
       filterParts.push(
-        `[${noiseIndex}:v]fps=${fps},scale=${w}:${h}:flags=fast_bilinear,format=yuva420p,colorkey=0x000000:0.1:0.1,colorchannelmixer=aa=${NOISE_ALPHA}[noise]`
+        `[${noiseIndex}:v]fps=${fps},scale=${w}:${h}:flags=fast_bilinear,format=yuva420p,colorkey=0x000000:0.1:0.1,colorchannelmixer=aa=${NOISE_ALPHA}[noise]`,
       );
     }
     filterParts.push(`[${currentVLabel}][noise]overlay=0:0:shortest=1[v_noised]`);
@@ -211,19 +228,6 @@ export async function makeVideoWithImageNoise(options = {}, bgImgPath) {
     currentVLabel = 'vpadded';
   }
 
-  // Reaction overlay: đặt góc top-left, cách mép 50px (hình tròn)
-  if (hasReaction && reactionIndex >= 0) {
-    const reactionX = 50;
-    const reactionY = 50;
-    const rRadius = Math.floor(REACTION_CROP_W / 2);
-    const circleGeq = `if(lte(hypot(X-W/2,Y-H/2),${rRadius}),255,0)`;
-    filterParts.push(
-      `[${reactionIndex}:v]setpts=3*PTS,fps=${fps},scale=${REACTION_CROP_W}:${REACTION_CROP_H}:flags=fast_bilinear,format=rgba,geq=r='r(X,Y)':g='g(X,Y)':b='b(X,Y)':a='${circleGeq}'[reaction]`
-    );
-    filterParts.push(`[${currentVLabel}][reaction]overlay=${reactionX}:${reactionY}:shortest=1[v_reaction]`);
-    currentVLabel = 'v_reaction';
-  }
-
   // Logo filter
   if (hasLogo) {
     if (logoIsPrebaked) {
@@ -232,7 +236,7 @@ export async function makeVideoWithImageNoise(options = {}, bgImgPath) {
       const r = Math.floor(LOGO.SIZE / 2);
       const geqExpr = `if(lte(hypot(X-W/2,Y-H/2),${r}),255,0)`;
       filterParts.push(
-        `[${logoIndex}:v]scale=${LOGO.SIZE}:${LOGO.SIZE}:flags=fast_bilinear,format=rgba,geq=r='r(X,Y)':g='g(X,Y)':b='b(X,Y)':a='${geqExpr}'[logo]`
+        `[${logoIndex}:v]scale=${LOGO.SIZE}:${LOGO.SIZE}:flags=fast_bilinear,format=rgba,geq=r='r(X,Y)':g='g(X,Y)':b='b(X,Y)':a='${geqExpr}'[logo]`,
       );
     }
     filterParts.push(`[${currentVLabel}][logo]overlay=main_w-overlay_w-${LOGO.MARGIN_RIGHT}:${LOGO.MARGIN_TOP}[vout_final]`);
@@ -267,19 +271,19 @@ export async function makeVideoWithImageNoise(options = {}, bgImgPath) {
     '128k',
     '-t',
     String(audioDurationAfterTempo),
-    outputPath
+    outputPath,
   );
 
   console.log(`Đang merge nội dung Image Noise Pipeline...`);
   await ffmpegSpawnAsync(mergeArgs);
 
-  if (fs.existsSync(filterScriptPath)) fs.unlinkSync(filterScriptPath);
-  if (tempSubPath && fs.existsSync(tempSubPath)) fs.unlinkSync(tempSubPath);
-  if (scaledSrtPath && fs.existsSync(scaledSrtPath)) fs.unlinkSync(scaledSrtPath);
+  // if (fs.existsSync(filterScriptPath)) fs.unlinkSync(filterScriptPath);
+  // if (tempSubPath && fs.existsSync(tempSubPath)) fs.unlinkSync(tempSubPath);
+  // if (scaledSrtPath && fs.existsSync(scaledSrtPath)) fs.unlinkSync(scaledSrtPath);
 
   // Dọn temp reaction
   if (reactionTempDir && fs.existsSync(reactionTempDir)) {
-    fs.rmSync(reactionTempDir, { recursive: true, force: true });
+    // fs.rmSync(reactionTempDir, { recursive: true, force: true });
     console.log(`[Narrator] Đã xóa thư mục tạm: ${reactionTempDir}`);
   }
 
@@ -309,13 +313,19 @@ export async function makeVideoWithImageNoise(options = {}, bgImgPath) {
         const trDestPath = path.join(perVideoDir, transcript);
         fs.copyFileSync(path.join(downloadsDir, transcript), trDestPath);
       }
+
+      const metaFiles = downloadFiles.filter(f => /\.(json)$/i.test(f));
+      for (const meta of metaFiles) {
+        const metaDestPath = path.join(perVideoDir, meta);
+        fs.copyFileSync(path.join(downloadsDir, meta), metaDestPath);
+      }
     }
 
-    let gem = geminiByUrl && url ? geminiByUrl[url] : {};
-    if (!gem || !gem.title) {
-      await new Promise(r => setTimeout(r, 2000));
-      gem = geminiByUrl && url ? geminiByUrl[url] : {};
-    }
+    // let gem = geminiByUrl && url ? geminiByUrl[url] : {};
+    // if (!gem || !gem.title) {
+    //   await new Promise(r => setTimeout(r, 2000));
+    //   gem = geminiByUrl && url ? geminiByUrl[url] : {};
+    // }
 
     // const ytTagsStr = Array.isArray(tags) ? tags.join(', ') : tags || '';
     // const metaPayload = {
@@ -332,7 +342,7 @@ export async function makeVideoWithImageNoise(options = {}, bgImgPath) {
   }
 
   if (fs.existsSync(bgImgPath)) {
-    fs.unlinkSync(bgImgPath);
+    // fs.unlinkSync(bgImgPath);
     console.log(`[Image Noise] Đã xóa ảnh background tạm: ${bgImgPath}`);
   }
 }

@@ -223,7 +223,7 @@ function ChannelsPage() {
         setDetailLoading(false);
       }
     },
-    [channels]
+    [channels],
   );
 
   useEffect(() => {
@@ -297,7 +297,7 @@ function ChannelsPage() {
         console.log(
           failures.length === queue.length
             ? `Tất cả ${failures.length} kênh lỗi: ${failures.slice(0, 3).join(' ')}${failures.length > 3 ? '…' : ''}`
-            : `Một số kênh lỗi (${failures.length}/${queue.length}): ${failures.slice(0, 4).join(' ')}${failures.length > 4 ? '…' : ''}`
+            : `Một số kênh lỗi (${failures.length}/${queue.length}): ${failures.slice(0, 4).join(' ')}${failures.length > 4 ? '…' : ''}`,
         );
       }
     } finally {
@@ -333,7 +333,7 @@ function ChannelsPage() {
 
   const pageIndexRows = useMemo(
     () => indexFilteredChannels.slice(indexStartIndex, indexStartIndex + indexPageSize),
-    [indexFilteredChannels, indexStartIndex, indexPageSize]
+    [indexFilteredChannels, indexStartIndex, indexPageSize],
   );
 
   const indexPageSelectionFlags = useMemo(() => {
@@ -375,7 +375,7 @@ function ChannelsPage() {
 
   const pageDetailRows = useMemo(
     () => filteredRowsWithIndex.slice(detailStartIndex, detailStartIndex + detailPageSize),
-    [filteredRowsWithIndex, detailStartIndex, detailPageSize]
+    [filteredRowsWithIndex, detailStartIndex, detailPageSize],
   );
 
   const detailPageSelectionFlags = useMemo(() => {
@@ -568,7 +568,7 @@ function ChannelsPage() {
     if (skippedBusy.length > 0) {
       const uniq = [...new Set(skippedBusy)];
       setUploadScheduleInfo(
-        `Bỏ qua ${uniq.length} email đang upload trên luồng khác: ${uniq.join(', ')}. Chờ xong rồi mới chạy lại cho các email đó.`
+        `Bỏ qua ${uniq.length} email đang upload trên luồng khác: ${uniq.join(', ')}. Chờ xong rồi mới chạy lại cho các email đó.`,
       );
     }
 
@@ -628,8 +628,8 @@ function ChannelsPage() {
         if (fail > 0) parts.push(`${fail} kênh lỗi`);
         setUploadScheduleInfo(
           `${skipNote}Upload YouTube (${claimed.length} kênh, tối đa ${MAX_CONCURRENT_YOUTUBE_UPLOAD_CHANNELS} song song): ${parts.join(
-            ' — '
-          )}. Kiểm tra GPM / YouTube Studio và tab Logs.`
+            ' — ',
+          )}. Kiểm tra GPM / YouTube Studio và tab Logs.`,
         );
       } catch (e) {
         const msg = e instanceof Error ? e.message : String(e);
@@ -676,7 +676,7 @@ function ChannelsPage() {
           videos: onlyLinks,
         },
       ],
-      defaultMaxVideosPerBatchDetail
+      defaultMaxVideosPerBatchDetail,
     );
   }, [selectedChannel, channelVideos, detailSelectedRowIndices, channels, defaultMaxVideosPerBatchDetail, runCreateVideoForQueue]);
 
@@ -758,8 +758,16 @@ function ChannelsPage() {
         setMappingStatus(null);
       }
     },
-    [channels]
+    [channels],
   );
+
+  const handleCreateBatchVideo = useCallback(async () => {
+    if (typeof window.runner?.minimizeApp === 'function') {
+      window.runner.minimizeApp();
+    }
+
+    await runCreateVideoForQueue(createVideoQueueFromSelection, 3);
+  }, [createVideoQueueFromSelection, runCreateVideoForQueue]);
 
   const handleExportChannelsCsv = useCallback(() => {
     const rows = indexFilteredChannels;
@@ -777,10 +785,7 @@ function ChannelsPage() {
       const s = String(v ?? '').replace(/"/g, '""');
       return /[",\n\r]/.test(s) ? `"${s}"` : s;
     };
-    const lines = [
-      headerKeys.map(([h]) => h).join(','),
-      ...rows.map(row => headerKeys.map(([, k]) => escape(row[k])).join(',')),
-    ];
+    const lines = [headerKeys.map(([h]) => h).join(','), ...rows.map(row => headerKeys.map(([, k]) => escape(row[k])).join(','))];
     const BOM = '\uFEFF';
     const blob = new Blob([BOM + lines.join('\n')], { type: 'text/csv;charset=utf-8' });
     const url = URL.createObjectURL(blob);
@@ -811,7 +816,7 @@ function ChannelsPage() {
             uploadEligibleSelectedCount={uploadChannelsFromSelection.length}
             youtubeUploadActiveThreads={youtubeUploadActiveThreads}
             refreshBusy={refreshBusy}
-            onOpenCreateVideo={() => setCreateVideoOpen(true)}
+            onOpenCreateVideo={handleCreateBatchVideo}
             onOpenAddChannel={() => {
               setMappingStatus({
                 type: 'add',

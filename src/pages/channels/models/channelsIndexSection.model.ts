@@ -4,14 +4,7 @@ import type { ChannelRow } from '@/types';
  * Cột hiển thị bảng index — khớp `CHANNELS` có `show: true`.
  * Key là prop name trên `ChannelRow` sau khi mapping từ Excel.
  */
-export const CHANNELS_INDEX_VISIBLE_COLUMNS = [
-  'channelLink',
-  'email',
-  'lastUpload',
-  'status',
-  'group',
-  'channelId',
-] as const;
+export const CHANNELS_INDEX_VISIBLE_COLUMNS = ['channelLink', 'email', 'lastUpload', 'status', 'group', 'channelId'] as const;
 
 /** Nhãn hiển thị phụ (documentation / export). */
 export const CHANNELS_INDEX_COLUMN_LABELS: Record<string, string> = {
@@ -46,10 +39,16 @@ export const CHANNELS = [
     index: 1,
   },
   {
+    key: 'channelId',
+    label: 'CHANNEL ID',
+    index: 2,
+    show: true,
+  },
+  {
     key: 'channelLink',
     label: 'CHANNEL LINK',
     index: 3,
-    show: true,
+    show: false,
   },
   {
     key: 'email',
@@ -73,12 +72,6 @@ export const CHANNELS = [
     key: 'group',
     label: 'GROUP',
     index: 10,
-    show: true,
-  },
-  {
-    key: 'channelId',
-    label: 'CHANNEL ID',
-    index: 2,
     show: true,
   },
   {

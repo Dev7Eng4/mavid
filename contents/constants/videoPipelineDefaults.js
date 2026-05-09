@@ -5,7 +5,7 @@ export const STOCK_VIDEO = {
   /** false (mặc định) = concat thuần (cut-cut, nhanh hơn nhiều); true = xfade chuỗi (đẹp hơn nhưng tốn CPU). */
   USE_XFADE: false,
   RENDER_EXTRA_SEC: 3,
-  SLOWMO_FACTOR: 2,
+  SLOWMO_FACTOR: 3,
   CANVAS_W: 1280,
   CANVAS_H: 720,
   FPS: 15,

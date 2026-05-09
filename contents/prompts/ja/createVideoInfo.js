@@ -618,17 +618,69 @@ ${transcriptLines}
 `;
 
 export const promptToCreateTextForThumbnail = (title, summary) => `
-You are a top-performing Japanese YouTube thumbnail copywriter specialized in HIGH CTR drama content.
+You are a top-performing Japanese YouTube thumbnail copywriter and thumbnail design planner.
 
-Your goal is to MAXIMIZE clicks using psychological hooks, emotional shock, and curiosity gaps.
+Your task is to convert a Japanese video title and summary into a production-ready JSON spec for an automated thumbnail renderer.
 
-Given a video title and summary, output JSON with 5 Japanese text lines and their colors.
+The thumbnail will be rendered by code.
+Therefore, your output must be stable, structured, and easy to consume programmatically.
 
-## ─── STEP 1: DETECT NICHE (internal only) ───
+The final thumbnail format:
+- Canvas: 1280x720
+- Full-text Japanese drama thumbnail
+- Exactly 5 Japanese text lines
+- L1-L4 will use the same font size in code
+- L5 will be the biggest punch line in code
+- Do not decide exact font sizes
+- Text is rendered on top of one unified cinematic background
+- Do NOT create a separate flat color panel behind the text
+- The text area may use only a dark transparent gradient overlay for readability
 
-Do NOT explain. Use it to control tone, vocabulary, and emotional intensity.
+━━━━━━━━━━━━━━━━━━━━
+LANGUAGE RULE
+━━━━━━━━━━━━━━━━━━━━
 
-Choose ONE:
+- Values inside "thumbnail_copy" must be Japanese.
+- All other fields must be English.
+- Do not write Japanese outside "thumbnail_copy".
+
+━━━━━━━━━━━━━━━━━━━━
+FACT SAFETY RULES
+━━━━━━━━━━━━━━━━━━━━
+
+Use only facts supported by the title or summary.
+
+NEVER invent:
+- numbers
+- money amounts
+- names
+- dates
+- DNA results
+- legal outcomes
+- pregnancy results
+- crimes
+- relationship details
+- locations not present in the input
+
+If the summary does not contain a number, do not create one.
+If the summary contains only suspicion, use suspicion wording.
+Do not turn suspicion into confirmed fact.
+
+Good:
+妊娠詐称疑惑
+SNSでホスト通いが発覚
+歌舞伎町の裏関係が浮上
+
+Bad:
+DNA鑑定で嘘確定
+慰謝料500万円
+ホストに300万貢いだ
+
+━━━━━━━━━━━━━━━━━━━━
+NICHE DETECTION
+━━━━━━━━━━━━━━━━━━━━
+
+Choose one niche internally and output it in English:
 
 REVENGE_SUKATTO
 FAMILY_DRAMA
@@ -644,429 +696,225 @@ ILLNESS_SACRIFICE
 CONFESSION
 HEARTWARMING
 
-## ─── GLOBAL CTR RULES (CRITICAL) ───
-
-✓ Use SPECIFIC details (numbers, money, people, duration)
-✓ Prefer concrete facts over abstract phrases
-✓ Maximize contrast (normal → betrayal / hidden truth)
-✓ Create strong curiosity gap between L3 and L4
-
-✗ FORBIDDEN:
-
-* 曖昧表現（衝撃の事実 / 信じられない真相）
-* 汎用ワード（まさかの展開 / 驚きの結果）
-* 説明的すぎる文章
-
-Thumbnail text must feel instant, sharp, and emotional.
-
-## ─── STEP 2: GENERATE 5 LINES ───
-
-### L1 — SETUP (10–15文字)
-
-Situation + relationship + time
-
-MUST include:
-
-* character (夫 / 妻 / 上司 / 義母 etc.)
-* number if possible (years, children, etc.)
-
----
-
-### L2 — TRIGGER (13–19文字)
-
-Incident or problem begins
-
-MUST:
-
-* describe clear action
-* preferably end with a verb/event
-
----
-
-### L3 — REVELATION (13–18文字) ★ MAX IMPACT
-
-⚠️ MUST BE SPECIFIC + SHOCKING
-
-REQUIRED: at least ONE:
-
-* exact number（480万円 / 3人 / 12年間）
-* specific person（元カノ / 親友 / 上司）
-* concrete wrongdoing（不倫 / 横領 / 二重生活）
-
-GOOD:
-不倫相手が3人いたと発覚
-貯金480万円を義母が使い込み
-
-BAD:
-衝撃の事実が判明 ← NG
-
----
-
-### L4 — REACTION (13–18文字)
-
-⚠️ MUST BE STRONG CONFLICT DIALOGUE
-
-FORMAT:
-[誰が]「台詞」
-
-REQUIRED:
-
-* accusation / denial / suspicion
-* emotional tension
-* end with … or ?
-
-GOOD:
-夫「それ本当に俺の子か？…」
-妻「全部あなたの嘘よね？…」
-
-BAD:
-「どういうこと？」 ← weak
-
----
-
-### L5 — RESOLUTION (8–12文字)
-
-⚠️ MUST BE CLEAR OUTCOME (NO CLIFFHANGER)
-
-REQUIRED:
-
-* victory OR downfall OR irony
-
-GOOD:
-夫、完全崩壊
-妻の逆転勝利
-義母、孤立確定
-
-BAD:
-どうなるのか？ ← NG
-
----
-
-## ─── EXTRA: CONTRAST RULE ───
-
-Prefer strong reversal:
-
-L1 (normal / positive)
-→ L3 (dark truth / betrayal)
-
-Examples:
-優しい夫 → 不倫相手3人
-貧乏生活 → 実は資産2億円
-
-## ─── STEP 3: COLORS (HIGH CTR – ADAPTIVE) ───
-
-All text is on a dark canvas.
-Color must create instant emotional impact.
-
----
-
-### 🎯 CORE RULES
-
-* L1 & L5 = Anchor color
-* L2 & L4 = #FFFFFF
-* L3 = strongest contrast (emotion-driven)
-* NEVER use #FFFFFF for L3
-
----
-
-### 🧩 ANCHOR COLOR (L1 & L5)
-
-REVENGE_SUKATTO / FAMILY_DRAMA / POVERTY_STRUGGLE / HEARTWARMING / PARENTING
-→ #FFD700
-
-HORROR_GHOST
-→ #FF3333
-
-ROMANCE_BETRAYAL / CONFESSION
-→ #FF69B4
-
-MYSTERY_URBAN
-→ #00FFFF
-
-TRUE_CRIME
-→ #8A2BE2
-
-WORKPLACE_DRAMA / INHERITANCE
-→ #FF8C00
-
-ILLNESS_SACRIFICE
-→ #87CEEB
-
----
-
-### ⚡ L2 & L4
-
-→ ALWAYS #FFFFFF
-
----
-
-### 🔥 L3 — ADAPTIVE SHOCK COLOR
-
-Choose based on content:
-
-* Betrayal / anger → #FF2D2D
-* Money gain → #FFD700
-* Money loss / debt → #FFB300
-* Horror / fear → #FF0033
-* Crime / psychological → #8A2BE2
-* Mystery → #66CCFF
-* Emotional / love → #FF1493
-
----
-
-### 🎨 CANVAS
-
-Drama / Emotional:
-→ #0f0f1f → #1a1a2e
-
-Horror / Mystery / Crime:
-→ #000000 → #050510
-
----
-
-### ⚠️ FINAL VISUAL RULES
-
-* L3 must be most eye-catching
-* L1 & L5 must match
-* Avoid similar colors between L1 and L3
-* Ensure strong contrast with background
-
-If weak → regenerate
-
----
-
-## ─── OUTPUT FORMAT (STRICT) ───
-
-* Output ONLY valid JSON
-* Wrap in ONE markdown code block
-* No explanation
-
-{
-"niche": "",
-"lines": {
-"L1": "",
-"L2": "",
-"L3": "",
-"L4": "",
-"L5": ""
-},
-"colors": {
-"L1": "",
-"L2": "#FFFFFF",
-"L3": "",
-"L4": "#FFFFFF",
-"L5": "",
-"canvas_from": "",
-"canvas_to": ""
-}
-}
-
-═══════════════════════════════════════════════════
-USER PROMPT
-═══════════════════════════════════════════════════
-
-Title: ${title}
-Summary: ${summary}
-`;
-
-export const promptToCreateTextForThumbnailText = (title, summary) => `
-# THE ULTIMATE JAPANESE DRAMA CTR PROMPT (FINAL VERSION - COMPLETE)
-
-You are a top-performing Japanese YouTube thumbnail copywriter specialized in HIGH CTR drama content.
-Your goal is to MAXIMIZE clicks using psychological hooks, emotional shock, and curiosity gaps.
-
-═══════════════════════════════════════════════════
-## ─── STEP 0: INPUT ───
-═══════════════════════════════════════════════════
-
-You will be given:
-
-Title: ${title}  
-Summary: ${summary}
-
-Use BOTH to extract key details, relationships, conflict, and hidden truth.
-
----
-
-## ─── STEP 1: DETECT NICHE (internal only) ───
-
-Choose ONE:
-REVENGE_SUKATTO / FAMILY_DRAMA / ROMANCE_BETRAYAL / POVERTY_STRUGGLE / HORROR_GHOST / MYSTERY_URBAN / TRUE_CRIME / WORKPLACE_DRAMA / PARENTING / INHERITANCE / ILLNESS_SACRIFICE / CONFESSION / HEARTWARMING
-
-Do NOT explain.
-
----
-
-## ─── GLOBAL CTR RULES (CRITICAL) ───
-
-✓ **MOBILE FIRST:** 10–14 characters per line  
-✓ **STRONG VERBS:** 暴露 / 発覚 / 崩壊 / 強奪 / 裏切り / 消失 / 転落  
-✓ **SPECIFICITY:** numbers, duration, concrete people  
-✓ **CONTRAST:** L1 (normal) → L3 (dark truth)  
-✓ **VISUAL FOCUS:** L3 must be the most eye-catching  
-
-✗ FORBIDDEN:  
-曖昧表現（衝撃の事実 / 信じられない真相）  
-汎用ワード（まさかの展開 / 驚きの結果）  
-説明的すぎる文章  
-
----
-
-## ─── STEP 2: GENERATE 5 LINES ───
-
-### L1 — SETUP (10–12文字)
-Situation + relationship
-
-REQUIRED:
-- character (夫 / 妻 / 義母 / 上司 etc.)
-- number (結婚5年 / 子供2人)
-
----
-
-### L2 — TRIGGER (10–14文字)
-
-Start of conflict with STRONG VERB
-
-REQUIRED:
-- include **abnormal pattern or unusual behavior**
-
-Examples:
-毎晩3時に夫のスマホが鳴る  
-妻が金曜だけ外泊し始める  
-
----
-
-### L3 — REVELATION (10–14文字) ★ MAIN HOOK
-
-REQUIRED:
-- wrap with 【 】
-- must include at least **TWO of the following**:
-  ① number（3人 / 500万 / 12年）  
-  ② specific person（親友 / 実の妹 / 上司）  
-  ③ concrete wrongdoing（不倫 / 横領 / 二重生活）  
-
-Examples:
-【不倫相手は親友3人】  
-【借金500万を義母が横領】  
-
----
-
-### L4 — REACTION (10–14文字)
-
-FORMAT:
-[誰が]「台詞」
-
-REQUIRED:
-- must be ONE of:
-  ・accusation（断定）  
-  ・denial（全面否定）  
-  ・blame（責任転嫁）  
-
-Examples:
-妻「全部あなたの嘘よね？」  
-夫「お前が全部壊したんだ！」  
-
----
-
-### L5 — RESOLUTION (8–10文字)
-
-REQUIRED:
-- clear outcome
-- must include ONE:
-  ・転落（downfall）  
-  ・喪失（losing everything）  
-  ・逆転（comeback）  
-  ・因果応報（karma）  
-
-Examples:
-夫、全て失う  
-妻の完全逆転  
-義母、孤立確定  
-
----
-
-## ─── STEP 3: COLORS & CANVAS (PSYCHOLOGICAL) ───
-
-### 🧩 ANCHOR COLOR (L1 & L5)
-
-REVENGE / FAMILY / POVERTY → #FFD700  
-HORROR / GHOST → #FF3333  
-ROMANCE / CONFESSION → #FF69B4  
-MYSTERY → #00FFFF  
-TRUE_CRIME → #8A2BE2  
-WORKPLACE / INHERITANCE → #FF8C00  
-
----
-
-### ⚡ L2 & L4
-→ ALWAYS #FFFFFF
-
----
-
-### 🔥 L3 — SHOCK COLOR (MOST IMPORTANT)
-
-RULE:
-Must be the most visually dominant
-
-Use based on content:
-
-- Betrayal / anger → #FF0000  
-- Money gain → #FFD700  
-- Money loss → #FFB300  
-- Crime / psychological → #8A2BE2  
-- Mystery → #66CCFF  
-
-If L3 contains numbers → prefer brighter tone
-
----
-
-### 🎨 CANVAS GRADIENT (NICHE-SPECIFIC)
-
-REVENGE / ROMANCE_BETRAYAL:
-→ #1a0505 → #000000  
-
-HORROR / TRUE_CRIME / MYSTERY:
-→ #0a0015 → #050510  
-
-OTHERS:
-→ #121212 → #000000  
-
----
-
-### ⚠️ FINAL VISUAL RULES
-
-- L3 must dominate visually  
-- L1 and L5 must match color  
-- Avoid similar colors between L1 and L3  
-- Ensure readability on mobile  
-
-If weak → regenerate
-
----
-
-## ─── OUTPUT FORMAT (STRICT) ───
-
-Output ONLY valid JSON. No explanation.
+━━━━━━━━━━━━━━━━━━━━
+COPY STRUCTURE
+━━━━━━━━━━━━━━━━━━━━
+
+Create exactly 5 Japanese lines.
+
+IMPORTANT LENGTH RULE:
+- L1, L2, L3, L4 must each be 13–21 Japanese full-width characters.
+- L5 must be 8–16 Japanese full-width characters.
+- Do not make L1–L4 too short.
+- Avoid overly long lines that become hard to read on mobile.
+- Japanese does not use spaces like English, so count visual Japanese characters, not words.
+
+L1 — SETUP
+- Normal situation before the collapse
+- Include a clear character if possible
+- Must be 13–21 Japanese full-width characters
+
+L2 — TRIGGER
+- The event where the problem begins
+- Clear action or incident
+- Must be 13–21 Japanese full-width characters
+
+L3 — EVIDENCE / SHOCK
+- The most concrete shocking evidence
+- Must use specific nouns from the summary
+- No generic phrases
+- Must be 13–21 Japanese full-width characters
+
+L4 — CONFLICT / ACCUSATION
+- Emotional confrontation, accusation, denial, or suspicion
+- Dialogue is allowed but not required
+- If using dialogue, keep it visually balanced
+- Must be 13–21 Japanese full-width characters
+
+L5 — FINAL PUNCH / TWIST
+- Biggest and strongest line
+- Clear twist, downfall, betrayal, or outcome
+- No question-only cliffhanger
+- Must be 8–16 Japanese full-width characters
+- Must be visually punchy and stronger than L1-L4
+
+━━━━━━━━━━━━━━━━━━━━
+FORBIDDEN JAPANESE PHRASES
+━━━━━━━━━━━━━━━━━━━━
+
+Do not use vague generic phrases such as:
+- 衝撃の事実
+- 信じられない真相
+- まさかの展開
+- 驚きの結果
+- ヤバすぎる
+- とんでもない
+- その結末は
+- どうなるのか
+
+━━━━━━━━━━━━━━━━━━━━
+COLOR STRATEGY
+━━━━━━━━━━━━━━━━━━━━
+
+Return fill color, stroke color, and shadow color for every line.
+
+General rules:
+- L1 = setup anchor color
+- L2 = white
+- L3 = strongest evidence/shock color
+- L4 = white
+- L5 = final punch color
+- L3 and L5 must be the most eye-catching lines
+- L5 may match L3 if it strengthens the final punch
+- Avoid low contrast with the background
+
+Recommended fill colors:
+- Betrayal / anger: #FF2D2D
+- Money / gain: #FFD700
+- Money loss / debt: #FFB300
+- Horror / fear: #FF0033
+- Crime / psychological: #8A2BE2
+- Mystery: #66CCFF
+- Emotional / romance: #FF1493
+- Setup anchor: #FFD700
+- White line: #FFFFFF
+
+Stroke rules:
+- White fill → black stroke
+- Yellow fill → black stroke
+- Red fill → white stroke and black shadow
+- Pink fill → black stroke
+- Cyan fill → black stroke
+- Purple fill → white or black stroke depending on contrast
+
+━━━━━━━━━━━━━━━━━━━━
+BACKGROUND STRATEGY
+━━━━━━━━━━━━━━━━━━━━
+
+Return a unified cinematic background color strategy.
+
+The background must support the story mood and text readability.
+
+Important:
+- The left text area and right visual area must share the same background atmosphere.
+- Do not create a separate solid color background for the text.
+- Use a transparent dark gradient overlay behind text only if needed.
+
+Background categories:
+- Romance betrayal drama: dark red, purple, black, magenta accents
+- Family drama: navy, dark purple, warm yellow accents
+- Revenge / sukakto: black, gold, crimson
+- Horror / mystery: black, blue, green, red
+- Workplace drama: dark blue, orange, gray
+- Poverty struggle: dark brown, navy, muted gold
+- Heartwarming: warm orange, soft gold, dark brown
+
+━━━━━━━━━━━━━━━━━━━━
+LAYOUT CONTRACT FOR CODE
+━━━━━━━━━━━━━━━━━━━━
+
+Output layout metadata for the renderer:
+- Text side: left
+- Visual/emotional image side: right
+- Text block should occupy about 45% of canvas width
+- Visual side should occupy about 55% of canvas width
+- L1-L4 are upper text lines
+- L5 is punch line
+- L3 is shock line
+
+Do not output exact font sizes.
+
+━━━━━━━━━━━━━━━━━━━━
+OUTPUT FORMAT
+━━━━━━━━━━━━━━━━━━━━
+
+Output ONLY valid JSON.
+Wrap in one markdown code block.
+No explanation.
 
 {
   "niche": "",
-  "lines": {
+  "emotion": {
+    "primary": "",
+    "secondary": ""
+  },
+  "thumbnail_copy": {
     "L1": "",
     "L2": "",
     "L3": "",
     "L4": "",
     "L5": ""
   },
-  "colors": {
-    "L1": "",
-    "L2": "#FFFFFF",
-    "L3": "",
-    "L4": "#FFFFFF",
-    "L5": "",
-    "canvas_from": "",
-    "canvas_to": ""
+  "text_styles": {
+    "L1": {
+      "fill": "",
+      "stroke": "",
+      "stroke_width_role": "normal",
+      "shadow": "#000000"
+    },
+    "L2": {
+      "fill": "#FFFFFF",
+      "stroke": "#000000",
+      "stroke_width_role": "normal",
+      "shadow": "#000000"
+    },
+    "L3": {
+      "fill": "",
+      "stroke": "",
+      "stroke_width_role": "shock",
+      "shadow": "#000000"
+    },
+    "L4": {
+      "fill": "#FFFFFF",
+      "stroke": "#000000",
+      "stroke_width_role": "normal",
+      "shadow": "#000000"
+    },
+    "L5": {
+      "fill": "",
+      "stroke": "",
+      "stroke_width_role": "punch",
+      "shadow": "#000000"
+    }
+  },
+  "background": {
+    "base_from": "",
+    "base_to": "",
+    "accent_color": "",
+    "mood": "",
+    "text_area_treatment": "same unified background continues under text with transparent dark gradient overlay only",
+    "vignette": true
+  },
+  "layout": {
+    "canvas": "1280x720",
+    "text_side": "left",
+    "visual_side": "right",
+    "text_width_ratio": 0.45,
+    "visual_width_ratio": 0.55,
+    "upper_lines": ["L1", "L2", "L3", "L4"],
+    "punch_line": "L5",
+    "shock_line": "L3",
+    "mobile_readability_required": true
+  },
+  "validation": {
+    "L1_to_L4_are_13_to_21_japanese_chars": true,
+    "L5_is_8_to_16_japanese_chars": true,
+    "all_thumbnail_copy_is_japanese": true,
+    "no_japanese_outside_thumbnail_copy": true,
+    "no_invented_facts": true,
+    "no_generic_phrase": true,
+    "L5_is_strongest": true
   }
 }
+
+━━━━━━━━━━━━━━━━━━━━
+USER INPUT
+━━━━━━━━━━━━━━━━━━━━
+
+Title: ${title}
+
+Summary:
+${summary}
 `;
 
 export const promptToDetectNiche = (headTranscript, tailTranscript) => `

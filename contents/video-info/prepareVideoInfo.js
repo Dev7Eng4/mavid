@@ -597,7 +597,7 @@ const prepareVideoInfo = async ({ url, options = {} }) => {
 
     if (!generalPromptFromMeta) {
       console.warn(
-        '[prepareVideoInfo] onlyUpdateInfo: không có generalPrompt (hoặc visualBible.hero_image_package.prompt) trong video-meta.json.'
+        '[prepareVideoInfo] onlyUpdateInfo: không có generalPrompt (hoặc visualBible.hero_image_package.prompt) trong video-meta.json.',
       );
       return { url, onlyUpdateInfo: true, generalPrompt: '' };
     }
@@ -672,7 +672,7 @@ const prepareVideoInfo = async ({ url, options = {} }) => {
   const visualBible = 'visualBible' in llmResult ? llmResult.visualBible : null;
   const generalPrompt = 'generalPrompt' in llmResult ? llmResult.generalPrompt : undefined;
   const title = finalSummary?.metadata?.title || '';
-  const summary = finalSummary?.final_summary?.overview || '';
+  const summary = finalSummary?.final_summary;
 
   // save video info to video-meta.json
   const videoMetaData = {

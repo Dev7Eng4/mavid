@@ -3,7 +3,7 @@
  *
  * Đọc danh sách stock video từ excel trong assets/visual-resource/stock,
  * chọn video phù hợp (phần usable × slowdown >= target, USED thấp nhất),
- * tải về, zoom 120% + crop center + slowdown ×2 → trả path clip đã xử lý.
+ * tải về, zoom 140% (+40%) → crop center + slowdown ×2 → trả path clip đã xử lý.
  */
 
 import fs from 'fs';
@@ -13,7 +13,7 @@ import { promisify } from 'util';
 import ExcelJS from 'exceljs';
 import youtubedl from 'youtube-dl-exec';
 
-import { OUTPUT_DIR, ROOT } from '../shared.js';
+import { DOWNLOADS_DIR, OUTPUT_DIR, ROOT } from '../shared.js';
 import { STOCK_VIDEO } from '../../constants/index.js';
 import { GPU_INFO } from '../../utils/hardware.util.js';
 
@@ -25,9 +25,9 @@ const SKIP_START_SEC = 120;
 /** Bỏ bao nhiêu giây cuối video stock */
 const SKIP_END_SEC = 120;
 /** Hệ số slowdown (video gốc sẽ chậm đi bấy nhiêu lần) */
-const SLOWMO_FACTOR = STOCK_VIDEO.SLOWMO_FACTOR || 2;
-/** Hệ số zoom (1.2 = 120%) */
-const ZOOM_FACTOR = 1.2;
+const SLOWMO_FACTOR = STOCK_VIDEO.SLOWMO_FACTOR || 3;
+/** Hệ số zoom so với canvas trước khi crop (1.4 = phóng 140%, tương đương zoom ~+40%) */
+const ZOOM_FACTOR = 1.4;
 
 const CANVAS_W = STOCK_VIDEO.CANVAS_W;
 const CANVAS_H = STOCK_VIDEO.CANVAS_H;
@@ -66,8 +66,8 @@ function parseDurationToSeconds(duration) {
  * @returns {number}
  */
 function getEffectiveDuration(durationSec) {
-  const usable = durationSec - SKIP_START_SEC - SKIP_END_SEC;
-  return Math.max(0, usable) * SLOWMO_FACTOR;
+  // const usable = durationSec - SKIP_START_SEC - SKIP_END_SEC;
+  return Math.max(0, durationSec) * 3;
 }
 
 /**
@@ -172,46 +172,89 @@ async function selectAndMarkStockVideo(targetDurationSec) {
   return { link: chosen.link, durationSec: chosen.durationSec };
 }
 
+/** @param {string} name */
+function isProbablyVideoFile(name) {
+  return /\.(mp4|webm|mkv|mov|m4v|avi)$/i.test(name) && !/\.part$/i.test(name);
+}
+
 /**
- * Tải video YouTube (chỉ video, không audio) ở chất lượng HD.
- * @param {string} url
+ * File video mới xuất hiện trong thư mục sau khi yt-dlp chạy xong.
  * @param {string} outputDir
- * @returns {Promise<string>} Đường dẫn file video đã tải
+ * @param {Set<string>} namesBefore
+ * @returns {string} đường dẫn tuyệt đối tới file
  */
-async function downloadYoutubeVideoOnly(url, outputDir) {
-  fs.mkdirSync(outputDir, { recursive: true });
-  const outputTemplate = path.join(outputDir, 'stock_raw.%(ext)s');
+function resolveDownloadedVideoPath(outputDir, namesBefore) {
+  const namesAfter = fs.readdirSync(outputDir);
+  const added = namesAfter.filter(f => !namesBefore.has(f) && isProbablyVideoFile(f));
+  if (added.length === 1) {
+    return path.join(outputDir, added[0]);
+  }
+  if (added.length > 1) {
+    const scored = added.map(f => ({
+      f,
+      t: fs.statSync(path.join(outputDir, f)).mtimeMs,
+    }));
+    scored.sort((a, b) => b.t - a.t);
+    return path.join(outputDir, scored[0].f);
+  }
+  /* yt-dlp ghi đè cùng tên file → không có tên mới: lấy file video mới sửa gần nhất (trừ output ffmpeg) */
+  const skip = new Set(['stock_processed.mp4']);
+  const candidates = namesAfter.filter(f => isProbablyVideoFile(f) && !skip.has(f));
+  if (candidates.length === 0) {
+    throw new Error(`[StockVisual] Không thấy file video trong ${outputDir} sau khi tải.`);
+  }
+  const scored = candidates.map(f => ({
+    f,
+    t: fs.statSync(path.join(outputDir, f)).mtimeMs,
+  }));
+  scored.sort((a, b) => b.t - a.t);
+  return path.join(outputDir, scored[0].f);
+}
 
-  console.log('[StockVisual] Đang tải video stock (video only, HD)...');
+async function downloadOverlayVisualVideo(url, options = {}) {
+  const { outputDir = DOWNLOADS_DIR, format = 'best', maxHeight = 480 } = options;
 
-  const subprocess = youtubedl.exec(url, {
-    output: outputTemplate,
-    format: 'bestvideo[height<=720][vcodec^=avc1]/bestvideo[height<=720]/bestvideo[vcodec^=avc1]/bestvideo',
-    noCheckCertificates: true,
-    noWarnings: true,
-    addHeader: ['referer:youtube.com', 'user-agent:googlebot'],
-  });
+  const preferredFormats = [
+    // 480p không âm thanh
+    'bestvideo[height=480][ext=mp4]',
+    'bestvideo[height=480]',
+    // Backup: 360p
+    'bestvideo[height=360][ext=mp4]',
+    'bestvideo[height=360]',
+    // Backup: 720p (nếu không có 480 hoặc thấp hơn)
+    'bestvideo[height=720][ext=mp4]',
+    'bestvideo[height=720]',
+    // Backup cuối: video tốt nhất không âm thanh
+    'bestvideo[ext=mp4]',
+    'bestvideo',
+  ];
 
-  subprocess.stderr?.on('data', chunk => {
-    const text = chunk.toString();
-    const match = text.match(/(\d+\.?\d*)%/);
-    if (match) process.stdout.write(`\r[StockVisual] Đang tải: ${parseFloat(match[1]).toFixed(1)}%`);
-  });
+  for (const format of preferredFormats) {
+    try {
+      console.log(`Thử tải với format: ${format}`);
 
-  await subprocess;
-  process.stdout.write('\n');
-  console.log('[StockVisual] Tải video stock xong!');
+      const outPath = path.join(outputDir, 'overlay_visual.mp4');
+      await youtubedl(url, {
+        format,
+        output: outPath,
+        noAudio: true,
+      });
 
-  const files = fs.readdirSync(outputDir).filter(f => f.startsWith('stock_raw.'));
-  if (files.length === 0) throw new Error('[StockVisual] Không tìm thấy file stock sau khi tải.');
-  return path.join(outputDir, files[0]);
+      console.log(`✅ Tải thành công với format: ${format}`);
+      return outPath;
+    } catch (err) {
+      console.warn(`⚠️ Format "${format}" không khả dụng, thử format tiếp theo...`);
+    }
+  }
+
+  throw new Error('❌ Không thể tải video với bất kỳ format nào.');
 }
 
 /**
  * Xử lý video stock:
  * 1. Bỏ SKIP_START_SEC giây đầu
  * 2. Lấy đủ (targetDuration / SLOWMO_FACTOR) giây gốc
- * 3. Zoom 120% (scale lên rồi crop center về canvas size)
+ * 3. Zoom 140% (+40%): scale lên rồi crop center về canvas size
  * 4. Slowdown ×2 (setpts=2*PTS)
  *
  * @param {string} rawVideoPath
@@ -220,6 +263,9 @@ async function downloadYoutubeVideoOnly(url, outputDir) {
  * @returns {Promise<string>} Đường dẫn file clip đã xử lý
  */
 async function prepareStockClip(rawVideoPath, targetDuration, outputDir) {
+  console.log('🚀 ~ prepareStockClip ~ outputDir:', outputDir);
+  console.log('🚀 ~ prepareStockClip ~ targetDuration:', targetDuration);
+  console.log('🚀 ~ prepareStockClip ~ rawVideoPath:', rawVideoPath);
   const clipPath = path.join(outputDir, 'stock_processed.mp4');
   const sourceDuration = targetDuration / SLOWMO_FACTOR;
 
@@ -239,6 +285,9 @@ async function prepareStockClip(rawVideoPath, targetDuration, outputDir) {
       `slowdown ×${SLOWMO_FACTOR} = ${targetDuration.toFixed(1)}s, zoom ${ZOOM_FACTOR * 100}% → crop ${CANVAS_W}×${CANVAS_H}`,
   );
 
+  // `-t` phải đứng trước `-i` để giới hạn độ dài **nguồn** (giây gốc sau -ss).
+  // Nếu `-t` đặt sau `-i` thì ffmpeg coi là giới hạn **đầu ra** → với setpts slowmo,
+  // file ra chỉ ~sourceDuration giây thay vì targetDuration (vd: 1800s → ~15 phút).
   const args = [
     'ffmpeg',
     '-hide_banner',
@@ -247,10 +296,10 @@ async function prepareStockClip(rawVideoPath, targetDuration, outputDir) {
     '-y',
     '-ss',
     String(SKIP_START_SEC),
-    '-i',
-    rawVideoPath,
     '-t',
     String(sourceDuration),
+    '-i',
+    rawVideoPath,
     '-vf',
     vf,
     '-an',
@@ -280,7 +329,7 @@ export async function prepareStockVisualClip(targetDuration) {
     }
 
     fs.mkdirSync(stockTempDir, { recursive: true });
-    const rawPath = await downloadYoutubeVideoOnly(chosen.link, stockTempDir);
+    const rawPath = await downloadOverlayVisualVideo(chosen.link, { outputDir: stockTempDir });
     console.log('[StockVisual] rawPath:', rawPath);
     stockClipPath = await prepareStockClip(rawPath, targetDuration, stockTempDir);
     console.log('[StockVisual] stockClipPath:', stockClipPath);

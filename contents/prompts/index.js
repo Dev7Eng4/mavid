@@ -45,7 +45,7 @@ export function resolveThumbnailPromptBuilder(prompts, styleKey) {
     };
   }
   console.warn(
-    `[thumbnail] Style "${raw}" (→ "${k}") không có trong gói createImage (hoặc không phải hàm) — dùng promptToCreateThumbnail (tự động).`
+    `[thumbnail] Style "${raw}" (→ "${k}") không có trong gói createImage (hoặc không phải hàm) — dùng promptToCreateThumbnail (tự động).`,
   );
   return { build: def, isNeedImage: false, usedStyleKey: '', didFallback: true };
 }
@@ -80,29 +80,14 @@ export async function loadPromptByLanguage(language) {
 
   async function importVideoInfo() {
     try {
-      return await import(`./${lang}/createVideoInfo.js`);
+      return await import(`./${lang}/index.js`);
     } catch {
       if (lang !== FALLBACK_LANG) {
-        console.log(`Không tìm thấy createVideoInfo cho "${lang}", dùng "${FALLBACK_LANG}".`);
+        console.log(`Không tìm thấy index cho "${lang}", dùng "${FALLBACK_LANG}".`);
       }
-      return await import(`./${FALLBACK_LANG}/createVideoInfo.js`);
+      return await import(`./${FALLBACK_LANG}/index.js`);
     }
   }
 
-  async function importCreateImage() {
-    try {
-      return await import(`./${lang}/createImage.js`);
-    } catch {
-      if (lang !== FALLBACK_LANG) {
-        console.log(`Không tìm thấy createImage cho "${lang}", dùng "${FALLBACK_LANG}".`);
-      }
-      return await import(`./${FALLBACK_LANG}/createImage.js`);
-    }
-  }
-
-  const [videoInfo, createImage] = await Promise.all([importVideoInfo(), importCreateImage()]);
-  return {
-    ...videoInfo,
-    ...createImage,
-  };
+  return await importVideoInfo();
 }
