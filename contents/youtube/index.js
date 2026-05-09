@@ -4,7 +4,7 @@
  */
 export { YOUTUBE_SELECTOR } from './studioSelectors.js';
 export { assertSafeChannelFolder } from './channelFolder.util.js';
-export { findChannelRowByEmail, pickPublishFieldsFromChannelRow, readChannelConfigSync } from '../channel/index.js';
+export { findChannelRowByEmail, findChannelRowById, pickPublishFieldsFromChannelRow, readChannelConfigSync } from '../channel/index.js';
 export { getYoutubePublishPlan } from './publishSchedule.util.js';
 export {
   syncChannelAfterYoutubeUpload,
@@ -13,10 +13,4 @@ export {
   updateChannelConfigInfo,
   MAVID_CHANNEL_CONFIG_FILENAME,
 } from './uploadAfterSync.js';
-export {
-  apiRootForPlaywright,
-  firstMp4InDir,
-  hasThumbnailImageInDir,
-  assertSafeSubfolderName,
-  listUploadJobs,
-} from './uploadJobs.util.js';
+export { apiRootForPlaywright, firstMp4InDir, hasThumbnailImageInDir, assertSafeSubfolderName, listUploadJobs } from './uploadJobs.util.js';

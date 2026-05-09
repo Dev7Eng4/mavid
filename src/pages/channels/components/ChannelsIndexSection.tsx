@@ -1,12 +1,7 @@
-import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { useEffect, useMemo, useRef, type ReactNode } from 'react';
 import type { ChannelsIndexSectionProps } from '../models/channelsIndexSection.model';
 import { CHANNELS, CHANNEL_TABLE_HEADER_DISPLAY } from '../models/channelsIndexSection.model';
-import {
-  DownloadIcon,
-  FilterIcon,
-  MoreVerticalIcon,
-  SpinnerIcon,
-} from '@/components/ui/Icons';
+import { DownloadIcon, FilterIcon, SpinnerIcon } from '@/components/ui/Icons';
 import { AppButton } from '@/components/ui/AppButton';
 import { CustomSelect } from '@/components/ui/CustomSelect';
 import { TablePaginationBar } from '@/components/ui/TablePaginationBar';
@@ -15,92 +10,6 @@ import {
   channelStatusBadgeStyle,
   formatChannelLastUploadDisplay,
 } from '../utils/channelTableDisplay';
-
-function IndexRowActionsMenu({
-  rowId,
-  onEdit,
-  onDetail,
-}: {
-  rowId: string;
-  onEdit: (id: string) => void;
-  onDetail: (id: string) => void;
-}) {
-  const [open, setOpen] = useState(false);
-  const wrapRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    if (!open) return;
-    const close = (e: MouseEvent) => {
-      if (wrapRef.current && !wrapRef.current.contains(e.target as Node)) setOpen(false);
-    };
-    document.addEventListener('mousedown', close);
-    return () => document.removeEventListener('mousedown', close);
-  }, [open]);
-
-  return (
-    <div ref={wrapRef} className='relative inline-flex justify-center' onClick={e => e.stopPropagation()}>
-      <button
-        type='button'
-        aria-haspopup='menu'
-        aria-expanded={open}
-        className='rounded-lg p-2 opacity-85 transition-opacity hover:opacity-100 cursor-pointer'
-        style={{ color: 'var(--text-muted)' }}
-        title='Thao tác'
-        onClick={() => setOpen(o => !o)}
-      >
-        <MoreVerticalIcon className='h-5 w-5' />
-      </button>
-      {open ? (
-        <div
-          role='menu'
-          className='absolute right-0 top-full z-30 mt-1 min-w-[10rem] rounded-xl py-1 shadow-lg'
-          style={{
-            background: 'var(--card-bg)',
-            border: '1px solid var(--border)',
-            boxShadow: 'var(--shadow-elevated)',
-          }}
-        >
-          <button
-            type='button'
-            role='menuitem'
-            className='block w-full px-3 py-2 text-left text-sm font-medium cursor-pointer transition-colors'
-            style={{ color: 'var(--text-h)' }}
-            onMouseEnter={e => {
-              e.currentTarget.style.background = 'var(--hover-bg)';
-            }}
-            onMouseLeave={e => {
-              e.currentTarget.style.background = 'transparent';
-            }}
-            onClick={() => {
-              onEdit(rowId);
-              setOpen(false);
-            }}
-          >
-            Sửa
-          </button>
-          <button
-            type='button'
-            role='menuitem'
-            className='block w-full px-3 py-2 text-left text-sm font-medium cursor-pointer transition-colors'
-            style={{ color: 'var(--text-h)' }}
-            onMouseEnter={e => {
-              e.currentTarget.style.background = 'var(--hover-bg)';
-            }}
-            onMouseLeave={e => {
-              e.currentTarget.style.background = 'transparent';
-            }}
-            onClick={() => {
-              onDetail(rowId);
-              setOpen(false);
-            }}
-          >
-            Chi tiết
-          </button>
-        </div>
-      ) : null}
-    </div>
-  );
-}
 
 export function ChannelsIndexSection({
   loading,
@@ -275,7 +184,7 @@ export function ChannelsIndexSection({
                   </th>
                 ))}
                 <th
-                  className='w-14 px-2 py-3 text-center align-middle text-xs font-semibold uppercase tracking-wider whitespace-nowrap'
+                  className='px-2 py-3 text-center align-middle text-xs font-semibold uppercase tracking-wider whitespace-nowrap'
                   style={{ color: 'var(--text-muted)', borderBottom: '1px solid var(--border)' }}
                 >
                   ACTIONS
@@ -340,10 +249,30 @@ export function ChannelsIndexSection({
                       })}
 
                       <td
-                        className='px-2 py-3 align-middle text-center'
+                        className='px-2 py-3 align-middle'
                         style={{ borderBottom: '1px solid var(--border)' }}
+                        onClick={e => e.stopPropagation()}
                       >
-                        <IndexRowActionsMenu rowId={row.id} onEdit={onOpenEditRow} onDetail={onOpenDetailRow} />
+                        <div className='flex flex-wrap items-center justify-center gap-1.5'>
+                          <AppButton
+                            type='button'
+                            variant='neutral'
+                            size='sm'
+                            className='min-w-0 shrink-0'
+                            onClick={() => onOpenEditRow(row.id)}
+                          >
+                            Sửa
+                          </AppButton>
+                          <AppButton
+                            type='button'
+                            variant='neutral'
+                            size='sm'
+                            className='min-w-0 shrink-0'
+                            onClick={() => onOpenDetailRow(row.id)}
+                          >
+                            Chi tiết
+                          </AppButton>
+                        </div>
                       </td>
                     </tr>
                   );

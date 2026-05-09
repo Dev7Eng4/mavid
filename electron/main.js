@@ -969,7 +969,7 @@ async function importConstantsFresh() {
   } catch (e) {
     console.warn(
       '[MaVid] Không import được contents/constants/index.js. Dùng giá trị fallback trong main cho đến khi sửa lỗi / Lưu settings.',
-      e instanceof Error ? e.message : e
+      e instanceof Error ? e.message : e,
     );
     mod = getDefaultConstantsModule();
   }
@@ -1303,7 +1303,7 @@ function normHeaderCell(s) {
 }
 
 /** Khớp constants trong contents/getInfoChannel.js (dropdown index.xlsx). */
-const INDEX_VIDEO_TYPE_OPTIONS = ['from_audio', 'reup_full'];
+const INDEX_VIDEO_TYPE_OPTIONS = ['audio', 'video'];
 const INDEX_THOI_GIAN_OPTIONS = [15, 20, 30, 60];
 
 ipcMain.handle('read-channel-data', async (_event, { filePath }) => {
@@ -1545,7 +1545,7 @@ ipcMain.handle('write-mavid-channel-config', async (_event, { channelFolder, pat
     if (!Array.isArray(clean.channels)) throw new Error('channels phải là mảng.');
     for (const ch of clean.channels) {
       if (ch.email != null && typeof ch.email !== 'string') throw new Error('email không hợp lệ.');
-      if (ch.videoType != null && ch.videoType !== 'from_audio' && ch.videoType !== 'reup_full') {
+      if (ch.videoType != null && ch.videoType !== 'audio' && ch.videoType !== 'video') {
         throw new Error('videoType không hợp lệ.');
       }
       if (ch.durationMinuteFrom != null && (typeof ch.durationMinuteFrom !== 'number' || !Number.isFinite(ch.durationMinuteFrom))) {

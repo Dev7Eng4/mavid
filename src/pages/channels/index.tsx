@@ -275,7 +275,7 @@ function ChannelsPage() {
       for (let i = 0; i < queue.length; i++) {
         const { videoType, channelId, id, videos } = queue[i];
         setIndexBatchVideo({ current: i + 1, total: queue.length, channelLabel: channelId });
-        const def = scriptDefs.find(s => s.id === (videoType === 'reup_full' ? SCRIPT_REUP_FULL : SCRIPT_FROM_AUDIO));
+        const def = scriptDefs.find(s => s.id === (videoType === 'video' ? SCRIPT_REUP_FULL : SCRIPT_FROM_AUDIO));
         if (!def) {
           continue;
         }
@@ -599,6 +599,7 @@ function ChannelsPage() {
           await window.runner!.runScript('uploadYoutubeViaGpm', {
             gpmProfileId: p.gpmProfileId,
             channelFolder: p.channelFolder,
+            id: p.id,
             email: p.email,
             maxUploads: p.totalVideos,
             gpmApiBase: gpmApi.getBaseUrl(),
@@ -721,6 +722,7 @@ function ChannelsPage() {
         {
           channelFolder: selectedChannelRow?.channelId,
           email,
+          id: selectedChannel,
           totalVideos: uploadFolderNames.length,
           gpmProfileId,
           uploadFolderNames,

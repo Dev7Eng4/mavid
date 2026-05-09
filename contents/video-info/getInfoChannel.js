@@ -435,7 +435,7 @@ const handleUpdateChannelConfigFile = async (channelDir, formData) => {
  * @param {string} options.formData.channelLink - URL kênh / playlist
  * @param {string} options.formData.email
  * @param {string} [options.formData.myChannel] — cột «KÊNH CỦA TÔI» index (sau EMAIL)
- * @param {string} options.formData.videoType - from_audio | reup_full
+ * @param {string} options.formData.videoType - audio | video
  * @param {number} options.formData.durationMinuteFrom
  * @param {number} options.formData.durationMinuteTo
  * @param {string} options.formData.background
@@ -555,7 +555,7 @@ export async function addChannelFromForm(options = {}) {
     videoType: formData.videoType,
     durationMinutes: formData.durationMinuteFrom + '_' + formData.durationMinuteTo,
     background:
-      formData.videoType === 'reup_full'
+      formData.videoType === 'video'
         ? String(formData.overlay ?? formData.background ?? '').trim()
         : String(formData.background ?? '').trim(),
     channelStatus: String(formData.email ?? '').trim() ? 'LIVE' : 'INIT',

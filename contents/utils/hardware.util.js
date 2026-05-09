@@ -74,7 +74,7 @@ function detectHardware() {
   const { BITRATE, MAX_BITRATE, BUFSIZE } = STOCK_VIDEO;
   const bitrateArgs = ['-b:v', BITRATE, '-maxrate', MAX_BITRATE, '-bufsize', BUFSIZE];
 
-  // [OPT-4] Bitrate thấp hơn cho reup_full (720p, đã overlay, không cần bitrate cao)
+  // [OPT-4] Bitrate thấp hơn cho video (720p, đã overlay, không cần bitrate cao)
   const reupBitrateArgs = ['-maxrate', '2M', '-bufsize', '3M'];
 
   const makeAudioBitrateArgs = ['-b:v', '1M', '-maxrate', '1.5M', '-bufsize', '2M'];
@@ -137,18 +137,7 @@ function detectHardware() {
     stockDecodeArgs = ['-hwaccel', 'd3d11va'];
     // AMF tuning: usage=transcoding (cân bằng tốc độ), bf=0 (B-frame AMF hay flaky + chậm),
     // async_depth=4 (pipeline GPU 4 frame), pix_fmt nv12 (native AMF, tránh swscale yuv420p→nv12 mỗi frame).
-    const amfBaseArgs = [
-      '-c:v',
-      'h264_amf',
-      '-usage',
-      'transcoding',
-      '-quality',
-      'speed',
-      '-bf',
-      '0',
-      '-async_depth',
-      '4',
-    ];
+    const amfBaseArgs = ['-c:v', 'h264_amf', '-usage', 'transcoding', '-quality', 'speed', '-bf', '0', '-async_depth', '4'];
     videoEncodeArgs = [...amfBaseArgs, ...bitrateArgs, '-pix_fmt', 'nv12', '-tag:v', 'avc1'];
     reupVideoEncodeArgs = [...amfBaseArgs, ...reupBitrateArgs, '-pix_fmt', 'nv12', '-tag:v', 'avc1'];
     makeAudioVideoEncodeArgs = [...amfBaseArgs, ...makeAudioBitrateArgs, '-pix_fmt', 'nv12', '-tag:v', 'avc1'];

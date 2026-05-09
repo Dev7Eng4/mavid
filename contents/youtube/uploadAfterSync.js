@@ -3,6 +3,7 @@
  * - `mavid-channel-config.json`: uploadedVideos, latestUploadDate, latestUploadTime (theo email hoặc `channels[]` chỉ có 1 phần tử).
  *   Có thể gọi từng bước: `successfulFolderNames` 1 phần tử + `latestScheduleSlot` mốc vừa xong → tăng +1 và ghi mốc mới ngay.
  * - Excel/CSV kênh: cột STATUS cho các dòng khớp LINK VIDEO ↔ thư mục video.
+ * - `channels/index.xlsx`: cột LAST UPLOAD (bước cuối, sau khi xử lý STATUS ở file kênh).
  */
 
 import fs from 'fs';
@@ -10,6 +11,7 @@ import path from 'path';
 import { resolveChannelsDir } from '../utils/channelsStoragePath.js';
 import { readChannelConfigSync, CHANNEL_CONFIG_FILENAME } from '../channel/index.js';
 import { pickChronologicallyLatestSlot } from './publishScheduleByDuration.util.js';
+import { CHANNELS } from '../constants/channel.js';
 
 export const MAVID_CHANNEL_CONFIG_FILENAME = CHANNEL_CONFIG_FILENAME;
 
@@ -20,17 +22,12 @@ const LOG = '[afterUpload]';
 
 /**
  * Ghi cột LAST UPLOAD trên `channels/index.xlsx` cho đúng dòng kênh (cột ID hoặc CHANNEL).
- * @param {string} channelFolder
+ * @param {string} id
  * @param {string} lastUploadText — cùng nguồn với mavid-channel-config (DD/MM/YYYY [HH:mm])
  */
-async function updateChannelsIndexLastUpload(channelFolder, lastUploadText) {
+async function updateChannelsIndexLastUpload(id, lastUploadText) {
   const text = String(lastUploadText || '').trim();
   if (!text) return;
-
-  const folderNorm = String(channelFolder || '')
-    .trim()
-    .toLowerCase();
-  if (!folderNorm) return;
 
   const indexPath = path.join(resolveChannelsDir(), 'index.xlsx');
   if (!fs.existsSync(indexPath)) {
@@ -48,50 +45,23 @@ async function updateChannelsIndexLastUpload(channelFolder, lastUploadText) {
     const headerRow = sheet.getRow(1);
     const vals = headerRow.values || [];
 
-    /** @param {string} norm */
-    const colIndex = norm => {
-      const n = norm.toUpperCase();
-      for (let i = 1; i < vals.length; i++) {
-        if (
-          String(vals[i] ?? '')
-            .trim()
-            .toUpperCase() === n
-        ) {
-          return i;
-        }
-      }
-      return -1;
-    };
-
-    const lastUploadCol = vals.findIndex(
-      (v, i) =>
-        i >= 1 &&
-        String(v || '')
-          .toUpperCase()
-          .includes('LAST UPLOAD')
-    );
-    if (lastUploadCol < 1) {
-      console.warn(`${LOG} index.xlsx: không tìm thấy cột LAST UPLOAD.`);
-      return;
-    }
-
-    const idCol = colIndex('ID');
-    const channelCol = colIndex('CHANNEL');
+    const idCol = CHANNELS.find(c => c.key === 'id').index;
+    console.log('🚀 ~ updateChannelsIndexLastUpload ~ idCol:', idCol);
+    const lastUploadCol = CHANNELS.find(c => c.key === 'lastUpload').index;
+    console.log('🚀 ~ updateChannelsIndexLastUpload ~ lastUploadCol:', lastUploadCol);
 
     let updated = 0;
     for (let r = 2; r <= sheet.rowCount; r++) {
       const row = sheet.getRow(r);
       let cellVal = '';
-      if (idCol >= 1) {
-        const v = row.getCell(idCol).value;
-        cellVal = String(v ?? '').trim();
-      }
-      if (!cellVal && channelCol >= 1) {
-        const v = row.getCell(channelCol).value;
-        cellVal = String(v ?? '').trim();
-      }
-      if (cellVal.toLowerCase() !== folderNorm) continue;
+      const v = row.getCell(idCol).value;
+      console.log('🚀 ~ updateChannelsIndexLastUpload ~ v:', v);
+      cellVal = String(v ?? '').trim();
+      console.log('🚀 ~ updateChannelsIndexLastUpload ~ cellVal:', cellVal);
+
+      if (cellVal !== id) continue;
       row.getCell(lastUploadCol).value = text;
+      console.log('🚀 ~ updateChannelsIndexLastUpload ~ lastUploadCol:', lastUploadCol);
       updated++;
     }
 
@@ -160,28 +130,21 @@ function applyLatestUploadFromScheduleSlot(ch, slot) {
 /**
  * Chọn dòng `channels[]` để cập nhật sau upload: theo email nếu có; không có email thì chỉ khi đúng 1 phần tử.
  * @param {object} cfg
- * @param {string} email
+ * @param {string} id
  * @returns {{ idx: number, label: string }}
  */
-function resolveChannelRowIndexForAfterUpload(cfg, email) {
-  if (!Array.isArray(cfg.channels)) return { idx: -1, label: '' };
-  const em = String(email || '')
-    .trim()
-    .toLowerCase();
-  if (em) {
+function resolveChannelRowIndexForAfterUpload(cfg, id) {
+  if (!Array.isArray(cfg.channels)) return -1;
+  if (id) {
     const idx = cfg.channels.findIndex(
       ch =>
-        String(ch?.email || '')
+        String(ch?.id || '')
           .trim()
-          .toLowerCase() === em
+          .toLowerCase() === id,
     );
-    return idx >= 0 ? { idx, label: String(cfg.channels[idx]?.email || email).trim() || email } : { idx: -1, label: '' };
+    return idx >= 0 ? idx : -1;
   }
-  if (cfg.channels.length === 1) {
-    const row = cfg.channels[0];
-    return { idx: 0, label: String(row?.email || '').trim() || 'channels[0]' };
-  }
-  return { idx: -1, label: '' };
+  return cfg.channels.length === 1 ? 0 : -1;
 }
 
 /**
@@ -245,16 +208,17 @@ export async function syncChannelAfterYoutubeUpload(p) {
   }
 
   const channelAbs = path.join(resolveChannelsDir(), p.channelFolder);
-  const email = String(p.email || '').trim();
+  /** Chuỗi LAST UPLOAD cho `channels/index.xlsx` (DD/MM/YYYY [HH:mm]) — ghi ở bước cuối sau STATUS. */
+  let indexLastUploadText = '';
 
   try {
     const cfg = readChannelConfigSync({ channelFolder: p.channelFolder });
-    const { idx, label } = resolveChannelRowIndexForAfterUpload(cfg, email);
+    const idx = resolveChannelRowIndexForAfterUpload(cfg, p.id);
     if (idx < 0) {
       throw new Error(
-        email
-          ? `Không tìm thấy email «${email}» trong mavid-channel-config.`
-          : 'Thiếu email và channels[] có ≠ 1 phần tử — không chọn được dòng để cập nhật uploadedVideos / latestUpload*.'
+        p.id
+          ? `Không tìm thấy id «${p.id}» trong mavid-channel-config.`
+          : 'Thiếu id và channels[] có ≠ 1 phần tử — không chọn được dòng để cập nhật uploadedVideos / latestUpload*.',
       );
     }
     const ch = { ...cfg.channels[idx] };
@@ -265,20 +229,14 @@ export async function syncChannelAfterYoutubeUpload(p) {
     cfg.channels[idx] = ch;
     const configPath = path.join(channelAbs, MAVID_CHANNEL_CONFIG_FILENAME);
     fs.writeFileSync(configPath, `${JSON.stringify(cfg, null, 2)}\n`, 'utf8');
-    console.log(
-      `${LOG} mavid-channel-config «${label}»: uploadedVideos=${ch.uploadedVideos}, latestUploadDate=${
-        ch.latestUploadDate ?? '—'
-      }, latestUploadTime=${ch.latestUploadTime ?? '—'}`
-    );
 
     /** Giống `latestUploadDate` / `latestUploadTime` vừa ghi vào JSON — chỉ khi có mốc schedule (không dùng giá trị cũ trong config). */
-    const indexLastUploadText =
+    indexLastUploadText =
       slotForLatest && ch.latestUploadDate != null && String(ch.latestUploadDate).trim()
         ? `${String(ch.latestUploadDate).trim()}${
             ch.latestUploadTime != null && String(ch.latestUploadTime).trim() ? ` ${String(ch.latestUploadTime).trim()}` : ''
           }`.trim()
         : '';
-    await updateChannelsIndexLastUpload(p.channelFolder, indexLastUploadText);
   } catch (e) {
     console.warn(`${LOG} JSON:`, e instanceof Error ? e.message : e);
   }
@@ -286,101 +244,105 @@ export async function syncChannelAfterYoutubeUpload(p) {
   const sheetPath = resolveChannelSpreadsheetPath(channelAbs);
   if (!sheetPath) {
     console.warn(`${LOG} Không tìm thấy .xlsx/.csv trong thư mục kênh — bỏ qua STATUS.`);
-    return;
-  }
+  } else {
+    const wanted = new Set(p.successfulFolderNames.map(f => String(f).trim().toLowerCase()).filter(Boolean));
 
-  const wanted = new Set(p.successfulFolderNames.map(f => String(f).trim().toLowerCase()).filter(Boolean));
-
-  try {
-    const lower = sheetPath.toLowerCase();
-    if (lower.endsWith('.xlsx')) {
-      const ExcelJS = (await import('exceljs')).default;
-      const workbook = new ExcelJS.Workbook();
-      await workbook.xlsx.readFile(sheetPath);
-      const sheet = workbook.worksheets[0];
-      if (!sheet || sheet.rowCount < 2) return;
-      const headerRow = sheet.getRow(1);
-      const videoIdx = headerRow.values.findIndex(v => String(v || '').toLowerCase() === 'link video');
-      const statusIdx = headerRow.values.findIndex(v =>
-        String(v || '')
-          .toLowerCase()
-          .includes('status')
-      );
-      if (videoIdx < 1 || statusIdx < 1) {
-        console.warn(`${LOG} Excel: không tìm thấy cột LINK VIDEO hoặc STATUS.`);
-        return;
-      }
-      let updated = 0;
-      for (let r = 2; r <= sheet.rowCount; r++) {
-        const row = sheet.getRow(r);
-        const url = extractUrlFromCell(row.getCell(videoIdx).value);
-        if (!url.startsWith('http://') && !url.startsWith('https://')) continue;
-        let hit = false;
-        for (const id of wanted) {
-          if (linkUrlMatchesFolderId(url, id)) {
-            hit = true;
-            break;
-          }
-        }
-        if (hit) {
-          row.getCell(statusIdx).value = STATUS_DA_DANG_VIDEO;
-          updated++;
-        }
-      }
-      await workbook.xlsx.writeFile(sheetPath);
-      console.log(`${LOG} Excel ${path.basename(sheetPath)}: ${updated} dòng STATUS = «${STATUS_DA_DANG_VIDEO}».`);
-      return;
-    }
-
-    if (lower.endsWith('.csv')) {
-      const content = fs.readFileSync(sheetPath, 'utf-8').replace(/^\uFEFF/, '');
-      const lines = content
-        .split('\n')
-        .map(l => l.trimEnd())
-        .filter(l => l.trim());
-      if (lines.length < 2) return;
-      const parseLine = line => line.split(',').map(c => c.trim().replace(/^"|"$/g, ''));
-      const headers = parseLine(lines[0]);
-      const videoIdx = headers.findIndex(h => h.toLowerCase() === 'link video');
-      const statusIdx = headers.findIndex(h => h.toLowerCase().includes('status'));
-      if (videoIdx < 0 || statusIdx < 0) {
-        console.warn(`${LOG} CSV: không tìm thấy cột LINK VIDEO hoặc STATUS.`);
-        return;
-      }
-      const out = [lines[0]];
-      let updated = 0;
-      for (let i = 1; i < lines.length; i++) {
-        const cells = parseLine(lines[i]);
-        while (cells.length < headers.length) cells.push('');
-        const url = cells[videoIdx] || '';
-        let hit = false;
-        if (url.startsWith('http://') || url.startsWith('https://')) {
-          for (const id of wanted) {
-            if (linkUrlMatchesFolderId(url, id)) {
-              hit = true;
-              break;
+    try {
+      const lower = sheetPath.toLowerCase();
+      if (lower.endsWith('.xlsx')) {
+        const ExcelJS = (await import('exceljs')).default;
+        const workbook = new ExcelJS.Workbook();
+        await workbook.xlsx.readFile(sheetPath);
+        const sheet = workbook.worksheets[0];
+        if (!sheet || sheet.rowCount < 2) {
+          /* bỏ qua STATUS */
+        } else {
+          const headerRow = sheet.getRow(1);
+          const videoIdx = headerRow.values.findIndex(v => String(v || '').toLowerCase() === 'link video');
+          const statusIdx = headerRow.values.findIndex(v =>
+            String(v || '')
+              .toLowerCase()
+              .includes('status'),
+          );
+          if (videoIdx < 1 || statusIdx < 1) {
+            console.warn(`${LOG} Excel: không tìm thấy cột LINK VIDEO hoặc STATUS.`);
+          } else {
+            let updated = 0;
+            for (let r = 2; r <= sheet.rowCount; r++) {
+              const row = sheet.getRow(r);
+              const url = extractUrlFromCell(row.getCell(videoIdx).value);
+              if (!url.startsWith('http://') && !url.startsWith('https://')) continue;
+              let hit = false;
+              for (const id of wanted) {
+                if (linkUrlMatchesFolderId(url, id)) {
+                  hit = true;
+                  break;
+                }
+              }
+              if (hit) {
+                row.getCell(statusIdx).value = STATUS_DA_DANG_VIDEO;
+                updated++;
+              }
             }
+            await workbook.xlsx.writeFile(sheetPath);
+            console.log(`${LOG} Excel ${path.basename(sheetPath)}: ${updated} dòng STATUS = «${STATUS_DA_DANG_VIDEO}».`);
           }
         }
-        if (hit) {
-          cells[statusIdx] = STATUS_DA_DANG_VIDEO;
-          updated++;
+      } else if (lower.endsWith('.csv')) {
+        const content = fs.readFileSync(sheetPath, 'utf-8').replace(/^\uFEFF/, '');
+        const lines = content
+          .split('\n')
+          .map(l => l.trimEnd())
+          .filter(l => l.trim());
+        if (lines.length < 2) {
+          /* bỏ qua STATUS */
+        } else {
+          const parseLine = line => line.split(',').map(c => c.trim().replace(/^"|"$/g, ''));
+          const headers = parseLine(lines[0]);
+          const videoIdx = headers.findIndex(h => h.toLowerCase() === 'link video');
+          const statusIdx = headers.findIndex(h => h.toLowerCase().includes('status'));
+          if (videoIdx < 0 || statusIdx < 0) {
+            console.warn(`${LOG} CSV: không tìm thấy cột LINK VIDEO hoặc STATUS.`);
+          } else {
+            const out = [lines[0]];
+            let updated = 0;
+            for (let i = 1; i < lines.length; i++) {
+              const cells = parseLine(lines[i]);
+              while (cells.length < headers.length) cells.push('');
+              const url = cells[videoIdx] || '';
+              let hit = false;
+              if (url.startsWith('http://') || url.startsWith('https://')) {
+                for (const id of wanted) {
+                  if (linkUrlMatchesFolderId(url, id)) {
+                    hit = true;
+                    break;
+                  }
+                }
+              }
+              if (hit) {
+                cells[statusIdx] = STATUS_DA_DANG_VIDEO;
+                updated++;
+              }
+              out.push(
+                cells
+                  .map(c => {
+                    const s = String(c ?? '');
+                    return s.includes(',') || s.includes('"') ? `"${s.replace(/"/g, '""')}"` : s;
+                  })
+                  .join(','),
+              );
+            }
+            fs.writeFileSync(sheetPath, out.join('\n'), 'utf-8');
+            console.log(`${LOG} CSV ${path.basename(sheetPath)}: ${updated} dòng STATUS = «${STATUS_DA_DANG_VIDEO}».`);
+          }
         }
-        out.push(
-          cells
-            .map(c => {
-              const s = String(c ?? '');
-              return s.includes(',') || s.includes('"') ? `"${s.replace(/"/g, '""')}"` : s;
-            })
-            .join(',')
-        );
       }
-      fs.writeFileSync(sheetPath, out.join('\n'), 'utf-8');
-      console.log(`${LOG} CSV ${path.basename(sheetPath)}: ${updated} dòng STATUS = «${STATUS_DA_DANG_VIDEO}».`);
+    } catch (e) {
+      console.warn(`${LOG} spreadsheet:`, e instanceof Error ? e.message : e);
     }
-  } catch (e) {
-    console.warn(`${LOG} spreadsheet:`, e instanceof Error ? e.message : e);
   }
+
+  await updateChannelsIndexLastUpload(p.id, indexLastUploadText);
 }
 
 /** Alias tên cũ — tránh gãy code gọi trực tiếp. */

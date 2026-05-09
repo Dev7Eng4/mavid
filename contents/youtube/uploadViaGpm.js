@@ -43,12 +43,18 @@ function scheduleSlotToUnixMs(s) {
 /**
  * Email kênh trong `mavid-channel-config.json` → `getYoutubePublishPlan` (ngày/giờ public) ở bước Schedule.
  * @param {string} email
+ * @param {string} id
  * @param {string} channelFolder
  * @param {number | null | undefined} maxUploads
  * @param {string[]} [uploadFolderNames]
  * @param {string} [gpmApiBase]
  */
 export default async function main(raw = {}) {
+  if (!raw.id || !raw.channelFolder) {
+    logToLogsPage(`[upload] Thiếu id. Không thể upload YouTube qua GPM.`, 'error');
+    return;
+  }
+
   if (!raw.email) {
     logToLogsPage(`[upload] Thiếu email. Không thể upload YouTube qua GPM.`, 'error');
     return;
@@ -78,9 +84,9 @@ export default async function main(raw = {}) {
   console.log('🚀 ~ main ~ channelAbs:', channelAbs);
   const jobs = await listUploadJobs(
     channelAbs,
-    scheduleEmail,
+    raw.id,
     maxUploads,
-    uploadFolderNames && uploadFolderNames.length > 0 ? uploadFolderNames : null
+    uploadFolderNames && uploadFolderNames.length > 0 ? uploadFolderNames : null,
   );
   console.log('🚀 ~ main ~ jobs:', jobs);
 
@@ -88,7 +94,7 @@ export default async function main(raw = {}) {
     throw new Error(
       `Không có thư mục con nào đủ điều kiện (.mp4 + thumbnail .png/.jpg/.jpeg) trong ${channelAbs} (đã giới hạn ${
         maxUploads == null ? 'tất cả' : maxUploads
-      } video).`
+      } video).`,
     );
   }
 
@@ -102,24 +108,20 @@ export default async function main(raw = {}) {
   let publishSchedule = null;
   /** `uploadedVideos` trong config trước batch (cho addRelatedVideo). */
   let baselineUploadedVideosFromConfig = 0;
-  if (scheduleEmail) {
-    try {
-      const { schedule, settings } = getYoutubePublishPlan({
-        channelFolder,
-        email: scheduleEmail,
-        uploadCount: jobs.length,
-      });
-      /** Thứ tự slot trùng thứ tự upload: video 1 → mốc 1, video 2 → mốc 2, … (từ publishTimes + preset trong config). */
-      publishSchedule = schedule;
-      baselineUploadedVideosFromConfig = Number.isFinite(Number(settings?.uploadedVideos))
-        ? Math.max(0, Math.floor(Number(settings.uploadedVideos)))
-        : 0;
-      console.log(`[upload] getYoutubePublishPlan: ${schedule.length} mốc (email «${scheduleEmail}»).`);
-    } catch (e) {
-      console.warn('[upload] getYoutubePublishPlan:', e instanceof Error ? e.message : e);
-    }
-  } else {
-    console.warn('[upload] Thiếu email — không tính lịch publish, chỉ bấm Schedule.');
+  try {
+    const { schedule, settings } = getYoutubePublishPlan({
+      channelFolder,
+      id: raw.id,
+      uploadCount: jobs.length,
+    });
+    /** Thứ tự slot trùng thứ tự upload: video 1 → mốc 1, video 2 → mốc 2, … (từ publishTimes + preset trong config). */
+    publishSchedule = schedule;
+    baselineUploadedVideosFromConfig = Number.isFinite(Number(settings?.uploadedVideos))
+      ? Math.max(0, Math.floor(Number(settings.uploadedVideos)))
+      : 0;
+    console.log(`[upload] getYoutubePublishPlan: ${schedule.length} mốc (email «${scheduleEmail}»).`);
+  } catch (e) {
+    console.warn('[upload] getYoutubePublishPlan:', e instanceof Error ? e.message : e);
   }
 
   /** Cặp (job, slot) theo cùng chỉ số, rồi sắp theo mốc publish tăng dần (gần → xa). */
@@ -157,7 +159,7 @@ export default async function main(raw = {}) {
       const { job, slot } = uploadQueue[i];
       const { folderName, folderPath, mp4Path } = job;
       console.log(
-        `[upload] (${i + 1}/${uploadQueue.length}) Thư mục «${folderName}» → ${path.basename(mp4Path)} (mốc: ${slot?.date ?? '—'} ${slot?.time ?? ''})`
+        `[upload] (${i + 1}/${uploadQueue.length}) Thư mục «${folderName}» → ${path.basename(mp4Path)} (mốc: ${slot?.date ?? '—'} ${slot?.time ?? ''})`,
       );
 
       try {
@@ -177,12 +179,11 @@ export default async function main(raw = {}) {
         baselineUploadedVideosFromConfig++;
         successfulFolderNames.push(folderName);
 
-        const forLatest =
-          slot && String(slot.date ?? '').trim() && String(slot.time ?? '').trim() ? slot : null;
+        const forLatest = slot && String(slot.date ?? '').trim() && String(slot.time ?? '').trim() ? slot : null;
         try {
           await syncChannelAfterYoutubeUpload({
             channelFolder,
-            email: scheduleEmail,
+            id: raw.id,
             successfulFolderNames: [folderName],
             latestScheduleSlot: forLatest,
           });
@@ -230,10 +231,7 @@ export default async function main(raw = {}) {
       const delayMs = GPM_CLOSE_DELAY_MS;
       void (async () => {
         try {
-          logToLogsPage(
-            `[upload] Đã xong — chờ ${delayMs / 60000} phút (nền) rồi mới đóng trình duyệt GPM (profile ${pid}).`,
-            'info'
-          );
+          logToLogsPage(`[upload] Đã xong — chờ ${delayMs / 60000} phút (nền) rồi mới đóng trình duyệt GPM (profile ${pid}).`, 'info');
           await delay(delayMs);
         } catch (e) {
           console.warn('[upload] Chờ trước khi đóng GPM:', e instanceof Error ? e.message : e);

@@ -8,8 +8,8 @@ import { STOCK_VIDEO, SUBTITLE, LOGO } from './videoPipelineDefaults.js';
 
 export const INDEX_ONLY_DEFAULTS = {
   MAKE_VIDEO_MODE: {
-    FROM_AUDIO: 'from_audio',
-    REUP_FULL: 'reup_full',
+    FROM_AUDIO: 'audio',
+    REUP_FULL: 'video',
   },
   VIDEO_TYPE: {
     '2CH': '2ch',
@@ -47,14 +47,11 @@ export function expandAppSettingsIntoModule(mod) {
     ...mod,
     flowSettings: {
       FLOW_PROJECT_ID: typeof flow.PROJECT_ID === 'string' ? flow.PROJECT_ID : '',
-      FLOW_CHROME_PROFILE:
-        typeof flow.CHROME_PROFILE === 'number' && Number.isFinite(flow.CHROME_PROFILE) ? flow.CHROME_PROFILE : 1,
+      FLOW_CHROME_PROFILE: typeof flow.CHROME_PROFILE === 'number' && Number.isFinite(flow.CHROME_PROFILE) ? flow.CHROME_PROFILE : 1,
     },
     VIDEO_STORAGE_ROOT: typeof AS.STORAGE === 'string' ? AS.STORAGE : '',
     MAX_SCHEDULED_DAYS:
-      typeof video.MAX_SCHEDULED_DAYS === 'number' && Number.isFinite(video.MAX_SCHEDULED_DAYS)
-        ? video.MAX_SCHEDULED_DAYS
-        : 4,
+      typeof video.MAX_SCHEDULED_DAYS === 'number' && Number.isFinite(video.MAX_SCHEDULED_DAYS) ? video.MAX_SCHEDULED_DAYS : 4,
     MAX_VIDEOS_PREPARE_AHEAD:
       typeof video.MAX_VIDEOS_PREPARE_AHEAD === 'number' && Number.isFinite(video.MAX_VIDEOS_PREPARE_AHEAD)
         ? video.MAX_VIDEOS_PREPARE_AHEAD

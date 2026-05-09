@@ -181,7 +181,7 @@ export interface VideoFromAudioConfig {
   maxVideosPerBatch: number;
   /** 0 = không lọc; >0 = chỉ dòng có cột DURATION ≥ N phút. */
   minDurationMinutes?: number;
-  /** Tùy chọn nâng cao (ví dụ: stock/image cho from_audio). */
+  /** Tùy chọn nâng cao (ví dụ: stock/image cho audio). */
   overlay?: string;
 }
 
@@ -230,11 +230,11 @@ export interface AddChannelFromFormParams {
       myChannel?: string;
       /** ID nhóm trong `group.json`. */
       groupId?: string;
-      videoType: 'from_audio' | 'reup_full';
+      videoType: 'audio' | 'video';
       durationMinuteFrom: number;
       durationMinuteTo: number | null;
       background: string;
-      /** Chỉ dùng khi `videoType === 'reup_full'` — tên trong OVERLAY_OPTIONS. */
+      /** Chỉ dùng khi `videoType === 'video'` — tên trong OVERLAY_OPTIONS. */
       overlay?: string;
       /** Khớp `PROMPTS_CREATE_THUMBNAIL_OPTIONS[].value` trong contents/prompts/index.js */
       thumbnailPrompt?: string;

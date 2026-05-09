@@ -56,26 +56,24 @@ export function assertSafeSubfolderName(name) {
 }
 
 /**
- * Đọc cấu hình kênh → lấy durationMinuteFrom / durationMinuteTo theo email.
+ * Đọc cấu hình kênh → lấy durationMinuteFrom / durationMinuteTo theo id.
  * @param {string} channelAbs
- * @param {string} email
+ * @param {string} id
  * @returns {{ durationMinuteFrom: number, durationMinuteTo: number | null } | null}
  */
-function getDurationBoundsFromConfig(channelAbs, email) {
+function getDurationBoundsFromConfig(channelAbs, id) {
   const cfg = readChannelConfigFromFolderSync(channelAbs);
   if (!cfg) return null;
   const list = Array.isArray(cfg.channels) ? cfg.channels : [];
-  const norm = String(email || '')
-    .trim()
-    .toLowerCase();
+
   let item = null;
-  if (norm && list.length > 0) {
+  if (id && list.length > 0) {
     item = list.find(
       c =>
         c &&
-        String(c.email || '')
+        String(c.id || '')
           .trim()
-          .toLowerCase() === norm,
+          .toLowerCase() === id,
     );
   }
   if (!item && list.length > 0) item = list[0];
@@ -244,11 +242,11 @@ async function readVideoIdsWithStatusDone(channelAbs, durBounds) {
  * - Có `folderNamesOrder`: theo đúng thứ tự danh sách (chỉ thư mục có .mp4 + thumbnail), tối đa `maxUploads` nếu có.
  * - Không có: đọc Excel lấy video ID có status "Đã tạo video" + lọc duration → kiểm tra folder + .mp4 + thumbnail.
  * @param {string} channelAbs
- * @param {string} email
+ * @param {string} id
  * @param {number | null} maxUploads
  * @param {string[] | null | undefined} folderNamesOrder
  */
-export async function listUploadJobs(channelAbs, email, maxUploads, folderNamesOrder) {
+export async function listUploadJobs(channelAbs, id, maxUploads, folderNamesOrder) {
   if (!fs.existsSync(channelAbs)) throw new Error(`Không tìm thấy thư mục kênh: ${channelAbs}`);
 
   if (Array.isArray(folderNamesOrder) && folderNamesOrder.length > 0) {
@@ -273,7 +271,7 @@ export async function listUploadJobs(channelAbs, email, maxUploads, folderNamesO
   }
 
   // ──── Logic mới: đọc Excel → status "Đã tạo video" + duration filter → video ID → folder + .mp4 ────
-  const durBounds = getDurationBoundsFromConfig(channelAbs, email);
+  const durBounds = getDurationBoundsFromConfig(channelAbs, id);
   if (durBounds) {
     console.log(
       `[upload-jobs] Duration filter: from ${durBounds.durationMinuteFrom} phút, to ${durBounds.durationMinuteTo ?? 'không giới hạn'} phút`,

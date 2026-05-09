@@ -14,7 +14,20 @@ export function findChannelRowByEmail(config, email) {
       ch =>
         String(ch?.email ?? '')
           .trim()
-          .toLowerCase() === want
+          .toLowerCase() === want,
+    ) ?? null
+  );
+}
+
+export function findChannelRowById(config, id) {
+  if (!id) return null;
+  const list = Array.isArray(config?.channels) ? config.channels : [];
+  return (
+    list.find(
+      ch =>
+        String(ch?.id ?? '')
+          .trim()
+          .toLowerCase() === id,
     ) ?? null
   );
 }
@@ -36,4 +49,3 @@ export function pickPublishFieldsFromChannelRow(row) {
     latestUploadTime: row.latestUploadTime != null ? String(row.latestUploadTime).trim() : '',
   };
 }
-

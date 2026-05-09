@@ -4,13 +4,13 @@ import type { BackgroundOption, ChannelRow, Group } from '@/types';
 import { OPTIONS_CONTENT } from '@contents/makeFromAudio/constant.js';
 import { PROMPTS_CREATE_THUMBNAIL_OPTIONS } from '@contents/prompts/index.js';
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { VIDEO_PER_DAY_OPTIONS } from '../constants';
+import { VIDEO_MAKE_TYPE, VIDEO_PER_DAY_OPTIONS } from '../constants';
 import {
   CHANNEL_ADD_DURATION_SELECT_OPTIONS,
   defaultReupOverlayName,
   defaultThumbnailPrompt,
   isValidReupOverlayName,
-  isValidthumbnailPrompt,
+  isValidThumbnailPrompt,
   labelForPublishTimeSlot,
   normalizeChannelIndexStatus,
   normalizeWallClockTimeToHHmm,
@@ -19,10 +19,11 @@ import {
   type ChannelAddDialogInitialFields,
   type VideoPerDayPreset,
 } from '../utils/channelIndexHelpers';
+import type { VideoMakeType } from '../models/channelsIndexSection.model';
 
 const videoTypeOptions = [
-  { value: 'reup_full', label: 'Tạo video reup toàn bộ' },
-  { value: 'from_audio', label: 'Tạo video từ audio' },
+  { value: VIDEO_MAKE_TYPE.VIDEO, label: 'Tạo video reup toàn bộ' },
+  { value: VIDEO_MAKE_TYPE.AUDIO, label: 'Tạo video từ audio' },
 ];
 
 /** Đọc giờ trực tiếp từ `<input type="time">` lúc submit — tránh state React lệch với DOM (Electron/Chromium). */
@@ -44,7 +45,7 @@ const ADD_FORM_DEFAULT: ChannelAddDialogInitialFields = {
   email: '',
   myChannel: '',
   group: '',
-  videoType: 'reup_full',
+  videoType: VIDEO_MAKE_TYPE.AUDIO,
   durationMinutes: '0_null',
   background: '',
   overlay: defaultReupOverlayName(),
@@ -64,7 +65,7 @@ export interface ChannelAddSavePayload {
   myChannel?: string;
   /** ID nhóm trong `MaVidMedia/channels/group.json`. */
   groupId?: string;
-  videoType: 'from_audio' | 'reup_full';
+  videoType: VideoMakeType;
   durationMinuteFrom: number;
   durationMinuteTo: number | null;
   background: string;
@@ -116,7 +117,7 @@ export function ChannelAddDialog({ backgroundOptions, channels = [], onClose, on
   }, [backgroundOptions, background]);
 
   const reupOverlayOptionsList = useMemo(() => {
-    if (videoType === 'from_audio') return OPTIONS_CONTENT;
+    if (videoType === VIDEO_MAKE_TYPE.AUDIO) return OPTIONS_CONTENT;
     return reupOverlaySelectOptions();
   }, [videoType]);
 
@@ -156,12 +157,12 @@ export function ChannelAddDialog({ backgroundOptions, channels = [], onClose, on
         value: String(o.value),
         label: String(o.label),
       })),
-    []
+    [],
   );
 
   const resolvedReupOverlay = useMemo(() => {
     const pick = overlay.trim();
-    if (videoType === 'from_audio') {
+    if (videoType === VIDEO_MAKE_TYPE.AUDIO) {
       if (pick && OPTIONS_CONTENT.some((o: any) => o.value === pick)) return pick;
       return OPTIONS_CONTENT[0]?.value ?? '';
     }
@@ -171,7 +172,7 @@ export function ChannelAddDialog({ backgroundOptions, channels = [], onClose, on
 
   const resolvedThumbnailPrompt = useMemo(() => {
     const pick = thumbnailPrompt.trim();
-    if (pick && isValidthumbnailPrompt(pick)) return pick;
+    if (pick && isValidThumbnailPrompt(pick)) return pick;
     return defaultThumbnailPrompt();
   }, [thumbnailPrompt]);
 
@@ -211,7 +212,7 @@ export function ChannelAddDialog({ backgroundOptions, channels = [], onClose, on
 
   const bgOptions = [{ value: '', label: 'Random' }, ...backgroundOptions.map(bg => ({ value: bg.id, label: bg.label }))];
 
-  const showBackgroundField = videoType === 'from_audio';
+  const showBackgroundField = videoType === VIDEO_MAKE_TYPE.AUDIO;
   const showReupOverlayField = true; // Luôn hiển thị Option reup cho cả 2 loại video
 
   const handleConfirm = async () => {
@@ -228,10 +229,10 @@ export function ChannelAddDialog({ backgroundOptions, channels = [], onClose, on
       email: email.trim(),
       myChannel: myChannel.trim(),
       group,
-      videoType: videoType as 'from_audio' | 'reup_full',
+      videoType,
       durationMinuteFrom: from,
       durationMinuteTo: to,
-      background: videoType === 'from_audio' ? resolvedBackground.trim() : '',
+      background: videoType === VIDEO_MAKE_TYPE.AUDIO ? resolvedBackground.trim() : '',
       overlay: resolvedReupOverlay.trim(),
       thumbnailPrompt: resolvedThumbnailPrompt.trim(),
       videosPerDayPreset,
@@ -373,7 +374,7 @@ export function ChannelAddDialog({ backgroundOptions, channels = [], onClose, on
             <CustomSelect
               value={videoType}
               options={videoTypeOptions}
-              onChange={v => setForm(f => ({ ...f, videoType: v }))}
+              onChange={v => setForm(f => ({ ...f, videoType: v as VideoMakeType }))}
               placeholder='Chọn'
               menuZIndex={100}
             />

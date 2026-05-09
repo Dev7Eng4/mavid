@@ -2,9 +2,11 @@ import type { ChannelRow, ScriptId } from '@/types';
 import { PROMPTS_CREATE_THUMBNAIL_OPTIONS } from '@contents/prompts/index.js';
 import { OPTIONS_CONTENT } from '@contents/makeFromAudio/constant.js';
 import { OVERLAY_OPTIONS } from '@contents/constants/overlayOptions.js';
+import type { VideoMakeType } from '../models/channelsIndexSection.model';
+import { VIDEO_MAKE_TYPE } from '../constants';
 
 /** Khớp dropdown trong getInfoChannel / electron write-channel-index */
-export const INDEX_VIDEO_TYPE_VALUES = ['from_audio', 'reup_full'] as const;
+export const INDEX_VIDEO_TYPE_VALUES = ['audio', 'video'] as const;
 /** Giá trị nhãn (dropdown) khớp cột THỜI GIAN VIDEO trong index / getInfoChannel. */
 export const INDEX_VIDEO_DURATION_LABELS = ['Tất cả', '0 - 30 phút', '0 - 60 phút', '30 - 60 phút', 'Từ 30 phút', 'Từ 60 phút'] as const;
 /** @deprecated Dùng INDEX_VIDEO_DURATION_LABELS */
@@ -144,10 +146,10 @@ export function indexRowsEqual(a: ChannelRow[], b: ChannelRow[], headers: string
   return true;
 }
 
-export function resolveIndexRowVideoType(row: ChannelRow): 'from_audio' | 'reup_full' | '' {
+export function resolveIndexRowVideoType(row: ChannelRow): 'audio' | 'video' | '' {
   const raw = String(row.videoType ?? '').trim();
-  if (raw === 'reup_full') return 'reup_full';
-  if (raw === 'from_audio') return 'from_audio';
+  if (raw === 'video') return 'video';
+  if (raw === 'audio') return 'audio';
   return '';
 }
 
@@ -220,11 +222,11 @@ export interface ChannelAddFormInput {
   myChannel: string;
   /** Cột index cuối «Group». */
   group: string;
-  videoType: 'from_audio' | 'reup_full';
+  videoType: VideoMakeType;
   durationOption: string;
-  /** from_audio — tên folder trong MaVidMedia/backgrounds */
+  /** audio — tên folder trong MaVidMedia/backgrounds */
   background: string;
-  /** reup_full — khớp OVERLAY_OPTIONS[].NAME */
+  /** video — khớp OVERLAY_OPTIONS[].NAME */
   overlay: string;
   /** Khớp `PROMPTS_CREATE_THUMBNAIL_OPTIONS[].value` (contents/prompts/index.js). */
   thumbnailPrompt: string;
@@ -246,11 +248,11 @@ export interface ChannelAddDialogInitialFields {
   myChannel: string;
   /** ID nhóm (group.json); rỗng = không gán. */
   group: string;
-  videoType: string;
+  videoType: VideoMakeType;
   /** Chuỗi cấu hình duration (vd. "0_30"). */
   durationMinutes: string;
   background: string;
-  /** reup_full — tên preset overlay */
+  /** video — tên preset overlay */
   overlay: string;
   /** Style thumbnail — `PROMPTS_CREATE_THUMBNAIL_OPTIONS` */
   thumbnailPrompt: string;
@@ -278,7 +280,7 @@ export function isValidReupOverlayName(name: string): boolean {
   return OVERLAY_OPTIONS.some(o => String(o.NAME).trim() === t);
 }
 
-/** Giá trị hợp lệ cho overlay khi `videoType === 'from_audio'` (dropdown OPTIONS_CONTENT). */
+/** Giá trị hợp lệ cho overlay khi `videoType === 'audio'` (dropdown OPTIONS_CONTENT). */
 export function isValidFromAudioOverlayValue(name: string): boolean {
   const t = name.trim();
   if (!t) return false;
@@ -290,7 +292,7 @@ export function defaultThumbnailPrompt(): string {
   return first ? String(first.value) : '';
 }
 
-export function isValidthumbnailPrompt(name: string): boolean {
+export function isValidThumbnailPrompt(name: string): boolean {
   const t = name.trim();
   if (!t) return false;
   return PROMPTS_CREATE_THUMBNAIL_OPTIONS.some(o => String(o.value) === t);
@@ -419,7 +421,7 @@ export function buildChannelRowFromAddForm(
   row.videoType = input.videoType;
   row.videoDuration = durationOptionToLabel(input.durationOption);
 
-  if (input.videoType === 'reup_full') row.background = input.overlay.trim();
+  if (input.videoType === VIDEO_MAKE_TYPE.VIDEO) row.background = input.overlay.trim();
   else row.background = input.background.trim();
 
   row.id = folder;

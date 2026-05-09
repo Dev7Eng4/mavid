@@ -1,11 +1,7 @@
 /**
  * Tính lịch publish YouTube Studio từ preset + `publishTimes` trong mavid-channel-config.
  */
-import {
-  readChannelConfigSync,
-  findChannelRowByEmail,
-  pickPublishFieldsFromChannelRow,
-} from '../channel/index.js';
+import { readChannelConfigSync, findChannelRowByEmail, findChannelRowById, pickPublishFieldsFromChannelRow } from '../channel/index.js';
 
 function parseVideosPerDayPreset(raw) {
   const s = String(raw ?? '')
@@ -189,21 +185,21 @@ function toMmDdYyyy(d) {
  *
  * @param {object} params
  * @param {string} params.channelFolder — tên thư mục kênh (channel id)
- * @param {string} params.email
+ * @param {string} params.id
  * @param {number} params.uploadCount — số video cần mốc publish
  * @returns {{
  *   settings: ReturnType<typeof pickPublishFieldsFromChannelRow> & { preset: string, publishTimesNormalized: string[] },
  *   schedule: Array<{ date: string, time: string, iso: string }> — `date` dạng MM/DD/YYYY
  * }}
  */
-export function getYoutubePublishPlan({ channelFolder, email, uploadCount }) {
+export function getYoutubePublishPlan({ channelFolder, id, uploadCount }) {
   const n = Number(uploadCount);
   if (!Number.isFinite(n) || n < 0 || !Number.isInteger(n)) {
     throw new Error('uploadCount phải là số nguyên ≥ 0.');
   }
 
   const config = readChannelConfigSync({ channelFolder });
-  const row = findChannelRowByEmail(config, email);
+  const row = findChannelRowById(config, id);
   if (!row) throw new Error(`Không tìm thấy email «${String(email).trim()}» trong mavid-channel-config.json.`);
 
   const base = pickPublishFieldsFromChannelRow(row);

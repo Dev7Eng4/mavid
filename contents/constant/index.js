@@ -1,6 +1,6 @@
 export const VIDEO_MAKE_MODE = {
-  FROM_AUDIO: 'from_audio',
-  FROM_VIDEO: 'reup_full',
+  FROM_AUDIO: 'audio',
+  FROM_VIDEO: 'video',
 };
 
 export const VIDEO_MAKE_OPTION = {

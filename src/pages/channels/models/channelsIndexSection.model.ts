@@ -1,5 +1,7 @@
 import type { ChannelRow } from '@/types';
 
+export type VideoMakeType = 'audio' | 'video';
+
 /**
  * Cột hiển thị bảng index — khớp `CHANNELS` có `show: true`.
  * Key là prop name trên `ChannelRow` sau khi mapping từ Excel.

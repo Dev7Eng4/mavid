@@ -89,8 +89,7 @@ export function ChannelCreateVideoDialog({
       return;
     }
 
-    const maxVideosPerBatch =
-      maxVideosInput == null ? MAX_VIDEOS_PREPARE_AHEAD : clampInt(maxVideosInput, 1, MAX_VIDEOS_CAP);
+    const maxVideosPerBatch = maxVideosInput == null ? MAX_VIDEOS_PREPARE_AHEAD : clampInt(maxVideosInput, 1, MAX_VIDEOS_CAP);
 
     setFormError(null);
     setBusy(true);
@@ -102,20 +101,9 @@ export function ChannelCreateVideoDialog({
     } finally {
       if (mountedRef.current) setBusy(false);
     }
-  }, [
-    eligibleQueueLength,
-    maxVideosInput,
-    MAX_VIDEOS_PREPARE_AHEAD,
-    onClose,
-    onConfirm,
-    configEmails.length,
-    selectedEmail,
-  ]);
+  }, [eligibleQueueLength, maxVideosInput, MAX_VIDEOS_PREPARE_AHEAD, onClose, onConfirm, configEmails.length, selectedEmail]);
 
-  const defaultPlaceholderHint = useMemo(
-    () => `Mặc định ${MAX_VIDEOS_PREPARE_AHEAD} (để trống)`,
-    [MAX_VIDEOS_PREPARE_AHEAD]
-  );
+  const defaultPlaceholderHint = useMemo(() => `Mặc định ${MAX_VIDEOS_PREPARE_AHEAD} (để trống)`, [MAX_VIDEOS_PREPARE_AHEAD]);
 
   const skippedCount = Math.max(0, selectedRowCount - eligibleQueueLength);
   const canSubmit = eligibleQueueLength > 0;
@@ -160,7 +148,7 @@ export function ChannelCreateVideoDialog({
             </p>
             {skippedCount > 0 ? (
               <p className='mt-2' style={{ color: 'var(--text-muted)' }}>
-                {skippedCount} dòng được chọn bị bỏ qua (thiếu ID/CHANNEL, EMAIL hoặc LOẠI VIDEO from_audio / reup_full).
+                {skippedCount} dòng được chọn bị bỏ qua (thiếu ID/CHANNEL, EMAIL hoặc LOẠI VIDEO audio / video).
               </p>
             ) : null}
           </div>

@@ -5,5 +5,4 @@ export {
   readChannelConfigFromFolderSync,
   readChannelConfigFromFolder,
 } from './channelConfig.read.js';
-export { findChannelRowByEmail, pickPublishFieldsFromChannelRow } from './channelConfig.selectors.js';
-
+export { findChannelRowByEmail, findChannelRowById, pickPublishFieldsFromChannelRow } from './channelConfig.selectors.js';

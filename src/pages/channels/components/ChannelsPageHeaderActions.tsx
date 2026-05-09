@@ -89,7 +89,7 @@ export function ChannelsPageHeaderActions({
                   indexCreateVideoEligibleSelectedCount === 0
                     ? indexSelectedRowCount === 0
                       ? 'Không có kênh nào có email và đúng loại video để tạo.'
-                      : 'Các dòng đã chọn cần có ID/CHANNEL và LOẠI VIDEO (from_audio/reup_full).'
+                      : 'Các dòng đã chọn cần có ID/CHANNEL và LOẠI VIDEO (audio/video).'
                     : indexSelectedRowCount === 0
                       ? `Không chọn dòng nào — tạo video cho TẤT CẢ ${indexCreateVideoEligibleSelectedCount} kênh CÓ EMAIL đầy đủ cấu hình.`
                       : `Tạo video cho ${indexCreateVideoEligibleSelectedCount} kênh đang chọn.`

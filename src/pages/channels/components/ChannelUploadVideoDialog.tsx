@@ -35,12 +35,13 @@ export function ChannelUploadVideoDialog({
   }, [onClose]);
 
   const handleConfirm = useCallback(async () => {
+    console.log('🚀 ~ ChannelUploadVideoDialog ~ channels:', channels);
     if (channels.length === 0) {
       setFormError('Không có kênh đủ điều kiện trong phần đã chọn (cần ID/CHANNEL và EMAIL trong index).');
       return;
     }
 
-    const total = totalVideos == null ? null : clampInt(totalVideos, 1, 99_999);
+    const total = totalVideos == null ? null : clampInt(totalVideos, 1, 99);
     setFormError(null);
     try {
       const profiles = await fetchAllGpmProfileRows();
@@ -50,10 +51,9 @@ export function ChannelUploadVideoDialog({
         const gpmProfileId = resolveGpmProfileIdByEmail(profiles, ch.email);
 
         if (!gpmProfileId) {
-          setFormError(`Kênh ${ch.channelId}: Không tìm thấy profile GPM có trường name trùng email «${ch.email}».`);
-          return;
+          continue;
         }
-        payloads.push({ channelFolder: ch.channelId, email: ch.email, totalVideos: total, gpmProfileId });
+        payloads.push({ channelFolder: ch.channelId, id: ch.id, email: ch.email, totalVideos: total, gpmProfileId });
       }
 
       if (payloads.length === 0) {
@@ -131,14 +131,14 @@ export function ChannelUploadVideoDialog({
               id='upload-total-videos'
               type='number'
               min={1}
-              max={99999}
+              max={99}
               value={totalVideos ?? ''}
               onChange={e => {
                 const v = e.target.value.trim();
                 if (v === '') setTotalVideos(null);
-                else setTotalVideos(clampInt(parseInt(v, 10), 1, 99_999));
+                else setTotalVideos(clampInt(parseInt(v, 10), 1, 99));
               }}
-              placeholder='Tất cả thư mục có .mp4 + thumbnail'
+              placeholder='Upload thư mục có .mp4 + thumbnail'
               className={inputClass}
               style={{
                 background: 'var(--code-bg)',
@@ -146,10 +146,6 @@ export function ChannelUploadVideoDialog({
                 borderColor: 'var(--border)',
               }}
             />
-            <p className='text-xs mt-1.5' style={{ color: 'var(--text-muted)' }}>
-              Để trống = mọi thư mục con đủ .mp4 và thumbnail, theo thứ tự từ Excel. Mốc lịch từ channel-config: upload theo thứ tự giờ đăng
-              sớm → muộn; mỗi video xong sẽ cập nhật ngày/giờ upload mới nhất và bộ đếm số bài đã đăng trong mavid-channel-config ngay.
-            </p>
           </div>
 
           {formError ? (

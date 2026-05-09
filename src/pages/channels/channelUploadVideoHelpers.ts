@@ -3,7 +3,7 @@ import { gpmApi } from '@/services';
 import { CHANNEL_DETAIL, CHANNELS } from './models/channelsIndexSection.model';
 
 /** Số kênh upload YouTube tối đa chạy song song; kênh còn lại xếp hàng, khi một kênh xong sẽ tự chạy tiếp. */
-export const MAX_CONCURRENT_YOUTUBE_UPLOAD_CHANNELS = 2;
+export const MAX_CONCURRENT_YOUTUBE_UPLOAD_CHANNELS = 1;
 
 function pickStr(obj: Record<string, unknown>, keys: string[]): string {
   for (const k of keys) {
@@ -71,7 +71,7 @@ export function resolveGpmProfileIdByEmail(profiles: GpmProfileRow[], email: str
 export interface ChannelUploadVideoPayload {
   /** Một kênh cụ thể (thư mục MaVidMedia/channels/…). */
   channelFolder: string;
-  /** Email kênh (index / config) — script upload dùng để lấy lịch publish. */
+  id: string;
   email: string;
   /** `null` = mọi thư mục con đủ .mp4 + thumbnail ảnh (theo thứ tự từ Excel khi không truyền uploadFolderNames). */
   totalVideos: number | null;
