@@ -9,6 +9,12 @@
  *     - `thumbnailPromptKey === 'jaFulLText'`: Gemini (profile 4) chạy
  *       `promptToCreateTextForThumbnailFullText` để lấy JSON `{ lines, colors }`, rồi render
  *       ảnh bằng Playwright (`jaFullText/thumbnail.cli.js` → `jaFullText/thumbnailFullText.html`), không gọi Flow.
+ *     - `thumbnailPromptKey === 'jaThumbnailHorizontal'`: Gemini 3 bước (`jaHorizontal/thumbnailHorizontalGemini.js`)
+ *       — phân tích → copy JP → `visual_prompt`; `runCreateThumbnailFlow`, rồi Playwright ghép chữ từ JSON visual
+ *       (`jaHorizontal/thumbnailComposite.cli.js` + `thumbnailHorizontalFlowComposite.html`) lên `flow-thumbnail.jpg`.
+ *     - `thumbnailPromptKey === 'jaThumbnailVertical'`: Gemini một bước `promptToCreateBottomTextThumbnailSpec`
+ *       (`createThumbnailVertical.js`) → `visual_prompt`; `runCreateThumbnailFlow`, rồi ghép chữ đáy + quote trên
+ *       (`jaVertical/thumbnailComposite.cli.js` + `thumbnailVerticalFlowComposite.html`).
  *  4. Các style khác: `runCreateThumbnailFlow(...)` — Flow lưu `outputDir/flow-thumbnail.jpg`.
  *  5. `optimizeFlowThumbnailJpegIfLarge(...)` — re-encode JPG nếu vượt ngưỡng kích thước.
  *
@@ -19,6 +25,8 @@ import { openChatPage, sendPromptWithRetry, stripJsonCodeFence } from '../../llm
 import { loadPromptByLanguage, resolveThumbnailPromptBuilder } from '../../prompts/index.js';
 import { openChromeProfile } from '../../scripts/makeChromeProfile.js';
 import { renderThumbnailFullTextToPath } from './jaFullText/thumbnail.cli.js';
+import { generateAnalysisAndTextForThumbnailHorizontal } from './jaHorizontal/thumbnailHorizontalGemini.js';
+import { generateBottomTextThumbnailJaVertical } from './jaVertical/thumbnailVerticalGemini.js';
 import { runCreateThumbnailFlow } from './runCreateThumbnailFlow.js';
 import { optimizeFlowThumbnailJpegIfLarge } from './thumbnailOptimize.util.js';
 import { PLAYWRIGHT_PROFILES } from '../../constants/playwright-profile.js';
@@ -63,7 +71,7 @@ async function generateFulLTextLinesColorsViaGemini({ prompts, title, summary, l
   if (typeof prompts.promptToCreateTextForThumbnailFullText !== 'function') {
     throw new Error('prompts.promptToCreateTextForThumbnailFullText không có trong gói ngôn ngữ — không thể chạy jaFulLText.');
   }
-  const geminiPrompt = prompts.promptToCreateTextForThumbnailFullText(title, summary);
+  const geminiPrompt = prompts.promptToCreateTextForThumbnailFullText(title, JSON.stringify(summary, null, 2));
 
   const { context: ctx, page: pg } = await openChromeProfile({ profile: PLAYWRIGHT_PROFILES[0], visible: true });
   try {
@@ -109,6 +117,22 @@ export async function generateFlowThumbnailFromGemini({
       text_styles,
       background,
       outPath: path.join(outputDir, 'flow-thumbnail.jpg'),
+    });
+  } else if (thumbnailPromptKey === 'jaThumbnailHorizontal') {
+    await generateAnalysisAndTextForThumbnailHorizontal({
+      prompts,
+      title,
+      summary,
+      outputDir,
+      logTag,
+    });
+  } else if (thumbnailPromptKey === 'jaThumbnailVertical') {
+    await generateBottomTextThumbnailJaVertical({
+      prompts,
+      title,
+      summary,
+      outputDir,
+      logTag,
     });
   } else {
     const flowPrompt = build(title, summary);

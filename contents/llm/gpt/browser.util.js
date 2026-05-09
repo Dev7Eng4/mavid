@@ -113,13 +113,7 @@ export async function sendPromptToGpt(page, prompt, options = {}) {
  * @param {object} [options]
  */
 export async function sendPromptToGptWithRetry(page, prompt, options = {}) {
-  const {
-    maxRetries = 2,
-    retryDelayMs = 2000,
-    validate = validateJsonResponse,
-    label = 'ChatGPT',
-    requireCodeBlock = true,
-  } = options;
+  const { maxRetries = 2, retryDelayMs = 2000, validate = validateJsonResponse, label = 'ChatGPT', requireCodeBlock = false } = options;
   const totalAttempts = Math.max(1, maxRetries + 1);
   let lastErr = null;
 

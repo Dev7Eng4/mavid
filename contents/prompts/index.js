@@ -53,6 +53,8 @@ export function resolveThumbnailPromptBuilder(prompts, styleKey) {
 export const PROMPTS_CREATE_THUMBNAIL_OPTIONS = [
   { label: 'Tự động', value: '' },
   { label: '[JAPAN] FulL Text', value: 'jaFulLText' },
+  { label: '[JAPAN] 4 lines text + right visual', value: 'jaThumbnailHorizontal' },
+  { label: '[JAPAN] Bottom 2 lines + optional top quote', value: 'jaThumbnailVertical' },
   // { label: 'Japan 2CH Chỉ text', value: 'ja2CHOnlyText' },
   {
     label: '[JAPAN] Love Story',
