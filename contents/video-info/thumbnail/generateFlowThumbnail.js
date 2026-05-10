@@ -80,6 +80,7 @@ async function generateFulLTextLinesColorsViaGemini({ prompts, title, summary, l
       maxRetries: 2,
       validate: validateThumbnailFulLTextJson,
       label: `${logTag} jaFulLText lines/colors`,
+      requireCodeBlock: false,
     });
     const parsed = JSON.parse(stripJsonCodeFence(rawResponse));
     console.log(`[${logTag}] jaFulLText → đã nhận lines/colors từ Gemini.`);
@@ -108,7 +109,6 @@ export async function generateFlowThumbnailFromGemini({
 }) {
   console.log('🚀 ~ generateFlowThumbnailFromGemini ~ thumbnailPromptKey:', thumbnailPromptKey);
   const prompts = await loadPromptByLanguage(language);
-  const { build, isNeedImage } = resolveThumbnailPromptBuilder(prompts, thumbnailPromptKey);
 
   if (thumbnailPromptKey === 'jaFulLText') {
     console.log('🚀 ~ generateFlowThumbnailFromGemini ~ thumbnailPromptKey1:', thumbnailPromptKey);
@@ -138,6 +138,7 @@ export async function generateFlowThumbnailFromGemini({
       logTag,
     });
   } else {
+    const { build, isNeedImage } = resolveThumbnailPromptBuilder(prompts, thumbnailPromptKey);
     const flowPrompt = build(title, summary);
     console.log('🚀 ~ generateFlowThumbnailFromGemini ~ thumbnailPromptKey4:', flowPrompt);
     await runCreateThumbnailFlow({

@@ -46,22 +46,17 @@ async function updateChannelsIndexLastUpload(id, lastUploadText) {
     const vals = headerRow.values || [];
 
     const idCol = CHANNELS.find(c => c.key === 'id').index;
-    console.log('🚀 ~ updateChannelsIndexLastUpload ~ idCol:', idCol);
     const lastUploadCol = CHANNELS.find(c => c.key === 'lastUpload').index;
-    console.log('🚀 ~ updateChannelsIndexLastUpload ~ lastUploadCol:', lastUploadCol);
 
     let updated = 0;
     for (let r = 2; r <= sheet.rowCount; r++) {
       const row = sheet.getRow(r);
       let cellVal = '';
       const v = row.getCell(idCol).value;
-      console.log('🚀 ~ updateChannelsIndexLastUpload ~ v:', v);
       cellVal = String(v ?? '').trim();
-      console.log('🚀 ~ updateChannelsIndexLastUpload ~ cellVal:', cellVal);
 
       if (cellVal !== id) continue;
       row.getCell(lastUploadCol).value = text;
-      console.log('🚀 ~ updateChannelsIndexLastUpload ~ lastUploadCol:', lastUploadCol);
       updated++;
     }
 

@@ -131,7 +131,7 @@ export function PipelinePage({ runningScript, setRunningScript, appendErrorLog, 
           <ScriptCard
             key={s.id}
             script={s}
-            status={s.id === runningScript ? 'running' : statuses[s.id] ?? 'idle'}
+            status={s.id === runningScript ? 'running' : (statuses[s.id] ?? 'idle')}
             disabled={runningScript !== null}
             onRun={() => handleClickRun(s.id, s.npmScript)}
           />

@@ -69,6 +69,7 @@ async function runAnalysisForThumbnailHorizontalOnPage(pg, { prompts, title, sum
     maxRetries: 2,
     validate: validateThumbnailHorizontalAnalysisJson,
     label: `${logTag} jaThumbnailHorizontal analysis`,
+    requireCodeBlock: false,
   });
   return stripJsonCodeFence(rawResponse).trim();
 }
@@ -88,6 +89,7 @@ async function runTextForThumbnailHorizontalOnPage(pg, { prompts, analysisResult
     maxRetries: 2,
     validate: validateThumbnailHorizontalTextJson,
     label: `${logTag} jaThumbnailHorizontal text copy`,
+    requireCodeBlock: false,
   });
   return stripJsonCodeFence(rawResponse).trim();
 }
@@ -108,6 +110,7 @@ async function runVisualForThumbnailHorizontalOnPage(pg, { prompts, analysisResu
     maxRetries: 2,
     validate: validateThumbnailHorizontalVisualJson,
     label: `${logTag} jaThumbnailHorizontal visual prompt`,
+    requireCodeBlock: false,
   });
   const parsed = JSON.parse(stripJsonCodeFence(rawResponse));
 
