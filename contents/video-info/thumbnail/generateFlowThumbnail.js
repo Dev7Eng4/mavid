@@ -80,7 +80,6 @@ async function generateFulLTextLinesColorsViaGemini({ prompts, title, summary, l
       maxRetries: 2,
       validate: validateThumbnailFulLTextJson,
       label: `${logTag} jaFulLText lines/colors`,
-      requireCodeBlock: false,
     });
     const parsed = JSON.parse(stripJsonCodeFence(rawResponse));
     console.log(`[${logTag}] jaFulLText → đã nhận thông tin từ Gemini.`, parsed);
@@ -111,15 +110,13 @@ export async function generateFlowThumbnailFromGemini({
 
   if (thumbnailPromptKey === 'jaFulLText') {
     const { thumbnail_copy, text_styles, background } = await generateFulLTextLinesColorsViaGemini({ prompts, title, summary, logTag });
-    console.log('🚀 ~ generateFlowThumbnailFromGemini ~ background:', background);
-    console.log('🚀 ~ generateFlowThumbnailFromGemini ~ text_styles:', text_styles);
-    console.log('🚀 ~ generateFlowThumbnailFromGemini ~ thumbnail_copy:', thumbnail_copy);
     await renderThumbnailFullTextToPath({
       thumbnail_copy,
       text_styles,
       background,
       outPath: path.join(outputDir, 'flow-thumbnail.jpg'),
     });
+  } else if (thumbnailPromptKey === 'jaThumbnailHorizontal') {
     console.log('🚀 ~ generateFlowThumbnailFromGemini ~ thumbnailPromptKey2:', thumbnailPromptKey);
     await generateAnalysisAndTextForThumbnailHorizontal({
       prompts,
@@ -128,6 +125,7 @@ export async function generateFlowThumbnailFromGemini({
       outputDir,
       logTag,
     });
+  } else if (thumbnailPromptKey === 'jaThumbnailVertical') {
     console.log('🚀 ~ generateFlowThumbnailFromGemini ~ thumbnailPromptKey3:', thumbnailPromptKey);
     await generateBottomTextThumbnailJaVertical({
       prompts,

@@ -87,10 +87,10 @@ function validateBottomTextThumbnailSpecJson(raw) {
   if (typeof tc.bottom_line_1 !== 'string' || !tc.bottom_line_1.trim()) throw new Error('Thiếu bottom_line_1.');
   if (typeof tc.bottom_line_2 !== 'string' || !tc.bottom_line_2.trim()) throw new Error('Thiếu bottom_line_2.');
   if (typeof tc.top_quote_enabled !== 'boolean') throw new Error('Thiếu top_quote_enabled (boolean).');
-  if (typeof tc.top_quote !== 'string') throw new Error('Thiếu top_quote.');
-  if (tc.top_quote_enabled && !tc.top_quote.trim()) {
-    throw new Error('top_quote_enabled true nhưng top_quote rỗng.');
-  }
+  // if (typeof tc.top_quote !== 'string') throw new Error('Thiếu top_quote.');
+  // if (tc.top_quote_enabled && !tc.top_quote.trim()) {
+  //   throw new Error('top_quote_enabled true nhưng top_quote rỗng.');
+  // }
   if (!textColorLooksValid(parsed.text_color)) throw new Error('Thiếu hoặc sai text_color (fill/stroke từng dòng).');
   if (typeof parsed.visual_prompt !== 'string' || !parsed.visual_prompt.trim()) throw new Error('Thiếu visual_prompt.');
 }
