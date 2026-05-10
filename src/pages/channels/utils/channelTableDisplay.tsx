@@ -13,7 +13,7 @@ function parseFlexibleDate(raw: string): Date | null {
   if (!Number.isNaN(iso)) return new Date(iso);
 
   const dm =
-    /^(\d{1,2})[/\-](\d{1,2})[/\-](\d{2,4})(?:\s+(\d{1,2}):(\d{2})(?::(\d{2}))?)?/.exec(s);
+    /^(\d{1,2})[/-](\d{1,2})[/-](\d{2,4})(?:\s+(\d{1,2}):(\d{2})(?::(\d{2}))?)?/.exec(s);
   if (dm) {
     const d = Number(dm[1]);
     const m = Number(dm[2]) - 1;

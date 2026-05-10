@@ -5,11 +5,7 @@ import { DownloadIcon, FilterIcon, SpinnerIcon } from '@/components/ui/Icons';
 import { AppButton } from '@/components/ui/AppButton';
 import { CustomSelect } from '@/components/ui/CustomSelect';
 import { TablePaginationBar } from '@/components/ui/TablePaginationBar';
-import {
-  channelPlatformIcon,
-  channelStatusBadgeStyle,
-  formatChannelLastUploadDisplay,
-} from '../utils/channelTableDisplay';
+import { channelPlatformIcon, channelStatusBadgeStyle, formatChannelLastUploadDisplay } from '../utils/channelTableDisplay';
 
 export function ChannelsIndexSection({
   loading,
@@ -57,7 +53,7 @@ export function ChannelsIndexSection({
     }
 
     if (colKey === 'lastUpload') {
-      return <span className='leading-snug'>{formatChannelLastUploadDisplay(rawCell)}</span>;
+      return <span className='leading-snug'>{String(rawCell ?? '').trim()}</span>;
     }
 
     if (colKey === 'status') {
@@ -96,10 +92,7 @@ export function ChannelsIndexSection({
         className='w-full min-w-0 overflow-hidden rounded-2xl'
         style={{ background: 'var(--card-bg)', border: '1px solid var(--border)' }}
       >
-        <div
-          className='flex flex-wrap items-center gap-2 border-b px-4 py-3 sm:gap-3'
-          style={{ borderColor: 'var(--border)' }}
-        >
+        <div className='flex flex-wrap items-center gap-2 border-b px-4 py-3 sm:gap-3' style={{ borderColor: 'var(--border)' }}>
           <input
             type='search'
             value={toolbarSearch}
@@ -137,10 +130,7 @@ export function ChannelsIndexSection({
         </div>
 
         {filterExpanded ? (
-          <div
-            className='border-b px-4 py-3 sm:flex sm:max-w-md sm:items-center sm:gap-3'
-            style={{ borderColor: 'var(--border)' }}
-          >
+          <div className='border-b px-4 py-3 sm:flex sm:max-w-md sm:items-center sm:gap-3' style={{ borderColor: 'var(--border)' }}>
             <span className='mb-2 block text-sm font-medium sm:mb-0 sm:w-28 shrink-0' style={{ color: 'var(--text-muted)' }}>
               Nhóm
             </span>
@@ -158,11 +148,7 @@ export function ChannelsIndexSection({
           <table className='w-full min-w-0 text-base' style={{ borderCollapse: 'collapse', tableLayout: 'auto' }}>
             <thead>
               <tr style={{ background: 'var(--code-bg)' }}>
-                <th
-                  className='w-12 px-2 py-3 text-center align-middle'
-                  style={{ borderBottom: '1px solid var(--border)' }}
-                  scope='col'
-                >
+                <th className='w-12 px-2 py-3 text-center align-middle' style={{ borderBottom: '1px solid var(--border)' }} scope='col'>
                   <input
                     ref={headerSelectRef}
                     type='checkbox'

@@ -135,6 +135,7 @@ export async function generateBottomTextThumbnailJaVertical({
       maxRetries: 2,
       validate: validateBottomTextThumbnailSpecJson,
       label: `${logTag} jaThumbnailVertical bottom-text spec`,
+      requireCodeBlock: false,
     });
     specResult = JSON.parse(stripJsonCodeFence(rawResponse));
     console.log(`[${logTag}] jaThumbnailVertical → đã nhận JSON spec (copy + visual_prompt).`);
