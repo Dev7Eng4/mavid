@@ -41,18 +41,18 @@ function validateThumbnailFulLTextJson(raw) {
   if (!cleaned) throw new Error('Gemini trả về response rỗng.');
   const parsed = JSON.parse(cleaned);
   if (!parsed || typeof parsed !== 'object') throw new Error('JSON không phải object.');
-  const { lines, colors } = parsed;
-  if (!lines || !colors) throw new Error('Thiếu trường lines/colors.');
+  const { thumbnail_copy, text_styles, background } = parsed;
+  if (!thumbnail_copy || !text_styles || !background) throw new Error('Thiếu trường thumbnail_copy/text_styles/background.');
   for (const k of ['L1', 'L2', 'L3', 'L4', 'L5']) {
-    if (typeof lines[k] !== 'string' || !lines[k].trim()) {
-      throw new Error(`Thiếu lines.${k}`);
+    if (!thumbnail_copy[k] || !thumbnail_copy[k].trim()) {
+      throw new Error(`Thiếu thumbnail_copy.${k}`);
     }
-    if (typeof colors[k] !== 'string' || !colors[k].trim()) {
-      throw new Error(`Thiếu colors.${k}`);
+    if (!text_styles[k] || !text_styles[k].fill) {
+      throw new Error(`Thiếu text_styles.${k}.fill`);
     }
   }
-  if (typeof colors.canvas_from !== 'string' || typeof colors.canvas_to !== 'string') {
-    throw new Error('Thiếu colors.canvas_from / canvas_to');
+  if (!background.base_from || !background.base_to) {
+    throw new Error('Thiếu background.base_from / base_to');
   }
 }
 
@@ -82,8 +82,8 @@ async function generateFulLTextLinesColorsViaGemini({ prompts, title, summary, l
       label: `${logTag} jaFulLText lines/colors`,
     });
     const parsed = JSON.parse(stripJsonCodeFence(rawResponse));
-    console.log(`[${logTag}] jaFulLText → đã nhận lines/colors từ Gemini.`);
-    return { lines: parsed.lines, colors: parsed.colors };
+    console.log(`[${logTag}] jaFulLText → đã nhận thông tin từ Gemini.`, parsed);
+    return parsed;
   } finally {
     await ctx.close().catch(() => {});
   }
@@ -106,20 +106,20 @@ export async function generateFlowThumbnailFromGemini({
   thumbnailPromptKey,
   logTag = 'thumbnail-flow',
 }) {
-  console.log('🚀 ~ generateFlowThumbnailFromGemini ~ thumbnailPromptKey:', thumbnailPromptKey);
   const prompts = await loadPromptByLanguage(language);
   const { build, isNeedImage } = resolveThumbnailPromptBuilder(prompts, thumbnailPromptKey);
 
   if (thumbnailPromptKey === 'jaFulLText') {
-    console.log('🚀 ~ generateFlowThumbnailFromGemini ~ thumbnailPromptKey1:', thumbnailPromptKey);
     const { thumbnail_copy, text_styles, background } = await generateFulLTextLinesColorsViaGemini({ prompts, title, summary, logTag });
+    console.log('🚀 ~ generateFlowThumbnailFromGemini ~ background:', background);
+    console.log('🚀 ~ generateFlowThumbnailFromGemini ~ text_styles:', text_styles);
+    console.log('🚀 ~ generateFlowThumbnailFromGemini ~ thumbnail_copy:', thumbnail_copy);
     await renderThumbnailFullTextToPath({
       thumbnail_copy,
       text_styles,
       background,
       outPath: path.join(outputDir, 'flow-thumbnail.jpg'),
     });
-  } else if (thumbnailPromptKey === 'jaThumbnailHorizontal') {
     console.log('🚀 ~ generateFlowThumbnailFromGemini ~ thumbnailPromptKey2:', thumbnailPromptKey);
     await generateAnalysisAndTextForThumbnailHorizontal({
       prompts,
@@ -128,7 +128,6 @@ export async function generateFlowThumbnailFromGemini({
       outputDir,
       logTag,
     });
-  } else if (thumbnailPromptKey === 'jaThumbnailVertical') {
     console.log('🚀 ~ generateFlowThumbnailFromGemini ~ thumbnailPromptKey3:', thumbnailPromptKey);
     await generateBottomTextThumbnailJaVertical({
       prompts,
@@ -138,7 +137,6 @@ export async function generateFlowThumbnailFromGemini({
       logTag,
     });
   } else {
-    const flowPrompt = build(title, summary);
     console.log('🚀 ~ generateFlowThumbnailFromGemini ~ thumbnailPromptKey4:', flowPrompt);
     await runCreateThumbnailFlow({
       prompt: flowPrompt,
