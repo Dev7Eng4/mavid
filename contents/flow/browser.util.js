@@ -84,11 +84,11 @@ async function setupFlow(page) {
   }
 }
 
-export async function attachImage(page) {
+export async function attachImage(page, pathSave) {
   try {
-    if (fs.existsSync(FLOW_DOWNLOADS_DIR)) {
+    if (fs.existsSync(pathSave)) {
       console.log('🔄 Đang attach ảnh thumbnail...');
-      const files = fs.readdirSync(FLOW_DOWNLOADS_DIR);
+      const files = fs.readdirSync(pathSave);
       const thumbFile = files.find(f => f.startsWith('thumbnail.'));
 
       if (thumbFile) {
@@ -101,7 +101,7 @@ export async function attachImage(page) {
 
         const [fileChooser] = await Promise.all([page.waitForEvent('filechooser'), clickElement(page, FLOW_SELECTOR.btnUploadImage, true)]);
         console.log('🔄 Đang set files...');
-        await fileChooser.setFiles(path.join(FLOW_DOWNLOADS_DIR, thumbFile));
+        await fileChooser.setFiles(path.join(pathSave, thumbFile));
         console.log('🔄 Đã set files...');
         await delay(2900);
 
@@ -156,7 +156,6 @@ async function getResponseImage({ page, projectId, folder, exportName }) {
       { timeout: 3 * 60 * 1000 },
     ),
   ]);
-  console.log('🚀 ~ getResponseThumbnail ~ response:', response);
 
   const data = await response.json();
   const imageUrl = data?.media[0]?.image?.generatedImage?.fifeUrl;
@@ -178,7 +177,14 @@ async function getResponseImage({ page, projectId, folder, exportName }) {
  * @param {object} [setting] — merge lên flowSettings
  * @param {boolean} [isNeedImage]
  */
-export async function generateImageWithFlow(prompt, pathSave, exportName, setting = {}, isNeedImage = false, pathOldImage) {
+export async function generateImageWithFlow(
+  prompt,
+  pathSave = FLOW_DOWNLOADS_DIR,
+  exportName,
+  setting = {},
+  isNeedImage = false,
+  pathOldImage,
+) {
   const cfg = { ...flowSettings, ...setting };
 
   const chromeProfile = resolveFlowChromeProfile(cfg);
@@ -189,7 +195,7 @@ export async function generateImageWithFlow(prompt, pathSave, exportName, settin
 
   try {
     if (isNeedImage) {
-      await attachImage(page);
+      await attachImage(page, pathSave);
     }
     await inputPromptCreateImage(page, prompt);
     await getResponseImage({ page, projectId: cfg.FLOW_PROJECT_ID, folder: pathSave, exportName });

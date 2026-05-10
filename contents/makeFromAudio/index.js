@@ -30,7 +30,6 @@ const defaultOption = process.env.MAVID_VIDEO_OPTION || OPTIONS_CONTENT[0].value
  * @param {boolean} [options.syncProgressToSpreadsheet=true]
  */
 async function main(options = {}) {
-  console.log('🚀 ~ main ~ options:', options);
   const syncProgressToSpreadsheet = options.syncProgressToSpreadsheet !== false;
   const inputFile = options.inputFile || null;
   const items = options.items || [];
@@ -88,8 +87,6 @@ async function main(options = {}) {
     console.warn('[logo] showLogo bật nhưng không có ảnh (.png/.jpg/...) trong folder channel.');
   }
 
-  const geminiByUrl = {};
-
   function resolveVideoOutputDir(videoId) {
     const base = videoId || 'unknown_id';
     const dir = path.join(destFolder, base);
@@ -141,7 +138,7 @@ async function main(options = {}) {
   }
 
   for (let i = 0; i < items.length; i++) {
-    const { url, background } = items[i];
+    const url = items[i];
     console.log(`\n[${i + 1}/${items.length}] Chờ tải/xử lý metadata: ${url}`);
 
     const dlResult = await nextDownloadPromise;
@@ -173,7 +170,7 @@ async function main(options = {}) {
           const bgImgPath = path.join(isolatedDownloadsDir, 'background.jpg');
           await makeVideoWithImageNoise(perItemOptions, bgImgPath);
         } else if (currentOption === VIDEO_MAKE_OPTION.SI) {
-          await makeVideoWithOverlayImageNoise(background || defaultStockFolder, perItemOptions);
+          await makeVideoWithOverlayImageNoise(defaultStockFolder, perItemOptions);
         } else {
           console.warn(`[main] Bỏ qua option không hỗ trợ: ${currentOption} (chỉ còn IN | SI).`);
         }
@@ -181,17 +178,17 @@ async function main(options = {}) {
         console.log(`ĐÃ HOÀN THÀNH VIDEO: ${url}`);
 
         if (fs.existsSync(OUTPUT_DIR)) {
-          const outputFiles = fs.readdirSync(OUTPUT_DIR);
-          for (const f of outputFiles) {
-            try {
-              fs.unlinkSync(path.join(OUTPUT_DIR, f));
-            } catch (e) {}
-          }
+          // const outputFiles = fs.readdirSync(OUTPUT_DIR);
+          // for (const f of outputFiles) {
+          //   try {
+          //     fs.unlinkSync(path.join(OUTPUT_DIR, f));
+          //   } catch (e) {}
+          // }
           console.log('Đã dọn dẹp outputs/ cẩn thận cho video tiếp theo.');
         }
 
         if (fs.existsSync(isolatedDownloadsDir)) {
-          fs.rmSync(isolatedDownloadsDir, { recursive: true, force: true });
+          // fs.rmSync(isolatedDownloadsDir, { recursive: true, force: true });
         }
 
         progressData[url] = {

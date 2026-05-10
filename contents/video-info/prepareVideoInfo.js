@@ -24,6 +24,7 @@ import { generateFlowThumbnailFromGemini } from './thumbnail/generateFlowThumbna
 import { runCreateThumbnailFlow } from './thumbnail/runCreateThumbnailFlow.js';
 import { MAKE_VIDEO_MODE } from '../constants/index.js';
 import { internalUpdateTranscript } from './transcriptPipeline.js';
+import { detectVideoLang } from '../utils/detectLanguage.util.js';
 
 const MERGE_SECTION_BATCH_SIZE = 12;
 const MERGE_SECTION_MAX_PROFILES = 4;
@@ -31,6 +32,18 @@ const PREVIOUS_CONTEXT_CHUNKS = 10;
 const CHUNK_SIZE = 150;
 const GENERAL_IMAGE_NAME = 'background';
 const VIDEO_META_FILE = 'video-meta.json';
+const FLOW_THUMBNAIL_FILENAME = 'flow-thumbnail.jpg';
+
+/**
+ * @param {Record<string, unknown>|null|undefined} meta
+ * @returns {boolean}
+ */
+function hasNonEmptySeoTitleAndDescription(meta) {
+  if (!meta || typeof meta !== 'object') return false;
+  const seoTitle = String(meta.seoTitle ?? '').trim();
+  const seoDescription = String(meta.seoDescription ?? '').trim();
+  return seoTitle !== '' && seoDescription !== '';
+}
 
 const VISUAL_STYLE_PRESETS = {
   cinematic: {
@@ -364,10 +377,6 @@ export const createVideoInfoWithLLM = async (options = {}) => {
     }
   }
 
-  console.log('🚀 ~ createVideoInfoWithLLM ~ finalSummary:', finalSummary);
-  console.log('🚀 ~ createVideoInfoWithLLM ~ mergeStrategy:', !generateGeneralImage && !generateSceneImages);
-  console.log('🚀 ~ createVideoInfoWithLLM ~ generateGeneralImage:', !finalSummary || (!generateGeneralImage && !generateSceneImages));
-
   // step 3 — visual bible khi cần hero và/hoặc scene images
   if (!finalSummary || (!generateGeneralImage && !generateSceneImages)) {
     return { finalSummary };
@@ -577,12 +586,13 @@ const prepareVideoInfo = async ({ url, options = {} }) => {
   if (onlyUpdateInfo) {
     if (!fs.existsSync(actualOutputDir)) {
       console.warn(`[prepareVideoInfo] onlyUpdateInfo: outputDir không tồn tại: ${actualOutputDir}`);
-      return { url, onlyUpdateInfo: true };
+      return { ok: false };
     }
+
     const metaPath = path.join(actualOutputDir, VIDEO_META_FILE);
     if (!fs.existsSync(metaPath)) {
       console.warn(`[prepareVideoInfo] onlyUpdateInfo: không tìm thấy ${metaPath}`);
-      return { url, onlyUpdateInfo: true };
+      return { ok: false };
     }
     /** @type {Record<string, unknown>} */
     let meta;
@@ -591,26 +601,85 @@ const prepareVideoInfo = async ({ url, options = {} }) => {
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
       console.warn(`[prepareVideoInfo] onlyUpdateInfo: không đọc được video-meta.json: ${msg}`);
-      return { url, onlyUpdateInfo: true };
-    }
-    let generalPromptFromMeta = meta.generalPrompt;
-
-    if (!generalPromptFromMeta) {
-      console.warn(
-        '[prepareVideoInfo] onlyUpdateInfo: không có generalPrompt (hoặc visualBible.hero_image_package.prompt) trong video-meta.json.',
-      );
-      return { url, onlyUpdateInfo: true, generalPrompt: '' };
+      return { ok: false };
     }
 
-    await runFlowImagesAfterVideoInfo({
-      actualOutputDir,
-      generalPrompt: generalPromptFromMeta,
-    });
+    /** @type {Record<string, unknown>} */
+    let workingMeta = { ...meta };
+
+    if (!hasNonEmptySeoTitleAndDescription(workingMeta)) {
+      const srts = fs.readdirSync(actualOutputDir).filter(f => /\.srt$/i.test(f));
+      if (srts.length === 0) {
+        console.warn(
+          `[prepareVideoInfo] onlyUpdateInfo: thiếu seoTitle/seoDescription cần LLM nhưng không có file .srt trong ${actualOutputDir}`,
+        );
+        return { ok: false };
+      }
+
+      const llmResult = await createVideoInfoWithLLM({
+        outputDir: actualOutputDir,
+        visualStyle,
+        generateGeneralImage: false,
+        generateSceneImages: false,
+      });
+
+      const finalSummary = 'finalSummary' in llmResult ? llmResult.finalSummary : null;
+      const visualBible = 'visualBible' in llmResult ? llmResult.visualBible : undefined;
+      const generalPrompt = 'generalPrompt' in llmResult ? llmResult.generalPrompt : undefined;
+
+      if (!finalSummary) {
+        console.warn('[prepareVideoInfo] onlyUpdateInfo: createVideoInfoWithLLM không trả về finalSummary');
+        return { ok: false };
+      }
+
+      const title = finalSummary?.metadata?.title || '';
+      workingMeta = {
+        ...workingMeta,
+        seoTitle: title,
+        seoDescription: finalSummary?.metadata?.description || '',
+        seoTags: finalSummary?.metadata?.tags || '',
+        summary: finalSummary?.final_summary,
+        visualBible,
+        generalPrompt,
+      };
+      fs.writeFileSync(metaPath, JSON.stringify(workingMeta, null, 2), 'utf-8');
+    }
+
+    const transcriptLang =
+      typeof workingMeta.transcriptLang === 'string' && workingMeta.transcriptLang.trim()
+        ? workingMeta.transcriptLang.trim()
+        : detectVideoLang(String(workingMeta.title ?? ''));
+
+    const flowThumbPath = path.join(actualOutputDir, FLOW_THUMBNAIL_FILENAME);
+    if (!fs.existsSync(flowThumbPath)) {
+      const titleForThumb = String(workingMeta.seoTitle ?? '').trim();
+      const summaryForThumb = workingMeta.summary;
+      if (titleForThumb && summaryForThumb) {
+        try {
+          await generateFlowThumbnailFromGemini({
+            title: titleForThumb,
+            summary: summaryForThumb,
+            outputDir: actualOutputDir,
+            language: transcriptLang,
+            thumbnailPromptKey: thumbnailOptions.prompt ?? '',
+            logTag: 'prepare-video-info-only-update',
+          });
+        } catch (e) {
+          const msg = e instanceof Error ? e.message : String(e);
+          console.warn(`[prepareVideoInfo] onlyUpdateInfo Flow thumbnail: ${msg}`);
+        }
+      } else {
+        console.warn(
+          '[prepareVideoInfo] onlyUpdateInfo: chưa có flow-thumbnail.jpg nhưng thiếu seoTitle hoặc summary để gọi generateFlowThumbnailFromGemini',
+        );
+      }
+    }
 
     return {
-      url,
+      ok: true,
       onlyUpdateInfo: true,
-      generalPrompt: generalPromptFromMeta,
+      videoId: String(workingMeta.videoId ?? ''),
+      lang: transcriptLang,
     };
   }
 
@@ -682,6 +751,7 @@ const prepareVideoInfo = async ({ url, options = {} }) => {
     seoTitle: title,
     seoDescription: finalSummary?.metadata?.description || '',
     seoTags: finalSummary?.metadata?.tags || '',
+    lang: transcriptLang,
     summary,
     visualBible,
     generalPrompt,

@@ -1,12 +1,12 @@
 /**
- * CLI / Electron: cập nhật video-meta.json + thumbnail Flow cho các video đã chọn (theo URL).
+ * CLI / Electron: cập nhật meta qua prepareVideoInfo (onlyUpdateInfo: SEO/summary + Flow thumbnail khi thiếu).
  * @param {{ channelFolder?: string, items?: { url: string }[] }} params
  */
 import path from 'path';
 import { resolveChannelsDir } from '../utils/channelsStoragePath.js';
 import { extractYoutubeVideoId } from '../channel/youtubeUrl.util.js';
 import { readThumbnailPromptKeyFromChannelDir } from '../channel/readChannelThumbnailPrompt.util.js';
-import { processOneVideoMetaUpdate } from '../channel/processOneVideoMetaUpdate.js';
+import prepareVideoInfo from '../video-info/prepareVideoInfo.js';
 
 export default async function updateChannelVideosMeta(params = { channelFolder: '', channelId: '', items: [] }) {
   const { channelFolder, channelId, items } = params;
@@ -32,8 +32,29 @@ export default async function updateChannelVideosMeta(params = { channelFolder: 
 
     const videoDir = path.join(channelDir, videoId);
 
-    const r = await processOneVideoMetaUpdate({ videoDir, url, thumbnailPromptKey });
-    results.push({ ok: r.ok, url, videoId, reason: r.reason });
+    try {
+      const r = await prepareVideoInfo({
+        url,
+        options: {
+          onlyUpdateInfo: true,
+          outputDir: videoDir,
+          thumbnailOptions: {
+            prompt: thumbnailPromptKey ?? '',
+            // needImage: false,
+          },
+        },
+      });
+      const ok = r?.ok !== false;
+      results.push({
+        ok,
+        url,
+        videoId,
+        reason: ok ? undefined : String(r?.reason ?? 'prepareVideoInfo onlyUpdateInfo thất bại'),
+      });
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      results.push({ ok: false, url, videoId, reason: msg });
+    }
   }
 
   return { processed: results.length, results };

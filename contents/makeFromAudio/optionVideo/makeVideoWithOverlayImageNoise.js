@@ -490,7 +490,7 @@ export async function makeVideoWithOverlayImageNoise(bgNameArg, options = {}) {
   if (scaledSrtPath && fs.existsSync(scaledSrtPath)) fs.unlinkSync(scaledSrtPath);
 
   if (stockTempDir && fs.existsSync(stockTempDir)) {
-    fs.rmSync(stockTempDir, { recursive: true, force: true });
+    // fs.rmSync(stockTempDir, { recursive: true, force: true });
     console.log(`[StockVisual] Đã xóa thư mục tạm: ${stockTempDir}`);
   }
 
@@ -510,6 +510,7 @@ export async function makeVideoWithOverlayImageNoise(bgNameArg, options = {}) {
 
       for (const thumbBase of ['thumbnail', 'flow-thumbnail']) {
         const thumbSrc = findImageInDirByBasename(downloadsDir, thumbBase);
+        console.log('🚀 ~ makeVideoWithOverlayImageNoise ~ thumbSrc:', thumbSrc);
         if (thumbSrc) {
           const thumbDestPath = path.join(perVideoDir, path.basename(thumbSrc));
           fs.copyFileSync(thumbSrc, thumbDestPath);

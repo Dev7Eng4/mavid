@@ -25,14 +25,17 @@ export const THUMBNAIL_PROMPT_KEY_ALIASES = {
  * @returns {{ build: (title: string, summary: string) => string, isNeedImage: boolean, usedStyleKey: string, didFallback: boolean }}
  */
 export function resolveThumbnailPromptBuilder(prompts, styleKey) {
+  console.log('🚀 ~ resolveThumbnailPromptBuilder ~ styleKey:', styleKey);
   const raw = String(styleKey ?? '').trim();
   const def = prompts.promptToCreateThumbnail;
+  console.log('🚀 ~ resolveThumbnailPromptBuilder ~ def:', def);
   if (typeof def !== 'function') {
     throw new Error('resolveThumbnailPromptBuilder: thiếu hàm promptToCreateThumbnail trong gói ngôn ngữ');
   }
   if (!raw) {
-    return { build: def, isNeedImage: false, usedStyleKey: '', didFallback: false };
+    return { build: def, isNeedImage: true, usedStyleKey: '', didFallback: false };
   }
+  console.log('🚀 ~ resolveThumbnailPromptBuilder ~ raw after: ', raw);
 
   const k = THUMBNAIL_PROMPT_KEY_ALIASES[raw] || raw;
   const candidate = prompts[k];
