@@ -4,6 +4,7 @@ export type ScriptId =
   | 'tao-chrome-profile'
   | 'lay-thong-tin-youtube'
   | 'tao-batch-video-tu-audio'
+  | 'createBatchVideo'
   | 'tao-batch-video-reup-full'
   | 'tao-thumbnail-flow'
   | 'tom-tat-meta-tu-transcript';
@@ -39,6 +40,12 @@ export const scriptDefs: ScriptDef[] = [
     title: 'Tạo batch video reup full',
     summary: 'Reup video hàng loạt bằng overlay ảnh/video lên video gốc.',
     npmScript: 'tao-batch-video-reup-full',
+  },
+  {
+    id: 'createBatchVideo',
+    title: 'Tạo batch video',
+    summary: 'Tạo video hàng loạt từ audio + stock clips (FFmpeg, phụ đề, logo).',
+    npmScript: 'create-batch-video',
   },
   {
     id: 'tao-thumbnail-flow',

@@ -18,6 +18,7 @@ import {
   buildExtraEnvForIndexChannelRow,
   CHANNEL_ADD_DURATION_SELECT_OPTIONS,
   extractYoutubeVideoIdFromUrl,
+  SCRIPT_CREATE_BATCH_VIDEO,
   SCRIPT_FROM_AUDIO,
   SCRIPT_REUP_FULL,
 } from './utils/channelIndexHelpers';
@@ -273,9 +274,9 @@ function ChannelsPage() {
 
     try {
       for (let i = 0; i < queue.length; i++) {
-        const { videoType, channelId, id, videos } = queue[i];
+        const { channelId, id, videos } = queue[i];
         setIndexBatchVideo({ current: i + 1, total: queue.length, channelLabel: channelId });
-        const def = scriptDefs.find(s => s.id === (videoType === 'video' ? SCRIPT_REUP_FULL : SCRIPT_FROM_AUDIO));
+        const def = scriptDefs.find(s => s.id === SCRIPT_CREATE_BATCH_VIDEO);
         if (!def) {
           continue;
         }

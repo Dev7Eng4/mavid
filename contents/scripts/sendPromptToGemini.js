@@ -42,7 +42,7 @@ const __filename = fileURLToPath(import.meta.url);
  */
 
 export async function testSendPromptToLlm(options = {}) {
-  const { prompt = promptToDetectNiche('test', 'test'), profile = 2, visible = true, thinkingMode = false, closeBrowser = true } = options;
+  const { prompt = promptToDetectNiche('test', 'test'), profile = 4, visible = true, thinkingMode = false, closeBrowser = true } = options;
 
   const { context, page } = await openChromeProfile({ profile, visible });
 
@@ -78,7 +78,7 @@ async function main() {
 
 時には、自分の選択に迷い、不安になることもある。他人と比べてしまい、自分の道が正しいのか疑問に思うこともあるだろう。それでも、自分自身の気持ちに正直でいることが、最終的には後悔の少ない人生につながるはずだ。他人の期待ではなく、自分の価値観に基づいて選ぶこと。それは簡単なようで、とても難しい。
 
-失敗することもあるだろう。しかし、その経験こそが次の選択をより良いものにしてくれる。重要なのは、立ち止まらずに前へ進み続けることだ。どんなに遠回りに見えても、その道には必ず意味がある。人生において無駄な経験など一つもない。そう信じて、一歩一歩、自分のペースで歩んでいけばいいのだ。`
+失敗することもあるだろう。しかし、その経験こそが次の選択をより良いものにしてくれる。重要なのは、立ち止まらずに前へ進み続けることだ。どんなに遠回りに見えても、その道には必ず意味がある。人生において無駄な経験など一つもない。そう信じて、一歩一歩、自分のペースで歩んでいけばいいのだ。`,
     );
 
   console.log('Prompt:', prompt);

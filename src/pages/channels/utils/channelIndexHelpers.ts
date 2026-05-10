@@ -44,6 +44,7 @@ export const CHANNEL_ADD_DURATION_SELECT_OPTIONS: { value: string; label: string
 
 export const SCRIPT_FROM_AUDIO: ScriptId = 'tao-batch-video-tu-audio';
 export const SCRIPT_REUP_FULL: ScriptId = 'tao-batch-video-reup-full';
+export const SCRIPT_CREATE_BATCH_VIDEO: ScriptId = 'createBatchVideo';
 
 export function headerNorm(h: string): string {
   return String(h).trim().toUpperCase();

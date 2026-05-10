@@ -66,40 +66,6 @@ export async function syncProgressStatusToSpreadsheet(inputFile, progressData) {
     return true;
   }
 
-  if (lower.endsWith('.csv')) {
-    const content = fs.readFileSync(inputFile, 'utf-8').replace(/^\uFEFF/, '');
-    const lines = content.split('\n').map(l => l.trimEnd()).filter(l => l.trim());
-    if (lines.length < 2) return false;
-    const parseLine = line => line.split(',').map(c => c.trim().replace(/^"|"$/g, ''));
-    const headers = parseLine(lines[0]);
-    const videoIdx = headers.findIndex(h => h.toLowerCase() === 'link video');
-    const statusIdx = headers.findIndex(h => h.toLowerCase().includes('status'));
-    if (videoIdx < 0 || statusIdx < 0) {
-      console.warn('[sync] CSV: không tìm thấy LINK VIDEO hoặc STATUS.');
-      return false;
-    }
-    const out = [lines[0]];
-    let updated = 0;
-    for (let i = 1; i < lines.length; i++) {
-      const cells = parseLine(lines[i]);
-      while (cells.length < headers.length) cells.push('');
-      const url = cells[videoIdx] || '';
-      const entry = pd[url];
-      if (entry?.status && (url.startsWith('http://') || url.startsWith('https://'))) {
-        cells[statusIdx] = entry.status;
-        updated++;
-      }
-      out.push(
-        cells.map(c => {
-          const s = String(c ?? '');
-          return s.includes(',') || s.includes('"') ? `"${s.replace(/"/g, '""')}"` : s;
-        }).join(','),
-      );
-    }
-    fs.writeFileSync(inputFile, out.join('\n'), 'utf-8');
-    console.log(`[sync] Đã đồng bộ STATUS từ progress → ${path.basename(inputFile)} (${updated} dòng CSV).`);
-    return true;
-  }
   return false;
 }
 

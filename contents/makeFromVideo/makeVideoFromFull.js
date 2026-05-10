@@ -12,8 +12,6 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.join(__dirname, '..', '..');
 const CHANNELS_DIR = resolveChannelsDir();
 
-const DOWNLOADS_DIR = path.join(ROOT, 'downloads');
-
 /** Re-export để code cũ `import { OVERLAY_OPTIONS } from './makeVideoFromFull.js'` vẫn dùng được. */
 export { OVERLAY_OPTIONS };
 
@@ -158,6 +156,41 @@ function sanitizeFilename(name) {
   return name.replace(/[\\/:*?"<>|]/g, '_').trim();
 }
 
+/** Tìm file ảnh trong `dir` có basename khớp `basename`, không phân biệt hoa thường. */
+function findImageInDirByBasename(dir, basename) {
+  if (!dir || !fs.existsSync(dir)) return null;
+  const lowerBase = basename.toLowerCase();
+  const imageNameRe = /\.(jpe?g|png|webp)$/i;
+  for (const f of fs.readdirSync(dir)) {
+    if (!imageNameRe.test(f)) continue;
+    if (path.parse(f).name.toLowerCase() === lowerBase) return path.join(dir, f);
+  }
+  return null;
+}
+
+/** Chọn file video đã tải trong `downloadsDir` (ưu tiên tên chứa `videoId`). */
+function pickDownloadedVideoPath(downloadsDir, videoId) {
+  const videoExt = /\.(mp4|mkv|mov|webm|avi)$/i;
+  const mediaFiles = fs.readdirSync(downloadsDir).filter(f => videoExt.test(f));
+  if (mediaFiles.length === 0) return null;
+  let pick = mediaFiles[0];
+  if (videoId) {
+    const byId = mediaFiles.find(f => f.includes(videoId));
+    if (byId) pick = byId;
+  }
+  return path.join(downloadsDir, pick);
+}
+
+function readVideoMetaJson(outputDir) {
+  const metaPath = path.join(outputDir, 'video-meta.json');
+  if (!fs.existsSync(metaPath)) return {};
+  try {
+    return JSON.parse(fs.readFileSync(metaPath, 'utf8'));
+  } catch {
+    return {};
+  }
+}
+
 async function remakeVideo(videoPath, imagePath, overlayVideoPath, outputPath, overlayRender) {
   const { imageOpacity, videoOpacity, overlayCacheDir, videoCropPercent = 0 } = overlayRender;
   return new Promise((resolve, reject) => {
@@ -282,13 +315,16 @@ async function main(options = {}) {
 
   const overlayRender = { imageOpacity, videoOpacity, overlayCacheDir, videoCropPercent, outputHeight };
 
-  const { downloadSingleVideo } = await import('../video-info/downloadVideo.js');
-
   // Tìm file thực tế được dùng để lấy thư mục đích (folder channel)
   const actualInputFile = inputFile;
   let destFolder = CHANNELS_DIR;
   if (actualInputFile) {
     destFolder = path.dirname(actualInputFile);
+  }
+
+  function resolveVideoOutputDir(videoId) {
+    const base = videoId || 'unknown_id';
+    return path.join(destFolder, base);
   }
 
   const progressFile = actualInputFile
@@ -326,102 +362,110 @@ async function main(options = {}) {
   const overlayImage = images[0];
   const overlayClip = overlayVideos[0];
 
-  /** Metadata Gemini theo URL (callback downloadTranscript) — ghi vào video-meta.json sau render */
-  const geminiByUrl = {};
+  let nextDownloadPromise = null;
 
-  /** Thư mục cho 1 video: destFolder/<videoID> */
-  function resolveVideoOutputDir(videoId) {
-    const base = videoId || 'unknown_id';
-    const dir = path.join(destFolder, base);
-    return dir;
+  async function startDownload(itemIndex) {
+    if (itemIndex >= items.length) return null;
+    const url = items[itemIndex];
+    const isolatedDownloadsDir = path.join(ROOT, 'downloads', `job_${Date.now()}_${itemIndex}`);
+
+    const { default: prepareVideoInfo } = await import('../video-info/prepareVideoInfo.js');
+
+    return prepareVideoInfo({
+      url,
+      options: {
+        mode: MAKE_VIDEO_MODE.REUP_FULL,
+        outputDir: isolatedDownloadsDir,
+        downloadMaxHeight: outputHeight,
+        thumbnailOptions: {
+          prompt: options.thumbnailPrompt,
+        },
+        generateGeneralImage: false,
+        generateSceneImages: false,
+      },
+    })
+      .then(result => ({ result, isolatedDownloadsDir }))
+      .catch(err => {
+        console.error(`Lỗi prepareVideoInfo ${url}:`, err.message);
+        return { result: null, isolatedDownloadsDir };
+      });
+  }
+
+  if (items.length > 0) {
+    console.log('\n[Pipeline] Bắt đầu prepareVideoInfo cho video đầu tiên...');
+    nextDownloadPromise = startDownload(0);
   }
 
   for (let i = 0; i < items.length; i++) {
-    const { url } = items[i];
+    const url = items[i];
     console.log(`\n[${i + 1}/${items.length}] ${url} (Remake Full)`);
 
-    const result = await downloadSingleVideo(url, {
-      mode: MAKE_VIDEO_MODE.REUP_FULL, // Tải cả video
-      thumbnailChannelRoot: destFolder,
-      thumbnailPrompt: options.thumbnailPrompt,
-      downloadMaxHeight: outputHeight,
-      callback: ({ title: gemTitle, description: gemDesc, tags: gemTags, summary: gemSummary }) => {
-        const tagsStr = typeof gemTags === 'string' ? gemTags : Array.isArray(gemTags) ? gemTags.join(', ') : '';
-        geminiByUrl[url] = {
-          title: gemTitle || '',
-          description: gemDesc || '',
-          tags: tagsStr,
-          summary: gemSummary || '',
-        };
-        console.log('Đã nhận title/description/tags/summary từ Gemini (sẽ ghi video-meta.json sau khi render).');
-      },
-    });
+    const dlResult = await nextDownloadPromise;
 
-    if (result) {
-      const videoId = result.metadata?.id || 'unknown_id';
-      const perVideoDir = resolveVideoOutputDir(videoId);
-      fs.mkdirSync(perVideoDir, { recursive: true });
+    if (i + 1 < items.length) {
+      console.log(
+        `\n>>> [Pipeline] Bắt đầu prepareVideoInfo trước cho [${i + 2}/${items.length}] trong lúc render [${i + 1}/${items.length}]...`,
+      );
+      nextDownloadPromise = startDownload(i + 1);
+    } else {
+      nextDownloadPromise = null;
+    }
 
-      const videoPath = result.filePath;
-      if (!fs.existsSync(videoPath)) {
-        console.error(`Không tìm thấy file video đã tải: ${videoPath}`);
-        continue;
+    if (!dlResult || !dlResult.result) {
+      if (dlResult?.isolatedDownloadsDir && fs.existsSync(dlResult.isolatedDownloadsDir)) {
+        fs.rmSync(dlResult.isolatedDownloadsDir, { recursive: true, force: true });
+      }
+      continue;
+    }
+
+    const { result: prepResult, isolatedDownloadsDir } = dlResult;
+    const videoId = prepResult.videoId || 'unknown_id';
+    const perVideoDir = resolveVideoOutputDir(videoId);
+    fs.mkdirSync(perVideoDir, { recursive: true });
+
+    const videoPath = pickDownloadedVideoPath(isolatedDownloadsDir, videoId);
+    if (!videoPath || !fs.existsSync(videoPath)) {
+      console.error(`Không tìm thấy file video đã tải trong ${isolatedDownloadsDir}`);
+      if (fs.existsSync(isolatedDownloadsDir)) {
+        fs.rmSync(isolatedDownloadsDir, { recursive: true, force: true });
+      }
+      continue;
+    }
+
+    const meta = readVideoMetaJson(isolatedDownloadsDir);
+    const baseName = sanitizeFilename(meta.title || path.basename(videoPath, path.extname(videoPath)));
+    const finalVideoPath = path.join(perVideoDir, `${baseName}.mp4`);
+
+    try {
+      await remakeVideo(videoPath, overlayImage, overlayClip, finalVideoPath, overlayRender);
+
+      for (const thumbBase of ['thumbnail', 'flow-thumbnail']) {
+        const thumbSrc = findImageInDirByBasename(isolatedDownloadsDir, thumbBase);
+        if (thumbSrc) {
+          const thumbDestPath = path.join(perVideoDir, path.basename(thumbSrc));
+          fs.copyFileSync(thumbSrc, thumbDestPath);
+          console.log(`>>> Đã copy ảnh ${thumbBase}: ${thumbDestPath}`);
+        }
       }
 
-      const baseName = sanitizeFilename(result.title || path.basename(videoPath, path.extname(videoPath)));
-      const finalVideoPath = path.join(perVideoDir, `${baseName}.mp4`);
+      const videoMetaSrc = path.join(isolatedDownloadsDir, 'video-meta.json');
+      if (fs.existsSync(videoMetaSrc)) {
+        const videoMetaDest = path.join(perVideoDir, 'video-meta.json');
+        fs.copyFileSync(videoMetaSrc, videoMetaDest);
+        console.log(`>>> Đã copy video-meta.json: ${videoMetaDest}`);
+      }
 
-      try {
-        await remakeVideo(videoPath, overlayImage, overlayClip, finalVideoPath, overlayRender);
+      progressData[url] = { status: 'Đã tạo video' };
+      fs.writeFileSync(progressFile, JSON.stringify(progressData, null, 2), 'utf8');
+      await flushProgressToSpreadsheet();
 
-        // Thumbnail YouTube (downloads) → thumbnail.{ext}; Flow → flow-thumbnail.jpg (cùng tồn tại)
-        if (fs.existsSync(DOWNLOADS_DIR)) {
-          const downloadFiles = fs.readdirSync(DOWNLOADS_DIR);
-          const thumbFile = downloadFiles.find(f => /\.(jpg|jpeg|png|webp)$/i.test(f));
-          if (thumbFile) {
-            const thumbExt = path.extname(thumbFile);
-            const thumbDestPath = path.join(perVideoDir, `thumbnail${thumbExt}`);
-            fs.copyFileSync(path.join(DOWNLOADS_DIR, thumbFile), thumbDestPath);
-            console.log(`>>> Đã copy thumbnail YouTube: ${thumbDestPath}`);
-          }
-        }
-        const flowThumbJpg = path.join(perVideoDir, 'flow-thumbnail.jpg');
-        if (fs.existsSync(flowThumbJpg)) {
-          console.log(`>>> Đã có thumbnail Flow: ${flowThumbJpg}`);
-        }
-
-        // Lưu metadata
-        let gem = geminiByUrl[url] || {};
-        const metaPayload = {
-          title: result.title || '',
-          description: result.description || '',
-          tags: Array.isArray(result.tags) ? result.tags.join(', ') : result.tags || '',
-          titleGemini: gem.title || '',
-          descriptionGemini: gem.description || '',
-          tagsGemini: gem.tags || '',
-          summaryGemini: gem.summary || '',
-        };
-        const metaPath = path.join(perVideoDir, 'video-meta.json');
-        fs.writeFileSync(metaPath, JSON.stringify(metaPayload, null, 2), 'utf8');
-
-        progressData[url] = { status: 'Đã tạo video' };
-        fs.writeFileSync(progressFile, JSON.stringify(progressData, null, 2), 'utf8');
-        await flushProgressToSpreadsheet();
-
-        console.log(`ĐÃ HOÀN THÀNH VIDEO: ${url}`);
-        processedFolderNames.push(String(videoId).trim() || 'unknown_id');
-      } catch (err) {
-        console.error('Lỗi remake video:', err.message);
-      } finally {
-        // Xóa file tạm trong downloads để video tiếp theo không bị lẫn
-        if (fs.existsSync(DOWNLOADS_DIR)) {
-          const files = fs.readdirSync(DOWNLOADS_DIR);
-          for (const f of files) {
-            try {
-              fs.unlinkSync(path.join(DOWNLOADS_DIR, f));
-            } catch (e) {}
-          }
-        }
+      console.log(`ĐÃ HOÀN THÀNH VIDEO: ${url}`);
+      processedFolderNames.push(String(videoId).trim() || 'unknown_id');
+    } catch (err) {
+      console.error('Lỗi remake video:', err.message);
+    } finally {
+      if (fs.existsSync(isolatedDownloadsDir)) {
+        fs.rmSync(isolatedDownloadsDir, { recursive: true, force: true });
       }
     }
   }
@@ -444,4 +488,3 @@ if (process.argv[1] && fileURLToPath(import.meta.url) === path.resolve(process.a
 }
 
 export default main;
-

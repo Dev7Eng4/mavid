@@ -86,6 +86,18 @@ function resolveSiCenterBackgroundImage(explicitPath, downloadsDir) {
   return null;
 }
 
+/** Tìm file ảnh trong `dir` có tên file (không extension) khớp `basename`, không phân biệt hoa thường. */
+function findImageInDirByBasename(dir, basename) {
+  if (!dir || !fs.existsSync(dir)) return null;
+  const lowerBase = basename.toLowerCase();
+  const imageNameRe = /\.(jpe?g|png|webp)$/i;
+  for (const f of fs.readdirSync(dir)) {
+    if (!imageNameRe.test(f)) continue;
+    if (path.parse(f).name.toLowerCase() === lowerBase) return path.join(dir, f);
+  }
+  return null;
+}
+
 // ==========================================
 // FILTER HELPERS
 // ==========================================
@@ -127,10 +139,6 @@ export async function makeVideoWithOverlayImageNoise(bgNameArg, options = {}) {
   const {
     perVideoDir,
     originalTitle,
-    description,
-    tags,
-    url,
-    geminiByUrl,
     audioSpeed: speedIn,
     stockVideoCount: stockCountOpt,
     logoPath: logoPathOpt,
@@ -500,12 +508,13 @@ export async function makeVideoWithOverlayImageNoise(bgNameArg, options = {}) {
     if (fs.existsSync(downloadsDir)) {
       const downloadFiles = fs.readdirSync(downloadsDir);
 
-      const thumbFile = downloadFiles.find(f => /\.(jpg|jpeg|png|webp)$/i.test(f));
-      if (thumbFile) {
-        const thumbExt = path.extname(thumbFile);
-        const thumbDestPath = path.join(perVideoDir, `thumbnail${thumbExt}`);
-        fs.copyFileSync(path.join(downloadsDir, thumbFile), thumbDestPath);
-        console.log(`>>> Đã copy thumbnail YouTube: ${thumbDestPath}`);
+      for (const thumbBase of ['thumbnail', 'flow-thumbnail']) {
+        const thumbSrc = findImageInDirByBasename(downloadsDir, thumbBase);
+        if (thumbSrc) {
+          const thumbDestPath = path.join(perVideoDir, path.basename(thumbSrc));
+          fs.copyFileSync(thumbSrc, thumbDestPath);
+          console.log(`>>> Đã copy ảnh ${thumbBase}: ${thumbDestPath}`);
+        }
       }
 
       const transcriptFiles = downloadFiles.filter(f => /\.(srt|vtt)$/i.test(f));
@@ -519,11 +528,6 @@ export async function makeVideoWithOverlayImageNoise(bgNameArg, options = {}) {
       for (const meta of metaFiles) {
         const metaDestPath = path.join(perVideoDir, meta);
         fs.copyFileSync(path.join(downloadsDir, meta), metaDestPath);
-      }
-
-      const flowThumbJpg = path.join(perVideoDir, 'flow-thumbnail.jpg');
-      if (fs.existsSync(flowThumbJpg)) {
-        console.log(`>>> Đã có thumbnail Flow: ${flowThumbJpg}`);
       }
     }
   }

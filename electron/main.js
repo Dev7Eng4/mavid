@@ -33,6 +33,7 @@ const ALLOWED_NPM_SCRIPTS = new Set([
   'tao-batch-video-tu-audio',
   'tao-batch-video-reup-full',
   'tao-thumbnail-flow',
+  'create-batch-video',
   'tom-tat-meta-tu-transcript',
   'syncVideosToDrive',
 ]);

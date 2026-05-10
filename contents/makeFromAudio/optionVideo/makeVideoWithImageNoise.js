@@ -35,6 +35,18 @@ import { prepareNarratorReactionClip } from '../prepare/narrator.js';
 /** Kích thước hiển thị narrator (vuông), nằm dưới lớp noise */
 const NARRATOR_DISPLAY_PX = 240;
 
+/** Tìm file ảnh trong `dir` có tên file (không extension) khớp `basename`, không phân biệt hoa thường. */
+function findImageInDirByBasename(dir, basename) {
+  if (!dir || !fs.existsSync(dir)) return null;
+  const lowerBase = basename.toLowerCase();
+  const imageNameRe = /\.(jpe?g|png|webp)$/i;
+  for (const f of fs.readdirSync(dir)) {
+    if (!imageNameRe.test(f)) continue;
+    if (path.parse(f).name.toLowerCase() === lowerBase) return path.join(dir, f);
+  }
+  return null;
+}
+
 /**
  * Xử lý tạo video dành riêng cho chế độ `imageNoise`:
  * Ảnh nền toàn màn hình + video noise bỏ nền đen + audio + phụ đề.
@@ -49,15 +61,11 @@ export async function makeVideoWithImageNoise(options = {}, bgImgPath) {
   const {
     perVideoDir,
     originalTitle,
-    description,
-    tags,
-    url,
-    geminiByUrl,
     audioSpeed: speedIn,
     logoPath: logoPathOpt,
     downloadsDir = DOWNLOADS_DIR,
     videoLanguage,
-    showNarrator = true,
+    showNarrator = false,
   } = options;
 
   const speed = speedIn != null && Number.isFinite(Number(speedIn)) && Number(speedIn) > 0 ? Number(speedIn) : resolveAudioSpeed({});
@@ -299,13 +307,13 @@ export async function makeVideoWithImageNoise(options = {}, bgImgPath) {
     if (fs.existsSync(downloadsDir)) {
       const downloadFiles = fs.readdirSync(downloadsDir);
 
-      const thumbFile =
-        downloadFiles.find(f => /^thumbnail\./i.test(f)) ||
-        downloadFiles.find(f => /\.(jpg|jpeg|png|webp)$/i.test(f) && !/^background\./i.test(f));
-      if (thumbFile) {
-        const thumbExt = path.extname(thumbFile);
-        const thumbDestPath = path.join(perVideoDir, `thumbnail${thumbExt}`);
-        fs.copyFileSync(path.join(downloadsDir, thumbFile), thumbDestPath);
+      for (const thumbBase of ['thumbnail', 'flow-thumbnail']) {
+        const thumbSrc = findImageInDirByBasename(downloadsDir, thumbBase);
+        if (thumbSrc) {
+          const thumbDestPath = path.join(perVideoDir, path.basename(thumbSrc));
+          fs.copyFileSync(thumbSrc, thumbDestPath);
+          console.log(`>>> Đã copy ảnh ${thumbBase}: ${thumbDestPath}`);
+        }
       }
 
       const transcriptFiles = downloadFiles.filter(f => /\.(srt|vtt)$/i.test(f));
@@ -320,25 +328,6 @@ export async function makeVideoWithImageNoise(options = {}, bgImgPath) {
         fs.copyFileSync(path.join(downloadsDir, meta), metaDestPath);
       }
     }
-
-    // let gem = geminiByUrl && url ? geminiByUrl[url] : {};
-    // if (!gem || !gem.title) {
-    //   await new Promise(r => setTimeout(r, 2000));
-    //   gem = geminiByUrl && url ? geminiByUrl[url] : {};
-    // }
-
-    // const ytTagsStr = Array.isArray(tags) ? tags.join(', ') : tags || '';
-    // const metaPayload = {
-    //   title: originalTitle || '',
-    //   description: description || '',
-    //   tags: ytTagsStr,
-    //   titleGemini: gem?.title || '',
-    //   descriptionGemini: gem?.description || '',
-    //   tagsGemini: gem?.tags || '',
-    //   summaryGemini: gem?.summary || '',
-    // };
-    // const metaPath = path.join(perVideoDir, 'video-meta.json');
-    // fs.writeFileSync(metaPath, JSON.stringify(metaPayload, null, 2), 'utf8');
   }
 
   if (fs.existsSync(bgImgPath)) {

@@ -142,7 +142,7 @@ async function main(options = {}) {
 
   for (let i = 0; i < items.length; i++) {
     const { url, background } = items[i];
-    console.log(`\n[${i + 1}/${items.length}] Chờ tải/xử lý metadata: ${url} (Background: ${background})`);
+    console.log(`\n[${i + 1}/${items.length}] Chờ tải/xử lý metadata: ${url}`);
 
     const dlResult = await nextDownloadPromise;
 
@@ -163,14 +163,9 @@ async function main(options = {}) {
         const currentOption = options.overlay || defaultOption;
         const perItemOptions = {
           videoLanguage: result.lang,
-          logoPath: runLogoPath,
           perVideoDir,
           downloadsDir: isolatedDownloadsDir,
           originalTitle: result.title,
-          description: result.description,
-          tags: result.tags,
-          url,
-          geminiByUrl,
           audioSpeed: batchAudioSpeedOverride,
         };
 

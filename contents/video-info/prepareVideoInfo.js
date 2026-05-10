@@ -677,6 +677,7 @@ const prepareVideoInfo = async ({ url, options = {} }) => {
   // save video info to video-meta.json
   const videoMetaData = {
     title: videoMeta.title,
+    description: videoMeta.description || '',
     tags: videoMeta.tags,
     seoTitle: title,
     seoDescription: finalSummary?.metadata?.description || '',

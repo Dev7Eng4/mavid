@@ -547,8 +547,6 @@ function buildMakeVideoFromAudioOptions(props, channelFolderName) {
  * Sau đó chọn ngẫu nhiên không trùng vị trí trong danh sách, tối đa `maxVideosPerBatch` link.
  */
 async function main(props = {}) {
-  console.time('createBatchVideo');
-
   const channelId = props.channel || process.env.MAVID_CHANNEL;
   console.log('🚀 ~ main ~ channelId:', channelId);
   const mappingId = props.mapping || process.env.MAVID_MAPPING;
@@ -639,6 +637,7 @@ async function main(props = {}) {
   const k = maxVideosThisRun > 0 ? Math.min(maxVideosThisRun, n) : n;
   const pickedIndices = pickUniqueIndicesRandomFirst(n, k);
   const items = pickedIndices.map(i => rawItems[i]);
+  console.log('🚀 ~ main ~ items:', items);
 
   if (k < n) {
     console.log(`[MaVid] Chọn ngẫu nhiên ${k}/${n} link (giới hạn batch: ${maxVideosThisRun || 'tắt'}).`);
