@@ -5,6 +5,8 @@ import youtubedl from 'youtube-dl-exec';
 import { getVisualsDirPath } from '../urls/getListAllPaths.js';
 import { getVideoInfo } from '../../video-info/downloadVideo.js';
 
+export const MIN_DURATION_VIDEO = 30 * 60;
+
 /**
  * UC… → uploads playlist UU…
  * @param {string} channelId
@@ -13,36 +15,6 @@ import { getVideoInfo } from '../../video-info/downloadVideo.js';
 function channelToUploadsPlaylistId(channelId) {
   if (!channelId || !channelId.startsWith('UC')) return null;
   return `UU${channelId.slice(2)}`;
-}
-
-/**
- * Giây → HH:mm:ss
- * @param {number} seconds
- * @returns {string}
- */
-function formatDuration(seconds) {
-  if (seconds == null || !Number.isFinite(Number(seconds))) return '';
-  const s = Math.max(0, Math.floor(Number(seconds)));
-  const hrs = Math.floor(s / 3600);
-  const mins = Math.floor((s % 3600) / 60);
-  const secs = s % 60;
-  return [hrs, mins, secs].map(v => (v < 10 ? `0${v}` : String(v))).join(':');
-}
-
-/**
- * @param {string} input
- * @returns {string} UC… hoặc rỗng
- */
-function tryExtractUcChannelIdFromUrl(input) {
-  const u = String(input ?? '').trim();
-  const fromPath = u.match(/\/channel\/(UC[a-zA-Z0-9_-]{22})/);
-  if (fromPath?.[1]) return fromPath[1];
-  const fromList = u.match(/[?&]list=(UU[a-zA-Z0-9_-]+)/i);
-  if (fromList?.[1] && fromList[1].toUpperCase().startsWith('UU')) {
-    const id = fromList[1];
-    return `UC${id.slice(2)}`;
-  }
-  return '';
 }
 
 /**
@@ -115,7 +87,7 @@ async function fetchYoutubeVisualPayload(url) {
   const videos = entriesToVisualVideos(entries);
   const channelName = String(rawMeta.channel || rawMeta.uploader || rawMeta.title || rawMeta.id || '').trim();
   const channelLink = String(
-    rawMeta.uploader_url || rawMeta.channel_url || (channelId ? `https://www.youtube.com/channel/${channelId}` : url)
+    rawMeta.uploader_url || rawMeta.channel_url || (channelId ? `https://www.youtube.com/channel/${channelId}` : url),
   ).trim();
 
   let resolvedChannelId = channelId;
@@ -127,7 +99,7 @@ async function fetchYoutubeVisualPayload(url) {
     channelId: resolvedChannelId,
     channelName,
     channelLink,
-    videos,
+    videos: videos.filter(v => v.duration > MIN_DURATION_VIDEO),
   };
 }
 
@@ -138,7 +110,8 @@ async function fetchYoutubeVisualPayload(url) {
  * @param {string} url
  * @returns {Promise<{ ok: boolean, skipped?: boolean, filePath?: string, channelId?: string, videoCount?: number, error?: string, message?: string }>}
  */
-export async function addVisual(url) {
+export async function addVisual({ url }) {
+  console.log('🚀 ~ addVisual ~ url:', url);
   const input = String(url ?? '').trim();
   if (!input) {
     return { ok: false, error: 'empty_url' };
@@ -147,8 +120,10 @@ export async function addVisual(url) {
   const dir = getVisualsDirPath();
 
   const videoMeta = await getVideoInfo(url);
+  console.log('🚀 ~ addVisual ~ videoMeta:', videoMeta);
 
   const channelId = videoMeta?.metadata?.channel_id;
+  console.log('🚀 ~ addVisual ~ channelId:', channelId);
 
   const filePath = path.join(dir, `${channelId}.json`);
   if (fs.existsSync(filePath) && fs.statSync(filePath).isFile()) {

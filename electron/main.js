@@ -329,7 +329,8 @@ const SCRIPT_MAP = {
   summaryMetaFromTranscript: '../contents/scripts/summaryMetaFromTranscript.js',
   uploadYoutubeViaGpm: '../contents/youtube/uploadViaGpm.js',
   updateChannelVideosMeta: '../contents/scripts/updateChannelVideosMeta.js',
-  addVisualResource: '../contents/visual-resource/index.js',
+  addVisualResource: '../contents/api/visuals/addVisual.js',
+  deleteVisualResource: '../contents/api/visuals/deleteVisual.js',
 };
 
 ipcMain.handle('run-script', async (_event, { script, params = {} }) => {
@@ -908,31 +909,6 @@ async function resolveStockBackgroundsDirFromDisk() {
   return path.join(root, 'backgrounds');
 }
 
-/**
- * Đọc danh sách stock video channels từ assets/visual-resource/stock.
- * Mỗi subfolder chứa mavid-config.json với { channelId, channelName }.
- * @returns {{ id: string, label: string }[]}
- */
-function listVisualResourceStockChannels() {
-  const stockDir = path.join(ROOT, 'assets', 'visual-resource', 'stock');
-  if (!fs.existsSync(stockDir)) return [];
-
-  return fs
-    .readdirSync(stockDir, { withFileTypes: true })
-    .filter(d => d.isDirectory())
-    .map(d => {
-      const configPath = path.join(stockDir, d.name, 'mavid-config.json');
-      if (!fs.existsSync(configPath)) return null;
-      try {
-        const config = JSON.parse(fs.readFileSync(configPath, 'utf-8'));
-        return { id: config.channelId || d.name, label: config.channelName || d.name };
-      } catch {
-        return null;
-      }
-    })
-    .filter(Boolean);
-}
-
 async function resolveChannelsDirFromDisk() {
   const mod = await importConstantsFresh();
   let root = typeof mod.VIDEO_STORAGE_ROOT === 'string' ? mod.VIDEO_STORAGE_ROOT.trim() : '';
@@ -1090,10 +1066,16 @@ ipcMain.handle('list-backgrounds', async () => {
         .map(d => ({ id: d.name, label: d.name, source: 'local' }))
     : [];
 
-  const stockChannels = listVisualResourceStockChannels().map(ch => ({
-    ...ch,
-    source: 'stock',
-  }));
+  const visualsModuleUrl = pathToFileURL(path.join(__dirname, '..', 'contents', 'api', 'visuals', 'getListChannelVisuals.js')).toString();
+  const { getListChannelVisuals } = await import(`${visualsModuleUrl}?cacheBust=${Date.now()}`);
+  const visualRows = await getListChannelVisuals();
+  const stockChannels = visualRows
+    .filter(ch => String(ch.channelId ?? '').trim())
+    .map(ch => ({
+      id: String(ch.channelId).trim(),
+      label: String(ch.channelName ?? '').trim() || String(ch.channelId).trim(),
+      source: 'stock',
+    }));
 
   return [...localFolders, ...stockChannels].sort((a, b) => a.label.localeCompare(b.label));
 });
@@ -1207,9 +1189,9 @@ ipcMain.handle('get-stats', async () => {
 // --------------- Visual Resource ---------------
 
 ipcMain.handle('list-visual-resources', async () => {
-  const moduleUrl = pathToFileURL(path.join(__dirname, '..', 'contents', 'visual-resource', 'getListVisualResources.js')).toString();
-  const { default: getListVisualResources } = await import(`${moduleUrl}?cacheBust=${Date.now()}`);
-  return getListVisualResources();
+  const moduleUrl = pathToFileURL(path.join(__dirname, '..', 'contents', 'api', 'visuals', 'getListChannelVisuals.js')).toString();
+  const { getListChannelVisuals } = await import(`${moduleUrl}?cacheBust=${Date.now()}`);
+  return getListChannelVisuals();
 });
 
 // --------------- Channels ---------------

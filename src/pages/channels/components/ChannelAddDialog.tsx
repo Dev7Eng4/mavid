@@ -462,7 +462,6 @@ export function ChannelAddDialog({ backgroundOptions, channels = [], onClose, on
           <div className='lg:col-span-2 space-y-3'>
             <div className='text-sm font-medium' style={{ color: 'var(--text-h)' }}>
               Giờ upload
-              {videosPerDayPreset === '1-2' ? ' — 1 suất ngày thường + 2 suất cuối tuần' : ` (${slotCount} suất/ngày)`}
             </div>
 
             <div className='grid grid-cols-1 sm:grid-cols-2 gap-x-8'>

@@ -48,7 +48,7 @@ export function parseVisualChannelJson(raw) {
  * @param {string} visualsDir
  * @returns {Promise<Array<VisualChannelPayload & { filePath: string, fileBasename: string }>>}
  */
-async function readAllVisualChannelFiles(visualsDir) {
+export async function readAllVisualChannelFiles(visualsDir) {
   if (!fs.existsSync(visualsDir) || !fs.statSync(visualsDir).isDirectory()) {
     return [];
   }
@@ -88,15 +88,13 @@ export async function getListAllVisuals() {
     for (const v of ch.videos) {
       list.push({
         channelId: ch.channelId,
-        channelName: ch.channelName,
-        channelLink: ch.channelLink,
         link: v.link,
         duration: v.duration,
         used: v.used,
       });
     }
   }
-  return { dirPath, list };
+  return list;
 }
 
 /**
@@ -107,38 +105,27 @@ export async function getListAllVisuals() {
  */
 export async function getVisualsByChannelId(channelId) {
   const id = String(channelId ?? '').trim();
-  if (!isSafeChannelIdBasename(id)) {
-    return {
-      channelId: id,
-      filePath: '',
-      channelName: '',
-      channelLink: '',
-      list: [],
-      error: 'invalid_channel_id',
-    };
-  }
+  if (!id) return [];
 
   const dirPath = getVisualsDirPath();
   const filePath = path.join(dirPath, `${id}.json`);
 
   if (!fs.existsSync(filePath) || !fs.statSync(filePath).isFile()) {
-    return { channelId: id, filePath, channelName: '', channelLink: '', list: [] };
+    return [];
   }
 
   try {
     const raw = await fsp.readFile(filePath, 'utf8');
-    const { channelId: cidInFile, channelName, channelLink, videos } = parseVisualChannelJson(raw);
+    const { channelId: cidInFile, videos } = parseVisualChannelJson(raw);
     const resolvedChannelId = cidInFile || id;
-    return {
+
+    return videos.map(v => ({
       channelId: resolvedChannelId,
-      filePath,
-      channelName,
-      channelLink,
-      list: videos,
-    };
+      link: v.link,
+      duration: v.duration,
+      used: v.used,
+    }));
   } catch {
-    return { channelId: id, filePath, channelName: '', channelLink: '', list: [] };
+    return [];
   }
 }
-
-export default getListAllVisuals;

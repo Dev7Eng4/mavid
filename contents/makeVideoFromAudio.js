@@ -25,7 +25,7 @@ import { convertAudioFile } from './video-info/convertAudio.js';
 import { GPU_INFO } from './utils/hardware.util.js';
 import { unlinkProgressSidecarForSpreadsheet } from './syncProgressToSpreadsheet.js';
 
-const DEFAULT_STOCK_FOLDER = 'nature';
+const DEFAULT_STOCK_FOLDER = '';
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.join(__dirname, '..');
 const DOWNLOADS_DIR = path.join(ROOT, 'downloads');
@@ -650,7 +650,7 @@ async function processOne(bgNameArg, options = {}) {
   }
   if (!fs.existsSync(backgroundsDir)) {
     throw new Error(
-      `Không tìm thấy folder stock "${backgroundName}" trong ${stockBgRoot}/ — kiểm tra Settings (VIDEO_STORAGE_ROOT) và tạo thư mục con tương ứng.`
+      `Không tìm thấy folder stock "${backgroundName}" trong ${stockBgRoot}/ — kiểm tra Settings (VIDEO_STORAGE_ROOT) và tạo thư mục con tương ứng.`,
     );
   }
 
@@ -665,8 +665,8 @@ async function processOne(bgNameArg, options = {}) {
   const audioDurationAfterTempo = originalAudioDuration / speed;
   console.log(
     `Thời lượng audio gốc: ${originalAudioDuration.toFixed(1)}s, sau atempo (SPEED=${speed}): ${formatClockDuration(
-      audioDurationAfterTempo
-    )} (${audioDurationAfterTempo.toFixed(1)}s)`
+      audioDurationAfterTempo,
+    )} (${audioDurationAfterTempo.toFixed(1)}s)`,
   );
 
   // 2. Lấy toàn bộ video stock
@@ -744,7 +744,7 @@ async function processOne(bgNameArg, options = {}) {
     console.log(
       `[overlay] Lớp phủ: ${path.basename(stockOverlaySourcePath)} (merge: ${
         usePrebakedOverlay ? 'cache ProRes' : 'single-pass trên bản gốc'
-      })`
+      })`,
     );
   }
 
@@ -840,7 +840,7 @@ async function processOne(bgNameArg, options = {}) {
     const f = STOCK_VIDEO.FPS;
 
     filterParts.push(
-      `[${chartIndex}:v]scale=${wCap}:-2:flags=fast_bilinear,colorkey=0x000000:0.1:0.1,format=yuva420p,fps=${f},settb=tb=1/90000,setsar=1[chartvid]`
+      `[${chartIndex}:v]scale=${wCap}:-2:flags=fast_bilinear,colorkey=0x000000:0.1:0.1,format=yuva420p,fps=${f},settb=tb=1/90000,setsar=1[chartvid]`,
     );
     filterParts.push(`[${currentVLabel}][chartvid]overlay=main_w-overlay_w-${mr}:${boxY}-overlay_h[v_charted]`);
     currentVLabel = 'v_charted';
@@ -851,7 +851,7 @@ async function processOne(bgNameArg, options = {}) {
     const r = Math.floor(LOGO.SIZE / 2);
     const geqExpr = `if(lte(hypot(X-W/2,Y-H/2),${r}),255,0)`;
     filterParts.push(
-      `[${logoIndex}:v]scale=${LOGO.SIZE}:${LOGO.SIZE}:flags=fast_bilinear,format=rgba,geq=r='r(X,Y)':g='g(X,Y)':b='b(X,Y)':a='${geqExpr}'[logo]`
+      `[${logoIndex}:v]scale=${LOGO.SIZE}:${LOGO.SIZE}:flags=fast_bilinear,format=rgba,geq=r='r(X,Y)':g='g(X,Y)':b='b(X,Y)':a='${geqExpr}'[logo]`,
     );
     filterParts.push(`[${currentVLabel}][logo]overlay=main_w-overlay_w-${LOGO.MARGIN_RIGHT}:${LOGO.MARGIN_TOP}[vout_final]`);
     currentVLabel = 'vout_final';
@@ -876,7 +876,7 @@ async function processOne(bgNameArg, options = {}) {
     '128k',
     '-t',
     String(audioDurationAfterTempo),
-    outputPath
+    outputPath,
   );
 
   console.log(`Đang merge nội dung Single-Pass Pipeline...`);
@@ -980,8 +980,8 @@ export async function testMakeVideoFromDownloads(options = {}) {
   const runLogoPath = explicitLogo
     ? options.logoPath
     : wantLogo
-    ? resolveLogoFromChannelFolder(options, options.logoSearchDir || path.dirname(downloadsDir))
-    : null;
+      ? resolveLogoFromChannelFolder(options, options.logoSearchDir || path.dirname(downloadsDir))
+      : null;
   if (wantLogo && runLogoPath) {
     console.log(`[logo] ${runLogoPath}`);
   } else if (wantLogo && !runLogoPath) {
@@ -1175,7 +1175,7 @@ async function main(options = {}) {
 
     if (i + 1 < items.length) {
       console.log(
-        `\n>>> [Pipeline] Bắt đầu tải trước video [${i + 2}/${items.length}] trong lúc đang render video [${i + 1}/${items.length}]...`
+        `\n>>> [Pipeline] Bắt đầu tải trước video [${i + 2}/${items.length}] trong lúc đang render video [${i + 1}/${items.length}]...`,
       );
       nextDownloadPromise = startDownload(i + 1);
     } else {

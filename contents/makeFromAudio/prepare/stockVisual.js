@@ -16,6 +16,8 @@ import youtubedl from 'youtube-dl-exec';
 import { DOWNLOADS_DIR, OUTPUT_DIR, ROOT } from '../shared.js';
 import { STOCK_VIDEO } from '../../constants/index.js';
 import { GPU_INFO } from '../../utils/hardware.util.js';
+import { getListAllVisuals } from '../../api/visuals/getListAllVisuals.js';
+import updateVisual from '../../api/visuals/updateVisual.js';
 
 const execAsync = promisify(exec);
 
@@ -45,77 +47,45 @@ export function isVisualResourceStock(name) {
 }
 
 /**
- * Parse chuỗi duration "HH:MM:SS" hoặc "MM:SS" thành giây.
- * @param {string} duration
+ * Parse duration trong JSON/visuals:
+ * - Số giây thuần (chuỗi hoặc số): `"3249"`, `2094`
+ * - Hoặc `"HH:MM:SS"` / `"MM:SS"`
+ *
+ * @param {string|number} duration
  * @returns {number}
  */
 function parseDurationToSeconds(duration) {
-  if (!duration) return 0;
-  const parts = String(duration).split(':').map(Number);
+  if (duration == null || duration === '') return 0;
+  const raw = String(duration).trim();
+  if (!raw.includes(':')) {
+    const sec = Number(raw);
+    return Number.isFinite(sec) ? Math.max(0, sec) : 0;
+  }
+  const parts = raw.split(':').map(Number);
+  if (parts.some(p => !Number.isFinite(p))) return 0;
   if (parts.length === 3) return parts[0] * 3600 + parts[1] * 60 + parts[2];
   if (parts.length === 2) return parts[0] * 60 + parts[1];
   return parts[0] || 0;
 }
 
 /**
- * Tính thời gian hiệu dụng (sau slowdown) từ duration gốc.
- * usable = duration - skipStart - skipEnd
- * effective = usable × slowmoFactor
+ * Thời lượng đầu ra tối đa ước lượng (sau slowdown), từ tổng độ dài file (giây).
+ * usable = duration − skip đầu − skip cuối; effective = usable × SLOWMO_FACTOR.
  *
- * @param {number} durationSec
+ * @param {number} durationSec — tổng độ dài nguồn (giây), thường từ JSON dạng `"3249"`
  * @returns {number}
  */
 function getEffectiveDuration(durationSec) {
-  // const usable = durationSec - SKIP_START_SEC - SKIP_END_SEC;
-  return Math.max(0, durationSec) * 3;
+  const n = Number(durationSec);
+  if (!Number.isFinite(n) || n <= 0) return 0;
+  const usable = Math.max(0, n - SKIP_START_SEC - SKIP_END_SEC);
+  return usable * SLOWMO_FACTOR;
 }
 
-/**
- * Đọc tất cả file excel stock trong assets/visual-resource/stock,
- * gộp thành 1 danh sách video kèm metadata.
- *
- * @returns {Promise<Array<{ link: string, durationSec: number, used: number, excelPath: string, rowNumber: number }>>}
- */
-async function loadAllStockVideos() {
-  if (!fs.existsSync(STOCK_ASSETS_DIR)) {
-    console.warn(`[StockVisual] Không tìm thấy thư mục stock: ${STOCK_ASSETS_DIR}`);
-    return [];
-  }
-
-  const channelDirs = fs.readdirSync(STOCK_ASSETS_DIR, { withFileTypes: true }).filter(d => d.isDirectory());
-  const allVideos = [];
-
-  for (const dir of channelDirs) {
-    const channelId = dir.name;
-    const excelPath = path.join(STOCK_ASSETS_DIR, channelId, `${channelId}.xlsx`);
-    if (!fs.existsSync(excelPath)) continue;
-
-    const workbook = new ExcelJS.Workbook();
-    await workbook.xlsx.readFile(excelPath);
-    const sheet = workbook.getWorksheet(1);
-    if (!sheet) continue;
-
-    sheet.eachRow((row, rowNumber) => {
-      if (rowNumber === 1) return;
-
-      const link = String(row.getCell(1).value || '').trim();
-      const duration = String(row.getCell(2).value || '').trim();
-      const usedRaw = row.getCell(3).value;
-      const used = Number(usedRaw) || 0;
-
-      if (!link) return;
-
-      allVideos.push({
-        link,
-        durationSec: parseDurationToSeconds(duration),
-        used,
-        excelPath,
-        rowNumber,
-      });
-    });
-  }
-
-  return allVideos;
+/** @param {{ used?: string }} v */
+function visualUsedCount(v) {
+  const n = Number.parseInt(String(v.used ?? '').trim(), 10);
+  return Number.isFinite(n) ? n : 0;
 }
 
 /**
@@ -126,50 +96,41 @@ async function loadAllStockVideos() {
  * Sau khi chọn → update USED +1 trong excel.
  *
  * @param {number} targetDurationSec - Thời lượng video cần tạo (giây)
- * @returns {Promise<{ link: string, durationSec: number } | null>}
+ * @returns {Promise<string|null>}
  */
 async function selectAndMarkStockVideo(targetDurationSec) {
-  const allVideos = await loadAllStockVideos();
+  const allVideos = await getListAllVisuals();
 
-  if (allVideos.length === 0) {
-    console.warn('[StockVisual] Không tìm thấy video stock nào trong assets.');
+  const withLink = allVideos.filter(v => v && String(v.link ?? '').trim());
+
+  if (withLink.length === 0) {
+    console.warn('[StockVisual] Không tìm thấy video stock nào.');
     return null;
   }
 
-  const eligible = allVideos.filter(v => getEffectiveDuration(v.durationSec) >= targetDurationSec);
+  const eligible = withLink.filter(v => {
+    const durationSec = parseDurationToSeconds(v.duration);
+    return getEffectiveDuration(durationSec) >= targetDurationSec;
+  });
 
   if (eligible.length === 0) {
-    const longestEffective = Math.max(...allVideos.map(v => getEffectiveDuration(v.durationSec)));
-    console.warn(
-      `[StockVisual] Không có video nào đủ dài (cần effective >= ${Math.ceil(targetDurationSec / 60)} phút). ` +
-        `Tổng ${allVideos.length} video, effective dài nhất: ${Math.ceil(longestEffective / 60)} phút.`,
-    );
+    console.warn(`[StockVisual] Không có video nào đủ dài (cần effective >= ${Math.ceil(targetDurationSec / 60)} phút). `);
     return null;
   }
 
-  const minUsed = Math.min(...eligible.map(v => v.used));
-  const candidates = eligible.filter(v => v.used === minUsed);
+  const minUsed = Math.min(...eligible.map(visualUsedCount));
+  const candidates = eligible.filter(v => visualUsedCount(v) === minUsed);
   const chosen = candidates[Math.floor(Math.random() * candidates.length)];
-
-  console.log(
-    `[StockVisual] Chọn video: ${chosen.link} ` +
-      `(gốc: ${Math.ceil(chosen.durationSec / 60)} phút, ` +
-      `effective: ${Math.ceil(getEffectiveDuration(chosen.durationSec) / 60)} phút, ` +
-      `USED: ${chosen.used} → ${chosen.used + 1})`,
-  );
-
-  const workbook = new ExcelJS.Workbook();
-  await workbook.xlsx.readFile(chosen.excelPath);
-  const sheet = workbook.getWorksheet(1);
-  if (sheet) {
-    const row = sheet.getRow(chosen.rowNumber);
-    row.getCell(3).value = chosen.used + 1;
-    row.commit();
-    await workbook.xlsx.writeFile(chosen.excelPath);
-    console.log(`[StockVisual] Đã update USED = ${chosen.used + 1} tại row ${chosen.rowNumber} trong ${path.basename(chosen.excelPath)}`);
+  if (!chosen) {
+    console.warn('[StockVisual] Không chọn được video (danh sách ứng viên rỗng).');
+    return null;
   }
 
-  return { link: chosen.link, durationSec: chosen.durationSec };
+  console.log(`[StockVisual] Chọn video: ${chosen.link}`);
+
+  await updateVisual(chosen.channelId, chosen.link);
+
+  return chosen.link;
 }
 
 /** @param {string} name */
@@ -323,23 +284,22 @@ export async function prepareStockVisualClip(targetDuration) {
   let stockClipPath = null;
 
   try {
-    const chosen = await selectAndMarkStockVideo(targetDuration);
-    if (!chosen) {
+    const link = await selectAndMarkStockVideo(targetDuration);
+    console.log('🚀 ~ prepareStockVisualClip ~ link:', link);
+
+    if (!link) {
       return { stockClipPath: null, stockTempDir, hasStock: false };
     }
 
     fs.mkdirSync(stockTempDir, { recursive: true });
-    const rawPath = await downloadOverlayVisualVideo(chosen.link, { outputDir: stockTempDir });
-    console.log('[StockVisual] rawPath:', rawPath);
+    const rawPath = await downloadOverlayVisualVideo(link, { outputDir: stockTempDir });
     stockClipPath = await prepareStockClip(rawPath, targetDuration, stockTempDir);
-    console.log('[StockVisual] stockClipPath:', stockClipPath);
   } catch (err) {
     console.warn(`[StockVisual] Không thể chuẩn bị stock clip — bỏ qua: ${err.message}`);
     stockClipPath = null;
   }
 
   const hasStock = Boolean(stockClipPath && fs.existsSync(stockClipPath));
-  console.log('[StockVisual] hasStock:', hasStock);
 
   return { stockClipPath, stockTempDir, hasStock };
 }

@@ -248,7 +248,6 @@ export function resolveLogoFromChannelFolder(mainOptions, destFolder) {
 export function resolveDefaultStockFolder(mainOptions) {
   const o = mainOptions.stockFolder;
   if (o != null && String(o).trim()) return String(o).trim();
-  const env = process.env.MAVID_BACKGROUND;
-  if (env != null && String(env).trim()) return String(env).trim();
+
   return DEFAULT_STOCK_FOLDER;
 }

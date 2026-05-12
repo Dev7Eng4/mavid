@@ -32,6 +32,7 @@ import { getPrebakedLogoPng } from '../prepare/logo.js';
 import { getPrebakedNoiseMov } from '../prepare/noise.js';
 import { prepareNarratorReactionClip } from '../prepare/narrator.js';
 import { GENERAL_IMAGE_FILENAME } from '../../video-info/prepareVideoInfo.js';
+import { isIsolatedDownloadsJobDir, rmDirQuiet } from '../postRenderCleanup.util.js';
 
 /** Kích thước hiển thị narrator (vuông), nằm dưới lớp noise */
 const NARRATOR_DISPLAY_PX = 240;
@@ -293,8 +294,8 @@ export async function makeVideoWithImageNoise(options = {}) {
   if (scaledSrtPath && fs.existsSync(scaledSrtPath)) fs.unlinkSync(scaledSrtPath);
 
   // Dọn temp reaction
-  if (reactionTempDir && fs.existsSync(reactionTempDir)) {
-    fs.rmSync(reactionTempDir, { recursive: true, force: true });
+  if (reactionTempDir) {
+    rmDirQuiet(reactionTempDir);
     console.log(`[Narrator] Đã xóa thư mục tạm: ${reactionTempDir}`);
   }
 
@@ -333,7 +334,10 @@ export async function makeVideoWithImageNoise(options = {}) {
     }
   }
 
-  if (fs.existsSync(bgImgPath)) {
+  if (isIsolatedDownloadsJobDir(downloadsDir)) {
+    rmDirQuiet(downloadsDir);
+    console.log(`[cleanup] Đã xóa thư mục tạm downloads: ${downloadsDir}`);
+  } else if (fs.existsSync(bgImgPath)) {
     fs.unlinkSync(bgImgPath);
     console.log(`[Image Noise] Đã xóa ảnh background tạm: ${bgImgPath}`);
   }

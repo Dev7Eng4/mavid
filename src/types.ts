@@ -160,7 +160,7 @@ export interface ChannelFolderDataResult extends ChannelData {
 export interface BackgroundOption {
   id: string;
   label: string;
-  /** 'local' = folder trong MaVidMedia/backgrounds, 'stock' = channel từ assets/visual-resource/stock */
+  /** 'local' = folder trong MaVidMedia/backgrounds; 'stock' = kênh visual (`MaVidMedia/visuals/*.json`, cùng nguồn `listVisualResources`) */
   source: 'local' | 'stock';
 }
 
@@ -192,17 +192,7 @@ export interface VideoFromAudioConfig {
   overlay?: string;
 }
 
-export type DirectScriptId =
-  | 'getInfoChannel'
-  | 'addChannelFromForm'
-  | 'downloadVideo'
-  | 'createBatchVideo'
-  | 'makeChromeProfile'
-  | 'createThumbnailFlow'
-  | 'summaryMetaFromTranscript'
-  | 'uploadYoutubeViaGpm'
-  | 'updateChannelVideosMeta'
-  | 'addVisualResource';
+export type DirectScriptId = string;
 
 export interface ScriptResult<T = unknown> {
   success: boolean;

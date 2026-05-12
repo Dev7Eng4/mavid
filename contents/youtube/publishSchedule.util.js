@@ -1,6 +1,7 @@
 /**
  * Tính lịch publish YouTube Studio từ preset + `publishTimes` trong mavid-channel-config.
  */
+import { getChannelConfig } from '../api/channels/getChannelConfig.js';
 import { findChannelRowById, pickPublishFieldsFromChannelRow } from '../channel/index.js';
 
 function parseVideosPerDayPreset(raw) {
@@ -8,6 +9,7 @@ function parseVideosPerDayPreset(raw) {
     .trim()
     .replace(/\u2013/g, '-');
   if (s === '1-2') return '1-2';
+  if (s === '1/2' || s === '1/3') return s;
   const n = parseInt(s, 10);
   if (Number.isFinite(n) && n >= 1 && n <= 24) {
     return String(n);
@@ -16,11 +18,28 @@ function parseVideosPerDayPreset(raw) {
 }
 
 /**
- * Preset `1-2` → 3 ô giờ trong form; `"1"`…`"24"` → số suất tương ứng mỗi ngày.
+ * Preset `1-2` → 3 ô giờ; `1/2` | `1/3` → 1 ô (một giờ, cách 2 / 3 ngày lịch mỗi video);
+ * `"1"`…`"24"` → số suất mỗi ngày.
  * @param {string} preset
  */
 function timeSlotCountForPreset(preset) {
-  return preset === '1-2' ? 3 : Number(preset);
+  if (preset === '1/2' || preset === '1/3') return 1;
+  if (preset === '1-2') return 3;
+  return Number(preset);
+}
+
+/** @param {string} preset */
+function calendarSpacingDaysForPreset(preset) {
+  if (preset === '1/2') return 2;
+  if (preset === '1/3') return 3;
+  return 0;
+}
+
+/** @param {Date} a @param {Date} b — local start-of-day */
+function diffLocalCalendarDays(a, b) {
+  const t0 = startOfLocalDay(a).getTime();
+  const t1 = startOfLocalDay(b).getTime();
+  return Math.round((t1 - t0) / 86400000);
 }
 
 /**
@@ -91,9 +110,10 @@ function isWeekend(d) {
 /**
  * Các mốc giờ trong một ngày (local), đã sắp xếp tăng dần.
  * Preset `1-2`: ngày thường chỉ suất 0; cuối tuần suất 1 và 2.
+ * Preset `1/2`, `1/3`: một suất/ngày (ô 0), khoảng cách ngày do bước `nextPublish…` xử lý.
  * Preset số (`"1"`…`"24"`, không gồm `1-2`): mỗi ngày dùng lần lượt 1…N suất từ `timesHHmm`.
  * @param {Date} calendarDay — bất kỳ mốc trong ngày
- * @param {string} preset — `"1-2"` | `"1"`…`"24"`
+ * @param {string} preset — `"1-2"` | `"1/2"` | `"1/3"` | `"1"`…`"24"`
  * @param {string[]} timesHHmm — đã chuẩn hóa đủ số ô theo preset
  */
 function slotTimesForCalendarDay(calendarDay, preset, timesHHmm) {
@@ -121,7 +141,7 @@ function slotTimesForCalendarDay(calendarDay, preset, timesHHmm) {
       const a = atIndex(0);
       if (a) slots.push(a);
     }
-  } else if (preset === '1') {
+  } else if (preset === '1' || preset === '1/2' || preset === '1/3') {
     const a = atIndex(0);
     if (a) slots.push(a);
   } else {
@@ -157,6 +177,40 @@ function nextPublishAfter(cursor, preset, timesHHmm) {
 }
 
 /**
+ * Lần publish tiếp theo: các mốc cách nhau đúng `spacingDays` ngày lịch so với `lastPublishRef`,
+ * giờ từ `timesHHmm[0]`, phải sau `notBefore`.
+ * @param {Date} lastPublishRef — mốc neo chu kỳ (đỉnh nhảy bội của spacing)
+ * @param {number} spacingDays — 2 hoặc 3
+ * @param {string[]} timesHHmm
+ * @param {Date} notBefore
+ */
+function nextPublishOnCalendarInterval(lastPublishRef, spacingDays, timesHHmm, notBefore) {
+  const slot = parseHHmm(timesHHmm[0] ?? '09:00');
+  const sh = slot ? slot.h : 9;
+  const sm = slot ? slot.m : 0;
+  const refDay = startOfLocalDay(lastPublishRef);
+  /** @type {Date} */
+  let probeDay = addLocalDays(refDay, spacingDays);
+
+  for (let guard = 0; guard < 800; guard++) {
+    const y = probeDay.getFullYear();
+    const mo = probeDay.getMonth();
+    const da = probeDay.getDate();
+    const candidate = new Date(y, mo, da, sh, sm, 0, 0);
+    const gap = diffLocalCalendarDays(refDay, probeDay);
+    if (gap >= spacingDays && candidate.getTime() > notBefore.getTime()) {
+      return candidate;
+    }
+    probeDay = addLocalDays(probeDay, spacingDays);
+  }
+  throw new Error('Không tìm được suất publish interval trong phạm vi ~800 bước.');
+}
+
+function hasParsableLatestUpload(settings) {
+  return !!(parseDdMmYyyy(settings.latestUploadDate) && parseHHmm(settings.latestUploadTime));
+}
+
+/**
  * Neo thời gian: sau lần publish ghi trong config (nếu parse được), không nhỏ hơn hiện tại.
  * @param {ReturnType<typeof pickPublishFieldsFromChannelRow>} settings
  */
@@ -171,6 +225,14 @@ function scheduleCursorFromSettings(settings) {
   return now;
 }
 
+/** Ngày-giờ publish cuối ghi trong config (nếu parse được). */
+function latestUploadMoment(settings) {
+  const d = parseDdMmYyyy(settings.latestUploadDate);
+  const t = parseHHmm(settings.latestUploadTime);
+  if (!d || !t) return null;
+  return new Date(d.getFullYear(), d.getMonth(), d.getDate(), t.h, t.m, 0, 0);
+}
+
 /** Chuỗi ngày trong `schedule[].date` — MM/DD/YYYY (khớp nhập liệu kiểu Mỹ / YouTube Studio). */
 function toMmDdYyyy(d) {
   const mm = String(d.getMonth() + 1).padStart(2, '0');
@@ -180,7 +242,7 @@ function toMmDdYyyy(d) {
 }
 
 /**
- * Đọc `mavid-channel-config.json`, chọn `channels[]` theo email, trả về các trường lịch
+ * Đọc `mavid-channel-config.json`, chọn `channels[]` theo `id`, trả về các trường lịch
  * và danh sách ngày/giờ public dự kiến cho `uploadCount` video (theo preset + publishTimes).
  *
  * @param {object} params
@@ -200,7 +262,7 @@ export async function getYoutubePublishPlan({ channelFolder, id, uploadCount }) 
 
   const config = await getChannelConfig(channelFolder);
   const row = findChannelRowById(config, id);
-  if (!row) throw new Error(`Không tìm thấy email «${String(email).trim()}» trong mavid-channel-config.json.`);
+  if (!row) throw new Error(`Không tìm thấy id «${String(id).trim()}» trong mavid-channel-config.json.`);
 
   const base = pickPublishFieldsFromChannelRow(row);
   const preset = parseVideosPerDayPreset(base.videosPerDayPreset);
@@ -219,9 +281,28 @@ export async function getYoutubePublishPlan({ channelFolder, id, uploadCount }) 
 
   let cursor = scheduleCursorFromSettings(base);
   const timesForAlgo = publishTimesNormalized;
+  const spacing = calendarSpacingDaysForPreset(preset);
+  /** Neo chu kỳ config (latestUpload*) hoặc suất đã tính; `null` = chưa có anchor từ config. */
+  let intervalRef =
+    spacing > 0 && hasParsableLatestUpload(base) ? latestUploadMoment(base) : null;
 
   for (let i = 0; i < n; i++) {
-    const when = nextPublishAfter(cursor, preset, timesForAlgo);
+    let when;
+    if (spacing > 0) {
+      /**
+       * Không có `latestUpload*` → suất đầu giống preset `1` (không chờ thêm spacing từ "hôm nay");
+       * có anchor → các mốc cách nhau bội số của `spacing` ngày lịch.
+       */
+      if (i === 0 && !intervalRef) {
+        when = nextPublishAfter(cursor, '1', timesForAlgo);
+      } else {
+        const refAnchor = intervalRef ?? cursor;
+        when = nextPublishOnCalendarInterval(refAnchor, spacing, timesForAlgo, cursor);
+      }
+    } else {
+      when = nextPublishAfter(cursor, preset, timesForAlgo);
+    }
+    intervalRef = when;
     const hh = when.getHours();
     const mm = when.getMinutes();
     const time = `${String(hh).padStart(2, '0')}:${String(mm).padStart(2, '0')}`;

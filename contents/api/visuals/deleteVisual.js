@@ -3,7 +3,7 @@ import fsp from 'fs/promises';
 import path from 'path';
 import { getVisualsDirPath } from '../urls/getListAllPaths.js';
 
-export async function deleteVisual(channelId) {
+export async function deleteVisual({ channelId }) {
   if (!channelId) {
     return { ok: false, error: 'empty_channel_id' };
   }

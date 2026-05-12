@@ -145,7 +145,7 @@ async function main(options = {}) {
 
     if (i + 1 < items.length) {
       console.log(
-        `\n>>> [Pipeline] Bắt đầu tải trước video [${i + 2}/${items.length}] trong lúc đang render video [${i + 1}/${items.length}]...`
+        `\n>>> [Pipeline] Bắt đầu tải trước video [${i + 2}/${items.length}] trong lúc đang render video [${i + 1}/${items.length}]...`,
       );
       nextDownloadPromise = startDownload(i + 1);
     } else {

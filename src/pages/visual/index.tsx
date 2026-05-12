@@ -26,13 +26,6 @@ export default function VisualPage() {
     }
   }, []);
 
-  useEffect(() => {
-    window.runner
-      .listVisualResources()
-      .then(list => setResources(list ?? []))
-      .catch(() => setResources([]));
-  }, []);
-
   const onAdd = useCallback(() => {
     setActionStatus({ type: 'add', data: null });
   }, []);
@@ -40,7 +33,7 @@ export default function VisualPage() {
   const handleAddResource = async (form: { link: string; type: string }) => {
     try {
       const result = await window.runner.runScript('addVisualResource', {
-        link: form.link,
+        url: form.link,
         type: form.type,
       });
       console.log('[visual-resource] Kết quả:', result);
@@ -51,6 +44,23 @@ export default function VisualPage() {
     }
   };
 
+  const handleDeleteResource = async (channelId: string) => {
+    try {
+      const result = await window.runner.runScript('deleteVisualResource', { channelId });
+      console.log('[visual-resource] Kết quả:', result);
+      await loadResources();
+    } catch (err) {
+      console.error('[visual-resource] Lỗi:', err);
+    }
+  };
+
+  useEffect(() => {
+    window.runner
+      .listVisualResources()
+      .then(list => setResources(list ?? []))
+      .catch(() => setResources([]));
+  }, []);
+
   return (
     <div className='space-y-6 w-full min-w-0'>
       <PageHeader
@@ -59,7 +69,7 @@ export default function VisualPage() {
         description=''
         actions={
           <AppButton type='button' variant='primary' onClick={onAdd}>
-            Thêm
+            Add Visual
           </AppButton>
         }
       />
@@ -82,19 +92,19 @@ export default function VisualPage() {
                   className='text-left px-4 py-3 font-medium uppercase text-base tracking-wider'
                   style={{ color: 'var(--text-muted)', borderBottom: '1px solid var(--border)' }}
                 >
-                  Tên kênh
+                  Channel Name
                 </th>
                 <th
                   className='text-left px-4 py-3 font-medium uppercase text-base tracking-wider'
                   style={{ color: 'var(--text-muted)', borderBottom: '1px solid var(--border)' }}
                 >
-                  Loại
+                  Type
                 </th>
                 <th
                   className='text-right px-4 py-3 font-medium uppercase text-base tracking-wider whitespace-nowrap w-1'
                   style={{ color: 'var(--text-muted)', borderBottom: '1px solid var(--border)' }}
                 >
-                  Thao tác
+                  Actions
                 </th>
               </tr>
             </thead>
@@ -111,8 +121,14 @@ export default function VisualPage() {
                     {VISUAL_RESOURCE_TYPE.find(t => t.id === resource.type)?.label || ''}
                   </td>
                   <td className='px-4 py-3 text-right whitespace-nowrap'>
-                    <AppButton type='button' variant='danger' size='md' onClick={() => {}} className='py-1.5'>
-                      Xóa
+                    <AppButton
+                      type='button'
+                      variant='danger'
+                      size='md'
+                      onClick={() => handleDeleteResource(resource.channelId)}
+                      className='py-1.5'
+                    >
+                      Delete
                     </AppButton>
                   </td>
                 </tr>
