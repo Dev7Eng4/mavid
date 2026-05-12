@@ -30,7 +30,7 @@ function getProfileDir(profileNum) {
  * @param {number}  [options.profile=1] - Số profile (1, 2, 3, ...)
  * @param {boolean} [options.headless=false] - Chạy ẩn browser
  * @param {string}  [options.windowPosition='-2000,-2000'] - Vị trí cửa sổ (mặc định ngoài màn hình)
- * @param {boolean} [options.visible=true] - true = hiển thị bình thường, false = ẩn ngoài màn hình
+ * @param {boolean} [options.visible=true] - true = hiển thị bình thường (maximized), false = ẩn ngoài màn hình
  * @returns {Promise<{context: import('playwright').BrowserContext, page: import('playwright').Page}>}
  */
 export async function openChromeProfile(options = {}) {
@@ -46,6 +46,8 @@ export async function openChromeProfile(options = {}) {
   if (!visible) {
     args.push('--start-minimized');
     args.push(`--window-position=${windowPosition || '-2000,-2000'}`);
+  } else {
+    args.push('--start-maximized');
   }
 
   console.log(`Đang mở Chrome với profile${profile} (${profileDir})`);
@@ -70,8 +72,30 @@ export async function openChromeProfile(options = {}) {
  *   node contents/scripts/makeChromeProfile.js        → setup profile1
  *   node contents/scripts/makeChromeProfile.js 2      → setup profile2
  */
+/**
+ * Tìm số profile tiếp theo chưa được dùng.
+ * Quét chrome-profile/ → lấy các thư mục profileN → trả về max(N) + 1.
+ */
+function getNextProfileNum() {
+  if (!fs.existsSync(PROFILES_ROOT)) return 1;
+  const entries = fs.readdirSync(PROFILES_ROOT, { withFileTypes: true });
+  let maxNum = 0;
+  for (const entry of entries) {
+    if (!entry.isDirectory()) continue;
+    const match = entry.name.match(/^profile(\d+)$/);
+    if (match) {
+      const n = parseInt(match[1], 10);
+      if (n > maxNum) maxNum = n;
+    }
+  }
+  return maxNum + 1;
+}
+
 async function main() {
-  const profileNum = parseInt(process.argv[2], 10) || 1;
+  // Nếu truyền số cụ thể → dùng số đó (mở lại profile cũ).
+  // Không truyền số → tự tạo profile mới (số tiếp theo).
+  const explicitNum = process.argv[2] ? parseInt(process.argv[2], 10) : null;
+  const profileNum = explicitNum || getNextProfileNum();
   const profileDir = getProfileDir(profileNum);
 
   console.log(`Đang mở Chrome để tạo profile${profileNum}...`);

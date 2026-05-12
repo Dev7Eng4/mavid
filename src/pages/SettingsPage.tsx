@@ -33,14 +33,11 @@ const inputStyle = {
   border: '1px solid var(--border)',
 };
 
-type SettingsTab = 'common' | 'video';
-
 export function SettingsPage({ disabled }: Props) {
   const [model, setModel] = useState<ConstantsUiModel | null>(null);
   const [dirty, setDirty] = useState(false);
   const [saving, setSaving] = useState(false);
   const [msg, setMsg] = useState('');
-  const [tab, setTab] = useState<SettingsTab>('common');
   const [constantsLoading, setConstantsLoading] = useState(true);
 
   const canEdit = !disabled && !saving;
@@ -88,8 +85,8 @@ export function SettingsPage({ disabled }: Props) {
     }
   }
 
-  function patch<K extends keyof ConstantsUiModel>(key: K, value: ConstantsUiModel[K]) {
-    setModel(s => (s == null ? s : { ...s, [key]: value }));
+  function patchAppSettings(next: ConstantsUiModel['APP_SETTINGS']) {
+    setModel(s => (s == null ? s : { APP_SETTINGS: next }));
     setDirty(true);
   }
 
@@ -117,10 +114,12 @@ export function SettingsPage({ disabled }: Props) {
     }
     setMsg('');
     try {
-      const r = await window.runner.selectVideoStorageFolder(model.VIDEO_STORAGE_ROOT?.trim() || null);
+      const r = await window.runner.selectVideoStorageFolder(model.APP_SETTINGS.STORAGE?.trim() || null);
       if (!r?.ok || !r.path) return;
       const chosen = r.path;
-      setModel(m => (m == null ? m : { ...m, VIDEO_STORAGE_ROOT: chosen }));
+      setModel(m =>
+        m == null ? m : { APP_SETTINGS: { ...m.APP_SETTINGS, STORAGE: chosen } }
+      );
       setMsg('Đã lưu: trong thư mục đã chọn tạo MaVidMedia với backgrounds, videos, channels.');
     } catch (e) {
       setMsg(`Lỗi: ${e instanceof Error ? e.message : 'Không chọn được thư mục.'}`);
@@ -137,6 +136,8 @@ export function SettingsPage({ disabled }: Props) {
       </div>
     );
   }
+
+  const a = model.APP_SETTINGS;
 
   return (
     <div className='space-y-6 w-full min-w-0'>
@@ -163,27 +164,7 @@ export function SettingsPage({ disabled }: Props) {
         }
       />
 
-      <div className='flex gap-2'>
-        {(
-          [
-            ['common', 'Setting Chung'],
-            ['video', 'Setting Video'],
-          ] as const
-        ).map(([id, label]) => (
-          <button
-            key={id}
-            type='button'
-            onClick={() => setTab(id)}
-            className={`mavid-tab ${tab === id ? 'mavid-tab--active' : 'mavid-tab--inactive'}`}
-          >
-            {label}
-          </button>
-        ))}
-      </div>
-
-      {/* ───── CHUNG ───── */}
-      {tab === 'common' && (
-        <div className='space-y-4'>
+      <div className='space-y-4'>
           <SectionCard title='LƯU TRỮ VIDEO'>
             <p className='text-sm leading-relaxed mb-3' style={{ color: 'var(--text-muted)' }}>
               Chọn thư mục cha (ví dụ ổ D:\\ hoặc thư mục trên ổ ngoài). App tạo bên trong thư mục đó{' '}
@@ -203,12 +184,12 @@ export function SettingsPage({ disabled }: Props) {
               <div className='flex-1 min-w-[min(100%,18rem)]'>
                 <Field label=''>
                   <input
-                    value={constantsLoading ? 'Đang tải…' : model.VIDEO_STORAGE_ROOT}
+                    value={constantsLoading ? 'Đang tải…' : a.STORAGE}
                     readOnly
                     disabled={constantsLoading}
                     className='w-full rounded-xl px-3 py-2 text-sm outline-none'
                     style={inputStyle}
-                    title={model.VIDEO_STORAGE_ROOT}
+                    title={a.STORAGE}
                   />
                 </Field>
               </div>
@@ -226,8 +207,7 @@ export function SettingsPage({ disabled }: Props) {
 
           <SectionCard title='LÊN LỊCH ĐĂNG'>
             <p className='text-sm leading-relaxed mb-3' style={{ color: 'var(--text-muted)' }}>
-              Giới hạn lịch đăng và số video tạo trước; các luồng trong app đọc <code className='text-xs'>MAX_SCHEDULED_DAYS</code> và{' '}
-              <code className='text-xs'>MAX_VIDEOS_PREPARE_AHEAD</code> trong constants.
+              Giới hạn lịch đăng và số video tạo trước; lưu trong <code className='text-xs'>APP_SETTINGS.VIDEO</code>.
             </p>
             <div className='grid gap-3 sm:grid-cols-2'>
               <Field label='Số ngày lên lịch trước tối đa'>
@@ -235,12 +215,15 @@ export function SettingsPage({ disabled }: Props) {
                   type='number'
                   min={1}
                   max={500}
-                  value={model.MAX_SCHEDULED_DAYS}
+                  value={a.VIDEO.MAX_SCHEDULED_DAYS}
                   disabled={!canEdit || constantsLoading}
                   onChange={e => {
-                    const raw = toNum(e.target.value, model.MAX_SCHEDULED_DAYS);
+                    const raw = toNum(e.target.value, a.VIDEO.MAX_SCHEDULED_DAYS);
                     const n = Math.max(1, Math.min(500, Math.floor(raw)));
-                    patch('MAX_SCHEDULED_DAYS', n);
+                    patchAppSettings({
+                      ...a,
+                      VIDEO: { ...a.VIDEO, MAX_SCHEDULED_DAYS: n },
+                    });
                   }}
                   className='w-full max-w-xs rounded-xl px-3 py-2 text-sm outline-none'
                   style={inputStyle}
@@ -251,12 +234,15 @@ export function SettingsPage({ disabled }: Props) {
                   type='number'
                   min={1}
                   max={500}
-                  value={model.MAX_VIDEOS_PREPARE_AHEAD}
+                  value={a.VIDEO.MAX_VIDEOS_PREPARE_AHEAD}
                   disabled={!canEdit || constantsLoading}
                   onChange={e => {
-                    const raw = toNum(e.target.value, model.MAX_VIDEOS_PREPARE_AHEAD);
+                    const raw = toNum(e.target.value, a.VIDEO.MAX_VIDEOS_PREPARE_AHEAD);
                     const n = Math.max(1, Math.min(500, Math.floor(raw)));
-                    patch('MAX_VIDEOS_PREPARE_AHEAD', n);
+                    patchAppSettings({
+                      ...a,
+                      VIDEO: { ...a.VIDEO, MAX_VIDEOS_PREPARE_AHEAD: n },
+                    });
                   }}
                   className='w-full max-w-xs rounded-xl px-3 py-2 text-sm outline-none'
                   style={inputStyle}
@@ -267,77 +253,14 @@ export function SettingsPage({ disabled }: Props) {
 
           <SectionCard title='FLOW'>
             <div className='grid gap-3'>
-              <Field label='URL'>
-                <input
-                  value={model.flowSettings.FLOW_URL}
-                  disabled
-                  onChange={e => patch('flowSettings', { ...model.flowSettings, FLOW_URL: e.target.value })}
-                  className='w-full rounded-xl px-3 py-2 text-sm outline-none'
-                  style={inputStyle}
-                />
-              </Field>
               <Field label='PROJECT ID'>
                 <input
-                  value={model.flowSettings.FLOW_PROJECT_ID}
-                  disabled={!canEdit}
-                  onChange={e => patch('flowSettings', { ...model.flowSettings, FLOW_PROJECT_ID: e.target.value })}
-                  className='w-full rounded-xl px-3 py-2 text-sm outline-none'
-                  style={inputStyle}
-                />
-              </Field>
-            </div>
-          </SectionCard>
-
-          <SectionCard title='GEMINI'>
-            <div className='grid gap-3'>
-              <Field label='URL'>
-                <input
-                  value={model.GEMINI_CONFIG.URL}
-                  disabled
-                  onChange={e => patch('GEMINI_CONFIG', { ...model.GEMINI_CONFIG, URL: e.target.value })}
-                  className='w-full rounded-xl px-3 py-2 text-sm outline-none'
-                  style={inputStyle}
-                />
-              </Field>
-              <Field label='MAX CONCURRENT'>
-                <input
-                  type='number'
-                  value={model.GEMINI_CONFIG.MAX_CONCURRENT}
+                  value={a.FLOW.PROJECT_ID}
                   disabled={!canEdit}
                   onChange={e =>
-                    patch('GEMINI_CONFIG', {
-                      ...model.GEMINI_CONFIG,
-                      MAX_CONCURRENT: toNum(e.target.value, model.GEMINI_CONFIG.MAX_CONCURRENT),
-                    })
-                  }
-                  className='w-full rounded-xl px-3 py-2 text-sm outline-none'
-                  style={inputStyle}
-                />
-              </Field>
-              <Field label='CHUNK: UPDATE_TRANSCRIPT'>
-                <input
-                  type='number'
-                  value={model.GEMINI_CHUNK_SIZE.UPDATE_TRANSCRIPT}
-                  disabled={!canEdit}
-                  onChange={e =>
-                    patch('GEMINI_CHUNK_SIZE', {
-                      ...model.GEMINI_CHUNK_SIZE,
-                      UPDATE_TRANSCRIPT: toNum(e.target.value, model.GEMINI_CHUNK_SIZE.UPDATE_TRANSCRIPT),
-                    })
-                  }
-                  className='w-full rounded-xl px-3 py-2 text-sm outline-none'
-                  style={inputStyle}
-                />
-              </Field>
-              <Field label='CHUNK: SUMMARY_CONTENT'>
-                <input
-                  type='number'
-                  value={model.GEMINI_CHUNK_SIZE.SUMMARY_CONTENT}
-                  disabled={!canEdit}
-                  onChange={e =>
-                    patch('GEMINI_CHUNK_SIZE', {
-                      ...model.GEMINI_CHUNK_SIZE,
-                      SUMMARY_CONTENT: toNum(e.target.value, model.GEMINI_CHUNK_SIZE.SUMMARY_CONTENT),
+                    patchAppSettings({
+                      ...a,
+                      FLOW: { ...a.FLOW, PROJECT_ID: e.target.value },
                     })
                   }
                   className='w-full rounded-xl px-3 py-2 text-sm outline-none'
@@ -346,72 +269,7 @@ export function SettingsPage({ disabled }: Props) {
               </Field>
             </div>
           </SectionCard>
-        </div>
-      )}
-
-      {/* ───── VIDEO ───── */}
-      {tab === 'video' && (
-        <div className='space-y-4'>
-          <SectionCard title='STOCK VIDEO'>
-            <div className='grid gap-3 sm:grid-cols-2'>
-              {(Object.keys(model.STOCK_VIDEO) as (keyof typeof model.STOCK_VIDEO)[]).map(k => {
-                const val = model.STOCK_VIDEO[k];
-                const isNum = typeof val === 'number';
-                return (
-                  <Field key={k} label={k}>
-                    <input
-                      type={isNum ? 'number' : 'text'}
-                      value={val}
-                      disabled={!canEdit}
-                      onChange={e => {
-                        const next = isNum ? toNum(e.target.value, val as number) : e.target.value;
-                        patch('STOCK_VIDEO', { ...model.STOCK_VIDEO, [k]: next });
-                      }}
-                      className='w-full rounded-xl px-3 py-2 text-sm outline-none'
-                      style={inputStyle}
-                    />
-                  </Field>
-                );
-              })}
-            </div>
-          </SectionCard>
-
-          <SectionCard title='SUBTITLE'>
-            <div className='grid gap-3 sm:grid-cols-2'>
-              {(Object.keys(model.SUBTITLE) as (keyof typeof model.SUBTITLE)[]).map(k => (
-                <Field key={k} label={k}>
-                  <input
-                    type='number'
-                    value={model.SUBTITLE[k]}
-                    disabled={!canEdit}
-                    step={k === 'BOX_OPACITY' ? 0.1 : 1}
-                    onChange={e => patch('SUBTITLE', { ...model.SUBTITLE, [k]: toNum(e.target.value, model.SUBTITLE[k]) })}
-                    className='w-full rounded-xl px-3 py-2 text-sm outline-none'
-                    style={inputStyle}
-                  />
-                </Field>
-              ))}
-            </div>
-          </SectionCard>
-
-          <SectionCard title='LOGO'>
-            <div className='grid gap-3 sm:grid-cols-3'>
-              {(Object.keys(model.LOGO) as (keyof typeof model.LOGO)[]).map(k => (
-                <Field key={k} label={k}>
-                  <input
-                    type='number'
-                    value={model.LOGO[k]}
-                    disabled={!canEdit}
-                    onChange={e => patch('LOGO', { ...model.LOGO, [k]: toNum(e.target.value, model.LOGO[k]) })}
-                    className='w-full rounded-xl px-3 py-2 text-sm outline-none'
-                    style={inputStyle}
-                  />
-                </Field>
-              ))}
-            </div>
-          </SectionCard>
-        </div>
-      )}
+      </div>
     </div>
   );
 }

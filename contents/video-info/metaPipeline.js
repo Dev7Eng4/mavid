@@ -1,0 +1,82 @@
+/**
+ * Pipeline video-info: tóm tắt SRT theo chunk → metadata (title, description, tags, summary).
+ */
+import { DEFAULT_PROMPT_LANG } from '../constants/index.js';
+import { VIDEO_INFO_CHUNK_SIZE } from './videoInfoDefaults.js';
+import { loadPromptByLanguage } from '../prompts/index.js';
+import { srtToPlainText } from '../utils/srt.util.js';
+import { openChatPage, sendPrompt } from '../llm/index.js';
+import { parseCreateMetaInfoResponse } from './metaParser.util.js';
+
+/**
+ * Trên cùng một tab chat (LLM): tóm tắt SRT theo chunk → metadata tổng hợp.
+ * @param {import('playwright').Page} page
+ * @param {{ srtContent: string, language?: string }} opts
+ */
+export async function runGeminiVideoMetaPrompts(page, { srtContent, language }) {
+  const lang = String(language || DEFAULT_PROMPT_LANG).toUpperCase();
+
+  const prompts = await loadPromptByLanguage(lang);
+
+  await page.waitForTimeout(1500);
+
+  const cues = srtContent
+    .split(/\n\n+/)
+    .map(c => c.trim())
+    .filter(Boolean);
+
+  const summaries = [];
+  const totalChunks = Math.ceil(cues.length / VIDEO_INFO_CHUNK_SIZE.SUMMARY_CONTENT) || 1;
+
+  for (let i = 0; i < cues.length; i += VIDEO_INFO_CHUNK_SIZE.SUMMARY_CONTENT) {
+    const chunk = cues.slice(i, i + VIDEO_INFO_CHUNK_SIZE.SUMMARY_CONTENT).join('\n\n');
+    const chunkIndex = Math.floor(i / VIDEO_INFO_CHUNK_SIZE.SUMMARY_CONTENT) + 1;
+
+    console.log(`Đang tóm tắt phần ${chunkIndex}/${totalChunks}...`);
+
+    const plainChunk = srtToPlainText(chunk);
+
+    const prompt = prompts.promptCreateSummaryChunk(plainChunk);
+    const result = await sendPrompt(page, prompt);
+
+    const cleanResult = result.trim();
+    summaries.push(cleanResult);
+
+    if (i + VIDEO_INFO_CHUNK_SIZE.SUMMARY_CONTENT < cues.length) {
+      await page.waitForTimeout(2000);
+    }
+  }
+
+  let finalSummaryForMeta = summaries.join('\n');
+
+  if (summaries.length >= 2) {
+    const mergePrompt = prompts.promptCreateFinalSummary(finalSummaryForMeta);
+    finalSummaryForMeta = await sendPrompt(page, mergePrompt);
+    await page.waitForTimeout(1500);
+  }
+
+  console.log('\nĐang tạo metadata từ bản tóm tắt tổng hợp...');
+
+  const metaRaw = await sendPrompt(page, prompts.promptCreateVideoMeta(finalSummaryForMeta));
+
+  const parsed = parseCreateMetaInfoResponse(metaRaw);
+
+  return {
+    ...parsed,
+    summary: finalSummaryForMeta,
+  };
+}
+
+/**
+ * Meta (title, description, tags) trên một page có sẵn.
+ * @param {import('playwright').Page} page
+ * @param {{ srtContent?: string, language?: string }} options
+ */
+export async function internalUpdateVideoMeta(page, options = {}) {
+  const { srtContent = '', language } = options;
+
+  await openChatPage(page);
+
+  const meta = await runGeminiVideoMetaPrompts(page, { srtContent, language });
+  return meta;
+}

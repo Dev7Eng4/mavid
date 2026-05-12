@@ -18,6 +18,7 @@ contextBridge.exposeInMainWorld('runner', {
   writeMavidChannelConfig: payload => ipcRenderer.invoke('write-mavid-channel-config', payload),
   setChannelFolderStartFromRow: (channelFolder, dataRowIndex) =>
     ipcRenderer.invoke('set-channel-folder-start-from-row', { channelFolder, dataRowIndex }),
+  listVisualResources: () => ipcRenderer.invoke('list-visual-resources'),
   listBackgrounds: () => ipcRenderer.invoke('list-backgrounds'),
   listChannelFolders: () => ipcRenderer.invoke('list-channel-folders'),
   listRegisteredChannelEmails: () => ipcRenderer.invoke('list-registered-channel-emails'),
@@ -52,4 +53,8 @@ contextBridge.exposeInMainWorld('runner', {
   appendPersistedErrorLog: line => ipcRenderer.invoke('append-persisted-error-log', { line }),
   clearPersistedErrorLogs: () => ipcRenderer.invoke('clear-persisted-error-logs'),
   minimizeApp: () => ipcRenderer.invoke('minimize-app'),
+  getMavidGroups: () => ipcRenderer.invoke('get-mavid-groups'),
+  setMavidGroups: payload => ipcRenderer.invoke('set-mavid-groups', payload),
+  getMavidWarnings: () => ipcRenderer.invoke('get-mavid-warnings'),
+  setMavidWarnings: payload => ipcRenderer.invoke('set-mavid-warnings', payload),
 });

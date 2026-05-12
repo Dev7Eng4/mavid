@@ -7,7 +7,8 @@ export interface SelectOption {
 
 interface Props {
   value: string;
-  options: SelectOption[];
+  /** Chỉ đọc — chấp nhận cả mảng `readonly` (hằng từ module). */
+  options: readonly SelectOption[];
   onChange: (value: string) => void;
   placeholder?: string;
   emptyText?: string;
@@ -130,7 +131,11 @@ export function CustomSelect({ value, options, onChange, placeholder, emptyText,
     }
   }
 
-  const selectedLabel = options.find(o => o.value === value)?.label ?? value;
+  /** Gồm cả `value === ''` khi option dùng chuỗi rỗng (vd. «Tự động») — không dùng `value` truthy. */
+  const selectedOption = options.find(o => o.value === value);
+  const displayLabel = selectedOption
+    ? (selectedOption.label ?? selectedOption.value)
+    : (placeholder ?? 'Chọn...');
 
   return (
     <div className='relative' ref={ref} onKeyDown={handleKeyDown}>
@@ -139,13 +144,13 @@ export function CustomSelect({ value, options, onChange, placeholder, emptyText,
         className='w-full flex items-center justify-between rounded-lg px-3 py-[9px] text-sm cursor-pointer transition-colors duration-150'
         style={{
           background: 'var(--code-bg)',
-          color: value ? 'var(--text-h)' : 'var(--text)',
+          color: selectedOption ? 'var(--text-h)' : 'var(--text)',
           border: `1px solid ${open ? 'var(--accent-border)' : 'var(--border)'}`,
         }}
       >
         <span className='flex items-center gap-2 min-w-0 truncate'>
           {icon ?? <span className='w-2 h-2 rounded-full shrink-0' style={{ background: 'var(--accent)', opacity: 0.8 }} />}
-          {value ? selectedLabel : (placeholder ?? 'Chọn...')}
+          {displayLabel}
         </span>
         <ChevronDown open={open} />
       </button>

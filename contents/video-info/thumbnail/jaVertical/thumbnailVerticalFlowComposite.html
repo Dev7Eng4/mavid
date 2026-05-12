@@ -1,0 +1,295 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="utf-8" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@900&display=swap" rel="stylesheet" />
+    <style>
+      body {
+        margin: 0;
+        background: #000;
+      }
+      #thumbCanvas {
+        display: block;
+      }
+    </style>
+  </head>
+  <body>
+    <canvas id="thumbCanvas" width="1280" height="720"></canvas>
+
+    <script>
+      const W = 1280;
+      const H = 720;
+
+      /** Tạm thời tắt hiển thị quote trên; đổi `true` khi muốn bật lại. */
+      const SHOW_TOP_QUOTE = false;
+
+      const DEFAULT_LAYOUT = {
+        canvas_width: 1280,
+        canvas_height: 720,
+        safe_margin: 28,
+        bottom_padding: 24,
+        bottom_band_min_y: Math.floor(H * 0.72),
+        top_quote_y: 52,
+        top_quote_max_width: W - 96,
+      };
+
+      const DEFAULT_TYPO = {
+        bottom_font_size: 76,
+        bottom_stroke_width: 12,
+        bottom_line_gap: 12,
+        top_quote_font_size: 40,
+        top_quote_stroke_width: 8,
+        top_quote_letter_spacing: -1,
+      };
+
+      const DEFAULT_COLORS = {
+        bottom_line_1_fill: '#FFFFFF',
+        bottom_line_1_stroke: '#111111',
+        bottom_line_2_fill: '#FFF200',
+        bottom_line_2_stroke: '#111111',
+        top_quote_fill: '#48FF4E',
+        top_quote_stroke: '#111111',
+      };
+
+      /**
+       * @param {unknown} raw
+       * @returns {{ layout: typeof DEFAULT_LAYOUT, typo: typeof DEFAULT_TYPO, colors: typeof DEFAULT_COLORS, thumbnail_copy: { top_quote_enabled: boolean, top_quote: string, bottom_line_1: string, bottom_line_2: string } }}
+       */
+      function mergeFlow(raw) {
+        const layout = { ...DEFAULT_LAYOUT };
+        const typo = { ...DEFAULT_TYPO };
+        const colors = { ...DEFAULT_COLORS };
+        const tc = {
+          top_quote_enabled: false,
+          top_quote: '',
+          bottom_line_1: '',
+          bottom_line_2: '',
+        };
+
+        if (raw && typeof raw === 'object') {
+          const tcIn = raw.thumbnail_copy;
+          if (tcIn && typeof tcIn === 'object') {
+            if (typeof tcIn.top_quote_enabled === 'boolean') tc.top_quote_enabled = tcIn.top_quote_enabled;
+            if (typeof tcIn.top_quote === 'string') tc.top_quote = tcIn.top_quote;
+            if (typeof tcIn.bottom_line_1 === 'string') tc.bottom_line_1 = tcIn.bottom_line_1;
+            if (typeof tcIn.bottom_line_2 === 'string') tc.bottom_line_2 = tcIn.bottom_line_2;
+          }
+
+          const tex = raw.text_color;
+          if (tex && typeof tex === 'object') {
+            /**
+             * @param {unknown} slot
+             * @param {keyof typeof colors} fillKey
+             * @param {keyof typeof colors} strokeKey
+             */
+            const pick = (slot, fillKey, strokeKey) => {
+              if (!slot || typeof slot !== 'object') return;
+              if (typeof slot.fill === 'string' && slot.fill.trim()) colors[fillKey] = slot.fill;
+              if (typeof slot.stroke === 'string' && slot.stroke.trim()) colors[strokeKey] = slot.stroke;
+            };
+            pick(tex.bottom_line_1, 'bottom_line_1_fill', 'bottom_line_1_stroke');
+            pick(tex.bottom_line_2, 'bottom_line_2_fill', 'bottom_line_2_stroke');
+            pick(tex.top_quote, 'top_quote_fill', 'top_quote_stroke');
+          }
+        }
+
+        return { layout, typo, colors, thumbnail_copy: tc };
+      }
+
+      /** @param {CanvasRenderingContext2D} ctx */
+      function drawImageCover(ctx, img, dx, dy, dw, dh) {
+        const ir = img.width / img.height;
+        const cr = dw / dh;
+        let sx;
+        let sy;
+        let sw;
+        let sh;
+        if (ir > cr) {
+          sh = img.height;
+          sw = img.height * cr;
+          sx = (img.width - sw) / 2;
+          sy = 0;
+        } else {
+          sw = img.width;
+          sh = img.width / cr;
+          sx = 0;
+          sy = (img.height - sh) / 2;
+        }
+        ctx.drawImage(img, sx, sy, sw, sh, dx, dy, dw, dh);
+      }
+
+      function narrowCornerQuotes(s) {
+        return String(s).replaceAll('\u300C', '\uFF62').replaceAll('\u300D', '\uFF63');
+      }
+
+      /**
+       * @param {CanvasRenderingContext2D} ctx
+       * @param {'alphabetic' | 'bottom'} [baseline]
+       */
+      function drawStrokeFillLine(
+        ctx,
+        text,
+        leftX,
+        yBaseline,
+        fontSize,
+        fill,
+        strokeColor,
+        strokeWidth,
+        maxWidth,
+        letterSpacingPx,
+        baseline = 'alphabetic',
+      ) {
+        text = narrowCornerQuotes(text);
+        const jp = `900 ${fontSize}px "Noto Sans JP", "Hiragino Sans", "Meiryo", sans-serif`;
+        ctx.font = jp;
+        if (letterSpacingPx) ctx.letterSpacing = `${letterSpacingPx}px`;
+        else ctx.letterSpacing = '0px';
+        ctx.textBaseline = baseline;
+        ctx.lineJoin = 'round';
+        ctx.miterLimit = 2;
+
+        const naturalW = ctx.measureText(text).width;
+        const scaleX = maxWidth > 0 && naturalW > maxWidth ? maxWidth / naturalW : 1;
+        const lineW = scaleX < 1 ? strokeWidth / scaleX : strokeWidth;
+
+        const boldScreenPx = Math.max(0.45, fontSize * 0.0055);
+        const bdx = boldScreenPx / scaleX;
+        const bdy = boldScreenPx;
+        const boldDirs = [
+          [bdx, 0],
+          [-bdx, 0],
+          [0, bdy],
+          [0, -bdy],
+        ];
+
+        ctx.save();
+        ctx.translate(leftX, yBaseline);
+        ctx.scale(scaleX, 1);
+        ctx.textAlign = 'left';
+
+        ctx.shadowBlur = 0;
+        ctx.strokeStyle = strokeColor;
+        ctx.lineWidth = lineW;
+        ctx.strokeText(text, 0, 0);
+
+        ctx.fillStyle = fill;
+        for (const [ox, oy] of boldDirs) {
+          ctx.fillText(text, ox, oy);
+        }
+        ctx.fillText(text, 0, 0);
+        ctx.restore();
+        ctx.letterSpacing = '0px';
+      }
+
+      /**
+       * @param {CanvasRenderingContext2D} ctx
+       */
+      function drawStrokeFillLineCentered(ctx, text, centerX, yBaseline, fontSize, fill, strokeColor, strokeWidth, maxWidth, letterSpacingPx) {
+        text = narrowCornerQuotes(text);
+        const jp = `900 ${fontSize}px "Noto Sans JP", "Hiragino Sans", "Meiryo", sans-serif`;
+        ctx.font = jp;
+        if (letterSpacingPx) ctx.letterSpacing = `${letterSpacingPx}px`;
+        else ctx.letterSpacing = '0px';
+        ctx.textBaseline = 'alphabetic';
+
+        const naturalW = ctx.measureText(text).width;
+        const scaleX = maxWidth > 0 && naturalW > maxWidth ? maxWidth / naturalW : 1;
+        const leftX = centerX - (naturalW * scaleX) / 2;
+        drawStrokeFillLine(ctx, text, leftX, yBaseline, fontSize, fill, strokeColor, strokeWidth, maxWidth, letterSpacingPx, 'alphabetic');
+        ctx.letterSpacing = '0px';
+      }
+
+      async function drawComposite() {
+        const bgUrl = window.__BG_DATA_URL__;
+        const rawFlow = window.__FLOW_LAYOUT__;
+        if (!bgUrl || typeof bgUrl !== 'string') throw new Error('Thiếu __BG_DATA_URL__');
+        const { layout, typo, colors, thumbnail_copy: tc } = mergeFlow(rawFlow);
+
+        const canvas = document.getElementById('thumbCanvas');
+        const ctx = canvas.getContext('2d');
+
+        const maxFs = SHOW_TOP_QUOTE ? Math.max(typo.bottom_font_size, typo.top_quote_font_size) : typo.bottom_font_size;
+        await document.fonts.load(`900 ${maxFs}px "Noto Sans JP"`);
+        await document.fonts.ready;
+
+        const img = new Image();
+        await new Promise((resolve, reject) => {
+          img.onload = () => resolve();
+          img.onerror = () => reject(new Error('Không load được ảnh nền Flow'));
+          img.src = bgUrl;
+        });
+
+        drawImageCover(ctx, img, 0, 0, W, H);
+
+        const maxLineW = W - 2 * layout.safe_margin;
+
+        if (SHOW_TOP_QUOTE && tc.top_quote_enabled && String(tc.top_quote || '').trim()) {
+          drawStrokeFillLineCentered(
+            ctx,
+            String(tc.top_quote),
+            W / 2,
+            layout.top_quote_y,
+            typo.top_quote_font_size,
+            colors.top_quote_fill,
+            colors.top_quote_stroke,
+            typo.top_quote_stroke_width,
+            layout.top_quote_max_width,
+            typo.top_quote_letter_spacing,
+          );
+        }
+
+        const fs = typo.bottom_font_size;
+        const gap = typo.bottom_line_gap;
+        /** Đặt hai dòng sát mép đáy: `bottom_line_2` là dòng dưới cùng, `bottom_line_1` ngay phía trên (`textBaseline: bottom`). */
+        const line2BottomY = H - layout.bottom_padding;
+        const line1BottomY = line2BottomY - fs - gap;
+        /** Vùng còn lại của “bottom 28%” — chỉ kiểm tra nhẹ, không ép chữ vào giữa band. */
+        const warnMinY = layout.bottom_band_min_y;
+        if (line1BottomY - fs < warnMinY) {
+          console.warn(
+            '[thumbnail-vertical] Hai dòng đáy hơi cao so với vùng 28%; cân nhắc ngắn copy hoặc giảm font.',
+            { line1BottomY, fs, warnMinY },
+          );
+        }
+
+        drawStrokeFillLine(
+          ctx,
+          String(tc.bottom_line_2 ?? ''),
+          layout.safe_margin,
+          line2BottomY,
+          fs,
+          colors.bottom_line_2_fill,
+          colors.bottom_line_2_stroke,
+          typo.bottom_stroke_width,
+          maxLineW,
+          0,
+          'bottom',
+        );
+
+        drawStrokeFillLine(
+          ctx,
+          String(tc.bottom_line_1 ?? ''),
+          layout.safe_margin,
+          line1BottomY,
+          fs,
+          colors.bottom_line_1_fill,
+          colors.bottom_line_1_stroke,
+          typo.bottom_stroke_width,
+          maxLineW,
+          0,
+          'bottom',
+        );
+      }
+
+      drawComposite()
+        .then(() => {
+          window.__THUMBNAIL_READY__ = true;
+        })
+        .catch(e => {
+          window.__THUMBNAIL_ERROR__ = String(e);
+        });
+    </script>
+  </body>
+</html>

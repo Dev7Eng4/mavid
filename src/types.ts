@@ -1,9 +1,10 @@
-export type Page = 'pipeline' | 'create-video' | 'settings' | 'channels' | 'analyst' | 'gpm' | 'logs';
+export type Page = 'pipeline' | 'create-video' | 'settings' | 'channels' | 'visual' | 'groups' | 'warnings' | 'analyst' | 'gpm' | 'logs';
 
 export type ScriptId =
   | 'tao-chrome-profile'
-  | 'lay-thong-tin-youtube (video, channel)'
+  | 'lay-thong-tin-youtube'
   | 'tao-batch-video-tu-audio'
+  | 'createBatchVideo'
   | 'tao-batch-video-reup-full'
   | 'tao-thumbnail-flow'
   | 'tom-tat-meta-tu-transcript';
@@ -23,10 +24,10 @@ export const scriptDefs: ScriptDef[] = [
     npmScript: 'tao-chrome-profile',
   },
   {
-    id: 'lay-thong-tin-youtube (video, channel)',
+    id: 'lay-thong-tin-youtube',
     title: 'Lấy thông tin YouTube',
     summary: 'Đọc URL từ input.txt, lấy info kênh/playlist, xuất Excel vào MaVidMedia/channels/.',
-    npmScript: 'lay-thong-tin-youtube (video, channel)',
+    npmScript: 'lay-thong-tin-youtube',
   },
   {
     id: 'tao-batch-video-tu-audio',
@@ -39,6 +40,12 @@ export const scriptDefs: ScriptDef[] = [
     title: 'Tạo batch video reup full',
     summary: 'Reup video hàng loạt bằng overlay ảnh/video lên video gốc.',
     npmScript: 'tao-batch-video-reup-full',
+  },
+  {
+    id: 'createBatchVideo',
+    title: 'Tạo batch video',
+    summary: 'Tạo video hàng loạt từ audio + stock clips (FFmpeg, phụ đề, logo).',
+    npmScript: 'create-batch-video',
   },
   {
     id: 'tao-thumbnail-flow',
@@ -60,43 +67,19 @@ export interface AppStats {
   downloads: number;
 }
 
-export interface ConstantsUiModel {
-  flowSettings: { FLOW_URL: string; FLOW_PROJECT_ID: string };
-  GEMINI_CONFIG: { URL: string; MAX_CONCURRENT: number };
-  GEMINI_CHUNK_SIZE: { UPDATE_TRANSCRIPT: number; SUMMARY_CONTENT: number };
-  LANGUAGES_NEED_UPDATE_TRANSCRIPT: string[];
-  META_DATA: { NICHE: string; TITLE: string; DESCRIPTION: string; TAGS: string };
-  DEFAULT_VIDEO: { BACKGROUND_VIDEO: string };
-  AUDIO_SPEED: number;
-  STOCK_VIDEO: {
-    CROSSFADE_SEC: number;
-    RENDER_EXTRA_SEC: number;
-    SLOWMO_FACTOR: number;
-    CANVAS_W: number;
-    CANVAS_H: number;
-    FPS: number;
-    BITRATE: string;
-    MAX_BITRATE: string;
-    BUFSIZE: string;
-  };
-  SUBTITLE: {
-    BOX_HEIGHT: number;
-    BOX_OPACITY: number;
-    FONT_SIZE: number;
-    PADDING_TOP: number;
-    PADDING_HORIZONTAL: number;
-    CHAR_SPACING: number;
-  };
-  LOGO: { SIZE: number; MARGIN_TOP: number; MARGIN_RIGHT: number };
+/** Phần chỉnh qua Settings / JSON user — khớp `APP_SETTINGS` trong contents/constants. */
+export interface AppSettingsModel {
+  FLOW: { PROJECT_ID: string; CHROME_PROFILE: number };
+  VIDEO: { MAX_SCHEDULED_DAYS: number; MAX_VIDEOS_PREPARE_AHEAD: number };
   /**
    * Thư mục `MaVidMedia`: bên trong có `backgrounds/`, `videos/`, `channels/`.
-   * Rỗng trong file → app gợi ý mặc định (Windows: ổ không C:; macOS: volume ngoài hoặc HOME).
+   * Rỗng → app gợi ý mặc định (Windows: ổ không C:; macOS: volume ngoài hoặc HOME).
    */
-  VIDEO_STORAGE_ROOT: string;
-  /** Số ngày lên lịch trước tối đa (cùng lúc / mỗi đợt — tùy luồng dùng hằng này). */
-  MAX_SCHEDULED_DAYS: number;
-  /** Số video tạo / chuẩn bị trước tối đa (buffer trước khi đăng). */
-  MAX_VIDEOS_PREPARE_AHEAD: number;
+  STORAGE: string;
+}
+
+export interface ConstantsUiModel {
+  APP_SETTINGS: AppSettingsModel;
 }
 
 export interface ChannelFile {
@@ -106,7 +89,7 @@ export interface ChannelFile {
 }
 
 export interface ChannelRow {
-  [key: string]: string | number | boolean | null;
+  [key: string]: any;
 }
 
 export interface ChannelData {
@@ -119,6 +102,19 @@ export interface GpmProfileRow {
   id: string;
   name: string;
   profilePath: string;
+}
+
+/** Nhóm lưu trong `MaVidMedia/channels/group.json`. */
+export interface Group {
+  id: string;
+  name: string;
+}
+
+/** Cảnh báo lưu trong `MaVidMedia/channels/warning.json`. */
+export interface MavidWarningRow {
+  id: string;
+  channelLink: string;
+  note: string;
 }
 
 export interface LoadGpmProfilesResult {
@@ -161,6 +157,13 @@ export interface ChannelFolderDataResult extends ChannelData {
   channelFolder: string;
 }
 
+export interface BackgroundOption {
+  id: string;
+  label: string;
+  /** 'local' = folder trong MaVidMedia/backgrounds, 'stock' = channel từ assets/visual-resource/stock */
+  source: 'local' | 'stock';
+}
+
 /** Nguồn nền: chọn folder stock cố định, hoặc tự động (số clip theo độ dài audio, folder mặc định). */
 export type VideoFromAudioBackgroundSource = 'stock' | 'auto';
 
@@ -174,6 +177,7 @@ export interface VideoReupFullConfig {
 
 export interface VideoFromAudioConfig {
   channel: string;
+  email?: string;
   background: string;
   /** Mặc định `stock` (popup Pipeline). Tab Tạo video có thể chọn `auto`. */
   backgroundSource?: VideoFromAudioBackgroundSource;
@@ -184,6 +188,8 @@ export interface VideoFromAudioConfig {
   maxVideosPerBatch: number;
   /** 0 = không lọc; >0 = chỉ dòng có cột DURATION ≥ N phút. */
   minDurationMinutes?: number;
+  /** Tùy chọn nâng cao (ví dụ: stock/image cho audio). */
+  overlay?: string;
 }
 
 export type DirectScriptId =
@@ -195,7 +201,8 @@ export type DirectScriptId =
   | 'createThumbnailFlow'
   | 'summaryMetaFromTranscript'
   | 'uploadYoutubeViaGpm'
-  | 'updateChannelVideosMeta';
+  | 'updateChannelVideosMeta'
+  | 'addVisualResource';
 
 export interface ScriptResult<T = unknown> {
   success: boolean;
@@ -227,11 +234,14 @@ export interface AddChannelFromFormParams {
   formMeta: {
     channels: {
       email: string;
-      videoType: 'from_audio' | 'reup_full';
+      myChannel?: string;
+      /** ID nhóm trong `group.json`. */
+      groupId?: string;
+      videoType: 'audio' | 'video';
       durationMinuteFrom: number;
       durationMinuteTo: number | null;
       background: string;
-      /** Chỉ dùng khi `videoType === 'reup_full'` — tên trong OVERLAY_OPTIONS. */
+      /** Chỉ dùng khi `videoType === 'video'` — tên trong OVERLAY_OPTIONS. */
       overlay?: string;
       /** Khớp `PROMPTS_CREATE_THUMBNAIL_OPTIONS[].value` trong contents/prompts/index.js */
       thumbnailPrompt?: string;
@@ -259,8 +269,8 @@ export interface GetInfoChannelResult {
 
 /** `MaVidMedia/channels/{folder}/mavid-channel-config.json` — đồng bộ với form Thêm/Sửa channel. */
 export interface MavidChannelConfigItem {
+  id?: string;
   email?: string;
-  /** Đồng bộ cột index «KÊNH CỦA TÔI». */
   myChannel?: string;
   videoType?: string;
   durationMinuteFrom?: number;
@@ -272,6 +282,9 @@ export interface MavidChannelConfigItem {
   thumbnailPrompt?: string;
   videosPerDayPreset?: string;
   publishTimes?: string[];
+  uploadedVideos?: number;
+  latestUploadDate?: string;
+  latestUploadTime?: string;
 }
 
 export interface MavidChannelConfig {
@@ -314,10 +327,13 @@ declare global {
       readMavidChannelConfig: (channelFolder: string) => Promise<MavidChannelConfig | null>;
       writeMavidChannelConfig: (payload: {
         channelFolder: string;
+        /** Email dòng trước khi sửa — dùng để merge với bản cũ khi index/config lệch hoặc đổi email. */
+        mergeFromPreviousEmail?: string;
         patch: Pick<MavidChannelConfig, 'channels'>;
       }) => Promise<{ ok: boolean }>;
       setChannelFolderStartFromRow: (channelFolder: string, dataRowIndex: number) => Promise<{ ok: boolean; fileName?: string }>;
-      listBackgrounds: () => Promise<string[]>;
+      listVisualResources: () => Promise<{ channelId: string; channelName: string; type: string }[]>;
+      listBackgrounds: () => Promise<BackgroundOption[]>;
       listChannelFolders: () => Promise<string[]>;
       /** Email đã có trong index.xlsx hoặc file kênh con (tránh trùng khi thêm kênh). */
       listRegisteredChannelEmails: () => Promise<string[]>;
@@ -346,6 +362,10 @@ declare global {
       appendPersistedErrorLog: (line: string) => Promise<{ ok: boolean }>;
       clearPersistedErrorLogs: () => Promise<{ ok: boolean }>;
       minimizeApp: () => Promise<{ ok: boolean }>;
+      getMavidGroups: () => Promise<{ items: Group[] }>;
+      setMavidGroups: (payload: { items: Group[] }) => Promise<{ ok: boolean }>;
+      getMavidWarnings: () => Promise<{ items: MavidWarningRow[] }>;
+      setMavidWarnings: (payload: { items: MavidWarningRow[] }) => Promise<{ ok: boolean }>;
     };
   }
 }

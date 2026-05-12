@@ -1,21 +1,76 @@
-import { DEFAULT_PROMPT_LANG } from '../constants/defaultPromptLang.js';
-import {
-  createPromptToCreateThumbnailFromImage,
-  createPromptToCreateThumbnailOnlyTextFromImage,
-  promptToCreateThumbnail,
-} from './ja/createImage.js';
+import { DEFAULT_PROMPT_LANG } from '../constants/lang.js';
 
-export const PROMPTS_CREATE_THUMBNAIL = {
-  ja2CHOnlyText: createPromptToCreateThumbnailOnlyTextFromImage,
-  ja2CHFromOldThumbnail: promptToCreateThumbnail,
-  // ja2CHNewImage: createPromptToCreateThumbnailNewImage,
+/**
+ * Tên hàm export trong createImage.js cần ảnh tham chiếu (Flow attach thumbnail).
+ * Trùng cách cũ: `ja2CHFromOldThumbnail` → `promptToCreateThumbnailSukatto`.
+ */
+export const PROMPTS_NEED_IMAGE = ['promptToCreateThumbnailSukatto'];
+
+/**
+ * Key cũ trong `mavid-channel-config` / bản `PROMPTS_CREATE_THUMBNAIL` (đã bỏ) → tên export thực trong `createImage.js`.
+ * Ví dụ cấu hình vẫn lưu `jaLoveStory` trong khi UI mới dùng `promptToCreateThumbnailLove`.
+ */
+export const THUMBNAIL_PROMPT_KEY_ALIASES = {
+  jaLoveStory: 'promptToCreateThumbnailLove',
+  ja2CHFromOldThumbnail: 'promptToCreateThumbnailSukatto',
+  jaSukattoImage: 'promptToCreateThumbnailSukatto',
+  jaSukattoFullText: 'promptToCreateThumbnailSukattoFulLText',
+  ja2CHOnlyText: 'createPromptToCreateThumbnailOnlyTextFromImage',
+  jaFulLText: 'promptToCreateThumbnailFulLText',
 };
 
-export const PROMPTS_NEED_IMAGE = ['ja2CHFromOldThumbnail'];
+/**
+ * @param {Record<string, unknown>} prompts - kết quả `loadPromptByLanguage` (createImage + createVideoInfo)
+ * @param {string|null|undefined} styleKey - rỗng = tự động (`promptToCreateThumbnail`); hoặc tên export, vd. `promptToCreateThumbnailLove`
+ * @returns {{ build: (title: string, summary: string) => string, isNeedImage: boolean, usedStyleKey: string, didFallback: boolean }}
+ */
+export function resolveThumbnailPromptBuilder(prompts, styleKey) {
+  console.log('🚀 ~ resolveThumbnailPromptBuilder ~ styleKey:', styleKey);
+  const raw = String(styleKey ?? '').trim();
+  const def = prompts.promptToCreateThumbnail;
+  console.log('🚀 ~ resolveThumbnailPromptBuilder ~ def:', def);
+  if (typeof def !== 'function') {
+    throw new Error('resolveThumbnailPromptBuilder: thiếu hàm promptToCreateThumbnail trong gói ngôn ngữ');
+  }
+  if (!raw) {
+    return { build: def, isNeedImage: true, usedStyleKey: '', didFallback: false };
+  }
+  console.log('🚀 ~ resolveThumbnailPromptBuilder ~ raw after: ', raw);
+
+  const k = THUMBNAIL_PROMPT_KEY_ALIASES[raw] || raw;
+  const candidate = prompts[k];
+  if (typeof candidate === 'function') {
+    return {
+      build: /** @type {(title: string, summary: string) => string} */ (candidate),
+      isNeedImage: PROMPTS_NEED_IMAGE.includes(k),
+      usedStyleKey: k,
+      didFallback: false,
+    };
+  }
+  console.warn(
+    `[thumbnail] Style "${raw}" (→ "${k}") không có trong gói createImage (hoặc không phải hàm) — dùng promptToCreateThumbnail (tự động).`,
+  );
+  return { build: def, isNeedImage: false, usedStyleKey: '', didFallback: true };
+}
 
 export const PROMPTS_CREATE_THUMBNAIL_OPTIONS = [
-  { label: 'Japan 2CH Từ thumbnail cũ', value: 'ja2CHFromOldThumbnail' },
-  { label: 'Japan 2CH Chỉ text', value: 'ja2CHOnlyText' },
+  { label: 'Tự động', value: '' },
+  { label: '[JAPAN] FulL Text', value: 'jaFulLText' },
+  { label: '[JAPAN] 4 lines text + right visual', value: 'jaThumbnailHorizontal' },
+  { label: '[JAPAN] Bottom 2 lines + optional top quote', value: 'jaThumbnailVertical' },
+  // { label: 'Japan 2CH Chỉ text', value: 'ja2CHOnlyText' },
+  {
+    label: '[JAPAN] Love Story',
+    value: 'promptToCreateThumbnailLove',
+  },
+  {
+    label: '[JAPAN] Sukatto Full Text',
+    value: 'promptToCreateThumbnailSukattoFulLText',
+  },
+  {
+    label: '[JAPAN] Sukatto Image',
+    value: 'promptToCreateThumbnailSukatto',
+  },
   // { label: '2CH New Image', value: 'ja2CHNewImage' },
 ];
 
@@ -30,29 +85,14 @@ export async function loadPromptByLanguage(language) {
 
   async function importVideoInfo() {
     try {
-      return await import(`./${lang}/createVideoInfo.js`);
+      return await import(`./${lang}/index.js`);
     } catch {
       if (lang !== FALLBACK_LANG) {
-        console.log(`Không tìm thấy createVideoInfo cho "${lang}", dùng "${FALLBACK_LANG}".`);
+        console.log(`Không tìm thấy index cho "${lang}", dùng "${FALLBACK_LANG}".`);
       }
-      return await import(`./${FALLBACK_LANG}/createVideoInfo.js`);
+      return await import(`./${FALLBACK_LANG}/index.js`);
     }
   }
 
-  async function importCreateImage() {
-    try {
-      return await import(`./${lang}/createImage.js`);
-    } catch {
-      if (lang !== FALLBACK_LANG) {
-        console.log(`Không tìm thấy createImage cho "${lang}", dùng "${FALLBACK_LANG}".`);
-      }
-      return await import(`./${FALLBACK_LANG}/createImage.js`);
-    }
-  }
-
-  const [videoInfo, createImage] = await Promise.all([importVideoInfo(), importCreateImage()]);
-  return {
-    ...videoInfo,
-    ...createImage,
-  };
+  return await importVideoInfo();
 }

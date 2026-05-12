@@ -5,17 +5,19 @@ import fs from 'fs';
 import { fileURLToPath, pathToFileURL } from 'url';
 import { resolveGpmChromiumExecutable } from '../contents/scripts/openGpmPlaywright.js';
 import { getDefaultVideoStorageRoot, MAVID_MEDIA_FOLDER } from '../contents/constants/defaultVideoStorageRoot.js';
-import { mergeConstantsBaseWithUserOverlay } from '../contents/constants/mergeConstantsOverlay.js';
-import { CONSTANT_EXPORT_KEYS } from '../contents/constants/constantsExportKeys.js';
-import { buildConstantsModuleBase } from '../contents/constants/constantsModuleBase.js';
+import { mergeAppSettingsObjects, normalizeUserConstantsOverlay } from '../contents/constants/mergeConstantsOverlay.js';
+import { OVERLAY_KEYS } from '../contents/constants/constantsExportKeys.js';
+import { buildConstantsModuleBase, expandAppSettingsIntoModule } from '../contents/constants/constantsModuleBase.js';
 import { getAppSettingsUserJsonPath } from '../contents/constants/userConstantsPaths.js';
+import { mapIndexDataToProps, mapIndexDataToHeaders, mapPropToHeader } from '../contents/constants/indexColumnMapping.js';
+import { GPM_API_DEFAULT_ORIGIN } from '../contents/constants/gpmApi.js';
 
 const VITE_DEV_SERVER_URL = process.env.VITE_DEV_SERVER_URL || 'http://localhost:5173';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const ROOT = path.join(__dirname, '..');
-const GPM_API_V3_ROOT = (process.env.GPM_API_BASE || 'http://127.0.0.1:19995/api/v3').replace(/\/$/, '');
+const GPM_API_V3_ROOT = (process.env.GPM_API_BASE || GPM_API_DEFAULT_ORIGIN).replace(/\/$/, '');
 const CONSTANTS_DIR = path.join(ROOT, 'contents', 'constants');
 const CONSTANTS_INDEX_FILE = path.join(CONSTANTS_DIR, 'index.js');
 const MAVID_CHANNEL_CONFIG_FILENAME = 'mavid-channel-config.json';
@@ -27,10 +29,11 @@ let mainWindow = null;
 
 const ALLOWED_NPM_SCRIPTS = new Set([
   'tao-chrome-profile',
-  'lay-thong-tin-youtube (video, channel)',
+  'lay-thong-tin-youtube',
   'tao-batch-video-tu-audio',
   'tao-batch-video-reup-full',
   'tao-thumbnail-flow',
+  'create-batch-video',
   'tom-tat-meta-tu-transcript',
   'syncVideosToDrive',
 ]);
@@ -139,8 +142,7 @@ function readPersistedErrorLogs() {
 
 function writePersistedErrorLogs(lines) {
   const p = getErrorLogFilePath();
-  const trimmed =
-    lines.length > MAX_PERSISTED_ERROR_LOG_LINES ? lines.slice(-MAX_PERSISTED_ERROR_LOG_LINES) : [...lines];
+  const trimmed = lines.length > MAX_PERSISTED_ERROR_LOG_LINES ? lines.slice(-MAX_PERSISTED_ERROR_LOG_LINES) : [...lines];
   fs.mkdirSync(path.dirname(p), { recursive: true });
   fs.writeFileSync(p, JSON.stringify({ lines: trimmed }, null, 0), 'utf8');
 }
@@ -230,8 +232,8 @@ ipcMain.handle('run-npm-script', async (_event, { npmScript, extraEnv }) => {
   if (!npmScript || typeof npmScript !== 'string') throw new Error('npmScript không hợp lệ.');
   if (!ALLOWED_NPM_SCRIPTS.has(npmScript)) throw new Error(`Script không được phép: ${npmScript}`);
   if (npmJobRunning) throw new Error('Đang có job npm chạy. Vui lòng chờ kết thúc.');
-  // Không chặn theo `activeRunScriptCount`: upload YouTube (`run-script`) có thể chạy nền lâu;
-  // người dùng vẫn cần chạy `npm run` tạo video / batch khác trên kênh khác.
+  // Một job `npm run` tại một thời điểm (`npmJobRunning`). `run-script` (vd. upload YouTube) không bị chặn
+  // khi npm đang chạy — cho phép tạo video và upload song song; tránh trùng profile GPM nếu hai luồng cùng email.
 
   npmJobRunning = true;
   npmRunUserCancelled = false;
@@ -318,21 +320,21 @@ ipcMain.handle('run-npm-script', async (_event, { npmScript, extraEnv }) => {
 // --------------- Direct Script Runner ---------------
 
 const SCRIPT_MAP = {
-  getInfoChannel: '../contents/getInfoChannel.js',
-  addChannelFromForm: '../contents/addChannelFromForm.js',
-  downloadVideo: '../contents/downloadVideo.js',
+  getInfoChannel: '../contents/video-info/getInfoChannel.js',
+  addChannelFromForm: '../contents/scripts/addChannel.js',
+  downloadVideo: '../contents/video-info/downloadVideo.js',
   createBatchVideo: '../contents/scripts/createBatchVideo.js',
   makeChromeProfile: '../contents/scripts/makeChromeProfile.js',
-  createThumbnailFlow: '../contents/flow/createThumbnailFlow.js',
+  createThumbnailFlow: '../contents/video-info/thumbnail/createThumbnailFlow.js',
   summaryMetaFromTranscript: '../contents/scripts/summaryMetaFromTranscript.js',
   uploadYoutubeViaGpm: '../contents/youtube/uploadViaGpm.js',
   updateChannelVideosMeta: '../contents/scripts/updateChannelVideosMeta.js',
+  addVisualResource: '../contents/visual-resource/index.js',
 };
 
 ipcMain.handle('run-script', async (_event, { script, params = {} }) => {
   if (!script || typeof script !== 'string') throw new Error('script không hợp lệ.');
   if (!SCRIPT_MAP[script]) throw new Error(`Script không được phép: ${script}`);
-  if (npmJobRunning) throw new Error('Đang chạy npm script. Vui lòng chờ kết thúc.');
 
   activeRunScriptCount += 1;
   beginRunScriptConsoleCapture();
@@ -370,6 +372,117 @@ ipcMain.handle('read-input-file', async () => {
 ipcMain.handle('write-input-file', async (_event, { content }) => {
   if (typeof content !== 'string') throw new Error('content không hợp lệ.');
   fs.writeFileSync(INPUT_FILE, content, 'utf-8');
+  return { ok: true };
+});
+
+// --------------- Nhóm (màn hình Group — `MaVidMedia/channels/group.json`) ---------------
+// resolveChannelsDirFromDisk() — định nghĩa ở dưới (function hoisted).
+
+const GROUP_JSON_BASENAME = 'group.json';
+
+function parseMavidGroupsJson(raw) {
+  const j = JSON.parse(raw);
+  const items = Array.isArray(j.items) ? j.items : [];
+  return {
+    items: items
+      .filter(x => x && typeof x === 'object')
+      .map(x => ({
+        id: String(x.id ?? '').trim(),
+        name: String(x.name ?? '').trim(),
+      }))
+      .filter(x => x.id),
+  };
+}
+
+function readMavidGroupsFile(absPath) {
+  try {
+    if (!fs.existsSync(absPath) || !fs.statSync(absPath).isFile()) {
+      return { items: [] };
+    }
+    const raw = fs.readFileSync(absPath, 'utf8');
+    return parseMavidGroupsJson(raw);
+  } catch {
+    return { items: [] };
+  }
+}
+
+ipcMain.handle('get-mavid-groups', async () => {
+  const channelsDir = await resolveChannelsDirFromDisk();
+  return readMavidGroupsFile(path.join(channelsDir, GROUP_JSON_BASENAME));
+});
+
+ipcMain.handle('set-mavid-groups', async (_event, { items }) => {
+  if (!Array.isArray(items)) throw new Error('items không hợp lệ.');
+  const seen = new Set();
+  const norm = [];
+  for (const it of items) {
+    if (!it || typeof it !== 'object') continue;
+    const id = String(it.id ?? '').trim();
+    const name = String(it.name ?? '').trim();
+    if (!id || seen.has(id)) continue;
+    seen.add(id);
+    norm.push({ id, name });
+  }
+  const channelsDir = await resolveChannelsDirFromDisk();
+  fs.mkdirSync(channelsDir, { recursive: true });
+  const absPath = path.join(channelsDir, GROUP_JSON_BASENAME);
+  fs.writeFileSync(absPath, JSON.stringify({ version: 1, items: norm }, null, 2), 'utf8');
+  return { ok: true };
+});
+
+// --------------- Warning (màn hình Warning — `MaVidMedia/channels/warning.json`) ---------------
+
+const WARNING_JSON_BASENAME = 'warning.json';
+
+function parseMavidWarningsJson(raw) {
+  const j = JSON.parse(raw);
+  const items = Array.isArray(j.items) ? j.items : [];
+  return {
+    items: items
+      .filter(x => x && typeof x === 'object')
+      .map(x => ({
+        id: String(x.id ?? '').trim(),
+        channelLink: String(x.channelLink ?? '').trim(),
+        note: String(x.note ?? '').trim(),
+      }))
+      .filter(x => x.id),
+  };
+}
+
+function readMavidWarningsFile(absPath) {
+  try {
+    if (!fs.existsSync(absPath) || !fs.statSync(absPath).isFile()) {
+      return { items: [] };
+    }
+    const raw = fs.readFileSync(absPath, 'utf8');
+    return parseMavidWarningsJson(raw);
+  } catch {
+    return { items: [] };
+  }
+}
+
+ipcMain.handle('get-mavid-warnings', async () => {
+  const channelsDir = await resolveChannelsDirFromDisk();
+  return readMavidWarningsFile(path.join(channelsDir, WARNING_JSON_BASENAME));
+});
+
+ipcMain.handle('set-mavid-warnings', async (_event, { items }) => {
+  if (!Array.isArray(items)) throw new Error('items không hợp lệ.');
+  const seen = new Set();
+  const norm = [];
+  for (const it of items) {
+    if (!it || typeof it !== 'object') continue;
+    const id = String(it.id ?? '').trim();
+    const channelLink = String(it.channelLink ?? '').trim();
+    const note = String(it.note ?? '').trim();
+    if (!id || seen.has(id)) continue;
+    seen.add(id);
+    norm.push({ id, channelLink, note });
+  }
+  const channelsDir = await resolveChannelsDirFromDisk();
+  fs.mkdirSync(channelsDir, { recursive: true });
+  const absPath = path.join(channelsDir, WARNING_JSON_BASENAME);
+  fs.writeFileSync(absPath, JSON.stringify({ version: 1, items: norm }, null, 2), 'utf8');
   return { ok: true };
 });
 
@@ -770,19 +883,18 @@ function getDefaultConstantsModule() {
 }
 
 function constantsModToUiModel(mod) {
-  const model = {};
-  for (const key of CONSTANT_EXPORT_KEYS) {
-    model[key] = mod[key];
-  }
-  return model;
+  return { APP_SETTINGS: mod.APP_SETTINGS };
 }
 
 function applyDefaultVideoStorageRootToUiModel(model) {
   const m = { ...model };
-  const root = m.VIDEO_STORAGE_ROOT;
+  const prev = m.APP_SETTINGS && typeof m.APP_SETTINGS === 'object' ? m.APP_SETTINGS : {};
+  const AS = { ...prev };
+  const root = AS.STORAGE;
   if (typeof root !== 'string' || !root.trim()) {
-    m.VIDEO_STORAGE_ROOT = getDefaultVideoStorageRoot();
+    AS.STORAGE = getDefaultVideoStorageRoot();
   }
+  m.APP_SETTINGS = AS;
   return m;
 }
 
@@ -794,6 +906,31 @@ async function resolveStockBackgroundsDirFromDisk() {
   let root = typeof mod.VIDEO_STORAGE_ROOT === 'string' ? mod.VIDEO_STORAGE_ROOT.trim() : '';
   if (!root) root = getDefaultVideoStorageRoot();
   return path.join(root, 'backgrounds');
+}
+
+/**
+ * Đọc danh sách stock video channels từ assets/visual-resource/stock.
+ * Mỗi subfolder chứa mavid-config.json với { channelId, channelName }.
+ * @returns {{ id: string, label: string }[]}
+ */
+function listVisualResourceStockChannels() {
+  const stockDir = path.join(ROOT, 'assets', 'visual-resource', 'stock');
+  if (!fs.existsSync(stockDir)) return [];
+
+  return fs
+    .readdirSync(stockDir, { withFileTypes: true })
+    .filter(d => d.isDirectory())
+    .map(d => {
+      const configPath = path.join(stockDir, d.name, 'mavid-config.json');
+      if (!fs.existsSync(configPath)) return null;
+      try {
+        const config = JSON.parse(fs.readFileSync(configPath, 'utf-8'));
+        return { id: config.channelId || d.name, label: config.channelName || d.name };
+      } catch {
+        return null;
+      }
+    })
+    .filter(Boolean);
 }
 
 async function resolveChannelsDirFromDisk() {
@@ -837,16 +974,20 @@ async function importConstantsFresh() {
     );
     mod = getDefaultConstantsModule();
   }
+  const plain = { ...mod };
   if (app.isPackaged) {
     const overlay = loadUserConstantsOverlay();
-    if (overlay) mod = mergeConstantsBaseWithUserOverlay(mod, overlay, CONSTANT_EXPORT_KEYS);
+    const norm = normalizeUserConstantsOverlay(overlay);
+    if (norm?.APP_SETTINGS) {
+      plain.APP_SETTINGS = mergeAppSettingsObjects(plain.APP_SETTINGS, norm.APP_SETTINGS);
+    }
   }
-  return mod;
+  return expandAppSettingsIntoModule(plain);
 }
 
 async function writeConstantsFiles(nextValues) {
   const payload = {};
-  for (const key of CONSTANT_EXPORT_KEYS) {
+  for (const key of OVERLAY_KEYS) {
     if (nextValues[key] !== undefined) payload[key] = nextValues[key];
   }
 
@@ -881,8 +1022,12 @@ ipcMain.handle('save-constants-ui-model', async (_event, { modelPatch }) => {
   const mod = await importConstantsFresh();
   const nextValues = { ...mod };
   for (const key of Object.keys(modelPatch)) {
-    if (!CONSTANT_EXPORT_KEYS.includes(key)) continue;
-    nextValues[key] = modelPatch[key];
+    if (!OVERLAY_KEYS.includes(key)) continue;
+    if (key === 'APP_SETTINGS' && modelPatch.APP_SETTINGS && typeof modelPatch.APP_SETTINGS === 'object') {
+      nextValues.APP_SETTINGS = mergeAppSettingsObjects(mod.APP_SETTINGS, modelPatch.APP_SETTINGS);
+    } else {
+      nextValues[key] = modelPatch[key];
+    }
   }
 
   await writeConstantsFiles(nextValues);
@@ -891,7 +1036,7 @@ ipcMain.handle('save-constants-ui-model', async (_event, { modelPatch }) => {
 
 /**
  * Chọn thư mục cha (vd. ổ D:\\); tạo `MaVidMedia/backgrounds`, `MaVidMedia/videos`, `MaVidMedia/channels`;
- * ghi `VIDEO_STORAGE_ROOT` = đường dẫn tới `MaVidMedia`.
+ * ghi `APP_SETTINGS.STORAGE` = đường dẫn tới `MaVidMedia`.
  */
 ipcMain.handle('select-video-storage-folder', async (_event, { currentPath } = {}) => {
   const win = BrowserWindow.getFocusedWindow() || mainWindow;
@@ -926,7 +1071,10 @@ ipcMain.handle('select-video-storage-folder', async (_event, { currentPath } = {
     fs.mkdirSync(path.join(root, sub), { recursive: true });
   }
   const mod = await importConstantsFresh();
-  const nextValues = { ...mod, VIDEO_STORAGE_ROOT: root };
+  const nextValues = {
+    ...mod,
+    APP_SETTINGS: { ...mod.APP_SETTINGS, STORAGE: root },
+  };
   await writeConstantsFiles(nextValues);
   return { ok: true, path: root };
 });
@@ -935,12 +1083,19 @@ ipcMain.handle('select-video-storage-folder', async (_event, { currentPath } = {
 
 ipcMain.handle('list-backgrounds', async () => {
   const dir = await resolveStockBackgroundsDirFromDisk();
-  if (!fs.existsSync(dir)) return [];
-  return fs
-    .readdirSync(dir, { withFileTypes: true })
-    .filter(d => d.isDirectory())
-    .map(d => d.name)
-    .sort((a, b) => a.localeCompare(b));
+  const localFolders = fs.existsSync(dir)
+    ? fs
+        .readdirSync(dir, { withFileTypes: true })
+        .filter(d => d.isDirectory())
+        .map(d => ({ id: d.name, label: d.name, source: 'local' }))
+    : [];
+
+  const stockChannels = listVisualResourceStockChannels().map(ch => ({
+    ...ch,
+    source: 'stock',
+  }));
+
+  return [...localFolders, ...stockChannels].sort((a, b) => a.label.localeCompare(b.label));
 });
 
 // --------------- Channel Folders ---------------
@@ -1049,6 +1204,14 @@ ipcMain.handle('get-stats', async () => {
   };
 });
 
+// --------------- Visual Resource ---------------
+
+ipcMain.handle('list-visual-resources', async () => {
+  const moduleUrl = pathToFileURL(path.join(__dirname, '..', 'contents', 'visual-resource', 'getListVisualResources.js')).toString();
+  const { default: getListVisualResources } = await import(`${moduleUrl}?cacheBust=${Date.now()}`);
+  return getListVisualResources();
+});
+
 // --------------- Channels ---------------
 
 ipcMain.handle('list-channels', async () => {
@@ -1125,37 +1288,11 @@ async function readXlsxAsChannelData(absPath) {
   return { headers, rows };
 }
 
-function readCsvAsChannelData(absPath) {
-  try {
-    const content = fs.readFileSync(absPath, 'utf-8').replace(/^\uFEFF/, '');
-    const lines = content
-      .split(/\n/)
-      .map(l => l.trimEnd())
-      .filter(l => l.trim());
-    if (lines.length === 0) return { headers: [], rows: [] };
-    const parseLine = line => line.split(',').map(c => c.trim().replace(/^"|"$/g, ''));
-    const headers = parseLine(lines[0]);
-    const rows = [];
-    for (let i = 1; i < lines.length; i++) {
-      const cells = parseLine(lines[i]);
-      const obj = {};
-      headers.forEach((h, idx) => {
-        obj[h] = cells[idx] ?? '';
-      });
-      rows.push(obj);
-    }
-    return { headers, rows };
-  } catch {
-    return { headers: [], rows: [] };
-  }
-}
-
 async function readSpreadsheetAsChannelData(absPath) {
   if (!fs.existsSync(absPath)) return { headers: [], rows: [] };
   const stat = fs.statSync(absPath);
   if (stat.size === 0) return { headers: [], rows: [] };
   const lower = absPath.toLowerCase();
-  if (lower.endsWith('.csv')) return readCsvAsChannelData(absPath);
   if (lower.endsWith('.xlsx')) return readXlsxAsChannelData(absPath);
   return { headers: [], rows: [] };
 }
@@ -1167,11 +1304,11 @@ function normHeaderCell(s) {
 }
 
 /** Khớp constants trong contents/getInfoChannel.js (dropdown index.xlsx). */
-const INDEX_VIDEO_TYPE_OPTIONS = ['from_audio', 'reup_full'];
+const INDEX_VIDEO_TYPE_OPTIONS = ['audio', 'video'];
 const INDEX_THOI_GIAN_OPTIONS = [15, 20, 30, 60];
 
 ipcMain.handle('read-channel-data', async (_event, { filePath }) => {
-  if (!filePath || typeof filePath !== 'string') throw new Error('filePath không hợp lệ.');
+  if (!filePath || typeof filePath !== 'string') throw new Error('FilePath không hợp lệ.');
 
   const { channelsDir, abs: norm } = await resolvePathUnderChannelsDir(filePath);
 
@@ -1181,7 +1318,9 @@ ipcMain.handle('read-channel-data', async (_event, { filePath }) => {
   const st = fs.statSync(norm);
   if (st.size === 0) return { headers: [], rows: [] };
 
-  return readSpreadsheetAsChannelData(norm);
+  const raw = await readSpreadsheetAsChannelData(norm);
+  // Map Excel headers (tiếng Việt) → camelCase prop names cho frontend
+  return raw;
 });
 
 /**
@@ -1199,13 +1338,18 @@ ipcMain.handle('write-channel-index', async (_event, { filePath, headers, rows }
   }
   if (!Array.isArray(rows)) throw new Error('rows không hợp lệ.');
 
+  // Reverse-map: prop names → Excel headers (tiếng Việt)
+  const mapped = mapIndexDataToHeaders({ headers, rows });
+  const excelHeaders = mapped.headers;
+  const excelRows = mapped.rows;
+
   const { default: ExcelJS } = await import('exceljs');
   const workbook = new ExcelJS.Workbook();
   const sheet = workbook.addWorksheet('Channels', { views: [{ state: 'frozen', ySplit: 1 }] });
-  sheet.addRow(headers);
+  sheet.addRow(excelHeaders);
 
-  for (const row of rows) {
-    const values = headers.map(h => {
+  for (const row of excelRows) {
+    const values = excelHeaders.map(h => {
       const v = row?.[h];
       if (v == null || v === '') return '';
       return typeof v === 'number' ? v : String(v);
@@ -1224,13 +1368,14 @@ ipcMain.handle('write-channel-index', async (_event, { filePath, headers, rows }
     BACKGROUND: 22,
     'LAST UPLOAD': 30,
     STATUS: 12,
+    Group: 28,
   };
-  sheet.columns = headers.map(h => ({ width: colWidths[h] ?? 20 }));
+  sheet.columns = excelHeaders.map(h => ({ width: colWidths[h] ?? 20 }));
 
-  const typeCol = headers.findIndex(h => normHeaderCell(h) === normHeaderCell('LOẠI VIDEO')) + 1;
-  const thoiGianCol = headers.findIndex(h => normHeaderCell(h) === normHeaderCell('THỜI GIAN VIDEO')) + 1;
-  const bgCol = headers.findIndex(h => normHeaderCell(h) === normHeaderCell('BACKGROUND')) + 1;
-  const statusCol = headers.findIndex(h => normHeaderCell(h) === normHeaderCell('STATUS')) + 1;
+  const typeCol = excelHeaders.findIndex(h => normHeaderCell(h) === normHeaderCell('LOẠI VIDEO')) + 1;
+  const thoiGianCol = excelHeaders.findIndex(h => normHeaderCell(h) === normHeaderCell('THỜI GIAN VIDEO')) + 1;
+  const bgCol = excelHeaders.findIndex(h => normHeaderCell(h) === normHeaderCell('BACKGROUND')) + 1;
+  const statusCol = excelHeaders.findIndex(h => normHeaderCell(h) === normHeaderCell('STATUS')) + 1;
 
   const backgroundsDir = await resolveStockBackgroundsDirFromDisk();
   let bgOptions = [];
@@ -1279,18 +1424,20 @@ ipcMain.handle('write-channel-index', async (_event, { filePath, headers, rows }
   return { ok: true };
 });
 
-/** Đọc file .xlsx hoặc .csv đầu tiên (ưu tiên .xlsx) trong `MaVidMedia/channels/{channelFolder}/`. */
 ipcMain.handle('read-channel-folder-data', async (_event, { channelFolder }) => {
   const channelsDir = await resolveChannelsDirFromDisk();
   const safe = assertSafeChannelFolderName(channelFolder);
   const dir = path.join(channelsDir, safe);
+
   if (!isPathInsideDir(channelsDir, dir)) throw new Error('Truy cập bị từ chối.');
+
   if (!fs.existsSync(dir) || !fs.statSync(dir).isDirectory()) {
     return { headers: [], rows: [], fileName: null, channelFolder: safe };
   }
+
   const names = fs.readdirSync(dir);
   const dataFiles = names
-    .filter(f => /\.xlsx$/i.test(f) || /\.csv$/i.test(f))
+    .filter(f => /\.xlsx$/i.test(f))
     .sort((a, b) => {
       const ax = /\.xlsx$/i.test(a);
       const bx = /\.xlsx$/i.test(b);
@@ -1298,9 +1445,11 @@ ipcMain.handle('read-channel-folder-data', async (_event, { channelFolder }) => 
       if (!ax && bx) return 1;
       return a.localeCompare(b);
     });
+
   if (dataFiles.length === 0) {
     return { headers: [], rows: [], fileName: null, channelFolder: safe };
   }
+
   const fileName = dataFiles[0];
   const fullPath = path.join(dir, fileName);
   const data = await readSpreadsheetAsChannelData(fullPath);
@@ -1329,7 +1478,48 @@ ipcMain.handle('read-mavid-channel-config', async (_event, { channelFolder }) =>
  * Ghi merge `patch` vào `MaVidMedia/channels/{channelFolder}/mavid-channel-config.json`.
  * Chỉ cập nhật các khóa được phép (setup từ form); giữ nguyên channelUrl, youtube, createdAt, …
  */
-ipcMain.handle('write-mavid-channel-config', async (_event, { channelFolder, patch }) => {
+/**
+ * @param {string | undefined} e
+ * @returns {string}
+ */
+function _normMavidChannelEmail(e) {
+  return String(e ?? '')
+    .trim()
+    .toLowerCase();
+}
+
+/**
+ * Cập nhật một dòng `channels[]` từ form: hợp nhất sâu với bản cũ (groupId, lastUpload, …) và không
+ * thay toàn bộ mảng bằng một phần tử.
+ * @param {object | null} oldCh
+ * @param {object} patchCh
+ * @param {object} baseRoot
+ */
+function _mergeMavidConfigChannelRow(oldCh, patchCh, baseRoot) {
+  const a = oldCh && typeof oldCh === 'object' ? oldCh : {};
+  const b = patchCh && typeof patchCh === 'object' ? patchCh : {};
+  const merged = { ...a, ...b };
+  if (!_normMavidChannelEmail(merged.email) && _normMavidChannelEmail(a.email)) {
+    merged.email = String(a.email).trim();
+  }
+  const uploadTrackingKeys = ['lastUpload', 'uploadedVideos', 'latestUploadDate', 'latestUploadTime'];
+  for (const key of uploadTrackingKeys) {
+    if (b[key] === undefined) {
+      if (a[key] !== undefined) {
+        merged[key] = a[key];
+      } else if (baseRoot[key] !== undefined) {
+        merged[key] = baseRoot[key];
+      } else {
+        if (key === 'uploadedVideos') merged[key] = 0;
+        else if (key === 'latestUploadTime') merged[key] = '00:00';
+        else merged[key] = '';
+      }
+    }
+  }
+  return merged;
+}
+
+ipcMain.handle('write-mavid-channel-config', async (_event, { channelFolder, patch, mergeFromPreviousEmail }) => {
   const channelsDir = await resolveChannelsDirFromDisk();
   const safe = assertSafeChannelFolderName(channelFolder);
   const dir = path.join(channelsDir, safe);
@@ -1356,7 +1546,7 @@ ipcMain.handle('write-mavid-channel-config', async (_event, { channelFolder, pat
     if (!Array.isArray(clean.channels)) throw new Error('channels phải là mảng.');
     for (const ch of clean.channels) {
       if (ch.email != null && typeof ch.email !== 'string') throw new Error('email không hợp lệ.');
-      if (ch.videoType != null && ch.videoType !== 'from_audio' && ch.videoType !== 'reup_full') {
+      if (ch.videoType != null && ch.videoType !== 'audio' && ch.videoType !== 'video') {
         throw new Error('videoType không hợp lệ.');
       }
       if (ch.durationMinuteFrom != null && (typeof ch.durationMinuteFrom !== 'number' || !Number.isFinite(ch.durationMinuteFrom))) {
@@ -1373,30 +1563,38 @@ ipcMain.handle('write-mavid-channel-config', async (_event, { channelFolder, pat
       if (ch.publishTimes != null && !Array.isArray(ch.publishTimes)) throw new Error('publishTimes phải là mảng.');
     }
 
-    // Preserve upload tracking fields from old channels (match by email) or from root-level (backward compat)
-    const oldChannels = Array.isArray(base.channels) ? base.channels : [];
-    const uploadTrackingKeys = ['lastUpload', 'uploadedVideos', 'latestUploadDate', 'latestUploadTime'];
-    clean.channels = clean.channels.map(ch => {
-      const email = (ch.email || '').trim().toLowerCase();
-      const oldCh = email ? oldChannels.find(o => (o.email || '').trim().toLowerCase() === email) : null;
-      const merged = { ...ch };
-      for (const key of uploadTrackingKeys) {
-        if (merged[key] === undefined) {
-          // Try old channel first, then root-level fallback
-          if (oldCh && oldCh[key] !== undefined) {
-            merged[key] = oldCh[key];
-          } else if (base[key] !== undefined) {
-            merged[key] = base[key];
-          } else {
-            // Default values
-            if (key === 'uploadedVideos') merged[key] = 0;
-            else if (key === 'latestUploadTime') merged[key] = '00:00';
-            else merged[key] = '';
-          }
-        }
+    const oldList = Array.isArray(base.channels) ? [...base.channels] : [];
+    const prevNorm =
+      typeof mergeFromPreviousEmail === 'string' && _normMavidChannelEmail(mergeFromPreviousEmail)
+        ? _normMavidChannelEmail(mergeFromPreviousEmail)
+        : null;
+    const newList = [...oldList];
+
+    const findIndexForPatch = patchCh => {
+      const pNorm = _normMavidChannelEmail(patchCh && patchCh.email);
+      if (pNorm) {
+        const byNew = newList.findIndex(o => _normMavidChannelEmail(o && o.email) === pNorm);
+        if (byNew >= 0) return byNew;
       }
-      return merged;
-    });
+      if (prevNorm) {
+        const byPrev = newList.findIndex(o => _normMavidChannelEmail(o && o.email) === prevNorm);
+        if (byPrev >= 0) return byPrev;
+      }
+      if (!pNorm && newList.length === 1) {
+        return 0;
+      }
+      return -1;
+    };
+
+    for (const ch of clean.channels) {
+      const idx = findIndexForPatch(ch);
+      if (idx >= 0) {
+        newList[idx] = _mergeMavidConfigChannelRow(newList[idx], ch, base);
+      } else {
+        newList.push(_mergeMavidConfigChannelRow(null, ch, base));
+      }
+    }
+    clean.channels = newList;
   }
 
   const next = { ...base, ...clean };

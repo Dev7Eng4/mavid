@@ -3,6 +3,7 @@
  */
 import fs from 'fs';
 import path from 'path';
+import { GPM_API_DEFAULT_ORIGIN } from '../constants/gpmApi.js';
 
 /**
  * Chuẩn hóa base GPM → origin cho Playwright (bỏ hậu tố /api/v3 nếu có).
@@ -16,7 +17,7 @@ export function apiRootForPlaywright(explicitBase) {
   if (s.endsWith('/api/v3')) return s.slice(0, -'/api/v3'.length);
   if (s) return s;
   const origin = (process.env.GPM_API_ORIGIN || '').trim().replace(/\/+$/, '');
-  return origin || 'http://127.0.0.1:19995';
+  return origin || GPM_API_DEFAULT_ORIGIN.replace(/\/api\/v3\/?$/i, '');
 }
 
 /**
@@ -54,41 +55,34 @@ export function assertSafeSubfolderName(name) {
 }
 
 /**
- * Đọc cấu hình kênh → lấy durationMinuteFrom / durationMinuteTo theo email.
+ * Đọc cấu hình kênh → lấy durationMinuteFrom / durationMinuteTo theo id.
  * @param {string} channelAbs
- * @param {string} email
+ * @param {string} id
  * @returns {{ durationMinuteFrom: number, durationMinuteTo: number | null } | null}
  */
-function getDurationBoundsFromConfig(channelAbs, email) {
-  const cfgPath = path.join(channelAbs, 'mavid-channel-config.json');
-  if (!fs.existsSync(cfgPath)) return null;
-  try {
-    const cfg = JSON.parse(fs.readFileSync(cfgPath, 'utf-8'));
-    const list = Array.isArray(cfg.channels) ? cfg.channels : [];
-    const norm = String(email || '')
-      .trim()
-      .toLowerCase();
-    let item = null;
-    if (norm && list.length > 0) {
-      item = list.find(
-        c =>
-          c &&
-          String(c.email || '')
-            .trim()
-            .toLowerCase() === norm
-      );
-    }
-    if (!item && list.length > 0) item = list[0];
-    if (!item) return null;
-    const from = Number(item.durationMinuteFrom);
-    const to = item.durationMinuteTo != null ? Number(item.durationMinuteTo) : null;
-    return {
-      durationMinuteFrom: Number.isFinite(from) && from > 0 ? from : 0,
-      durationMinuteTo: to != null && Number.isFinite(to) && to > 0 ? to : null,
-    };
-  } catch {
-    return null;
+async function getDurationBoundsFromConfig(channelAbs, id) {
+  const cfg = await getChannelConfig(channelAbs);
+  if (!cfg) return null;
+  const list = Array.isArray(cfg.channels) ? cfg.channels : [];
+
+  let item = null;
+  if (id && list.length > 0) {
+    item = list.find(
+      c =>
+        c &&
+        String(c.id || '')
+          .trim()
+          .toLowerCase() === id
+    );
   }
+  if (!item && list.length > 0) item = list[0];
+  if (!item) return null;
+  const from = Number(item.durationMinuteFrom);
+  const to = item.durationMinuteTo != null ? Number(item.durationMinuteTo) : null;
+  return {
+    durationMinuteFrom: Number.isFinite(from) && from > 0 ? from : 0,
+    durationMinuteTo: to != null && Number.isFinite(to) && to > 0 ? to : null,
+  };
 }
 
 /**
@@ -247,11 +241,11 @@ async function readVideoIdsWithStatusDone(channelAbs, durBounds) {
  * - Có `folderNamesOrder`: theo đúng thứ tự danh sách (chỉ thư mục có .mp4 + thumbnail), tối đa `maxUploads` nếu có.
  * - Không có: đọc Excel lấy video ID có status "Đã tạo video" + lọc duration → kiểm tra folder + .mp4 + thumbnail.
  * @param {string} channelAbs
- * @param {string} email
+ * @param {string} id
  * @param {number | null} maxUploads
  * @param {string[] | null | undefined} folderNamesOrder
  */
-export async function listUploadJobs(channelAbs, email, maxUploads, folderNamesOrder) {
+export async function listUploadJobs(channelAbs, id, maxUploads, folderNamesOrder) {
   if (!fs.existsSync(channelAbs)) throw new Error(`Không tìm thấy thư mục kênh: ${channelAbs}`);
 
   if (Array.isArray(folderNamesOrder) && folderNamesOrder.length > 0) {
@@ -276,7 +270,7 @@ export async function listUploadJobs(channelAbs, email, maxUploads, folderNamesO
   }
 
   // ──── Logic mới: đọc Excel → status "Đã tạo video" + duration filter → video ID → folder + .mp4 ────
-  const durBounds = getDurationBoundsFromConfig(channelAbs, email);
+  const durBounds = getDurationBoundsFromConfig(channelAbs, id);
   if (durBounds) {
     console.log(
       `[upload-jobs] Duration filter: from ${durBounds.durationMinuteFrom} phút, to ${durBounds.durationMinuteTo ?? 'không giới hạn'} phút`

@@ -1,0 +1,452 @@
+import type { ChannelRow, ScriptId } from '@/types';
+import { PROMPTS_CREATE_THUMBNAIL_OPTIONS } from '@contents/prompts/index.js';
+import { OPTIONS_CONTENT } from '@contents/makeFromAudio/constant.js';
+import { OVERLAY_OPTIONS } from '@contents/constants/overlayOptions.js';
+import type { VideoMakeType } from '../models/channelsIndexSection.model';
+import { VIDEO_MAKE_TYPE } from '../constants';
+
+/** Khớp dropdown trong getInfoChannel / electron write-channel-index */
+export const INDEX_VIDEO_TYPE_VALUES = ['audio', 'video'] as const;
+/** Giá trị nhãn (dropdown) khớp cột THỜI GIAN VIDEO trong index / getInfoChannel. */
+export const INDEX_VIDEO_DURATION_LABELS = ['Tất cả', '0 - 30 phút', '0 - 60 phút', '30 - 60 phút', 'Từ 30 phút', 'Từ 60 phút'] as const;
+/** @deprecated Dùng INDEX_VIDEO_DURATION_LABELS */
+export const INDEX_THOI_GIAN_MINUTES = INDEX_VIDEO_DURATION_LABELS as any;
+
+export function durationLabelToOption(label: string): string {
+  if (label === 'Tất cả') return '0_null';
+  if (label === '0 - 30 phút') return '0_30';
+  if (label === '0 - 60 phút') return '0_60';
+  if (label === '30 - 60 phút') return '30_60';
+  if (label === 'Từ 30 phút') return '30_null';
+  if (label === 'Từ 60 phút') return '60_null';
+  return '0_null'; // fallback
+}
+
+export function durationOptionToLabel(option: string): string {
+  if (option === '0_null') return 'Tất cả';
+  if (option === '0_30') return '0 - 30 phút';
+  if (option === '0_60') return '0 - 60 phút';
+  if (option === '30_60') return '30 - 60 phút';
+  if (option === '30_null') return 'Từ 30 phút';
+  if (option === '60_null') return 'Từ 60 phút';
+  return 'Tất cả'; // fallback
+}
+
+/** Giống dropdown «Tạo video với thời gian» trong ChannelAddDialog — value dạng `0_30`, `0_null` = không lọc preset. */
+export const CHANNEL_ADD_DURATION_SELECT_OPTIONS: { value: string; label: string }[] = [
+  { value: '0_null', label: 'Tất cả' },
+  { value: '0_30', label: '0 - 30 phút' },
+  { value: '0_60', label: '0 - 60 phút' },
+  { value: '30_60', label: '30 - 60 phút' },
+  { value: '30_null', label: 'Từ 30 phút' },
+  { value: '60_null', label: 'Từ 60 phút' },
+];
+
+export const SCRIPT_FROM_AUDIO: ScriptId = 'tao-batch-video-tu-audio';
+export const SCRIPT_REUP_FULL: ScriptId = 'tao-batch-video-reup-full';
+export const SCRIPT_CREATE_BATCH_VIDEO: ScriptId = 'createBatchVideo';
+
+export function headerNorm(h: string): string {
+  return String(h).trim().toUpperCase();
+}
+
+/** Trạng thái vòng đời kênh trong `index.xlsx` (cột STATUS). */
+export type ChannelIndexLifecycleStatus = 'INIT' | 'LIVE' | 'STOPPED';
+
+export function normalizeChannelIndexStatus(raw: unknown): ChannelIndexLifecycleStatus {
+  const v = String(raw ?? '')
+    .trim()
+    .toUpperCase();
+  if (v === 'INIT' || v === 'LIVE' || v === 'STOPPED') return v;
+  return 'INIT';
+}
+
+export function findIndexHeaderKey(headers: string[], normName: string): string | undefined {
+  const n = normName.trim().toUpperCase();
+  return headers.find(h => headerNorm(h) === n);
+}
+
+/** Trả về header đầu tiên khớp một trong các tên chuẩn hóa. */
+export function findIndexHeaderKeyAny(headers: string[], normNames: string[]): string | undefined {
+  for (const name of normNames) {
+    const k = findIndexHeaderKey(headers, name);
+    if (k) return k;
+  }
+  return undefined;
+}
+
+/**
+ * Suy ra tên thư mục kênh (ID) từ URL YouTube — dùng cho cột ID/CHANNEL.
+ */
+/** Trích video ID từ URL watch YouTube (?v=…) — khớp thư mục con sau khi tạo video. */
+export function extractYoutubeVideoIdFromUrl(url: string): string | null {
+  const s = String(url ?? '').trim();
+  if (!s) return null;
+  try {
+    const u = /^https?:\/\//i.test(s) ? new URL(s) : new URL(`https://${s}`);
+    const v = u.searchParams.get('v');
+    if (v?.trim()) return v.trim();
+  } catch {
+    /* ignore */
+  }
+  const m = s.match(/[?&]v=([^&]+)/);
+  return m ? m[1].trim() : null;
+}
+
+export function folderFromChannelUrl(raw: string): string | null {
+  const s = raw.trim();
+  if (!s) return null;
+  try {
+    const url = /^https?:\/\//i.test(s) ? new URL(s) : new URL(`https://${s}`);
+    const path = url.pathname.replace(/\/+$/, '');
+    const channel = path.match(/\/channel\/([^/]+)/i);
+    if (channel?.[1]) return decodeURIComponent(channel[1]);
+    const at = path.match(/\/@([^/]+)/);
+    if (at?.[1]) return decodeURIComponent(at[1]);
+    const c = path.match(/\/c\/([^/]+)/i);
+    if (c?.[1]) return decodeURIComponent(c[1]);
+    const user = path.match(/\/user\/([^/]+)/i);
+    if (user?.[1]) return decodeURIComponent(user[1]);
+    const parts = path.split('/').filter(Boolean);
+    if (parts.length) return decodeURIComponent(parts[parts.length - 1]);
+  } catch {
+    /* ignore */
+  }
+  return null;
+}
+
+/** Cột tối thiểu để thêm kênh từ form (prop names sau mapping). */
+export const INDEX_ADD_CHANNEL_REQUIRED_PROPS = ['link', 'email', 'videoType', 'videoDuration', 'background'] as const;
+
+export function indexHeadersMissingForAddChannel(headers: string[]): string[] {
+  const set = new Set(headers);
+  const missing: string[] = [];
+  if (!set.has('id') && !set.has('channel')) {
+    missing.push('id hoặc channel');
+  }
+  for (const p of INDEX_ADD_CHANNEL_REQUIRED_PROPS) {
+    if (!set.has(p)) missing.push(p);
+  }
+  return missing;
+}
+
+/**
+ * So khớp hai mảng dòng index. Dùng hợp key từ headers + Object.keys từng dòng
+ * để không bỏ sót cột (tránh Lưu index vẫn disabled sau khi sửa popup khi headers/file lệch).
+ */
+export function indexRowsEqual(a: ChannelRow[], b: ChannelRow[], headers: string[]): boolean {
+  if (a.length !== b.length) return false;
+  for (let i = 0; i < a.length; i++) {
+    const keySet = new Set<string>(headers);
+    for (const k of Object.keys(a[i] || {})) keySet.add(k);
+    for (const k of Object.keys(b[i] || {})) keySet.add(k);
+    for (const h of keySet) {
+      if (String(a[i][h] ?? '') !== String(b[i][h] ?? '')) return false;
+    }
+  }
+  return true;
+}
+
+export function resolveIndexRowVideoType(row: ChannelRow): 'audio' | 'video' | '' {
+  const raw = String(row.videoType ?? '').trim();
+  if (raw === 'video') return 'video';
+  if (raw === 'audio') return 'audio';
+  return '';
+}
+
+/** Ô EMAIL index có thể chứa nhiều địa chỉ phân tách dấu phẩy. */
+export function parseIndexEmailCell(raw: unknown): string[] {
+  return String(raw ?? '')
+    .split(',')
+    .map(e => e.trim())
+    .filter(Boolean);
+}
+
+/** So khớp một email đã chọn với dòng index (không phân biệt hoa thường). */
+export function indexRowMatchesPickedEmail(row: ChannelRow, emailHeaderKey: string | undefined, pickedEmail: string): boolean {
+  if (!emailHeaderKey) return false;
+  const norm = pickedEmail.trim().toLowerCase();
+  if (!norm) return false;
+  return parseIndexEmailCell(row[emailHeaderKey]).some(e => e.toLowerCase() === norm);
+}
+
+export function buildExtraEnvForIndexChannelRow(
+  id: string,
+  channelId: string,
+  videos: string[],
+  maxVideosPerBatch?: number,
+): Record<string, string> {
+  const maxBatch = Math.max(1, Math.min(100, Math.floor(Number(maxVideosPerBatch) || 5)));
+  const env: Record<string, string> = {
+    MAVID_CHANNEL: channelId,
+    MAVID_MAPPING: id,
+    MAVID_ONLY_LINKS: JSON.stringify(videos),
+    MAVID_MAX_VIDEOS_PER_BATCH: String(maxBatch),
+  };
+  return env;
+}
+
+/** Lựa chọn «số video update mỗi ngày» trong form; `1-2` = 1 suất ngày thường + 2 suất cuối tuần. */
+export type VideoPerDayPreset = '1' | '2' | '3' | '4' | '5' | '1-2';
+
+export function parseVideoPerDayCell(raw: unknown): VideoPerDayPreset {
+  const s = String(raw ?? '')
+    .trim()
+    .replace(/\u2013/g, '-');
+  if (s === '1-2') return '1-2';
+  const n = parseInt(s, 10);
+  if (n === 5) return '5';
+  if (n === 4) return '4';
+  if (n === 3) return '3';
+  if (n === 2) return '2';
+  return '1';
+}
+
+/** Số ô giờ cần nhập (`1`→1, `2`→2, `3`→3; preset `1-2` → 3 ô: 1 ngày thường + 2 cuối tuần). */
+export function timeSlotCountForVideoPerDayPreset(p: VideoPerDayPreset): number {
+  return p === '1-2' ? 3 : Number(p);
+}
+
+export function labelForPublishTimeSlot(preset: VideoPerDayPreset, index: number): string {
+  if (preset === '1-2') {
+    if (index === 0) return 'Ngày thường — 1 suất';
+    if (index === 1) return 'Cuối tuần — suất 1';
+    return 'Cuối tuần — suất 2';
+  }
+  return `Video ${index + 1} trong ngày`;
+}
+
+export interface ChannelAddFormInput {
+  channelUrl: string;
+  email: string;
+  /** Cột index «KÊNH CỦA TÔI» (sau EMAIL). */
+  myChannel: string;
+  /** Cột index cuối «Group». */
+  group: string;
+  videoType: VideoMakeType;
+  durationOption: string;
+  /** audio — tên folder trong MaVidMedia/backgrounds */
+  background: string;
+  /** video — khớp OVERLAY_OPTIONS[].NAME */
+  overlay: string;
+  /** Khớp `PROMPTS_CREATE_THUMBNAIL_OPTIONS[].value` (contents/prompts/index.js). */
+  thumbnailPrompt: string;
+  videosPerDayPreset: VideoPerDayPreset;
+  publishTimes: string[];
+  /** Nếu có — ghi đè suy luận từ URL cho ID/CHANNEL */
+  folderIdOverride: string;
+  /** Cột STATUS index (INIT | LIVE | STOPPED). */
+  channelStatus: string;
+}
+
+/** Giá trị khởi tạo form thêm/sửa kênh (map từ một dòng index). */
+export interface ChannelAddDialogInitialFields {
+  id: string;
+  channelName: string;
+  channelId: string;
+  channelLink: string;
+  email: string;
+  myChannel: string;
+  /** ID nhóm (group.json); rỗng = không gán. */
+  group: string;
+  videoType: VideoMakeType;
+  /** Chuỗi cấu hình duration (vd. "0_30"). */
+  durationMinutes: string;
+  background: string;
+  /** video — tên preset overlay */
+  overlay: string;
+  /** Style thumbnail — `PROMPTS_CREATE_THUMBNAIL_OPTIONS` */
+  thumbnailPrompt: string;
+  videosPerDayPreset: VideoPerDayPreset;
+  publishTimes: string[];
+  status: ChannelIndexLifecycleStatus;
+}
+
+/** Danh sách NAME hợp lệ cho dropdown Reup (đồng bộ makeVideoFromFull). */
+export function reupOverlaySelectOptions(): { value: string; label: string }[] {
+  return OVERLAY_OPTIONS.map(o => {
+    const name = String(o.NAME).trim();
+    return { value: name, label: name };
+  });
+}
+
+export function defaultReupOverlayName(): string {
+  const first = OVERLAY_OPTIONS[0];
+  return first ? String(first.NAME).trim() : 'Option 1';
+}
+
+export function isValidReupOverlayName(name: string): boolean {
+  const t = name.trim();
+  if (!t) return false;
+  return OVERLAY_OPTIONS.some(o => String(o.NAME).trim() === t);
+}
+
+/** Giá trị hợp lệ cho overlay khi `videoType === 'audio'` (dropdown OPTIONS_CONTENT). */
+export function isValidFromAudioOverlayValue(name: string): boolean {
+  const t = name.trim();
+  if (!t) return false;
+  return OPTIONS_CONTENT.some(o => o.value === t);
+}
+
+export function defaultThumbnailPrompt(): string {
+  const first = PROMPTS_CREATE_THUMBNAIL_OPTIONS[0];
+  return first ? String(first.value) : '';
+}
+
+export function isValidThumbnailPrompt(name: string): boolean {
+  const t = name.trim();
+  if (!t) return false;
+  return PROMPTS_CREATE_THUMBNAIL_OPTIONS.some(o => String(o.value) === t);
+}
+
+/**
+ * Chuẩn hóa giờ từ `<input type="time">` (HH:mm hoặc HH:mm:ss) → `HH:mm`.
+ * Tránh lệch giữa UI và state / JSON khi trình duyệt trả về định dạng khác nhau.
+ */
+export function normalizeWallClockTimeToHHmm(raw: string): string {
+  const s = String(raw ?? '').trim();
+  const m = s.match(/^(\d{1,2}):(\d{2})(?::(\d{2}))?$/);
+  if (!m) return s;
+  let h = parseInt(m[1], 10);
+  let min = parseInt(m[2], 10);
+  if (!Number.isFinite(h) || !Number.isFinite(min)) return s;
+  h = Math.min(23, Math.max(0, h));
+  min = Math.min(59, Math.max(0, min));
+  return `${String(h).padStart(2, '0')}:${String(min).padStart(2, '0')}`;
+}
+
+export function isValidPublishScheduleTime(s: string): boolean {
+  return /^\d{2}:\d{2}$/.test(normalizeWallClockTimeToHHmm(s));
+}
+
+/** Phần thập phân ngày Excel (0..1) → `HH:mm` (local). */
+function excelDayFractionToHHmm(frac: number): string {
+  const f = ((frac % 1) + 1) % 1;
+  const totalMinutes = Math.round(f * 24 * 60);
+  const h = Math.floor(totalMinutes / 60) % 24;
+  const m = totalMinutes % 60;
+  return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
+}
+
+/**
+ * Đưa giá trị ô index (sau read xlsx) về chuỗi có thể tách bởi `parseIndexPublishTimesCell`.
+ * Excel thường trả `Date`, số serial (ngày + phần giờ), `HH:mm:ss`, hoặc object có `.text`.
+ */
+export function coercePublishTimesCellToParsableString(raw: unknown): string {
+  if (raw == null || raw === '') return '';
+  if (typeof raw === 'string') {
+    const t = raw.trim();
+    if (t && !t.includes(',') && !t.includes(';') && /^\d{4}-\d{2}-\d{2}/.test(t)) {
+      const d = new Date(t);
+      if (!Number.isNaN(d.getTime())) {
+        return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+      }
+    }
+    return t;
+  }
+  if (raw instanceof Date && !Number.isNaN(raw.getTime())) {
+    return `${String(raw.getHours()).padStart(2, '0')}:${String(raw.getMinutes()).padStart(2, '0')}`;
+  }
+  if (typeof raw === 'number' && Number.isFinite(raw)) {
+    if (raw >= 0 && raw < 1e6) {
+      return excelDayFractionToHHmm(raw);
+    }
+    return String(raw);
+  }
+  if (typeof raw === 'object' && raw !== null) {
+    const o = raw as { text?: unknown; result?: unknown };
+    if (typeof o.text === 'string' && o.text.trim()) return o.text.trim();
+    if (typeof o.result === 'string' && o.result.trim()) return o.result.trim();
+  }
+  return String(raw ?? '').trim();
+}
+
+/** Parse ô «giờ update» (danh sách HH:mm hoặc HH:mm:ss, phân tách bởi dấu phẩy/chấm phẩy). */
+export function parseIndexPublishTimesCell(raw: unknown): string[] {
+  const s = coercePublishTimesCellToParsableString(raw);
+  if (!s) return ['09:00'];
+  const parts = s
+    .split(/[,;]/)
+    .map(p => p.trim())
+    .filter(Boolean);
+  const out: string[] = [];
+  for (const p of parts) {
+    const m = p.match(/^(\d{1,2}):(\d{2})(?::\d{2})?$/);
+    if (m) out.push(`${m[1].padStart(2, '0')}:${m[2]}`);
+  }
+  return out.length > 0 ? out : ['09:00'];
+}
+
+/** Điền form «Thêm/Sửa channel» từ một dòng bảng nháp (row đã dùng prop names). */
+export function channelAddDialogInitialFromIndexRow(row: ChannelRow): ChannelAddDialogInitialFields {
+  const { videoType, durationMinutes, videosPerDayPreset, background, status, ...rest } = row as any;
+
+  let convertedDurationMinutes = '0_null';
+  if (durationMinutes != null && durationMinutes !== '') {
+    convertedDurationMinutes = durationLabelToOption(durationMinutes);
+  }
+
+  return {
+    videosPerDayPreset,
+    status: normalizeChannelIndexStatus(row.status),
+    ...rest,
+    durationMinutes: convertedDurationMinutes,
+  };
+}
+
+export function buildChannelRowFromAddForm(
+  headers: string[],
+  input: ChannelAddFormInput,
+  opts?: { preserveChannelFromRow?: ChannelRow | null },
+): { row: ChannelRow; error?: string } {
+  const row: ChannelRow = {};
+  for (const h of headers) row[h] = '';
+
+  const urlRaw = input.channelUrl.trim();
+  if (!urlRaw) return { row, error: 'Nhập URL kênh.' };
+
+  const normalizedUrl = /^https?:\/\//i.test(urlRaw) ? urlRaw : `https://${urlRaw}`;
+
+  const folder = input.folderIdOverride.trim() || folderFromChannelUrl(urlRaw) || folderFromChannelUrl(normalizedUrl);
+  if (!folder) {
+    return {
+      row,
+      error: 'Không suy ra được ID thư mục từ URL — nhập «ID thư mục» thủ công.',
+    };
+  }
+
+  row.link = normalizedUrl;
+  row.email = input.email.trim();
+  row.myChannel = input.myChannel.trim();
+  row.group = input.group.trim();
+  row.videoType = input.videoType;
+  row.videoDuration = durationOptionToLabel(input.durationOption);
+
+  if (input.videoType === VIDEO_MAKE_TYPE.VIDEO) row.background = input.overlay.trim();
+  else row.background = input.background.trim();
+
+  row.id = folder;
+  if (headers.includes('channel')) {
+    const prev = opts?.preserveChannelFromRow ? String(opts.preserveChannelFromRow.channel ?? '').trim() : '';
+    row.channel = prev; // Giữ nguyên prev (bỏ trống nếu là dòng mới) không lưu tên channel
+  }
+
+  const videosPerDayColumnKey = findIndexHeaderKeyAny(headers, ['SỐ VIDEO MỖI NGÀY', 'VIDEO MỖI NGÀY', 'SỐ VIDEO UPDATE MỖI NGÀY']);
+  if (videosPerDayColumnKey) row[videosPerDayColumnKey] = input.videosPerDayPreset;
+
+  const publishTimesColumnKey = findIndexHeaderKeyAny(headers, ['GIỜ UPDATE', 'GIỜ UPLOAD MỖI NGÀY', 'GIỜ UPLOAD']);
+  if (publishTimesColumnKey) row[publishTimesColumnKey] = input.publishTimes.join(', ');
+
+  row.status = normalizeChannelIndexStatus(input.channelStatus);
+
+  return { row };
+}
+
+export function channelFolderFromRow(row: ChannelRow): string | null {
+  const raw = row.id;
+  if (raw != null) {
+    const s = String(raw).trim();
+    if (s) return s;
+  }
+  return null;
+}

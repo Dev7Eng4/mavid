@@ -101,20 +101,16 @@ export function CreateVideoReupPanel({
       return;
     }
 
-    const config = {
-      channel,
-      email: '',
-      overlay: overlay.trim(),
-      videoCropPercent,
-      maxVideosPerBatch,
-      minDurationMinutes,
-    };
-
     setSubmitting(true);
     setRunningScript(REUP_FULL_SCRIPT_ID);
 
     try {
-      const extraEnv = buildMavidEnvForReupFull(config);
+      const extraEnv = {
+        ...buildMavidEnvForReupFull(channel, [], maxVideosPerBatch),
+        MAVID_OVERLAY: overlay.trim(),
+        MAVID_VIDEO_CROP_PERCENT: String(videoCropPercent),
+        MAVID_MIN_DURATION_MINUTES: String(minDurationMinutes),
+      };
       const res = await window.runner.runNpmScript(def.npmScript, extraEnv);
       if (res.cancelled) {
         return;

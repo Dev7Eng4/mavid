@@ -35,6 +35,8 @@ outputs
 downloads
 MaVidMedia
 
+.cache
+
 contents/constants/appSettings.user.json
 
 # Google Drive OAuth (đồng bộ MaVidMedia → Drive)

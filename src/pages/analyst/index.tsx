@@ -3,17 +3,8 @@ import type { ChannelData, ChannelRow } from '@/types';
 import { PageHeader } from '@/components/ui/PageHeader';
 import { AppButton } from '@/components/ui/AppButton';
 import { RefreshIcon, SpinnerIcon } from '@/components/ui/Icons';
-import { findIndexHeaderKey } from '@/pages/channels/channelIndexHelpers';
 
 const INDEX_FILE = 'channels/index.xlsx';
-
-function indexHeadersFromData(data: ChannelData | null): string[] {
-  if (!data) return [];
-  if (data.headers?.length) return data.headers;
-  const first = data.rows?.[0];
-  if (first && typeof first === 'object') return Object.keys(first);
-  return [];
-}
 
 export default function AnalystPage() {
   const [loading, setLoading] = useState(true);
@@ -43,22 +34,19 @@ export default function AnalystPage() {
     void loadIndex();
   }, [loadIndex]);
 
-  const { emailKey, myChannelKey, rows } = useMemo(() => {
-    const headers = indexHeadersFromData(indexData);
+  const rows = useMemo(() => {
     const rawRows = indexData?.rows ?? [];
-    const ek = findIndexHeaderKey(headers, 'EMAIL');
-    const mk = findIndexHeaderKey(headers, 'KÊNH CỦA TÔI');
-    const mapped = rawRows.map((r: ChannelRow) => ({
-      email: ek ? String(r[ek] ?? '').trim() : '',
-      myChannel: mk ? String(r[mk] ?? '').trim() : '',
+    return rawRows.map((r: ChannelRow) => ({
+      email: String(r.email ?? '').trim(),
+      myChannel: String(r.myChannel ?? '').trim(),
     }));
-    return { emailKey: ek, myChannelKey: mk, rows: mapped };
   }, [indexData]);
 
+  const headers = indexData?.headers ?? [];
   const missingCols: string[] = [];
   if (!loading && indexData && (indexData.rows?.length ?? 0) > 0) {
-    if (!emailKey) missingCols.push('EMAIL');
-    if (!myChannelKey) missingCols.push('KÊNH CỦA TÔI');
+    if (!headers.includes('email')) missingCols.push('email');
+    if (!headers.includes('myChannel')) missingCols.push('myChannel');
   }
 
   return (

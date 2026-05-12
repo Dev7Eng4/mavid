@@ -1,15 +1,15 @@
-import type { VideoFromAudioConfig } from '../types';
+import type { BackgroundOption, VideoFromAudioConfig } from '../types';
 
 /** Ưu tiên folder tên "stock video" (không phân biệt hoa thường), không có thì phần tử đầu, fallback "cat". */
-export function defaultBackgroundFolder(available: string[]): string {
+export function defaultBackgroundFolder(available: BackgroundOption[]): string {
   if (available.length === 0) return 'cat';
   const norm = (s: string) => s.trim().toLowerCase().replace(/\s+/g, ' ');
-  const idx = available.findIndex(n => norm(n) === 'stock video');
-  return idx >= 0 ? available[idx] : available[0];
+  const idx = available.findIndex(n => norm(n.label) === 'stock video');
+  return idx >= 0 ? available[idx].id : available[0].id;
 }
 
 /** Biến cấu hình UI thành biến môi trường cho script batch từ audio. */
-export function buildMavidEnvForVideoFromAudio(config: VideoFromAudioConfig, availableBackgrounds: string[]): Record<string, string> {
+export function buildMavidEnvForVideoFromAudio(config: VideoFromAudioConfig, availableBackgrounds: BackgroundOption[]): Record<string, string> {
   const source = config.backgroundSource ?? 'stock';
   let background = config.background;
   let stockCount = config.stockVideoCount;
@@ -32,7 +32,14 @@ export function buildMavidEnvForVideoFromAudio(config: VideoFromAudioConfig, ava
     MAVID_AUDIO_SPEED: String(config.audioSpeed),
     MAVID_SHOW_LOGO: config.showLogo ? '1' : '0',
     MAVID_MAX_VIDEOS_PER_BATCH: String(maxVideosPerBatch),
+    /** 0 = tắt lọc tối thiểu; không gửi key thì createBatchVideo mặc định 18 phút. */
+    MAVID_MIN_DURATION_MINUTES: minDur > 0 ? String(minDur) : '0',
   };
-  if (minDur > 0) env.MAVID_MIN_DURATION_MINUTES = String(minDur);
+  if (config.email) {
+    env.MAVID_EMAIL = config.email;
+  }
+  if (config.overlay) {
+    env.MAVID_VIDEO_OPTION = config.overlay;
+  }
   return env;
 }

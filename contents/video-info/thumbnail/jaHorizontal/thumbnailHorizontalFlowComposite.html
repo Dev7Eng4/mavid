@@ -1,0 +1,285 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="utf-8" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@900&display=swap" rel="stylesheet" />
+    <style>
+      body {
+        margin: 0;
+        background: #000;
+      }
+      #thumbCanvas {
+        display: block;
+      }
+    </style>
+  </head>
+  <body>
+    <canvas id="thumbCanvas" width="1280" height="720"></canvas>
+
+    <script>
+      const W = 1280;
+      const H = 720;
+
+      const DEFAULT_LAYOUT = {
+        canvas_width: 1280,
+        canvas_height: 720,
+        left_text_x: 10,
+        left_text_y: 26,
+        left_text_width: 735,
+        top_text_area_height: 400,
+        right_visual_x: 760,
+        right_visual_width: 520,
+        twist_banner_x: 0,
+        twist_banner_y: 510,
+        twist_banner_width: 1280,
+        twist_banner_height: 210,
+        safe_margin: 24,
+      };
+
+      const DEFAULT_TYPO = {
+        font_family_recommendation: 'Noto Sans JP Black',
+        top_font_size: 145,
+        twist_font_size: 170,
+        top_stroke_width: 14,
+        twist_stroke_width: 23,
+        top_line_gap: 10,
+        twist_letter_spacing: -2,
+        text_align: 'left',
+        vertical_align: 'center',
+      };
+
+      const DEFAULT_COLORS = {
+        line_1_fill: '#FFFFFF',
+        line_2_fill: '#FFFFFF',
+        line_3_fill: '#FFFFFF',
+        top_text_stroke: '#000000',
+        twist_fill: '#FFFFFF',
+        twist_stroke: '#000000',
+        twist_bg: '#CC0000',
+        left_overlay_color: '#000000',
+        left_overlay_opacity: 0.72,
+      };
+
+      function mergeFlow(raw) {
+        const layout = { ...DEFAULT_LAYOUT };
+        const typo = { ...DEFAULT_TYPO };
+        const colors = { ...DEFAULT_COLORS };
+        const tc = { line_1: '', line_2: '', line_3: '', twist_line: '' };
+        if (raw && typeof raw === 'object') {
+          if (raw.color_strategy && typeof raw.color_strategy === 'object') Object.assign(colors, raw.color_strategy);
+          if (raw.thumbnail_copy && typeof raw.thumbnail_copy === 'object') Object.assign(tc, raw.thumbnail_copy);
+        }
+        return { layout, typo, colors, thumbnail_copy: tc };
+      }
+
+      /** @param {CanvasRenderingContext2D} ctx */
+      function drawImageCover(ctx, img, dx, dy, dw, dh) {
+        const ir = img.width / img.height;
+        const cr = dw / dh;
+        let sx;
+        let sy;
+        let sw;
+        let sh;
+        if (ir > cr) {
+          sh = img.height;
+          sw = img.height * cr;
+          sx = (img.width - sw) / 2;
+          sy = 0;
+        } else {
+          sw = img.width;
+          sh = img.width / cr;
+          sx = 0;
+          sy = (img.height - sh) / 2;
+        }
+        ctx.drawImage(img, sx, sy, sw, sh, dx, dy, dw, dh);
+      }
+
+      function narrowCornerQuotes(s) {
+        return String(s).replaceAll('\u300C', '\uFF62').replaceAll('\u300D', '\uFF63');
+      }
+
+      /**
+       * @param {CanvasRenderingContext2D} ctx
+       * @param {CanvasTextBaseline} [textBaseline] — dùng `middle` cho dòng twist để chữ nằm gọn trong khung banner khi banner thấp.
+       */
+      function drawStrokeFillLine(
+        ctx,
+        text,
+        x,
+        y,
+        fontSize,
+        fill,
+        strokeColor,
+        strokeWidth,
+        maxWidth,
+        letterSpacingPx,
+        textBaseline = 'alphabetic',
+      ) {
+        const jp = `900 ${fontSize}px "Noto Sans JP", "Hiragino Sans", "Meiryo", sans-serif`;
+        text = narrowCornerQuotes(text);
+        ctx.font = jp;
+        if (letterSpacingPx) ctx.letterSpacing = `${letterSpacingPx}px`;
+        else ctx.letterSpacing = '0px';
+        ctx.textBaseline = textBaseline;
+        ctx.lineJoin = 'round';
+        ctx.miterLimit = 2;
+
+        const naturalW = ctx.measureText(text).width;
+        const scaleX = maxWidth > 0 && naturalW > maxWidth ? maxWidth / naturalW : 1;
+        const lineW = scaleX < 1 ? strokeWidth / scaleX : strokeWidth;
+
+        const boldScreenPx = Math.max(0.45, fontSize * 0.0055);
+        const bdx = boldScreenPx / scaleX;
+        const bdy = boldScreenPx;
+        const boldDirs = [
+          [bdx, 0],
+          [-bdx, 0],
+          [0, bdy],
+          [0, -bdy],
+        ];
+
+        ctx.save();
+        ctx.translate(x, y);
+        ctx.scale(scaleX, 1);
+        ctx.textAlign = 'left';
+        const leftX = 0;
+
+        ctx.shadowBlur = 0;
+        ctx.strokeStyle = strokeColor;
+        ctx.lineWidth = lineW;
+        ctx.strokeText(text, leftX, 0);
+
+        ctx.fillStyle = fill;
+        for (const [ox, oy] of boldDirs) {
+          ctx.fillText(text, leftX + ox, oy);
+        }
+        ctx.fillText(text, leftX, 0);
+        ctx.restore();
+        ctx.letterSpacing = '0px';
+      }
+
+      async function drawComposite() {
+        const bgUrl = window.__BG_DATA_URL__;
+        const rawFlow = window.__FLOW_LAYOUT__;
+        if (!bgUrl || typeof bgUrl !== 'string') throw new Error('Thiếu __BG_DATA_URL__');
+        const { layout, typo, colors, thumbnail_copy: tc } = mergeFlow(rawFlow);
+
+        const canvas = document.getElementById('thumbCanvas');
+        const ctx = canvas.getContext('2d');
+
+        await document.fonts.load(`900 ${typo.top_font_size}px "Noto Sans JP"`);
+        await document.fonts.load(`900 ${typo.twist_font_size}px "Noto Sans JP"`);
+        await document.fonts.ready;
+
+        const img = new Image();
+        await new Promise((resolve, reject) => {
+          img.onload = () => resolve();
+          img.onerror = () => reject(new Error('Không load được ảnh nền Flow'));
+          img.src = bgUrl;
+        });
+
+        drawImageCover(ctx, img, 0, 0, W, H);
+
+        const topX = layout.left_text_x;
+        const maxLineW = layout.left_text_width;
+        const fs = typo.top_font_size;
+        const gap = typo.top_line_gap;
+
+        const line1Baseline = layout.left_text_y + fs * 0.88;
+        const line3Baseline = line1Baseline + 2 * (fs + gap);
+        /** Không vẽ overlay mờ lên vùng 3 dòng đầu; chỉ tô phần còn lại tới mép banner đỏ. */
+        const topThreeLinesBottomY = Math.min(layout.twist_banner_y, line3Baseline + fs * 1.12);
+
+        const overlayW = Math.min(layout.right_visual_x, W);
+        const overlayAlpha = Number(colors.left_overlay_opacity);
+        if (colors.left_overlay_color && overlayAlpha > 0) {
+          const y0 = topThreeLinesBottomY;
+          const overlayH = layout.twist_banner_y - y0;
+          if (overlayH > 0) {
+            ctx.save();
+            ctx.globalAlpha = Number.isFinite(overlayAlpha) ? Math.min(1, Math.max(0, overlayAlpha)) : 0.72;
+            ctx.fillStyle = colors.left_overlay_color;
+            ctx.fillRect(0, y0, overlayW, overlayH);
+            ctx.restore();
+          }
+        }
+
+        if (colors.twist_bg) {
+          ctx.fillStyle = colors.twist_bg;
+          ctx.fillRect(layout.twist_banner_x, layout.twist_banner_y, layout.twist_banner_width, layout.twist_banner_height);
+        }
+
+        let y = line1Baseline;
+
+        drawStrokeFillLine(
+          ctx,
+          String(tc.line_1 ?? ''),
+          topX,
+          y,
+          fs,
+          colors.line_1_fill,
+          colors.top_text_stroke,
+          typo.top_stroke_width,
+          maxLineW,
+          0,
+        );
+        y += fs + gap;
+        drawStrokeFillLine(
+          ctx,
+          String(tc.line_2 ?? ''),
+          topX,
+          y,
+          fs,
+          colors.line_2_fill,
+          colors.top_text_stroke,
+          typo.top_stroke_width,
+          maxLineW,
+          0,
+        );
+        y += fs + gap;
+        drawStrokeFillLine(
+          ctx,
+          String(tc.line_3 ?? ''),
+          topX,
+          y,
+          fs,
+          colors.line_3_fill,
+          colors.top_text_stroke,
+          typo.top_stroke_width,
+          maxLineW,
+          0,
+        );
+
+        const bannerH = layout.twist_banner_height;
+        const twistFs = typo.twist_font_size;
+        /** Co font nếu banner hẹp hơn chữ + viền để không tràn dọc (căn theo chiều cao khung). */
+        const twistScale = Math.min(1, ((bannerH > 0 ? bannerH : 1) * 0.82) / twistFs);
+        const twistDrawSize = Math.max(12, twistFs * twistScale);
+        const twistY = layout.twist_banner_y + bannerH * 0.5;
+        drawStrokeFillLine(
+          ctx,
+          String(tc.twist_line ?? ''),
+          layout.safe_margin,
+          twistY,
+          twistDrawSize,
+          colors.twist_fill,
+          colors.twist_stroke,
+          typo.twist_stroke_width * twistScale,
+          W - 2 * layout.safe_margin,
+          typo.twist_letter_spacing,
+          'middle',
+        );
+      }
+
+      drawComposite()
+        .then(() => {
+          window.__THUMBNAIL_READY__ = true;
+        })
+        .catch(e => {
+          window.__THUMBNAIL_ERROR__ = String(e);
+        });
+    </script>
+  </body>
+</html>

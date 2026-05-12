@@ -1,37 +1,61 @@
 /**
- * CLI / Electron: cập nhật video-meta.json + thumbnail Flow cho các video đã chọn (theo URL).
+ * CLI / Electron: cập nhật meta qua prepareVideoInfo (onlyUpdateInfo: SEO/summary + Flow thumbnail khi thiếu).
  * @param {{ channelFolder?: string, items?: { url: string }[] }} params
  */
 import path from 'path';
-import { resolveChannelsDir } from '../utils/channelsStoragePath.js';
-import { extractYoutubeVideoId } from '../channel/youtubeUrl.util.js';
+import { getChannelDirPath } from '../api/urls/getListAllPaths.js';
 import { readThumbnailPromptKeyFromChannelDir } from '../channel/readChannelThumbnailPrompt.util.js';
-import { processOneVideoMetaUpdate } from '../channel/processOneVideoMetaUpdate.js';
+import { extractYoutubeVideoId } from '../utils/youtube.js';
+import prepareVideoInfo from '../video-info/prepareVideoInfo.js';
 
-export default async function updateChannelVideosMeta(params = { channelFolder: '', items: [] }) {
-  console.log('🚀 ~ updateChannelVideosMeta ~ params:', params);
-  const { channelFolder, items } = params;
+export default async function updateChannelVideosMeta(params = { channelFolder: '', channelId: '', items: [] }) {
+  const { channelFolder, channelId, items } = params;
 
-  const channelsDir = resolveChannelsDir();
-  const channelDir = path.join(channelsDir, channelFolder.trim());
-  const thumbnailPromptKey = readThumbnailPromptKeyFromChannelDir(channelDir);
+  const channelDir = getChannelDirPath(channelFolder);
+  const thumbnailPromptKey = await readThumbnailPromptKeyFromChannelDir(channelFolder, channelId);
+  console.log('🚀 ~ updateChannelVideosMeta ~ thumbnailPromptKey:', thumbnailPromptKey);
 
   const results = [];
+
   for (const item of items) {
     const url = String(item.url || '').trim();
+
     if (!url) {
       results.push({ ok: false, url: '', reason: 'Thiếu URL' });
       continue;
     }
+
     const videoId = extractYoutubeVideoId(url);
     if (!videoId) {
       results.push({ ok: false, url, reason: 'Không parse được video ID' });
       continue;
     }
+
     const videoDir = path.join(channelDir, videoId);
-    console.log('🚀 ~ updateChannelVideosMeta ~ videoDir:', videoDir);
-    const r = await processOneVideoMetaUpdate({ videoDir, url, thumbnailPromptKey });
-    results.push({ ok: r.ok, url, videoId, reason: r.reason });
+
+    try {
+      const r = await prepareVideoInfo({
+        url,
+        options: {
+          onlyUpdateInfo: true,
+          outputDir: videoDir,
+          thumbnailOptions: {
+            prompt: thumbnailPromptKey ?? '',
+            // needImage: false,
+          },
+        },
+      });
+      const ok = r?.ok !== false;
+      results.push({
+        ok,
+        url,
+        videoId,
+        reason: ok ? undefined : String(r?.reason ?? 'prepareVideoInfo onlyUpdateInfo thất bại'),
+      });
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      results.push({ ok: false, url, videoId, reason: msg });
+    }
   }
 
   return { processed: results.length, results };

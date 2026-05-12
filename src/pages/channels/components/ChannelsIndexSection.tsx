@@ -1,0 +1,246 @@
+import { useEffect, useMemo, useRef, type ReactNode } from 'react';
+import type { ChannelsIndexSectionProps } from '../models/channelsIndexSection.model';
+import { CHANNELS, CHANNEL_TABLE_HEADER_DISPLAY } from '../models/channelsIndexSection.model';
+import { DownloadIcon, FilterIcon, SpinnerIcon } from '@/components/ui/Icons';
+import { AppButton } from '@/components/ui/AppButton';
+import { CustomSelect } from '@/components/ui/CustomSelect';
+import { TablePaginationBar } from '@/components/ui/TablePaginationBar';
+import { channelPlatformIcon, channelStatusBadgeStyle, formatChannelLastUploadDisplay } from '../utils/channelTableDisplay';
+
+export function ChannelsIndexSection({
+  loading,
+  pageIndexRows,
+  indexFilteredCount,
+  indexPag,
+  indexColCount,
+  selectedRows,
+  onToggleRowSelected,
+  onToggleSelectAllOnPage,
+  onOpenEditRow,
+  onOpenDetailRow,
+  pageSelectAll,
+  pageSelectSome,
+  groupNameById = {},
+  toolbarSearch,
+  onToolbarSearchChange,
+  filterExpanded,
+  onToggleFilterExpanded,
+  groupFilter,
+  groupFilterOptions,
+  onGroupFilterChange,
+  onExportCsv,
+}: ChannelsIndexSectionProps) {
+  const headerSelectRef = useRef<HTMLInputElement>(null);
+
+  const visibleChannelCols = useMemo(() => CHANNELS.filter(c => c.show), []);
+
+  useEffect(() => {
+    const el = headerSelectRef.current;
+    if (el) el.indeterminate = pageSelectSome && !pageSelectAll;
+  }, [pageSelectAll, pageSelectSome]);
+
+  function renderCell(colKey: string | undefined, rawCell: unknown): ReactNode {
+    if (!colKey) return String(rawCell ?? '');
+
+    if (colKey === 'channelLink') {
+      const url = String(rawCell ?? '').trim();
+      return (
+        <div className='flex min-w-0 items-start gap-2'>
+          <span className='mt-0.5 shrink-0'>{channelPlatformIcon(url)}</span>
+          <span className='min-w-0 wrap-break-word leading-snug'>{url || '—'}</span>
+        </div>
+      );
+    }
+
+    if (colKey === 'lastUpload') {
+      return <span className='leading-snug'>{String(rawCell ?? '').trim()}</span>;
+    }
+
+    if (colKey === 'status') {
+      const st = channelStatusBadgeStyle(rawCell);
+      return (
+        <span
+          className='inline-flex items-center gap-2 rounded-full px-2.5 py-1 text-xs font-semibold'
+          style={{
+            color: st.textColor,
+            background: st.bg,
+            border: `1px solid color-mix(in srgb, ${st.dotColor} 35%, transparent)`,
+          }}
+        >
+          <span className='h-1.5 w-1.5 shrink-0 rounded-full' style={{ background: st.dotColor }} />
+          {st.label}
+        </span>
+      );
+    }
+
+    if (colKey === 'group') {
+      const raw = String(rawCell ?? '').trim();
+      if (!raw) return '';
+      const name = groupNameById[raw];
+      return name?.trim() ? name.trim() : raw;
+    }
+
+    return String(rawCell ?? '');
+  }
+
+  const toolbarInputClass =
+    'min-w-0 flex-1 rounded-xl px-3 py-2.5 text-sm outline-none border transition-colors duration-150 sm:min-w-[200px]';
+
+  return (
+    <div className='w-full min-w-0 space-y-4'>
+      <div
+        className='w-full min-w-0 overflow-hidden rounded-2xl'
+        style={{ background: 'var(--card-bg)', border: '1px solid var(--border)' }}
+      >
+        <div className='flex flex-wrap items-center gap-2 border-b px-4 py-3 sm:gap-3' style={{ borderColor: 'var(--border)' }}>
+          <input
+            type='search'
+            value={toolbarSearch}
+            onChange={e => onToolbarSearchChange(e.target.value)}
+            placeholder='Filter by URL or email…'
+            autoComplete='off'
+            className={toolbarInputClass}
+            style={{
+              background: 'var(--code-bg)',
+              color: 'var(--text-h)',
+              borderColor: 'var(--border)',
+            }}
+          />
+        </div>
+
+        <div className='w-full min-w-0 overflow-auto'>
+          <table className='w-full min-w-0 text-base' style={{ borderCollapse: 'collapse', tableLayout: 'auto' }}>
+            <thead>
+              <tr style={{ background: 'var(--code-bg)' }}>
+                <th className='w-12 px-2 py-3 text-center align-middle' style={{ borderBottom: '1px solid var(--border)' }} scope='col'>
+                  <input
+                    ref={headerSelectRef}
+                    type='checkbox'
+                    className='h-4 w-4 cursor-pointer rounded border align-middle'
+                    style={{ borderColor: 'var(--border)', accentColor: 'var(--accent)' }}
+                    checked={pageSelectAll}
+                    onChange={() => onToggleSelectAllOnPage()}
+                    disabled={loading || pageIndexRows.length === 0}
+                    aria-label='Chọn tất cả kênh trên trang này'
+                  />
+                </th>
+                {visibleChannelCols.map((col, colIdx) => (
+                  <th
+                    key={`idx-h-${colIdx}-${col.key}`}
+                    className='px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider whitespace-nowrap'
+                    style={{ color: 'var(--text-muted)', borderBottom: '1px solid var(--border)' }}
+                  >
+                    {CHANNEL_TABLE_HEADER_DISPLAY[col.key] ?? col.label}
+                  </th>
+                ))}
+                <th
+                  className='px-2 py-3 text-center align-middle text-xs font-semibold uppercase tracking-wider whitespace-nowrap'
+                  style={{ color: 'var(--text-muted)', borderBottom: '1px solid var(--border)' }}
+                >
+                  ACTIONS
+                </th>
+              </tr>
+            </thead>
+
+            <tbody>
+              {loading ? (
+                <tr>
+                  <td colSpan={indexColCount} className='px-4 py-8 text-center'>
+                    <div className='flex items-center justify-center gap-3' style={{ color: 'var(--text)' }}>
+                      <SpinnerIcon className='h-5 w-5' />
+                      <span>Đang tải dữ liệu...</span>
+                    </div>
+                  </td>
+                </tr>
+              ) : pageIndexRows.length === 0 && indexFilteredCount === 0 ? (
+                <tr>
+                  <td colSpan={indexColCount} className='px-4 py-8 text-center' style={{ color: 'var(--text-muted)' }}>
+                    Không có dòng nào khớp bộ lọc (URL / email / nhóm).
+                  </td>
+                </tr>
+              ) : (
+                pageIndexRows.map(row => {
+                  return (
+                    <tr
+                      key={row.id}
+                      className='cursor-pointer transition-colors duration-150'
+                      style={{ borderBottom: '1px solid var(--border)' }}
+                      onClick={() => {
+                        onToggleRowSelected(row.id);
+                      }}
+                      onMouseEnter={e => {
+                        e.currentTarget.style.background = 'var(--hover-bg)';
+                      }}
+                      onMouseLeave={e => {
+                        e.currentTarget.style.background = 'transparent';
+                      }}
+                    >
+                      <td className='px-2 py-3 align-middle text-center' onClick={e => e.stopPropagation()}>
+                        <input
+                          type='checkbox'
+                          className='h-4 w-4 cursor-pointer rounded border align-middle'
+                          style={{ borderColor: 'var(--border)', accentColor: 'var(--accent)' }}
+                          checked={selectedRows.has(row.id)}
+                          onChange={() => onToggleRowSelected(row.id)}
+                          aria-label={`Chọn kênh dòng ${row.id}`}
+                        />
+                      </td>
+                      {visibleChannelCols.map((col, colIdx) => {
+                        const cell = col.key ? row[col.key] : '';
+                        return (
+                          <td
+                            key={`idx-c-${colIdx}-${col.label}`}
+                            className='min-w-0 px-4 py-3 align-middle wrap-break-word'
+                            style={{ color: 'var(--text-h)' }}
+                          >
+                            {renderCell(col.key, cell)}
+                          </td>
+                        );
+                      })}
+
+                      <td
+                        className='px-2 py-3 align-middle'
+                        style={{ borderBottom: '1px solid var(--border)' }}
+                        onClick={e => e.stopPropagation()}
+                      >
+                        <div className='flex flex-wrap items-center justify-center gap-1.5'>
+                          <AppButton
+                            type='button'
+                            variant='neutral'
+                            size='sm'
+                            className='min-w-0 shrink-0'
+                            onClick={() => onOpenEditRow(row.id)}
+                          >
+                            Sửa
+                          </AppButton>
+                          <AppButton
+                            type='button'
+                            variant='neutral'
+                            size='sm'
+                            className='min-w-0 shrink-0'
+                            onClick={() => onOpenDetailRow(row.id)}
+                          >
+                            Chi tiết
+                          </AppButton>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })
+              )}
+            </tbody>
+          </table>
+        </div>
+        {!loading && indexFilteredCount > 0 ? (
+          <TablePaginationBar
+            page={indexPag.page}
+            totalPages={indexPag.totalPages}
+            onPageChange={indexPag.setPage}
+            totalItems={indexFilteredCount}
+            pageSize={indexPag.pageSize}
+          />
+        ) : null}
+      </div>
+    </div>
+  );
+}

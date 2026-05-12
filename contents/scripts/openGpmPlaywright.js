@@ -32,6 +32,7 @@ import net from 'net';
 import { chromium } from 'playwright';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import { GPM_API_DEFAULT_ORIGIN, GPM_API_VERSION } from '../constants/gpmApi.js';
 
 function sleep(ms) {
   return new Promise(resolve => setTimeout(resolve, ms));
@@ -186,7 +187,7 @@ export function resolveGpmChromiumExecutable(profileDir, dataRoot, preferredExe)
 
 /** @param {string} [base] */
 function normalizeApiBase(base) {
-  const b = (base || process.env.GPM_API_BASE || 'http://127.0.0.1:19995').replace(/\/$/, '');
+  const b = (base || process.env.GPM_API_BASE || GPM_API_DEFAULT_ORIGIN).replace(/\/$/, '');
   return b;
 }
 
@@ -195,11 +196,12 @@ function normalizeApiBase(base) {
  * @param {string} [explicitBase] — chỉ origin (`http://127.0.0.1:19995`) hoặc đã kết thúc bằng `/api/v3`
  */
 function resolveGpmApiV3Root(explicitBase) {
-  const raw = String(explicitBase || process.env.GPM_API_BASE || 'http://127.0.0.1:19995')
+  const raw = String(explicitBase || process.env.GPM_API_BASE || GPM_API_DEFAULT_ORIGIN)
     .trim()
     .replace(/\/+$/, '');
-  if (/\/api\/v3$/i.test(raw)) return raw;
-  return `${raw}/api/v3`;
+  if (/\/api\/v\d+$/i.test(raw)) return raw;
+  const isV2 = GPM_API_VERSION === 'V2';
+  return `${raw}/api/${isV2 ? 'v1' : 'v3'}`;
 }
 
 /** @returns {Record<string, string>} */
@@ -241,8 +243,8 @@ export async function startGpmProfile(profileId, options = {}) {
   if (!profileId || typeof profileId !== 'string') {
     throw new Error('startGpmProfile: cần profileId (string).');
   }
-  const base = normalizeApiBase(options.apiBase);
-  const url = new URL(`/api/v3/profiles/start/${encodeURIComponent(profileId)}`, base);
+  const root = resolveGpmApiV3Root(options.apiBase);
+  const url = new URL(`${root}/profiles/start/${encodeURIComponent(profileId)}`);
   if (options.win_scale != null) url.searchParams.set('win_scale', String(options.win_scale));
   if (options.win_pos) url.searchParams.set('win_pos', options.win_pos);
   if (options.win_size) url.searchParams.set('win_size', options.win_size);
@@ -266,9 +268,15 @@ export async function startGpmProfile(profileId, options = {}) {
     throw new Error('GPM API: thiếu `data` trong response start profile.');
   }
 
-  const addr = d.remote_debugging_address;
+  let addr = d.remote_debugging_address;
+  if (!addr && d.remote_debugging_port) {
+    addr = `127.0.0.1:${d.remote_debugging_port}`;
+  }
+
   if (!addr || typeof addr !== 'string' || !String(addr).trim()) {
-    throw new Error('GPM không trả `remote_debugging_address` trong `data`. Kiểm tra profile / GPM đang chạy.');
+    throw new Error(
+      'GPM không trả `remote_debugging_address` hoặc `remote_debugging_port` trong `data`. Kiểm tra profile / GPM đang chạy.'
+    );
   }
 
   if (d.success === false) {
@@ -302,7 +310,8 @@ export async function closeProfile(profileId, options = {}) {
     throw new Error('closeProfile: cần profileId (string).');
   }
   const root = resolveGpmApiV3Root(options.apiBase);
-  const url = `${root}/profiles/close/${encodeURIComponent(profileId.trim())}`;
+  const endpoint = options.apiBase && String(options.apiBase).includes('/api/v1') ? 'stop' : 'close';
+  const url = `${root}/profiles/${endpoint}/${encodeURIComponent(profileId.trim())}`;
   const res = await fetch(url, { method: 'GET', headers: gpmHeaders() });
   const json = await res.json().catch(() => ({}));
   if (!json.success) {
@@ -429,8 +438,8 @@ async function waitUntilCloseSignal(context) {
  * @param {object} [query] — page, per_page, group_id, search, sort
  */
 export async function listGpmProfiles(query = {}) {
-  const base = normalizeApiBase();
-  const url = new URL('/api/v3/profiles', base);
+  const root = resolveGpmApiV3Root();
+  const url = new URL(`${root}/profiles`);
   Object.entries(query).forEach(([k, v]) => {
     if (v != null && v !== '') url.searchParams.set(k, String(v));
   });

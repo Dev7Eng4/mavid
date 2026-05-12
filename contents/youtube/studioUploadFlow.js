@@ -31,7 +31,7 @@ function getVideoDurationSeconds(mp4Path) {
     const out = execFileSync(
       'ffprobe',
       ['-v', 'error', '-show_entries', 'format=duration', '-of', 'default=noprint_wrappers=1:nokey=1', mp4Path],
-      { encoding: 'utf-8' },
+      { encoding: 'utf-8' }
     ).trim();
     const n = parseFloat(out);
     return Number.isFinite(n) && n > 0 ? n : null;
@@ -206,7 +206,7 @@ export async function fillVideoDetails(page, videoFolderPath, showErrorLogs) {
   if (boxUpload) {
     await page.mouse.move(
       boxUpload.x + boxUpload.width / 2 + (Math.random() * 20 - 10),
-      boxUpload.y + boxUpload.height / 2 + (Math.random() * 20 - 10),
+      boxUpload.y + boxUpload.height / 2 + (Math.random() * 20 - 10)
     );
   }
 
@@ -356,7 +356,8 @@ export async function addRelatedVideo(page, _isNeedAddRelatedVideo = false, mp4P
 }
 
 /**
- * Chọn «Lên lịch» (Schedule); nếu có `slot` (từ `getYoutubePublishPlan`) thì điền ngày/giờ.
+ * Chọn «Lên lịch» (Schedule); nếu có `slot` (từ kế hoạch publish) thì điền ngày/giờ.
+ * Caller sắp hàng upload theo mốc giờ tăng dần; mỗi lần gọi truyền `slot` ứng với video hiện tại.
  * @param {import('playwright').Page} page
  * @param {{ slot?: { date: string, time: string, iso?: string } | null, jobIndex: number, totalJobs: number }} ctx — `slot.date` MM/DD/YYYY
  */
@@ -369,11 +370,11 @@ export async function chooseVisibility(page, ctx) {
   if (boxUpload) {
     await page.mouse.move(
       boxUpload.x + boxUpload.width / 2 + (Math.random() * 20 - 10),
-      boxUpload.y + boxUpload.height / 2 + (Math.random() * 20 - 10),
+      boxUpload.y + boxUpload.height / 2 + (Math.random() * 20 - 10)
     );
   }
 
-  await humanScroll(page, 80);
+  await humanScroll(page, 140);
 
   if (slot?.date && slot?.time) {
     await clickElement(page, YOUTUBE_SELECTOR.btnChooseSchedule);

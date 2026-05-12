@@ -1,0 +1,176 @@
+import { useCallback, useEffect, useState } from 'react';
+import { AppButton } from '@/components/ui/AppButton';
+import {
+  fetchAllGpmProfileRows,
+  MAX_CONCURRENT_YOUTUBE_UPLOAD_CHANNELS,
+  resolveGpmProfileIdByEmail,
+  type ChannelUploadVideoDialogProps,
+  type ChannelUploadVideoPayload,
+} from '../channelUploadVideoHelpers';
+
+function clampInt(n: number, min: number, max: number): number {
+  if (!Number.isFinite(n)) return min;
+  return Math.min(max, Math.max(min, Math.trunc(n)));
+}
+
+export function ChannelUploadVideoDialog({
+  channels,
+  selectedRowCount,
+  activeBackgroundUploadThreads = 0,
+  onClose,
+  onConfirm,
+}: ChannelUploadVideoDialogProps) {
+  const [totalVideos, setTotalVideos] = useState<number | null>(null);
+  const [formError, setFormError] = useState<string | null>(null);
+
+  const eligibleCount = channels.length;
+  const skippedCount = Math.max(0, selectedRowCount - eligibleCount);
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose();
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [onClose]);
+
+  const handleConfirm = useCallback(async () => {
+    console.log('🚀 ~ ChannelUploadVideoDialog ~ channels:', channels);
+    if (channels.length === 0) {
+      setFormError('Không có kênh đủ điều kiện trong phần đã chọn (cần ID/CHANNEL và EMAIL trong index).');
+      return;
+    }
+
+    const total = totalVideos == null ? null : clampInt(totalVideos, 1, 99);
+    setFormError(null);
+    try {
+      const profiles = await fetchAllGpmProfileRows();
+      const payloads: ChannelUploadVideoPayload[] = [];
+
+      for (const ch of channels) {
+        const gpmProfileId = resolveGpmProfileIdByEmail(profiles, ch.email);
+
+        if (!gpmProfileId) {
+          continue;
+        }
+        payloads.push({ channelFolder: ch.channelId, id: ch.id, email: ch.email, totalVideos: total, gpmProfileId });
+      }
+
+      if (payloads.length === 0) {
+        setFormError('Không có kênh nào có email hợp lệ.');
+        return;
+      }
+
+      if (typeof window.runner?.minimizeApp === 'function') {
+        window.runner.minimizeApp();
+      }
+      onConfirm(payloads);
+      onClose();
+    } catch (e) {
+      setFormError(e instanceof Error ? e.message : 'Không chạy được upload.');
+    }
+  }, [channels, onClose, onConfirm, totalVideos]);
+
+  const inputClass = 'w-full rounded-xl px-3 py-2.5 text-base outline-none border transition-colors duration-150';
+
+  const canSubmit = eligibleCount > 0;
+
+  return (
+    <div
+      className='fixed inset-0 z-50 flex items-center justify-center p-4 overflow-y-auto overflow-x-hidden'
+      style={{ background: 'rgba(0, 0, 0, 0.45)' }}
+      onClick={() => onClose()}
+      role='presentation'
+    >
+      <div
+        className='max-w-lg w-full my-8 rounded-2xl p-6 sm:p-8 shadow-xl overflow-visible relative z-1 max-h-[min(90vh,720px)] flex flex-col min-h-0'
+        style={{ background: 'var(--card-bg)', border: '1px solid var(--border)' }}
+        onClick={e => e.stopPropagation()}
+        role='dialog'
+        aria-modal
+        aria-labelledby='upload-video-dialog-title'
+      >
+        <h2 id='upload-video-dialog-title' className='text-lg font-semibold shrink-0' style={{ color: 'var(--text-h)' }}>
+          Upload video
+        </h2>
+        <p className='text-sm leading-snug mt-2 shrink-0' style={{ color: 'var(--text-muted)' }}>
+          Profile GPM được chọn theo <code className='text-xs'>name</code> = email (từ index). Upload lần lượt các thư mục con có .mp4{' '}
+          <strong>và</strong> có ít nhất một ảnh thumbnail (.png, .jpg, .jpeg) — thư mục thiếu thumbnail sẽ bị bỏ qua.
+        </p>
+
+        <div className='grid grid-cols-1 gap-y-4 mt-4 overflow-y-auto min-h-0 flex-1 pr-1 content-start'>
+          <div
+            className='rounded-xl px-3 py-2.5 text-sm border'
+            style={{ background: 'var(--code-bg)', borderColor: 'var(--border)', color: 'var(--text-h)' }}
+          >
+            <p>
+              Đã chọn <strong>{selectedRowCount}</strong> dòng trên index.
+              {eligibleCount > 0 ? (
+                <>
+                  {' '}
+                  Sẽ xếp hàng upload cho <strong>{eligibleCount}</strong> kênh có ID và EMAIL (tối đa{' '}
+                  <strong>{MAX_CONCURRENT_YOUTUBE_UPLOAD_CHANNELS}</strong> kênh chạy song song — vừa kết thúc upload nền một kênh là tới
+                  lượt kênh kế, không cần chờ 15 phút tắt Chrome/GPM của kênh trước).
+                </>
+              ) : (
+                <> Chưa có kênh đủ điều kiện.</>
+              )}
+            </p>
+            {skippedCount > 0 ? (
+              <p className='mt-2' style={{ color: 'var(--text-muted)' }}>
+                {skippedCount} dòng bị bỏ qua (thiếu ID/CHANNEL hoặc EMAIL).
+              </p>
+            ) : null}
+          </div>
+
+          <div className='min-w-0'>
+            <label className='block text-sm font-medium mb-1.5' style={{ color: 'var(--text-h)' }} htmlFor='upload-total-videos'>
+              Số lượng video upload
+            </label>
+            <input
+              id='upload-total-videos'
+              type='number'
+              min={1}
+              max={99}
+              value={totalVideos ?? ''}
+              onChange={e => {
+                const v = e.target.value.trim();
+                if (v === '') setTotalVideos(null);
+                else setTotalVideos(clampInt(parseInt(v, 10), 1, 99));
+              }}
+              placeholder='Upload thư mục có .mp4 + thumbnail'
+              className={inputClass}
+              style={{
+                background: 'var(--code-bg)',
+                color: 'var(--text-h)',
+                borderColor: 'var(--border)',
+              }}
+            />
+          </div>
+
+          {formError ? (
+            <p className='text-sm' style={{ color: '#fecaca' }}>
+              {formError}
+            </p>
+          ) : null}
+
+          {activeBackgroundUploadThreads > 0 ? (
+            <p className='text-sm' style={{ color: 'var(--text-muted)' }}>
+              Đang chạy nền: <strong style={{ color: 'var(--text-h)' }}>{activeBackgroundUploadThreads}</strong> luồng upload (mỗi email một
+              profile GPM riêng). Có thể bấm Xác nhận thêm; email đang bận sẽ bị bỏ qua cho đến khi xong.
+            </p>
+          ) : null}
+        </div>
+
+        <div className='flex flex-wrap justify-end gap-2 mt-6 pt-4 shrink-0 border-t' style={{ borderColor: 'var(--border)' }}>
+          <AppButton type='button' variant='neutral' onClick={() => onClose()}>
+            Hủy
+          </AppButton>
+          <AppButton type='button' variant='primary' onClick={() => void handleConfirm()} disabled={!canSubmit}>
+            Xác nhận
+          </AppButton>
+        </div>
+      </div>
+    </div>
+  );
+}

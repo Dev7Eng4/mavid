@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import type { Page, ScriptId, VideoFromAudioBackgroundSource } from '@/types';
+import type { BackgroundOption, Page, ScriptId, VideoFromAudioBackgroundSource } from '@/types';
 import { scriptDefs } from '@/types';
 import { AlertIcon } from '@/components/ui/Icons';
 import { CustomSelect } from '@/components/ui/CustomSelect';
@@ -41,7 +41,7 @@ export function CreateVideoFromAudioPanel({
   onBack,
 }: CreateVideoFromAudioPanelProps) {
   const [channels, setChannels] = useState<string[]>([]);
-  const [backgrounds, setBackgrounds] = useState<string[]>([]);
+  const [backgrounds, setBackgrounds] = useState<BackgroundOption[]>([]);
   const [channel, setChannel] = useState('');
   const [backgroundSource, setBackgroundSource] = useState<VideoFromAudioBackgroundSource>('stock');
   const [background, setBackground] = useState('');
@@ -139,7 +139,7 @@ export function CreateVideoFromAudioPanel({
   }
 
   const chOptions = channels.map(n => ({ value: n }));
-  const bgOptions = backgrounds.map(n => ({ value: n }));
+  const bgOptions = backgrounds.map(bg => ({ value: bg.id, label: bg.label }));
 
   return (
     <div className='space-y-6 w-full min-w-0'>

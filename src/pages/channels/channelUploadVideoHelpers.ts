@@ -1,8 +1,9 @@
-import type { GpmProfileRow } from '@/types';
+import type { ChannelRow, GpmProfileRow } from '@/types';
 import { gpmApi } from '@/services';
+import { CHANNEL_DETAIL, CHANNELS } from './models/channelsIndexSection.model';
 
 /** Số kênh upload YouTube tối đa chạy song song; kênh còn lại xếp hàng, khi một kênh xong sẽ tự chạy tiếp. */
-export const MAX_CONCURRENT_YOUTUBE_UPLOAD_CHANNELS = 2;
+export const MAX_CONCURRENT_YOUTUBE_UPLOAD_CHANNELS = 1;
 
 function pickStr(obj: Record<string, unknown>, keys: string[]): string {
   for (const k of keys) {
@@ -37,12 +38,23 @@ export async function fetchAllGpmProfileRows(): Promise<GpmProfileRow[]> {
   do {
     const res = await gpmApi.listProfiles({ page, per_page: perPage });
     const env = res as unknown as GpmListProfilesEnvelope;
-    const list = Array.isArray(env.data) ? env.data : [];
+
+    let list: unknown[] = [];
+    if (Array.isArray(env.data)) {
+      list = env.data;
+    } else if (env.data && typeof env.data === 'object' && Array.isArray((env.data as any).data)) {
+      list = (env.data as any).data;
+    }
+
     for (const item of list) {
       const m = mapGpmApiProfileRow(item);
       if (m?.id?.trim()) rows.push(m);
     }
-    const tp = env.pagination?.total_page;
+
+    let tp = env.pagination?.total_page;
+    if (tp == null && env.data && typeof env.data === 'object' && 'last_page' in env.data) {
+      tp = (env.data as any).last_page;
+    }
     totalPage = tp != null && Number.isFinite(Number(tp)) && Number(tp) >= 1 ? Math.floor(Number(tp)) : 1;
     page += 1;
   } while (page <= totalPage);
@@ -59,7 +71,7 @@ export function resolveGpmProfileIdByEmail(profiles: GpmProfileRow[], email: str
 export interface ChannelUploadVideoPayload {
   /** Một kênh cụ thể (thư mục MaVidMedia/channels/…). */
   channelFolder: string;
-  /** Email kênh (index / config) — script upload dùng để lấy lịch publish. */
+  id: string;
   email: string;
   /** `null` = mọi thư mục con đủ .mp4 + thumbnail ảnh (theo thứ tự từ Excel khi không truyền uploadFolderNames). */
   totalVideos: number | null;
@@ -75,8 +87,7 @@ export interface ChannelItem {
 }
 
 export interface ChannelUploadVideoDialogProps {
-  /** Kênh đủ điều kiện trong phần đã chọn (ID + EMAIL). */
-  channels: ChannelItem[];
+  channels: ChannelRow[];
   /** Số dòng đã tick trên bảng. */
   selectedRowCount: number;
   /** Số luồng upload đang chạy nền (từ parent). */
@@ -85,3 +96,41 @@ export interface ChannelUploadVideoDialogProps {
   /** Gọi khi đã có payloads hợp lệ; parent tự chạy upload nền (không cần await). */
   onConfirm: (payloads: ChannelUploadVideoPayload[]) => void;
 }
+
+export const convertIndexRowToChannel = (rows: ChannelRow[]) => {
+  const labelToKeyMap = Object.fromEntries(CHANNELS.map(item => [item.label, item.key]));
+
+  const convertedData = rows.map(row => {
+    const newRow: ChannelRow = {};
+
+    for (const oldKey in row) {
+      const newKey = labelToKeyMap[oldKey];
+      if (newKey) {
+        newRow[newKey] = row[oldKey];
+      }
+    }
+
+    return newRow;
+  });
+
+  return convertedData;
+};
+
+export const convertChannelVideosRowToData = (rows: ChannelRow[]) => {
+  const labelToKeyMap = Object.fromEntries(CHANNEL_DETAIL.map(item => [item.label, item.key]));
+
+  const convertedData = rows.map(row => {
+    const newRow: ChannelRow = {};
+
+    for (const oldKey in row) {
+      const newKey = labelToKeyMap[oldKey];
+      if (newKey) {
+        newRow[newKey] = row[oldKey];
+      }
+    }
+
+    return newRow;
+  });
+
+  return convertedData;
+};

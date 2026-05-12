@@ -1,9 +1,6 @@
 /**
- * Gán mốc publish (từ `getYoutubePublishPlan`) cho từng job upload theo độ dài video:
- * video ngắn → suất sáng/chiều; video dài → suất tối (chiều muộn/đêm).
+ * So khớp mốc lịch publish (từ `getYoutubePublishPlan`) với thời gian thực — dùng khi sync sau upload.
  */
-import fs from 'fs';
-import { execFileSync } from 'child_process';
 
 /**
  * @param {string} raw
@@ -39,103 +36,7 @@ export function scheduleSlotToLocalDate(slot) {
 }
 
 /**
- * Sáng + chiều: 06:00–17:59. Tối: còn lại (phù hợp video dài).
- * @param {Date} when
- */
-function isDaySlotLocal(when) {
-  const h = when.getHours();
-  return h >= 6 && h < 18;
-}
-
-/**
- * Thời lượng .mp4 (giây) — ffprobe.
- * @param {string} mp4Path
- * @returns {number | null}
- */
-export function getMp4DurationSeconds(mp4Path) {
-  if (!mp4Path || !fs.existsSync(mp4Path)) return null;
-  try {
-    const out = execFileSync(
-      'ffprobe',
-      ['-v', 'error', '-show_entries', 'format=duration', '-of', 'default=noprint_wrappers=1:nokey=1', mp4Path],
-      { encoding: 'utf-8' }
-    ).trim();
-    const n = parseFloat(out);
-    return Number.isFinite(n) && n > 0 ? n : null;
-  } catch {
-    return null;
-  }
-}
-
-/**
- * Sau khi đã có danh sách job (thứ tự upload) và lịch publish cùng độ dài:
- * hoán vị slot sao cho video ngắn ưu tiên suất ban ngày, video dài ưu tiên suất tối.
- * Nếu không đọc được duration nào hoặc lệch độ dài mảng → trả về `schedule` gốc.
- *
- * @param {Array<{ mp4Path?: string }>} jobs
- * @param {Array<{ date: string, time: string, iso?: string }>} schedule
- * @returns {Array<{ date: string, time: string, iso?: string }>}
- */
-export function assignPublishSlotsByVideoDuration(jobs, schedule) {
-  if (!Array.isArray(jobs) || !Array.isArray(schedule) || jobs.length !== schedule.length || schedule.length === 0) {
-    return schedule;
-  }
-
-  const durations = jobs.map(j => getMp4DurationSeconds(j?.mp4Path));
-  if (!durations.some(d => d != null)) {
-    return schedule;
-  }
-
-  const fallback = durations.filter(d => d != null).sort((a, b) => a - b);
-  const midFallback = fallback.length ? fallback[Math.floor(fallback.length / 2)] : 0;
-  const durResolved = durations.map(d => (d != null ? d : midFallback));
-
-  /** @type {{ idx: number, when: Date, day: boolean }[]} */
-  const meta = [];
-  for (let i = 0; i < schedule.length; i++) {
-    const when = scheduleSlotToLocalDate(schedule[i]);
-    if (!when) return schedule;
-    meta.push({ idx: i, when, day: isDaySlotLocal(when) });
-  }
-
-  const daySlots = meta.filter(m => m.day).sort((a, b) => a.when.getTime() - b.when.getTime());
-  const nightSlots = meta.filter(m => !m.day).sort((a, b) => a.when.getTime() - b.when.getTime());
-
-  if (daySlots.length + nightSlots.length !== meta.length) return schedule;
-
-  const n = jobs.length;
-  const sortedJobIdx = Array.from({ length: n }, (_, i) => i).sort((a, b) => {
-    const da = durResolved[a];
-    const db = durResolved[b];
-    if (da !== db) return da - db;
-    return a - b;
-  });
-
-  const shortestForDay = sortedJobIdx.slice(0, daySlots.length);
-  const longestForNight = sortedJobIdx.slice(n - nightSlots.length, n);
-
-  if (new Set([...shortestForDay, ...longestForNight]).size !== n) {
-    return schedule;
-  }
-
-  /** @type {Array<{ date: string, time: string, iso?: string } | null>} */
-  const out = Array(n).fill(null);
-  for (let u = 0; u < daySlots.length; u++) {
-    const jobIdx = shortestForDay[u];
-    out[jobIdx] = schedule[daySlots[u].idx];
-  }
-  for (let v = 0; v < nightSlots.length; v++) {
-    const jobIdx = longestForNight[v];
-    out[jobIdx] = schedule[nightSlots[v].idx];
-  }
-
-  if (out.some(s => s == null)) return schedule;
-  return /** @type {typeof schedule} */ (out);
-}
-
-/**
- * Mốc publish muộn nhất (theo thời gian thực) trong danh sách — dùng khi lịch đã bị gán lại theo độ dài video
- * (không còn trùng thứ tự upload A, B, C).
+ * Mốc publish muộn nhất trong danh sách thành công — dùng cập nhật `latestUpload*` trong config.
  *
  * @param {Array<{ date?: string, time?: string, iso?: string } | null | undefined>} slots
  * @returns {{ date: string, time: string, iso?: string } | null}

@@ -6,17 +6,17 @@ import fs from 'fs';
 import path from 'path';
 import { resolveVideosDir } from '../utils/channelsStoragePath.js';
 import { assertSafeSubfolderName } from '../youtube/uploadJobs.util.js';
-import { DRIVE_ROOT_FOLDER_NAME } from './constants.js';
 import { getDrive } from './auth.util.js';
 import { ensureChildFolder } from './driveFolders.util.js';
 import { uploadLocalDirectoryTree } from './uploadLocalDir.util.js';
+import { MAVID_MEDIA_FOLDER } from '../api/urls/getListAllPaths.js';
 
 const LOG = '[syncVideosToDrive]';
 
 /**
  * @typedef {object} SyncVideosToDriveOptions
  * @property {string} [videosRootAbs] — mặc định `resolveVideosDir()`
- * @property {string} [driveRootName] — mặc định `DRIVE_ROOT_FOLDER_NAME`
+ * @property {string} [driveRootName] — mặc định
  */
 
 /**
@@ -24,7 +24,7 @@ const LOG = '[syncVideosToDrive]';
  */
 export async function runSyncVideosToDrive(opts = {}) {
   const videosRoot = opts.videosRootAbs || resolveVideosDir();
-  const driveRootName = opts.driveRootName || DRIVE_ROOT_FOLDER_NAME;
+  const driveRootName = opts.driveRootName || MAVID_MEDIA_FOLDER;
 
   if (!fs.existsSync(videosRoot) || !fs.statSync(videosRoot).isDirectory()) {
     console.warn(`${LOG} Không có thư mục videos: ${videosRoot}`);

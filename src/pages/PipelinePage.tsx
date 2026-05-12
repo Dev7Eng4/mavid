@@ -9,7 +9,7 @@ import { YouTubeLinkPopup } from '@/components/pipeline/YouTubeLinkPopup';
 import { VideoFromAudioPopup } from '@/components/pipeline/VideoFromAudioPopup';
 import type { ScriptStatus } from '@/components/pipeline/ScriptCard';
 
-const YOUTUBE_SCRIPT_ID: ScriptId = 'lay-thong-tin-youtube (video, channel)';
+const YOUTUBE_SCRIPT_ID: ScriptId = 'lay-thong-tin-youtube';
 const VIDEO_FROM_AUDIO_SCRIPT_ID: ScriptId = 'tao-batch-video-tu-audio';
 
 interface Props {
@@ -65,7 +65,7 @@ export function PipelinePage({ runningScript, setRunningScript, appendErrorLog, 
     setShowVideoAudioPopup(false);
     const def = scriptDefs.find(s => s.id === VIDEO_FROM_AUDIO_SCRIPT_ID);
     if (def) {
-      const bgList = await window.runner.listBackgrounds().catch(() => [] as string[]);
+      const bgList = await window.runner.listBackgrounds().catch(() => [] as import('@/types').BackgroundOption[]);
       const extraEnv = buildMavidEnvForVideoFromAudio(config, bgList);
       await runScript(def.id, def.npmScript, extraEnv);
     }
@@ -131,7 +131,7 @@ export function PipelinePage({ runningScript, setRunningScript, appendErrorLog, 
           <ScriptCard
             key={s.id}
             script={s}
-            status={s.id === runningScript ? 'running' : statuses[s.id] ?? 'idle'}
+            status={s.id === runningScript ? 'running' : (statuses[s.id] ?? 'idle')}
             disabled={runningScript !== null}
             onRun={() => handleClickRun(s.id, s.npmScript)}
           />

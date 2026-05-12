@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import type { VideoFromAudioConfig } from '../../types';
+import type { BackgroundOption, VideoFromAudioConfig } from '../../types';
 import { CustomSelect } from '../ui/CustomSelect';
 
 interface Props {
@@ -21,7 +21,7 @@ export function VideoFromAudioPopup({ onConfirm, onCancel }: Props) {
   const [maxVideosPerBatch, setMaxVideosPerBatch] = useState(5);
   const [minDurationMinutes, setMinDurationMinutes] = useState(0);
   const [showLogo, setShowLogo] = useState(false);
-  const [backgrounds, setBackgrounds] = useState<string[]>([]);
+  const [backgrounds, setBackgrounds] = useState<BackgroundOption[]>([]);
   const [channels, setChannels] = useState<string[]>([]);
 
   useEffect(() => {
@@ -30,7 +30,7 @@ export function VideoFromAudioPopup({ onConfirm, onCancel }: Props) {
       .listBackgrounds()
       .then(list => {
         setBackgrounds(list);
-        if (list.length > 0 && !list.includes(defaultBg)) setBackground(list[0]);
+        if (list.length > 0 && !list.some(bg => bg.id === defaultBg)) setBackground(list[0].id);
       })
       .catch(() => {});
     window.runner
@@ -66,7 +66,7 @@ export function VideoFromAudioPopup({ onConfirm, onCancel }: Props) {
     setMinDurationMinutes(prev => Math.max(0, Math.min(10080, prev + delta)));
   }
 
-  const bgOptions = backgrounds.map(n => ({ value: n }));
+  const bgOptions = backgrounds.map(bg => ({ value: bg.id, label: bg.label }));
   const chOptions = channels.map(n => ({ value: n }));
 
   return (
