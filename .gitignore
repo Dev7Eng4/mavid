@@ -25,6 +25,11 @@ dist-ssr
 *.sw?
 
 assets/backgrounds
+assets/visual-resource
+assets/noise/.cache
+assets/overlay/Option 1/.cache
+assets/chart/.cache
+assets/audioVisual/.cache
 chrome-profile
 outputs
 downloads
