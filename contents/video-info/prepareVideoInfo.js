@@ -10,7 +10,7 @@ import {
   promptCreateSummaryFromTranscript,
   promptCreateVisualBible,
   promptMergeSummaryToSection,
-} from '../prompts/new/createVideoInfo.js';
+} from '../prompts/ja/createVideoInfo.js';
 import { openChromeProfile } from '../scripts/makeChromeProfile.js';
 import { objectsToIdTextFormat, parseSrtToObjects } from '../utils/srt.util.js';
 import downloadVideo, {
@@ -33,6 +33,7 @@ const CHUNK_SIZE = 150;
 const GENERAL_IMAGE_NAME = 'background';
 const VIDEO_META_FILE = 'video-meta.json';
 const FLOW_THUMBNAIL_FILENAME = 'flow-thumbnail.jpg';
+export const GENERAL_IMAGE_FILENAME = 'background.jpg';
 
 /**
  * @param {Record<string, unknown>|null|undefined} meta
@@ -611,7 +612,7 @@ const prepareVideoInfo = async ({ url, options = {} }) => {
       const srts = fs.readdirSync(actualOutputDir).filter(f => /\.srt$/i.test(f));
       if (srts.length === 0) {
         console.warn(
-          `[prepareVideoInfo] onlyUpdateInfo: thiếu seoTitle/seoDescription cần LLM nhưng không có file .srt trong ${actualOutputDir}`,
+          `[prepareVideoInfo] onlyUpdateInfo: thiếu seoTitle/seoDescription cần LLM nhưng không có file .srt trong ${actualOutputDir}`
         );
         return { ok: false };
       }
@@ -670,7 +671,7 @@ const prepareVideoInfo = async ({ url, options = {} }) => {
         }
       } else {
         console.warn(
-          '[prepareVideoInfo] onlyUpdateInfo: chưa có flow-thumbnail.jpg nhưng thiếu seoTitle hoặc summary để gọi generateFlowThumbnailFromGemini',
+          '[prepareVideoInfo] onlyUpdateInfo: chưa có flow-thumbnail.jpg nhưng thiếu seoTitle hoặc summary để gọi generateFlowThumbnailFromGemini'
         );
       }
     }

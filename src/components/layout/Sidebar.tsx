@@ -1,5 +1,17 @@
 import type { Page } from '../../types';
-import { PlayIcon, VideoIcon, SettingsIcon, ListIcon, VisualIcon, GroupIcon, AlertIcon, TerminalIcon, FilmIcon, GpmIcon, ChartBarsIcon } from '../ui/Icons';
+import {
+  PlayIcon,
+  VideoIcon,
+  SettingsIcon,
+  ListIcon,
+  VisualIcon,
+  GroupIcon,
+  AlertIcon,
+  TerminalIcon,
+  FilmIcon,
+  GpmIcon,
+  ChartBarsIcon,
+} from '../ui/Icons';
 import type { ReactNode } from 'react';
 
 const NAV_ITEMS: { id: Page; label: string; icon: ReactNode }[] = [
@@ -31,7 +43,7 @@ export function Sidebar({ activePage, onNavigate, isRunning, onStopRunningJob }:
     >
       <div className='px-5 py-5 flex items-center gap-3'>
         <div
-          className='w-9 h-9 rounded-xl flex items-center justify-center text-sm font-bold shadow-lg shrink-0'
+          className='w-9 h-9 rounded-sm flex items-center justify-center text-sm font-bold shadow-lg shrink-0'
           style={{
             background: 'var(--accent)',
             color: '#fff',
@@ -43,20 +55,17 @@ export function Sidebar({ activePage, onNavigate, isRunning, onStopRunningJob }:
           <span className='text-lg font-semibold tracking-tight leading-tight' style={{ color: 'var(--text-h)' }}>
             MaVid
           </span>
-          <span className='text-[11px] font-medium leading-tight tracking-wide' style={{ color: 'var(--text-muted)' }}>
-            Pipeline và kênh video
-          </span>
         </div>
       </div>
 
-      <nav className='flex-1 px-3 mt-4 space-y-1'>
+      <nav className='flex-1 px-2 mt-4 space-y-1'>
         {NAV_ITEMS.map(item => {
           const active = activePage === item.id;
           return (
             <button
               key={item.id}
               onClick={() => onNavigate(item.id)}
-              className='relative w-full flex items-center gap-3 rounded-xl pl-3 pr-3 py-2.5 text-sm cursor-pointer transition-all duration-200 overflow-hidden'
+              className='relative w-full flex items-center gap-3 pl-3 pr-3 py-2.5 text-sm cursor-pointer transition-all duration-200 overflow-hidden'
               style={{
                 background: active ? 'var(--accent-bg)' : 'transparent',
                 color: active ? 'var(--accent)' : 'var(--text)',
@@ -78,9 +87,9 @@ export function Sidebar({ activePage, onNavigate, isRunning, onStopRunningJob }:
             >
               <span
                 aria-hidden
-                className='absolute left-0 top-1/2 -translate-y-1/2 w-[3px] rounded-r-full transition-opacity duration-200'
+                className='absolute left-0 top-1/2 -translate-y-1/2 w-[3px] transition-opacity duration-200'
                 style={{
-                  height: active ? '60%' : '40%',
+                  height: active ? '100%' : '0%',
                   opacity: active ? 1 : 0,
                   background: 'var(--accent)',
                   boxShadow: active ? '0 0 12px var(--accent-glow)' : 'none',

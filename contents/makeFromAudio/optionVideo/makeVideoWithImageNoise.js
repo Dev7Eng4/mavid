@@ -31,6 +31,7 @@ import {
 import { getPrebakedLogoPng } from '../prepare/logo.js';
 import { getPrebakedNoiseMov } from '../prepare/noise.js';
 import { prepareNarratorReactionClip } from '../prepare/narrator.js';
+import { GENERAL_IMAGE_FILENAME } from '../../video-info/prepareVideoInfo.js';
 
 /** Kích thước hiển thị narrator (vuông), nằm dưới lớp noise */
 const NARRATOR_DISPLAY_PX = 240;
@@ -57,7 +58,7 @@ function findImageInDirByBasename(dir, basename) {
  * @param {object} [options]
  * @param {boolean} [options.showNarrator=false] - Hiển thị narrator reaction overlay
  */
-export async function makeVideoWithImageNoise(options = {}, bgImgPath) {
+export async function makeVideoWithImageNoise(options = {}) {
   const {
     perVideoDir,
     originalTitle,
@@ -68,13 +69,15 @@ export async function makeVideoWithImageNoise(options = {}, bgImgPath) {
     showNarrator = false,
   } = options;
 
+  const bgImgPath = path.join(downloadsDir, GENERAL_IMAGE_FILENAME);
+
   const speed = speedIn != null && Number.isFinite(Number(speedIn)) && Number(speedIn) > 0 ? Number(speedIn) : resolveAudioSpeed({});
   const audioPath = getAudioFile(downloadsDir);
 
   const originalAudioDuration = await getAudioDurationSeconds(audioPath);
   const audioDurationAfterTempo = originalAudioDuration / speed;
   console.log(
-    `Thời lượng audio: ${originalAudioDuration.toFixed(1)}s, sau atempo (SPEED=${speed}): ${formatClockDuration(audioDurationAfterTempo)}`,
+    `Thời lượng audio: ${originalAudioDuration.toFixed(1)}s, sau atempo (SPEED=${speed}): ${formatClockDuration(audioDurationAfterTempo)}`
   );
 
   let subtitlePath = getSubtitleFile(downloadsDir);
@@ -186,7 +189,7 @@ export async function makeVideoWithImageNoise(options = {}, bgImgPath) {
       `crop=${zpW}:${zpH},` +
       `zoompan=z='${zoomExpr}':` +
       `d=${totalFrames}:x='${panX}':y='${panY}':s=${w}x${h}:fps=${fps},` +
-      `format=yuv420p,setsar=1[bg]`,
+      `format=yuv420p,setsar=1[bg]`
   );
 
   let currentVLabel = 'bg';
@@ -199,7 +202,7 @@ export async function makeVideoWithImageNoise(options = {}, bgImgPath) {
     const rRadius = n / 2;
     const circleGeq = `if(lte(hypot(X-W/2,Y-H/2),${rRadius}),255,0)`;
     filterParts.push(
-      `[${reactionIndex}:v]setpts=3*PTS,fps=${fps},scale=${n}:${n}:flags=fast_bilinear,format=rgba,geq=r='r(X,Y)':g='g(X,Y)':b='b(X,Y)':a='${circleGeq}'[reaction]`,
+      `[${reactionIndex}:v]setpts=3*PTS,fps=${fps},scale=${n}:${n}:flags=fast_bilinear,format=rgba,geq=r='r(X,Y)':g='g(X,Y)':b='b(X,Y)':a='${circleGeq}'[reaction]`
     );
     filterParts.push(`[${currentVLabel}][reaction]overlay=${reactionX}:${reactionY}:shortest=1[v_under_noise]`);
     currentVLabel = 'v_under_noise';
@@ -210,7 +213,7 @@ export async function makeVideoWithImageNoise(options = {}, bgImgPath) {
       filterParts.push(`[${noiseIndex}:v]null[noise]`);
     } else {
       filterParts.push(
-        `[${noiseIndex}:v]fps=${fps},scale=${w}:${h}:flags=fast_bilinear,format=yuva420p,colorkey=0x000000:0.1:0.1,colorchannelmixer=aa=${NOISE_ALPHA}[noise]`,
+        `[${noiseIndex}:v]fps=${fps},scale=${w}:${h}:flags=fast_bilinear,format=yuva420p,colorkey=0x000000:0.1:0.1,colorchannelmixer=aa=${NOISE_ALPHA}[noise]`
       );
     }
     filterParts.push(`[${currentVLabel}][noise]overlay=0:0:shortest=1[v_noised]`);
@@ -244,7 +247,7 @@ export async function makeVideoWithImageNoise(options = {}, bgImgPath) {
       const r = Math.floor(LOGO.SIZE / 2);
       const geqExpr = `if(lte(hypot(X-W/2,Y-H/2),${r}),255,0)`;
       filterParts.push(
-        `[${logoIndex}:v]scale=${LOGO.SIZE}:${LOGO.SIZE}:flags=fast_bilinear,format=rgba,geq=r='r(X,Y)':g='g(X,Y)':b='b(X,Y)':a='${geqExpr}'[logo]`,
+        `[${logoIndex}:v]scale=${LOGO.SIZE}:${LOGO.SIZE}:flags=fast_bilinear,format=rgba,geq=r='r(X,Y)':g='g(X,Y)':b='b(X,Y)':a='${geqExpr}'[logo]`
       );
     }
     filterParts.push(`[${currentVLabel}][logo]overlay=main_w-overlay_w-${LOGO.MARGIN_RIGHT}:${LOGO.MARGIN_TOP}[vout_final]`);
@@ -279,19 +282,19 @@ export async function makeVideoWithImageNoise(options = {}, bgImgPath) {
     '128k',
     '-t',
     String(audioDurationAfterTempo),
-    outputPath,
+    outputPath
   );
 
   console.log(`Đang merge nội dung Image Noise Pipeline...`);
   await ffmpegSpawnAsync(mergeArgs);
 
-  // if (fs.existsSync(filterScriptPath)) fs.unlinkSync(filterScriptPath);
-  // if (tempSubPath && fs.existsSync(tempSubPath)) fs.unlinkSync(tempSubPath);
-  // if (scaledSrtPath && fs.existsSync(scaledSrtPath)) fs.unlinkSync(scaledSrtPath);
+  if (fs.existsSync(filterScriptPath)) fs.unlinkSync(filterScriptPath);
+  if (tempSubPath && fs.existsSync(tempSubPath)) fs.unlinkSync(tempSubPath);
+  if (scaledSrtPath && fs.existsSync(scaledSrtPath)) fs.unlinkSync(scaledSrtPath);
 
   // Dọn temp reaction
   if (reactionTempDir && fs.existsSync(reactionTempDir)) {
-    // fs.rmSync(reactionTempDir, { recursive: true, force: true });
+    fs.rmSync(reactionTempDir, { recursive: true, force: true });
     console.log(`[Narrator] Đã xóa thư mục tạm: ${reactionTempDir}`);
   }
 
@@ -331,7 +334,7 @@ export async function makeVideoWithImageNoise(options = {}, bgImgPath) {
   }
 
   if (fs.existsSync(bgImgPath)) {
-    // fs.unlinkSync(bgImgPath);
+    fs.unlinkSync(bgImgPath);
     console.log(`[Image Noise] Đã xóa ảnh background tạm: ${bgImgPath}`);
   }
 }

@@ -3,19 +3,20 @@
  * @param {{ channelFolder?: string, items?: { url: string }[] }} params
  */
 import path from 'path';
-import { resolveChannelsDir } from '../utils/channelsStoragePath.js';
-import { extractYoutubeVideoId } from '../channel/youtubeUrl.util.js';
+import { getChannelDirPath } from '../api/urls/getListAllPaths.js';
 import { readThumbnailPromptKeyFromChannelDir } from '../channel/readChannelThumbnailPrompt.util.js';
+import { extractYoutubeVideoId } from '../utils/youtube.js';
 import prepareVideoInfo from '../video-info/prepareVideoInfo.js';
 
 export default async function updateChannelVideosMeta(params = { channelFolder: '', channelId: '', items: [] }) {
   const { channelFolder, channelId, items } = params;
 
-  const channelsDir = resolveChannelsDir();
-  const channelDir = path.join(channelsDir, channelFolder.trim());
-  const thumbnailPromptKey = readThumbnailPromptKeyFromChannelDir(channelDir, channelId);
+  const channelDir = getChannelDirPath(channelFolder);
+  const thumbnailPromptKey = await readThumbnailPromptKeyFromChannelDir(channelFolder, channelId);
+  console.log('🚀 ~ updateChannelVideosMeta ~ thumbnailPromptKey:', thumbnailPromptKey);
 
   const results = [];
+
   for (const item of items) {
     const url = String(item.url || '').trim();
 

@@ -1,14 +1,14 @@
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import { resolveChannelsDir } from '../utils/channelsStoragePath.js';
-import { CHANNEL_CONFIG_FILENAME, readChannelConfigFromFolderSync } from '../channel/index.js';
+import { CHANNEL_CONFIG_FILENAME, getChannelsDirPath } from '../api/urls/getListAllPaths.js';
 import { VIDEO_MAKE_MODE } from '../constant/index.js';
 import { CHANNEL_DETAIL, MAX_VIDEOS_PER_BATCH } from '../constants/channel.js';
+import { getChannelConfig } from '../api/channels/getChannelConfig.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.join(__dirname, '..', '..');
-const CHANNELS_DIR = resolveChannelsDir();
+const CHANNELS_DIR = getChannelsDirPath();
 const MAVID_CHANNEL_CONFIG_FILENAME = CHANNEL_CONFIG_FILENAME;
 
 /**
@@ -264,69 +264,6 @@ function pickIndicesSpreadAcrossThreeZones(n, takeCount) {
   return out;
 }
 
-/**
- * Đưa `takeCount` video đầu (theo phân bổ đầu–giữa–cuối danh sách file) lên đầu mảng; còn lại giữ thứ tự cũ.
- * @template T
- * @param {T[]} items
- * @param {number} takeCount
- * @returns {T[]}
- */
-function reorderVideoItemsForSpreadUpload(items, takeCount) {
-  const n = items.length;
-  if (n === 0 || takeCount < 1) return items.slice();
-  const take = Math.min(takeCount, n);
-  const pickIdx = pickIndicesSpreadAcrossThreeZones(n, take);
-  const set = new Set(pickIdx);
-  const first = pickIdx.map(i => items[i]);
-  const rest = [];
-  for (let i = 0; i < n; i++) {
-    if (!set.has(i)) rest.push(items[i]);
-  }
-  return [...first, ...rest];
-}
-
-/**
- * `uploadedVideos` trong mavid-channel-config (entry khớp email hoặc phần tử đầu / root).
- * @param {string} channelsDir
- * @param {string|null|undefined} filePath
- * @param {{ channelFolder?: string; email?: string }} options
- */
-function tryGetUploadedVideosForSelection(channelsDir, filePath, options) {
-  const folder = (options.channelFolder && String(options.channelFolder).trim()) || inferChannelFolderName(filePath, channelsDir);
-  if (!folder) return 0;
-  const p = path.join(channelsDir, folder, MAVID_CHANNEL_CONFIG_FILENAME);
-  if (!fs.existsSync(p)) return 0;
-  let cfg;
-  try {
-    cfg = JSON.parse(fs.readFileSync(p, 'utf-8'));
-  } catch {
-    return 0;
-  }
-  const list = Array.isArray(cfg.channels) ? cfg.channels : [];
-  const want = String(options.email || '')
-    .trim()
-    .toLowerCase();
-  let item = null;
-  if (want && list.length > 0) {
-    item =
-      list.find(
-        c =>
-          c &&
-          String(c.email || '')
-            .trim()
-            .toLowerCase() === want,
-      ) || null;
-  }
-  if (!item && list.length > 0) item = list[0];
-  if (item && item.uploadedVideos != null && Number.isFinite(Number(item.uploadedVideos))) {
-    return Math.max(0, Math.floor(Number(item.uploadedVideos)));
-  }
-  if (cfg.uploadedVideos != null && Number.isFinite(Number(cfg.uploadedVideos))) {
-    return Math.max(0, Math.floor(Number(cfg.uploadedVideos)));
-  }
-  return 0;
-}
-
 const UPLOADED_VIDEOS_SPREAD_THRESHOLD = 10;
 
 /**
@@ -565,7 +502,7 @@ async function main(props = {}) {
     throw new Error(`Không tìm thấy channel folder: ${channelId}`);
   }
 
-  const cfg = readChannelConfigFromFolderSync(folderPath);
+  const cfg = await getChannelConfig(channelId);
   let configItem = null;
 
   if (cfg) {
@@ -629,7 +566,7 @@ async function main(props = {}) {
         ? `Không có link video nào thỏa điều kiện độ dài (${minDurationMinutes > 0 ? `lớn hơn ${minDurationMinutes} phút` : ''}${
             minDurationMinutes > 0 && maxDurationMinutes > 0 ? ', ' : ''
           }${maxDurationMinutes > 0 ? `tối đa ${maxDurationMinutes} phút` : ''}) trong file Excel.`
-        : 'Không có link video nào trong file Excel.',
+        : 'Không có link video nào trong file Excel.'
     );
   }
 

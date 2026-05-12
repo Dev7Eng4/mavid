@@ -4,7 +4,7 @@
  */
 export { YOUTUBE_SELECTOR } from './studioSelectors.js';
 export { assertSafeChannelFolder } from './channelFolder.util.js';
-export { findChannelRowByEmail, findChannelRowById, pickPublishFieldsFromChannelRow, readChannelConfigSync } from '../channel/index.js';
+export { pickPublishFieldsFromChannelRow } from '../channel/index.js';
 export { getYoutubePublishPlan } from './publishSchedule.util.js';
 export {
   syncChannelAfterYoutubeUpload,

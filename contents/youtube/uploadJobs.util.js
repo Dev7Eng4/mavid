@@ -4,7 +4,6 @@
 import fs from 'fs';
 import path from 'path';
 import { GPM_API_DEFAULT_ORIGIN } from '../constants/gpmApi.js';
-import { readChannelConfigFromFolderSync } from '../channel/index.js';
 
 /**
  * Chuẩn hóa base GPM → origin cho Playwright (bỏ hậu tố /api/v3 nếu có).
@@ -61,8 +60,8 @@ export function assertSafeSubfolderName(name) {
  * @param {string} id
  * @returns {{ durationMinuteFrom: number, durationMinuteTo: number | null } | null}
  */
-function getDurationBoundsFromConfig(channelAbs, id) {
-  const cfg = readChannelConfigFromFolderSync(channelAbs);
+async function getDurationBoundsFromConfig(channelAbs, id) {
+  const cfg = await getChannelConfig(channelAbs);
   if (!cfg) return null;
   const list = Array.isArray(cfg.channels) ? cfg.channels : [];
 
@@ -73,7 +72,7 @@ function getDurationBoundsFromConfig(channelAbs, id) {
         c &&
         String(c.id || '')
           .trim()
-          .toLowerCase() === id,
+          .toLowerCase() === id
     );
   }
   if (!item && list.length > 0) item = list[0];
@@ -160,13 +159,13 @@ async function readVideoIdsWithStatusDone(channelAbs, durBounds) {
     const statusIdx = headerRow.values.findIndex(v =>
       String(v || '')
         .toLowerCase()
-        .includes('status'),
+        .includes('status')
     );
     const durationIdx = headerRow.values.findIndex(
       v =>
         String(v || '')
           .trim()
-          .toLowerCase() === 'duration',
+          .toLowerCase() === 'duration'
     );
 
     const ids = [];
@@ -274,7 +273,7 @@ export async function listUploadJobs(channelAbs, id, maxUploads, folderNamesOrde
   const durBounds = getDurationBoundsFromConfig(channelAbs, id);
   if (durBounds) {
     console.log(
-      `[upload-jobs] Duration filter: from ${durBounds.durationMinuteFrom} phút, to ${durBounds.durationMinuteTo ?? 'không giới hạn'} phút`,
+      `[upload-jobs] Duration filter: from ${durBounds.durationMinuteFrom} phút, to ${durBounds.durationMinuteTo ?? 'không giới hạn'} phút`
     );
   }
 

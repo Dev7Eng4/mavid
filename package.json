@@ -5,10 +5,6 @@
   "type": "module",
   "main": "electron/main.js",
   "scripts": {
-    "dev": "vite",
-    "build": "tsc -b && vite build",
-    "lint": "eslint .",
-    "preview": "vite preview",
     "start": "concurrently -k \"vite --port 5173 --strictPort\" \"nodemon --watch electron --ext js,cjs --exec \\\"npx electron .\\\"\"",
     "tao-chrome-profile": "node contents/scripts/makeChromeProfile.js",
     "mo-gpm-playwright": "node contents/scripts/openGpmPlaywright.js",
@@ -19,7 +15,11 @@
     "tao-thumbnail-flow": "node contents/video-info/thumbnail/createThumbnailFlow.cli.js",
     "tom-tat-meta-tu-transcript": "node contents/scripts/summaryMetaFromTranscript.js",
     "syncProgressToSpreadsheet": "node contents/scripts/syncProgressToSpreadsheet.js",
-    "syncVideosToDrive": "node contents/ggdrive/syncVideosToDrive.cli.js"
+    "syncVideosToDrive": "node contents/ggdrive/syncVideosToDrive.cli.js",
+    "dev": "vite",
+    "build": "tsc -b && vite build",
+    "lint": "eslint .",
+    "preview": "vite preview"
   },
   "dependencies": {
     "@tailwindcss/vite": "4.2.2",

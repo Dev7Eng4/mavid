@@ -8,10 +8,9 @@
 
 import fs from 'fs';
 import path from 'path';
-import { resolveChannelsDir } from '../utils/channelsStoragePath.js';
-import { readChannelConfigSync, CHANNEL_CONFIG_FILENAME } from '../channel/index.js';
-import { pickChronologicallyLatestSlot } from './publishScheduleByDuration.util.js';
+import { CHANNEL_CONFIG_FILENAME, getChannelDirPath, getListMappingPath } from '../api/urls/getListAllPaths.js';
 import { CHANNELS } from '../constants/channel.js';
+import { pickChronologicallyLatestSlot } from './publishScheduleByDuration.util.js';
 
 export const MAVID_CHANNEL_CONFIG_FILENAME = CHANNEL_CONFIG_FILENAME;
 
@@ -29,7 +28,7 @@ async function updateChannelsIndexLastUpload(id, lastUploadText) {
   const text = String(lastUploadText || '').trim();
   if (!text) return;
 
-  const indexPath = path.join(resolveChannelsDir(), 'index.xlsx');
+  const indexPath = getListMappingPath();
   if (!fs.existsSync(indexPath)) {
     console.warn(`${LOG} Không có channels/index.xlsx — bỏ qua LAST UPLOAD.`);
     return;
@@ -135,7 +134,7 @@ function resolveChannelRowIndexForAfterUpload(cfg, id) {
       ch =>
         String(ch?.id || '')
           .trim()
-          .toLowerCase() === id,
+          .toLowerCase() === id
     );
     return idx >= 0 ? idx : -1;
   }
@@ -202,18 +201,18 @@ export async function syncChannelAfterYoutubeUpload(p) {
     return;
   }
 
-  const channelAbs = path.join(resolveChannelsDir(), p.channelFolder);
+  const channelAbs = getChannelDirPath(p.channelFolder);
   /** Chuỗi LAST UPLOAD cho `channels/index.xlsx` (DD/MM/YYYY [HH:mm]) — ghi ở bước cuối sau STATUS. */
   let indexLastUploadText = '';
 
   try {
-    const cfg = readChannelConfigSync({ channelFolder: p.channelFolder });
+    const cfg = await getChannelConfig(p.channelFolder);
     const idx = resolveChannelRowIndexForAfterUpload(cfg, p.id);
     if (idx < 0) {
       throw new Error(
         p.id
           ? `Không tìm thấy id «${p.id}» trong mavid-channel-config.`
-          : 'Thiếu id và channels[] có ≠ 1 phần tử — không chọn được dòng để cập nhật uploadedVideos / latestUpload*.',
+          : 'Thiếu id và channels[] có ≠ 1 phần tử — không chọn được dòng để cập nhật uploadedVideos / latestUpload*.'
       );
     }
     const ch = { ...cfg.channels[idx] };
@@ -257,7 +256,7 @@ export async function syncChannelAfterYoutubeUpload(p) {
           const statusIdx = headerRow.values.findIndex(v =>
             String(v || '')
               .toLowerCase()
-              .includes('status'),
+              .includes('status')
           );
           if (videoIdx < 1 || statusIdx < 1) {
             console.warn(`${LOG} Excel: không tìm thấy cột LINK VIDEO hoặc STATUS.`);
@@ -324,7 +323,7 @@ export async function syncChannelAfterYoutubeUpload(p) {
                     const s = String(c ?? '');
                     return s.includes(',') || s.includes('"') ? `"${s.replace(/"/g, '""')}"` : s;
                   })
-                  .join(','),
+                  .join(',')
               );
             }
             fs.writeFileSync(sheetPath, out.join('\n'), 'utf-8');

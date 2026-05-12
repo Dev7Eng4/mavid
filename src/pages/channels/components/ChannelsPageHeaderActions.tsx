@@ -85,86 +85,38 @@ export function ChannelsPageHeaderActions({
                 variant='primary'
                 onClick={onOpenCreateVideo}
                 disabled={indexActionsLocked || indexCreateVideoEligibleSelectedCount === 0 || !canRunIndexBatchVideo}
-                title={
-                  indexCreateVideoEligibleSelectedCount === 0
-                    ? indexSelectedRowCount === 0
-                      ? 'Không có kênh nào có email và đúng loại video để tạo.'
-                      : 'Các dòng đã chọn cần có ID/CHANNEL và LOẠI VIDEO (audio/video).'
-                    : indexSelectedRowCount === 0
-                      ? `Không chọn dòng nào — tạo video cho TẤT CẢ ${indexCreateVideoEligibleSelectedCount} kênh CÓ EMAIL đầy đủ cấu hình.`
-                      : `Tạo video cho ${indexCreateVideoEligibleSelectedCount} kênh đang chọn.`
-                }
+                title='Create video'
               >
-                {indexBatchVideo ? (
-                  <span className='inline-flex items-center gap-2 max-w-[min(100vw-2rem,28rem)] min-w-0'>
-                    <SpinnerIcon className='w-4 h-4 shrink-0' />
-                    <span className='truncate'>
-                      Tạo video {indexBatchVideo.current}/{indexBatchVideo.total}: {indexBatchVideo.channelLabel}
-                    </span>
-                  </span>
-                ) : indexCreateVideoEligibleSelectedCount > 0 ? (
-                  `Tạo video (${indexCreateVideoEligibleSelectedCount})`
-                ) : (
-                  'Tạo video'
-                )}
+                Create Video
               </AppButton>
             </>
           )}
-          <AppButton
-            type='button'
-            variant='primary'
-            onClick={onOpenAddChannel}
-            disabled={loading}
-            title='Tạo thư mục kênh và tạo/cập nhật MaVidMedia/channels/index.xlsx (không cần có sẵn index)'
-          >
-            + Ánh xạ mới
+          <AppButton type='button' variant='primary' onClick={onOpenAddChannel} disabled={loading} title=''>
+            Mapping
           </AppButton>
           <AppButton
             type='button'
             variant='primary'
             onClick={onOpenUploadVideo}
             disabled={loading || uploadEligibleSelectedCount === 0}
-            title={
-              uploadEligibleSelectedCount === 0
-                ? indexSelectedRowCount === 0
-                  ? 'Không có kênh nào có email để upload.'
-                  : 'Các dòng đã chọn cần có ID/CHANNEL và BẮT BUỘC có EMAIL để upload.'
-                : indexBatchVideo !== null
-                  ? 'Có thể upload song song khi đang tạo video — chọn kênh và xác nhận trong hộp thoại.'
-                  : youtubeUploadActiveThreads > 0
-                    ? `Đang chạy ${youtubeUploadActiveThreads} luồng upload nền — vẫn có thể mở hộp thoại thêm kênh.`
-                    : indexSelectedRowCount === 0
-                      ? `Không chọn dòng nào — upload cho TẤT CẢ ${uploadEligibleSelectedCount} kênh CÓ EMAIL.`
-                      : `Upload cho ${uploadEligibleSelectedCount} kênh đang chọn (có email).`
-            }
+            title='Upload videos to YouTube'
           >
-            {youtubeUploadActiveThreads > 0 ? (
-              <span className='inline-flex items-center gap-2 max-w-[min(100vw-2rem,28rem)] min-w-0'>
-                <SpinnerIcon className='w-4 h-4 shrink-0' />
-                <span className='truncate'>
-                  Upload video ({uploadEligibleSelectedCount}) — {youtubeUploadActiveThreads} luồng
-                </span>
-              </span>
-            ) : uploadEligibleSelectedCount > 0 ? (
-              `Upload video (${uploadEligibleSelectedCount})`
-            ) : (
-              'Upload video'
-            )}
+            Upload
           </AppButton>
           <AppButton
             type='button'
             variant='secondary'
             onClick={() => void onUploadToGoogleDrive()}
             disabled={loading}
-            title='Chạy đồng bộ MaVidMedia/videos → Google Drive trong nền (npm run syncVideosToDrive). OAuth lần đầu có thể mở trình duyệt.'
+            title='Clean up videos to Google Drive'
           >
-            Dọn dẹp
+            Clean
           </AppButton>
         </>
       )}
       {selectedChannel && (
         <AppButton type='button' variant='neutral' onClick={onBackToIndex}>
-          ← Danh sách
+          ← List
         </AppButton>
       )}
       {selectedChannel && detailBulkVideo ? (
@@ -183,7 +135,7 @@ export function ChannelsPageHeaderActions({
             {detailBulkVideo.createVideoBusy ? (
               <span className='inline-flex items-center gap-2'>
                 <SpinnerIcon className='w-4 h-4' />
-                Đang tạo video…
+                Creating video…
               </span>
             ) : (
               'Tạo video'
@@ -203,7 +155,7 @@ export function ChannelsPageHeaderActions({
             {detailBulkVideo.detailUploadPrepBusy ? (
               <span className='inline-flex items-center gap-2'>
                 <SpinnerIcon className='w-4 h-4' />
-                Đang chuẩn bị…
+                Preparing…
               </span>
             ) : detailBulkVideo.createdVideoSelectedCount > 0 ? (
               `Upload video (${detailBulkVideo.createdVideoSelectedCount})`
@@ -228,7 +180,7 @@ export function ChannelsPageHeaderActions({
           {detailUpdateMeta.updateMetaBusy ? (
             <span className='inline-flex items-center gap-2'>
               <SpinnerIcon className='w-4 h-4' />
-              Đang cập nhật meta…
+              Updating meta…
             </span>
           ) : (
             `Cập nhật meta${detailUpdateMeta.createdVideoSelectedCount > 0 ? ` (${detailUpdateMeta.createdVideoSelectedCount})` : ''}`
@@ -237,7 +189,7 @@ export function ChannelsPageHeaderActions({
       ) : null}
       <AppButton type='button' variant='secondary' onClick={() => void onRefresh()} disabled={refreshBusy}>
         {refreshBusy ? <SpinnerIcon className='w-4 h-4' /> : <RefreshIcon className='w-4 h-4' />}
-        <span>{refreshBusy ? 'Đang tải...' : 'Tải lại'}</span>
+        <span>{refreshBusy ? 'Loading...' : 'Refresh'}</span>
       </AppButton>
     </>
   );

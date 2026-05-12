@@ -59,9 +59,6 @@ export function ChannelsDetailSection({
       </div>
 
       <div className='rounded-2xl p-4 w-full min-w-0 space-y-3' style={{ background: 'var(--card-bg)', border: '1px solid var(--border)' }}>
-        <div className='text-sm font-medium uppercase tracking-wider' style={{ color: 'var(--text-muted)' }}>
-          Tìm & lọc
-        </div>
         <div className='grid grid-cols-1 md:grid-cols-3 gap-4 items-end'>
           <label className='block min-w-0'>
             <span className='block text-sm mb-2' style={{ color: 'var(--text-h)' }}>

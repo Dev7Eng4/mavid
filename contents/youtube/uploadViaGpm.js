@@ -12,18 +12,18 @@
  * @param {string} [params.email] — email kênh trong `mavid-channel-config.json` → `getYoutubePublishPlan` (ngày/giờ public) ở bước Schedule.
  */
 import path from 'path';
+import { getChannelDirPath } from '../api/urls/getListAllPaths.js';
+import { closeProfile, connectPlaywrightToGpmProfile } from '../scripts/openGpmPlaywright.js';
 import { delay } from '../utils/dom.util.js';
-import { connectPlaywrightToGpmProfile, closeProfile } from '../scripts/openGpmPlaywright.js';
-import { syncChannelAfterYoutubeUpload } from './uploadAfterSync.js';
+import { resolveGpmProfileIdByEmail } from '../utils/gpm.util.js';
+import { logToLogsPage } from '../utils/logToLogsPage.util.js';
+import { assertSafeChannelFolder } from './channelFolder.util.js';
 import { moveSuccessfulUploadFoldersToVideosArchive } from './moveUploadedFoldersToVideosArchive.js';
 import { getYoutubePublishPlan } from './publishSchedule.util.js';
 import { scheduleSlotToLocalDate } from './publishScheduleByDuration.util.js';
+import { addRelatedVideo, chooseVisibility, fillVideoDetails, openYoutubeUpload, selectFile } from './studioUploadFlow.js';
+import { syncChannelAfterYoutubeUpload } from './uploadAfterSync.js';
 import { apiRootForPlaywright, listUploadJobs } from './uploadJobs.util.js';
-import { assertSafeChannelFolder } from './channelFolder.util.js';
-import { resolveChannelsDir } from '../utils/channelsStoragePath.js';
-import { openYoutubeUpload, selectFile, fillVideoDetails, addRelatedVideo, chooseVisibility } from './studioUploadFlow.js';
-import { logToLogsPage } from '../utils/logToLogsPage.util.js';
-import { resolveGpmProfileIdByEmail } from '../utils/gpm.util.js';
 
 /**
  * Mốc publish → ms (dùng sắp thứ tự upload: sớm → muộn). Ưu tiên `iso` nếu có.
@@ -80,21 +80,20 @@ export default async function main(raw = {}) {
     ? raw.uploadFolderNames.map(x => String(x ?? '').trim()).filter(Boolean)
     : null;
 
-  const channelAbs = path.join(resolveChannelsDir(), channelFolder);
-  console.log('🚀 ~ main ~ channelAbs:', channelAbs);
+  const channelAbs = getChannelDirPath(channelFolder);
+
   const jobs = await listUploadJobs(
     channelAbs,
     raw.id,
     maxUploads,
-    uploadFolderNames && uploadFolderNames.length > 0 ? uploadFolderNames : null,
+    uploadFolderNames && uploadFolderNames.length > 0 ? uploadFolderNames : null
   );
-  console.log('🚀 ~ main ~ jobs:', jobs);
 
   if (jobs.length === 0) {
     throw new Error(
       `Không có thư mục con nào đủ điều kiện (.mp4 + thumbnail .png/.jpg/.jpeg) trong ${channelAbs} (đã giới hạn ${
         maxUploads == null ? 'tất cả' : maxUploads
-      } video).`,
+      } video).`
     );
   }
 
@@ -159,7 +158,9 @@ export default async function main(raw = {}) {
       const { job, slot } = uploadQueue[i];
       const { folderName, folderPath, mp4Path } = job;
       console.log(
-        `[upload] (${i + 1}/${uploadQueue.length}) Thư mục «${folderName}» → ${path.basename(mp4Path)} (mốc: ${slot?.date ?? '—'} ${slot?.time ?? ''})`,
+        `[upload] (${i + 1}/${uploadQueue.length}) Thư mục «${folderName}» → ${path.basename(mp4Path)} (mốc: ${slot?.date ?? '—'} ${
+          slot?.time ?? ''
+        })`
       );
 
       try {

@@ -1,7 +1,3 @@
-import { LLM_PROVIDER } from './provider.js';
-
-const emptyLabel = () => (LLM_PROVIDER === 'gpt' ? 'ChatGPT' : 'Gemini');
-
 /**
  * Bỏ fence markdown nếu model bọc ``` / ```json.
  * @param {string} text
@@ -22,7 +18,7 @@ export function stripJsonCodeFence(text) {
 export function validateJsonResponse(raw) {
   const cleaned = stripJsonCodeFence(raw);
   if (!cleaned) {
-    throw new Error(`${emptyLabel()} trả về response rỗng.`);
+    throw new Error(`Trả về response rỗng.`);
   }
   JSON.parse(cleaned);
 }

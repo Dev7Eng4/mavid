@@ -5,11 +5,10 @@
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import { getChannelsDirPath } from '../api/urls/getListAllPaths.js';
 import { syncProgressFromFileToSpreadsheet } from '../syncProgressToSpreadsheet.js';
-import { resolveChannelsDir } from '../utils/channelsStoragePath.js';
 
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const CHANNELS_DIR = resolveChannelsDir();
+const CHANNELS_DIR = getChannelsDirPath();
 
 /** File .xlsx / .csv đầu tiên trong folder (ưu tiên .xlsx) — cùng quy tắc với batch/UI. */
 function getChannelDataFile(channelDir) {
@@ -35,7 +34,10 @@ async function main() {
   }
 
   const entries = fs.readdirSync(CHANNELS_DIR, { withFileTypes: true });
-  const dirs = entries.filter(e => e.isDirectory()).map(e => e.name).sort((a, b) => a.localeCompare(b));
+  const dirs = entries
+    .filter(e => e.isDirectory())
+    .map(e => e.name)
+    .sort((a, b) => a.localeCompare(b));
 
   let synced = 0;
   let skipped = 0;

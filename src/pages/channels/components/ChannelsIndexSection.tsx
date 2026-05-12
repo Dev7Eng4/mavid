@@ -97,7 +97,7 @@ export function ChannelsIndexSection({
             type='search'
             value={toolbarSearch}
             onChange={e => onToolbarSearchChange(e.target.value)}
-            placeholder='Lọc theo URL hoặc email…'
+            placeholder='Filter by URL or email…'
             autoComplete='off'
             className={toolbarInputClass}
             style={{
@@ -106,43 +106,7 @@ export function ChannelsIndexSection({
               borderColor: 'var(--border)',
             }}
           />
-          <AppButton
-            type='button'
-            variant={filterExpanded ? 'secondary' : 'neutral'}
-            size='sm'
-            className='inline-flex items-center gap-2 shrink-0'
-            onClick={onToggleFilterExpanded}
-          >
-            <FilterIcon className='h-4 w-4' />
-            Lọc nhóm
-          </AppButton>
-          <AppButton
-            type='button'
-            variant='neutral'
-            size='sm'
-            className='inline-flex items-center gap-2 shrink-0'
-            disabled={loading || indexFilteredCount === 0}
-            onClick={onExportCsv}
-          >
-            <DownloadIcon className='h-4 w-4' />
-            Xuất CSV
-          </AppButton>
         </div>
-
-        {filterExpanded ? (
-          <div className='border-b px-4 py-3 sm:flex sm:max-w-md sm:items-center sm:gap-3' style={{ borderColor: 'var(--border)' }}>
-            <span className='mb-2 block text-sm font-medium sm:mb-0 sm:w-28 shrink-0' style={{ color: 'var(--text-muted)' }}>
-              Nhóm
-            </span>
-            <CustomSelect
-              value={groupFilter}
-              options={groupFilterOptions}
-              onChange={onGroupFilterChange}
-              placeholder='Nhóm'
-              menuZIndex={100}
-            />
-          </div>
-        ) : null}
 
         <div className='w-full min-w-0 overflow-auto'>
           <table className='w-full min-w-0 text-base' style={{ borderCollapse: 'collapse', tableLayout: 'auto' }}>

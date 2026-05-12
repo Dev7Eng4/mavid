@@ -1,27 +1,10 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { PageHeader } from '@/components/ui/PageHeader';
+import { useClientPagination } from '@/hooks/useClientPagination';
+import { useResolvedVideoLimits } from '@/hooks/useResolvedVideoLimits';
+import { gpmApi } from '@/services';
 import type { ChannelRow, Group } from '@/types';
 import { scriptDefs } from '@/types';
-import { useResolvedVideoLimits } from '@/hooks/useResolvedVideoLimits';
-import { useClientPagination } from '@/hooks/useClientPagination';
-import { PageHeader } from '@/components/ui/PageHeader';
-import { ChannelAddDialog } from './components/ChannelAddDialog';
-import { ChannelCreateVideoDialog } from './components/ChannelCreateVideoDialog';
-import { ChannelUploadVideoDialog } from './components/ChannelUploadVideoDialog';
-import { fetchAllGpmProfileRows, resolveGpmProfileIdByEmail } from './utils/gpmProfileHelpers';
-import { ChannelsDetailSection } from './components/ChannelsDetailSection';
-import { ChannelsIndexSection } from './components/ChannelsIndexSection';
-import { CHANNELS } from './models/channelsIndexSection.model';
-import { ChannelsPageHeaderActions } from './components/ChannelsPageHeaderActions';
-import { durationPresetToSecRange, parseDurationToSeconds } from './utils/channelDurationFormat';
-import { gpmApi } from '@/services';
-import {
-  buildExtraEnvForIndexChannelRow,
-  CHANNEL_ADD_DURATION_SELECT_OPTIONS,
-  extractYoutubeVideoIdFromUrl,
-  SCRIPT_CREATE_BATCH_VIDEO,
-  SCRIPT_FROM_AUDIO,
-  SCRIPT_REUP_FULL,
-} from './utils/channelIndexHelpers';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   convertChannelVideosRowToData,
   convertIndexRowToChannel,
@@ -29,6 +12,21 @@ import {
   type ChannelUploadVideoPayload,
 } from './channelUploadVideoHelpers';
 import { getChannelsIndexCache, prefetchChannelsIndex } from './channelsPrefetch';
+import { ChannelAddDialog } from './components/ChannelAddDialog';
+import { ChannelCreateVideoDialog } from './components/ChannelCreateVideoDialog';
+import { ChannelUploadVideoDialog } from './components/ChannelUploadVideoDialog';
+import { ChannelsDetailSection } from './components/ChannelsDetailSection';
+import { ChannelsIndexSection } from './components/ChannelsIndexSection';
+import { ChannelsPageHeaderActions } from './components/ChannelsPageHeaderActions';
+import { CHANNELS } from './models/channelsIndexSection.model';
+import { durationPresetToSecRange, parseDurationToSeconds } from './utils/channelDurationFormat';
+import {
+  buildExtraEnvForIndexChannelRow,
+  CHANNEL_ADD_DURATION_SELECT_OPTIONS,
+  extractYoutubeVideoIdFromUrl,
+  SCRIPT_CREATE_BATCH_VIDEO,
+} from './utils/channelIndexHelpers';
+import { fetchAllGpmProfileRows, resolveGpmProfileIdByEmail } from './utils/gpmProfileHelpers';
 
 const INDEX_FILE = 'channels/index.xlsx';
 
@@ -224,7 +222,7 @@ function ChannelsPage() {
         setDetailLoading(false);
       }
     },
-    [channels],
+    [channels]
   );
 
   useEffect(() => {
@@ -298,7 +296,7 @@ function ChannelsPage() {
         console.log(
           failures.length === queue.length
             ? `Tất cả ${failures.length} kênh lỗi: ${failures.slice(0, 3).join(' ')}${failures.length > 3 ? '…' : ''}`
-            : `Một số kênh lỗi (${failures.length}/${queue.length}): ${failures.slice(0, 4).join(' ')}${failures.length > 4 ? '…' : ''}`,
+            : `Một số kênh lỗi (${failures.length}/${queue.length}): ${failures.slice(0, 4).join(' ')}${failures.length > 4 ? '…' : ''}`
         );
       }
     } finally {
@@ -334,7 +332,7 @@ function ChannelsPage() {
 
   const pageIndexRows = useMemo(
     () => indexFilteredChannels.slice(indexStartIndex, indexStartIndex + indexPageSize),
-    [indexFilteredChannels, indexStartIndex, indexPageSize],
+    [indexFilteredChannels, indexStartIndex, indexPageSize]
   );
 
   const indexPageSelectionFlags = useMemo(() => {
@@ -376,7 +374,7 @@ function ChannelsPage() {
 
   const pageDetailRows = useMemo(
     () => filteredRowsWithIndex.slice(detailStartIndex, detailStartIndex + detailPageSize),
-    [filteredRowsWithIndex, detailStartIndex, detailPageSize],
+    [filteredRowsWithIndex, detailStartIndex, detailPageSize]
   );
 
   const detailPageSelectionFlags = useMemo(() => {
@@ -422,7 +420,12 @@ function ChannelsPage() {
     let createdVideoWithYoutubeIdCount = 0;
     let hasCreatedVideoWithYoutubeIdInSelection = false;
 
+    console.log('🚀 ~ ChannelsPage ~ detailSelectedRowIndices:', detailSelectedRowIndices);
     if (detailSelectedRowIndices.size === 0) {
+      console.log(
+        '🚀 ~ ChannelsPage ~ channelVideos:',
+        channelVideos.filter(row => row.status === DETAIL_STATUS_VIDEO_CREATED)
+      );
       for (const row of channelVideos) {
         const status = String(row.status ?? '').trim();
         if (status === DETAIL_STATUS_VIDEO_CREATED) {
@@ -569,7 +572,7 @@ function ChannelsPage() {
     if (skippedBusy.length > 0) {
       const uniq = [...new Set(skippedBusy)];
       setUploadScheduleInfo(
-        `Bỏ qua ${uniq.length} email đang upload trên luồng khác: ${uniq.join(', ')}. Chờ xong rồi mới chạy lại cho các email đó.`,
+        `Bỏ qua ${uniq.length} email đang upload trên luồng khác: ${uniq.join(', ')}. Chờ xong rồi mới chạy lại cho các email đó.`
       );
     }
 
@@ -630,8 +633,8 @@ function ChannelsPage() {
         if (fail > 0) parts.push(`${fail} kênh lỗi`);
         setUploadScheduleInfo(
           `${skipNote}Upload YouTube (${claimed.length} kênh, tối đa ${MAX_CONCURRENT_YOUTUBE_UPLOAD_CHANNELS} song song): ${parts.join(
-            ' — ',
-          )}. Kiểm tra GPM / YouTube Studio và tab Logs.`,
+            ' — '
+          )}. Kiểm tra GPM / YouTube Studio và tab Logs.`
         );
       } catch (e) {
         const msg = e instanceof Error ? e.message : String(e);
@@ -678,7 +681,7 @@ function ChannelsPage() {
           videos: onlyLinks,
         },
       ],
-      defaultMaxVideosPerBatchDetail,
+      defaultMaxVideosPerBatchDetail
     );
   }, [selectedChannel, channelVideos, detailSelectedRowIndices, channels, defaultMaxVideosPerBatchDetail, runCreateVideoForQueue]);
 
@@ -686,12 +689,21 @@ function ChannelsPage() {
     if (!selectedChannel || !channelVideos?.length) return;
 
     const uploadFolderNames: string[] = [];
-    for (const link of detailSelectedRowIndices) {
-      const row = channelVideos.find(r => r.link === link);
-      if (!row) continue;
-      if (String(row.status ?? '').trim() !== DETAIL_STATUS_VIDEO_CREATED) continue;
-      const id = extractYoutubeVideoIdFromUrl(String(row.link ?? '').trim());
-      if (id) uploadFolderNames.push(id);
+    console.log('🚀 ~ ChannelsPage ~ detailSelectedRowIndices:', detailSelectedRowIndices);
+    if (detailSelectedRowIndices.size === 0) {
+      for (const row of channelVideos) {
+        if (String(row.status ?? '').trim() !== DETAIL_STATUS_VIDEO_CREATED) continue;
+        const id = extractYoutubeVideoIdFromUrl(String(row.link ?? '').trim());
+        if (id) uploadFolderNames.push(id);
+      }
+    } else {
+      for (const link of detailSelectedRowIndices) {
+        const row = channelVideos.find(r => r.link === link);
+        if (!row) continue;
+        if (String(row.status ?? '').trim() !== DETAIL_STATUS_VIDEO_CREATED) continue;
+        const id = extractYoutubeVideoIdFromUrl(String(row.link ?? '').trim());
+        if (id) uploadFolderNames.push(id);
+      }
     }
 
     if (uploadFolderNames.length === 0) {
@@ -761,7 +773,7 @@ function ChannelsPage() {
         setMappingStatus(null);
       }
     },
-    [channels],
+    [channels]
   );
 
   const handleCreateBatchVideo = useCallback(async () => {
@@ -803,8 +815,8 @@ function ChannelsPage() {
     <div className='space-y-6 w-full min-w-0'>
       <PageHeader
         align='start'
-        title='Ánh xạ kênh'
-        description='Quản lý và liên kết kênh video với pipeline xử lý nội bộ.'
+        title={selectedChannelRow ? selectedChannelRow.channelId : 'Mapping'}
+        description=''
         actions={
           <ChannelsPageHeaderActions
             selectedChannel={selectedChannel}

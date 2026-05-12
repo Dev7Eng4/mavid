@@ -1,18 +1,17 @@
-import { useState, useCallback, useEffect } from 'react';
-import type { Page, ScriptId } from './types';
-import { Sidebar } from './components/layout/Sidebar';
-import { AppTopBar } from './components/layout/AppTopBar';
-import { PipelinePage } from '@/pages/PipelinePage';
-import CreateVideoPage from '@/pages/create-video';
-import { SettingsPage } from '@/pages/SettingsPage';
-import ChannelsPage from '@/pages/channels';
-import VisualPage from '@/pages/visual';
+import { GpmPage } from '@/pages/GpmPage';
 import { GroupsPage } from '@/pages/GroupsPage';
+import { LogsPage } from '@/pages/LogsPage';
+import { PipelinePage } from '@/pages/PipelinePage';
+import { SettingsPage } from '@/pages/SettingsPage';
 import { WarningsPage } from '@/pages/WarningsPage';
 import AnalystPage from '@/pages/analyst';
-import { GpmPage } from '@/pages/GpmPage';
-import { LogsPage } from '@/pages/LogsPage';
+import ChannelsPage from '@/pages/channels';
 import { ensureChannelsIndexPrefetched } from '@/pages/channels/channelsPrefetch';
+import CreateVideoPage from '@/pages/create-video';
+import VisualPage from '@/pages/visual';
+import { useCallback, useEffect, useState } from 'react';
+import { Sidebar } from './components/layout/Sidebar';
+import type { Page, ScriptId } from './types';
 
 export default function App() {
   const [activePage, setActivePage] = useState<Page>('pipeline');
@@ -81,34 +80,33 @@ export default function App() {
         onStopRunningJob={runningScript !== null ? () => void stopRunningNpmJob() : undefined}
       />
       <div className='ml-56 flex min-h-screen min-w-0 flex-1 flex-col'>
-        <AppTopBar activePage={activePage} />
         <main className='min-h-0 flex-1 w-full overflow-auto p-4'>
-        {activePage === 'pipeline' && (
-          <PipelinePage
-            runningScript={runningScript}
-            setRunningScript={setRunningScript}
-            appendErrorLog={appendErrorLog}
-            onNavigate={setActivePage}
-          />
-        )}
-        {activePage === 'create-video' && (
-          <CreateVideoPage
-            key='create-video'
-            disabled={runningScript !== null}
-            runningScript={runningScript}
-            setRunningScript={setRunningScript}
-            appendErrorLog={appendErrorLog}
-            onNavigate={setActivePage}
-          />
-        )}
-        {activePage === 'settings' && <SettingsPage key='settings' disabled={runningScript !== null} />}
-        {activePage === 'channels' && <ChannelsPage key='channels' />}
-        {activePage === 'visual' && <VisualPage key='visual' />}
-        {activePage === 'groups' && <GroupsPage key='groups' />}
-        {activePage === 'warnings' && <WarningsPage key='warnings' />}
-        {activePage === 'analyst' && <AnalystPage key='analyst' />}
-        {activePage === 'gpm' && <GpmPage key='gpm' />}
-        {activePage === 'logs' && <LogsPage errorLogs={errorLogs} clearErrorLogs={clearErrorLogs} />}
+          {activePage === 'pipeline' && (
+            <PipelinePage
+              runningScript={runningScript}
+              setRunningScript={setRunningScript}
+              appendErrorLog={appendErrorLog}
+              onNavigate={setActivePage}
+            />
+          )}
+          {activePage === 'create-video' && (
+            <CreateVideoPage
+              key='create-video'
+              disabled={runningScript !== null}
+              runningScript={runningScript}
+              setRunningScript={setRunningScript}
+              appendErrorLog={appendErrorLog}
+              onNavigate={setActivePage}
+            />
+          )}
+          {activePage === 'settings' && <SettingsPage key='settings' disabled={runningScript !== null} />}
+          {activePage === 'channels' && <ChannelsPage key='channels' />}
+          {activePage === 'visual' && <VisualPage key='visual' />}
+          {activePage === 'groups' && <GroupsPage key='groups' />}
+          {activePage === 'warnings' && <WarningsPage key='warnings' />}
+          {activePage === 'analyst' && <AnalystPage key='analyst' />}
+          {activePage === 'gpm' && <GpmPage key='gpm' />}
+          {activePage === 'logs' && <LogsPage errorLogs={errorLogs} clearErrorLogs={clearErrorLogs} />}
         </main>
       </div>
     </div>

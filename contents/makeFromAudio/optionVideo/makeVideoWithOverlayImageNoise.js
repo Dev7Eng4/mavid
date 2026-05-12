@@ -160,7 +160,7 @@ export async function makeVideoWithOverlayImageNoise(bgNameArg, options = {}) {
     }
     if (!fs.existsSync(backgroundsDir)) {
       throw new Error(
-        `Không tìm thấy folder stock "${backgroundName}" trong ${stockBgRoot}/ — kiểm tra Settings (VIDEO_STORAGE_ROOT) và tạo thư mục con tương ứng.`,
+        `Không tìm thấy folder stock "${backgroundName}" trong ${stockBgRoot}/ — kiểm tra Settings (VIDEO_STORAGE_ROOT) và tạo thư mục con tương ứng.`
       );
     }
   }
@@ -180,8 +180,8 @@ export async function makeVideoWithOverlayImageNoise(bgNameArg, options = {}) {
   const audioDurationAfterTempo = originalAudioDuration / speed;
   console.log(
     `Thời lượng audio gốc: ${originalAudioDuration.toFixed(1)}s, sau atempo (SPEED=${speed}): ${formatClockDuration(
-      audioDurationAfterTempo,
-    )} (${audioDurationAfterTempo.toFixed(1)}s)`,
+      audioDurationAfterTempo
+    )} (${audioDurationAfterTempo.toFixed(1)}s)`
   );
 
   // 2. Lấy video stock — 2 trường hợp: local folder hoặc visual resource (YouTube)
@@ -277,7 +277,7 @@ export async function makeVideoWithOverlayImageNoise(bgNameArg, options = {}) {
     console.log(
       `[overlay] Lớp phủ: ${path.basename(stockOverlaySourcePath)} (merge: ${
         usePrebakedOverlay ? 'cache ProRes' : 'single-pass trên bản gốc'
-      })`,
+      })`
     );
   }
 
@@ -291,7 +291,7 @@ export async function makeVideoWithOverlayImageNoise(bgNameArg, options = {}) {
     console.log(
       `[chart] Góc phải trên: ${path.basename(chartSourcePath)} (max ${CHART_CORNER_MAX_WIDTH}px rộng, lặp theo hết video, ${
         chartIsPrebaked ? 'cache ProRes' : 'realtime'
-      })`,
+      })`
     );
   }
 
@@ -306,7 +306,7 @@ export async function makeVideoWithOverlayImageNoise(bgNameArg, options = {}) {
   if (!hasCenterImg) {
     console.warn(
       `[SI] Không có ảnh nền trung tâm (${SI_GENERAL_BACKGROUND_BASENAME}.jpg|jpeg|png|webp trong downloads hoặc centerImageOverlayPath). ` +
-        'Video chỉ dùng stock + các lớp overlay khác.',
+        'Video chỉ dùng stock + các lớp overlay khác.'
     );
   }
   let centerImgIndex = -1;
@@ -314,7 +314,9 @@ export async function makeVideoWithOverlayImageNoise(bgNameArg, options = {}) {
     centerImgIndex = inputIdx++;
     mergeArgs.push('-loop', '1', '-i', centerImageOverlayPath);
     console.log(
-      `[overlay] Ảnh nền trung tâm: ${path.basename(centerImageOverlayPath)} (${Math.round(SI_CENTER_IMAGE_WIDTH_RATIO * 100)}% rộng canvas, opacity ${SI_CENTER_IMAGE_OPACITY})`,
+      `[overlay] Ảnh nền trung tâm: ${path.basename(centerImageOverlayPath)} (${Math.round(
+        SI_CENTER_IMAGE_WIDTH_RATIO * 100
+      )}% rộng canvas, opacity ${SI_CENTER_IMAGE_OPACITY})`
     );
   }
 
@@ -387,7 +389,7 @@ export async function makeVideoWithOverlayImageNoise(bgNameArg, options = {}) {
   if (hasCenterImg && centerImgIndex >= 0) {
     const targetW = Math.round(STOCK_VIDEO.CANVAS_W * SI_CENTER_IMAGE_WIDTH_RATIO);
     filterParts.push(
-      `[${centerImgIndex}:v]fps=${STOCK_VIDEO.FPS},scale=${targetW}:-1,format=rgba,colorchannelmixer=aa=${SI_CENTER_IMAGE_OPACITY}[center_img]`,
+      `[${centerImgIndex}:v]fps=${STOCK_VIDEO.FPS},scale=${targetW}:-1,format=rgba,colorchannelmixer=aa=${SI_CENTER_IMAGE_OPACITY}[center_img]`
     );
     filterParts.push(`[${currentVLabel}][center_img]overlay=(main_w-overlay_w)/2:(main_h-overlay_h)/2:shortest=1[v_centered_img]`);
     currentVLabel = 'v_centered_img';
@@ -399,7 +401,7 @@ export async function makeVideoWithOverlayImageNoise(bgNameArg, options = {}) {
       filterParts.push(`[${siNoiseIndex}:v]null[si_noise]`);
     } else {
       filterParts.push(
-        `[${siNoiseIndex}:v]fps=${STOCK_VIDEO.FPS},scale=${STOCK_VIDEO.CANVAS_W}:${STOCK_VIDEO.CANVAS_H}:flags=fast_bilinear,format=yuva420p,colorkey=0x000000:0.1:0.1,colorchannelmixer=aa=${SI_NOISE_ALPHA}[si_noise]`,
+        `[${siNoiseIndex}:v]fps=${STOCK_VIDEO.FPS},scale=${STOCK_VIDEO.CANVAS_W}:${STOCK_VIDEO.CANVAS_H}:flags=fast_bilinear,format=yuva420p,colorkey=0x000000:0.1:0.1,colorchannelmixer=aa=${SI_NOISE_ALPHA}[si_noise]`
       );
     }
     filterParts.push(`[${currentVLabel}][si_noise]overlay=0:0:shortest=1[v_si_noised]`);
@@ -453,7 +455,7 @@ export async function makeVideoWithOverlayImageNoise(bgNameArg, options = {}) {
       const r = Math.floor(LOGO.SIZE / 2);
       const geqExpr = `if(lte(hypot(X-W/2,Y-H/2),${r}),255,0)`;
       filterParts.push(
-        `[${logoIndex}:v]scale=${LOGO.SIZE}:${LOGO.SIZE}:flags=fast_bilinear,format=rgba,geq=r='r(X,Y)':g='g(X,Y)':b='b(X,Y)':a='${geqExpr}'[logo]`,
+        `[${logoIndex}:v]scale=${LOGO.SIZE}:${LOGO.SIZE}:flags=fast_bilinear,format=rgba,geq=r='r(X,Y)':g='g(X,Y)':b='b(X,Y)':a='${geqExpr}'[logo]`
       );
     }
     filterParts.push(`[${currentVLabel}][logo]overlay=main_w-overlay_w-${LOGO.MARGIN_RIGHT}:${LOGO.MARGIN_TOP}[vout_final]`);
@@ -479,7 +481,7 @@ export async function makeVideoWithOverlayImageNoise(bgNameArg, options = {}) {
     '128k',
     '-t',
     String(audioDurationAfterTempo),
-    outputPath,
+    outputPath
   );
 
   console.log(`Đang merge nội dung Single-Pass Pipeline...`);
