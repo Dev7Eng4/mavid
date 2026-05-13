@@ -615,7 +615,7 @@ const prepareVideoInfo = async ({ url, options = {} }) => {
       const srts = fs.readdirSync(actualOutputDir).filter(f => /\.srt$/i.test(f));
       if (srts.length === 0) {
         console.warn(
-          `[prepareVideoInfo] onlyUpdateInfo: thiếu seoTitle/seoDescription cần LLM nhưng không có file .srt trong ${actualOutputDir}`
+          `[prepareVideoInfo] onlyUpdateInfo: thiếu seoTitle/seoDescription cần LLM nhưng không có file .srt trong ${actualOutputDir}`,
         );
         return { ok: false };
       }
@@ -674,7 +674,7 @@ const prepareVideoInfo = async ({ url, options = {} }) => {
         }
       } else {
         console.warn(
-          '[prepareVideoInfo] onlyUpdateInfo: chưa có flow-thumbnail.jpg nhưng thiếu seoTitle hoặc summary để gọi generateFlowThumbnailFromGemini'
+          '[prepareVideoInfo] onlyUpdateInfo: chưa có flow-thumbnail.jpg nhưng thiếu seoTitle hoặc summary để gọi generateFlowThumbnailFromGemini',
         );
       }
     }
@@ -738,7 +738,7 @@ const prepareVideoInfo = async ({ url, options = {} }) => {
     outputDir: actualOutputDir,
     visualStyle,
     generateGeneralImage,
-    generateSceneImages: true,
+    generateSceneImages,
   });
 
   // ghi llmResult vào file images.json
@@ -747,6 +747,7 @@ const prepareVideoInfo = async ({ url, options = {} }) => {
   const finalSummary = 'finalSummary' in llmResult ? llmResult.finalSummary : null;
   const visualBible = 'visualBible' in llmResult ? llmResult.visualBible : null;
   const generalPrompt = 'generalPrompt' in llmResult ? llmResult.generalPrompt : undefined;
+  console.log('🚀 ~ prepareVideoInfo ~ generalPrompt:', generalPrompt);
   const title = finalSummary?.metadata?.title || '';
   const summary = finalSummary?.final_summary;
 

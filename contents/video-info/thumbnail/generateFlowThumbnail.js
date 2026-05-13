@@ -80,6 +80,7 @@ async function generateFulLTextLinesColorsViaGemini({ prompts, title, summary, l
       maxRetries: 2,
       validate: validateThumbnailFulLTextJson,
       label: `${logTag} jaFulLText lines/colors`,
+      requireCodeBlock: false,
     });
     const parsed = JSON.parse(stripJsonCodeFence(rawResponse));
     console.log(`[${logTag}] jaFulLText → đã nhận thông tin từ Gemini.`, parsed);
