@@ -180,11 +180,11 @@ export function createGpmApiClient(options: GpmApiClientOptions = {}) {
     },
 
     /** Đóng profile trong GPM. */
-    closeProfile(profileId: string) {
-      const id = encodeURIComponent(profileId);
-      const endpoint = GPM_API_VERSION === 'V2' ? 'stop' : 'close';
-      return requestJson<unknown>(`profiles/${endpoint}/${id}`);
-    },
+    // closeProfile(profileId: string) {
+    //   const id = encodeURIComponent(profileId);
+    //   const endpoint = GPM_API_VERSION === 'V2' ? 'stop' : 'close';
+    //   return requestJson<unknown>(`profiles/${endpoint}/${id}`);
+    // },
   };
 }
 

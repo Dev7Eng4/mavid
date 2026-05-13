@@ -238,7 +238,7 @@ export default async function main(raw = {}) {
           console.warn('[upload] Chờ trước khi đóng GPM:', e instanceof Error ? e.message : e);
         }
         try {
-          await closeProfile(pid, { apiBase: api });
+          // await closeProfile(pid, { apiBase: api });
           console.log(`[upload] GPM API closeProfile — ${pid}`);
         } catch (e) {
           console.warn('[upload] closeProfile:', e instanceof Error ? e.message : e);
@@ -263,7 +263,7 @@ export default async function main(raw = {}) {
     } else {
       /* Lỗi trước khi bật delay — đóng nhanh, không chặn tụ lại nhiều 15p nền */
       try {
-        await closeProfile(String(profileIdToStop).trim(), { apiBase: gpmOpts.apiBase });
+        // await closeProfile(String(profileIdToStop).trim(), { apiBase: gpmOpts.apiBase });
         console.log(`[upload] GPM API closeProfile — ${profileIdToStop}`);
       } catch (e) {
         console.warn('[upload] closeProfile:', e instanceof Error ? e.message : e);

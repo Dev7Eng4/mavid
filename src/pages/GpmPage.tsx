@@ -47,7 +47,7 @@ export function GpmPage() {
   const gpmPag = useClientPagination(profiles.length);
   const pageProfiles = useMemo(
     () => profiles.slice(gpmPag.startIndex, gpmPag.startIndex + gpmPag.pageSize),
-    [profiles, gpmPag.startIndex, gpmPag.pageSize]
+    [profiles, gpmPag.startIndex, gpmPag.pageSize],
   );
 
   const loadProfiles = useCallback(async () => {
@@ -56,9 +56,8 @@ export function GpmPage() {
     try {
       const res = await gpmApi.listProfiles(GPM_PROFILES_LIST_QUERY);
       const raw = res.data;
-      const list = (typeof raw === 'object' && raw !== null && Array.isArray((raw as any).data)) 
-        ? (raw as any).data 
-        : (Array.isArray(raw) ? raw : []);
+      const list =
+        typeof raw === 'object' && raw !== null && Array.isArray((raw as any).data) ? (raw as any).data : Array.isArray(raw) ? raw : [];
       const rows: GpmProfileRow[] = [];
       for (const item of list) {
         const m = mapGpmApiProfileRow(item);
@@ -94,7 +93,7 @@ export function GpmPage() {
     setMessage(null);
     try {
       if (isOpen) {
-        await gpmApi.closeProfile(profileId);
+        // await gpmApi.closeProfile(profileId);
         setOpenProfileIds(prev => {
           const next = new Set(prev);
           next.delete(profileId);
