@@ -134,3 +134,8 @@ export function chunkSubtitlesSmart(data, options = {}) {
 
   return chunks;
 }
+
+/** @returns {number} Giá trị trong [SPEED_MIN, SPEED_MAX) */
+export function randomPlaybackSpeed() {
+  return SPEED_MIN + Math.random() * (SPEED_MAX - SPEED_MIN);
+}

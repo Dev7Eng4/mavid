@@ -13,7 +13,6 @@
     "tao-batch-video-reup-full": "node -e \"import('./contents/scripts/createBatchVideo.js').then(m => m.default({ videoType: 'video' }))\"",
     "create-batch-video": "node -e \"import('./contents/scripts/createBatchVideo.js').then(m => m.default())\"",
     "tao-thumbnail-flow": "node contents/video-info/thumbnail/createThumbnailFlow.cli.js",
-    "tom-tat-meta-tu-transcript": "node contents/scripts/summaryMetaFromTranscript.js",
     "syncProgressToSpreadsheet": "node contents/scripts/syncProgressToSpreadsheet.js",
     "syncVideosToDrive": "node contents/ggdrive/syncVideosToDrive.cli.js",
     "dev": "vite",

@@ -6,8 +6,7 @@ export type ScriptId =
   | 'tao-batch-video-tu-audio'
   | 'createBatchVideo'
   | 'tao-batch-video-reup-full'
-  | 'tao-thumbnail-flow'
-  | 'tom-tat-meta-tu-transcript';
+  | 'tao-thumbnail-flow';
 
 export interface ScriptDef {
   id: ScriptId;
@@ -52,12 +51,6 @@ export const scriptDefs: ScriptDef[] = [
     title: 'Tạo thumbnail (Flow)',
     summary: 'Tạo thumbnail qua Google Flow với prompt AI.',
     npmScript: 'tao-thumbnail-flow',
-  },
-  {
-    id: 'tom-tat-meta-tu-transcript',
-    title: 'Tóm tắt meta từ transcript',
-    summary: 'Lấy transcript video → gửi Gemini → tạo meta (title, desc, tags).',
-    npmScript: 'tom-tat-meta-tu-transcript',
   },
 ];
 

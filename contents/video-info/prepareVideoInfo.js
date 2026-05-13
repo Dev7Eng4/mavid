@@ -420,6 +420,7 @@ export const createVideoInfoWithLLM = async (options = {}) => {
   }
 
   const chapterInputs = createAllScenePromptInputs(visualBible, validAnalyses);
+  console.log('🚀 ~ createVideoInfoWithLLM ~ chapterInputs:', chapterInputs);
   const totalChapterInputs = chapterInputs.length;
 
   /** @type {(Record<string, unknown> | null)[]} */
@@ -428,6 +429,7 @@ export const createVideoInfoWithLLM = async (options = {}) => {
   const sceneProfiles = PLAYWRIGHT_PROFILES.slice(0, 3);
   let nextSceneIndex = 0;
   const sceneConcurrency = Math.min(3, totalChapterInputs);
+  console.log('🚀 ~ createVideoInfoWithLLM ~ sceneConcurrency:', sceneConcurrency);
 
   async function sceneWorker(workerIndex) {
     const profileNum = sceneProfiles[workerIndex];
@@ -470,6 +472,7 @@ export const createVideoInfoWithLLM = async (options = {}) => {
   await Promise.all(Array.from({ length: sceneConcurrency }, (_, w) => sceneWorker(w)));
 
   const allScenes = sceneOutputs.filter(Boolean).flatMap(o => (Array.isArray(o?.scenes) ? o.scenes : []));
+  console.log('🚀 ~ createVideoInfoWithLLM ~ allScenes:', allScenes);
 
   const normalizedScenes = allScenes.map((scene, index) => ({
     ...scene,
@@ -735,8 +738,11 @@ const prepareVideoInfo = async ({ url, options = {} }) => {
     outputDir: actualOutputDir,
     visualStyle,
     generateGeneralImage,
-    generateSceneImages,
+    generateSceneImages: true,
   });
+
+  // ghi llmResult vào file images.json
+  fs.writeFileSync(path.join(actualOutputDir, 'images.json'), JSON.stringify(llmResult, null, 2), 'utf-8');
 
   const finalSummary = 'finalSummary' in llmResult ? llmResult.finalSummary : null;
   const visualBible = 'visualBible' in llmResult ? llmResult.visualBible : null;
@@ -762,8 +768,6 @@ const prepareVideoInfo = async ({ url, options = {} }) => {
   const flowImages = await runFlowImagesAfterVideoInfo({
     actualOutputDir,
     generalPrompt: generateGeneralImage && generalPrompt ? generalPrompt : '',
-    // generateSceneImages,
-    // normalizedScenes,
   });
 
   if (title && summary) {

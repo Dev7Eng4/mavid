@@ -34,7 +34,6 @@ const ALLOWED_NPM_SCRIPTS = new Set([
   'tao-batch-video-reup-full',
   'tao-thumbnail-flow',
   'create-batch-video',
-  'tom-tat-meta-tu-transcript',
   'syncVideosToDrive',
 ]);
 
@@ -326,7 +325,6 @@ const SCRIPT_MAP = {
   createBatchVideo: '../contents/scripts/createBatchVideo.js',
   makeChromeProfile: '../contents/scripts/makeChromeProfile.js',
   createThumbnailFlow: '../contents/video-info/thumbnail/createThumbnailFlow.js',
-  summaryMetaFromTranscript: '../contents/scripts/summaryMetaFromTranscript.js',
   uploadYoutubeViaGpm: '../contents/youtube/uploadViaGpm.js',
   updateChannelVideosMeta: '../contents/scripts/updateChannelVideosMeta.js',
   addVisualResource: '../contents/api/visuals/addVisual.js',
@@ -946,7 +944,7 @@ async function importConstantsFresh() {
   } catch (e) {
     console.warn(
       '[MaVid] Không import được contents/constants/index.js. Dùng giá trị fallback trong main cho đến khi sửa lỗi / Lưu settings.',
-      e instanceof Error ? e.message : e,
+      e instanceof Error ? e.message : e
     );
     mod = getDefaultConstantsModule();
   }

@@ -871,29 +871,210 @@ Schema:
 - Preserve traceability
 `;
 
+// export const promptCreateVisualBible = (finalSynthesis, visualStyle) => `
+// You are a Senior Visual Concept Artist and Art Director specializing in Japanese video storytelling.
+
+// Your task is to transform the final editorial synthesis of a Japanese video into:
+// 1. a consistent Visual Bible for downstream AI image generation
+// 2. one strong hero-image concept and prompt that can represent the entire video as a single static image
+
+// ━━━━━━━━━━━━━━━━━━
+// ## ROLE
+// ━━━━━━━━━━━━━━━━━━
+// You are creating a VISUAL BIBLE and a SINGLE HERO IMAGE PACKAGE.
+
+// This is NOT chapter segmentation.
+// This is NOT metadata generation.
+// This is NOT a rewrite of the story.
+
+// Your job:
+// - define the global visual direction
+// - establish character consistency
+// - establish environment consistency
+// - translate each chapter into visual planning
+// - create one highly compelling single-image concept for the entire video
+// - generate one final image prompt for that single-image concept
+
+// ━━━━━━━━━━━━━━━━━━
+// ## INPUT
+// ━━━━━━━━━━━━━━━━━━
+
+// Final Synthesis JSON:
+// ${finalSynthesis}
+
+// Visual Style Preset:
+// ${JSON.stringify(visualStyle, null, 2)}
+
+// ━━━━━━━━━━━━━━━━━━
+// ## CORE RULES
+// ━━━━━━━━━━━━━━━━━━
+// - Do NOT change the story
+// - Do NOT add new plot events
+// - Do NOT create new major characters unless strongly implied
+// - Do NOT split or merge chapters
+// - Do NOT include text, captions, subtitles, logos, or UI elements in the image
+// - Keep all visual details consistent across chapters
+// - If a visual detail is not specified, infer conservatively from genre, tone, and chapter context
+// - Separate grounded details from assumptions in quality notes
+
+// ━━━━━━━━━━━━━━━━━━
+// ## HERO IMAGE REQUIREMENTS
+// ━━━━━━━━━━━━━━━━━━
+// - Create one single-image concept that can represent the whole video
+// - This image must be strong enough to be shown as the only visual for the entire video
+// - It must remain visually interesting during prolonged viewing
+// - It should contain layered storytelling, emotional tension, and environmental detail
+// - It must communicate the core conflict, mood, and narrative essence of the video in one image
+// - It must be visually rich, but still clear and readable
+// - Avoid flat, empty, or generic compositions
+// - Avoid simple portrait-only framing unless the story absolutely requires it
+// - Prefer a narrative tableau with foreground, midground, and background storytelling when appropriate
+// - The hero image prompt must be directly usable for an image-generation model
+
+// ━━━━━━━━━━━━━━━━━━
+// ## VISUAL TRANSLATION LOGIC
+// ━━━━━━━━━━━━━━━━━━
+// 1. Read the global_context and chapters from the final synthesis.
+// 2. Identify the emotional tone, genre, recurring motifs, and most representative conflict.
+// 3. Define a consistent global visual language.
+// 4. Create character designs only for recurring or important characters.
+// 5. Define recurring environments.
+// 6. Create a visual plan for each chapter without changing chapter structure.
+// 7. Create one hero image package that best represents the full story.
+// 8. Write one clean, production-ready image prompt for the hero image.
+
+// ━━━━━━━━━━━━━━━━━━
+// ## OUTPUT FORMAT (STRICT JSON)
+// ━━━━━━━━━━━━━━━━━━
+// Return ONLY valid JSON.
+// No markdown.
+// No commentary.
+// No extra text.
+
+// Schema:
+
+// {
+//   "video_id": string,
+//   "style": {
+//     "name": string,
+//     "preset": string
+//   },
+//   "visual_bible": {
+//     "overall_mood": string,
+//     "color_palette": [string],
+//     "lighting_style": string,
+//     "camera_language": [string],
+//     "composition_rules": [string],
+//     "texture_and_materials": [string],
+//     "visual_consistency_rules": [string]
+//   },
+//   "character_designs": [
+//     {
+//       "character_id": string,
+//       "name": string,
+//       "role": string,
+//       "age_range": string,
+//       "appearance": string,
+//       "wardrobe": string,
+//       "expression_range": [string],
+//       "consistency_notes": string,
+//       "confidence": number
+//     }
+//   ],
+//   "environment_design": {
+//     "primary_locations": [
+//       {
+//         "location_id": string,
+//         "name": string,
+//         "description": string,
+//         "mood": string,
+//         "recurring_visual_elements": [string]
+//       }
+//     ],
+//     "time_period": string,
+//     "cultural_context": string
+//   },
+//   "chapter_visual_plan": [
+//     {
+//       "chapter_id": string,
+//       "line_start": number,
+//       "line_end": number,
+//       "source_segment_ids": ["string"],
+//       "visual_goal": string,
+//       "scene_description": string,
+//       "composition": string,
+//       "lighting": string,
+//       "color_notes": string,
+//       "characters_present": [string],
+//       "location_id": string,
+//       "emotion_to_show": string,
+//       "visual_keywords": [string],
+//       "avoid": [string]
+//     }
+//   ],
+//   "hero_image_package": {
+//     "concept": string,
+//     "narrative_purpose": string,
+//     "why_this_works_for_full_video": string,
+//     "composition": string,
+//     "main_subject": string,
+//     "secondary_elements": [string],
+//     "environment": string,
+//     "emotion": string,
+//     "visual_density": string,
+//     "viewer_retention_strategy": [string],
+//     "prompt": string,
+//     "negative_prompt": string
+//   },
+//   "quality": {
+//     "assumptions": [string],
+//     "uncertain_visual_details": [string],
+//     "confidence": number
+//   }
+// }
+
+// ━━━━━━━━━━━━━━━━━━
+// ## STYLE
+// ━━━━━━━━━━━━━━━━━━
+// - Write all text values in English
+// - Use concise, production-ready visual language
+// - Avoid poetic wording
+// - Prefer concrete visual descriptors
+// - Make the hero image prompt directly reusable in an image-generation step
+// `;
+
 export const promptCreateVisualBible = (finalSynthesis, visualStyle) => `
-You are a Senior Visual Concept Artist and Art Director specializing in Japanese video storytelling.
+You are a Senior Visual Concept Artist, Art Director, and Japanese drama visual strategist specializing in audio-story video production.
 
 Your task is to transform the final editorial synthesis of a Japanese video into:
-1. a consistent Visual Bible for downstream AI image generation
-2. one strong hero-image concept and prompt that can represent the entire video as a single static image
+
+1. A consistent Visual Bible for downstream AI image generation
+2. One strong Hero Image Package that represents the entire video as a single static image
+3. One final production-ready image-generation prompt for that hero image
+
+The hero image will be used as the main visual for an audio-based Japanese video.
+It may be shown for a long duration, so it must be emotionally engaging, visually layered, and narratively clear.
 
 ━━━━━━━━━━━━━━━━━━
 ## ROLE
 ━━━━━━━━━━━━━━━━━━
+
 You are creating a VISUAL BIBLE and a SINGLE HERO IMAGE PACKAGE.
 
 This is NOT chapter segmentation.
 This is NOT metadata generation.
 This is NOT a rewrite of the story.
+This is NOT thumbnail text generation.
+This is NOT poster design.
 
 Your job:
-- define the global visual direction
-- establish character consistency
-- establish environment consistency
-- translate each chapter into visual planning
-- create one highly compelling single-image concept for the entire video
-- generate one final image prompt for that single-image concept
+- Define the global visual direction
+- Establish character consistency
+- Establish environment consistency
+- Translate each chapter into visual planning
+- Identify the strongest visual conflict in the whole story
+- Create one compelling single-image concept for the entire video
+- Generate one final image prompt directly usable by an image-generation model
 
 ━━━━━━━━━━━━━━━━━━
 ## INPUT
@@ -908,64 +1089,419 @@ ${JSON.stringify(visualStyle, null, 2)}
 ━━━━━━━━━━━━━━━━━━
 ## CORE RULES
 ━━━━━━━━━━━━━━━━━━
-- Do NOT change the story
-- Do NOT add new plot events
-- Do NOT create new major characters unless strongly implied
-- Do NOT split or merge chapters
-- Do NOT include text, captions, subtitles, logos, or UI elements in the image
-- Keep all visual details consistent across chapters
-- If a visual detail is not specified, infer conservatively from genre, tone, and chapter context
-- Separate grounded details from assumptions in quality notes
+
+- Do NOT change the story.
+- Do NOT add new plot events.
+- Do NOT create new major characters unless strongly implied by the story.
+- Do NOT split, merge, remove, or reorder chapters.
+- Do NOT include text, captions, subtitles, speech bubbles, logos, UI elements, signs, readable documents, or watermark-like elements in any image prompt.
+- Do NOT create a title card, poster layout, promotional graphic, or thumbnail text design.
+- The hero image is a visual story scene, not a graphic design.
+- Keep all visual details consistent across chapters.
+- If a visual detail is not specified, infer conservatively from genre, tone, age, role, cultural context, and chapter context.
+- Separate grounded details from assumptions in the quality section.
+- Do not invent shocking visual elements that are unsupported by the story.
+- Avoid gore, sexualized content, horror exaggeration, fantasy effects, supernatural elements, or comedic distortion unless explicitly supported by the story.
+- Prefer emotionally readable realism or stylized drama according to the provided visual style preset.
 
 ━━━━━━━━━━━━━━━━━━
-## HERO IMAGE REQUIREMENTS
+## VISUAL STYLE PRESET ENFORCEMENT
 ━━━━━━━━━━━━━━━━━━
-- Create one single-image concept that can represent the whole video
-- This image must be strong enough to be shown as the only visual for the entire video
-- It must remain visually interesting during prolonged viewing
-- It should contain layered storytelling, emotional tension, and environmental detail
-- It must communicate the core conflict, mood, and narrative essence of the video in one image
-- It must be visually rich, but still clear and readable
-- Avoid flat, empty, or generic compositions
-- Avoid simple portrait-only framing unless the story absolutely requires it
-- Prefer a narrative tableau with foreground, midground, and background storytelling when appropriate
-- The hero image prompt must be directly usable for an image-generation model
+
+The provided Visual Style Preset is mandatory.
+
+All outputs must follow it:
+- character design
+- age portrayal
+- wardrobe
+- environment
+- lighting
+- color palette
+- camera language
+- rendering style
+- emotional intensity
+- hero image prompt
+- negative prompt
+
+If the preset indicates anime:
+- Do NOT describe photorealistic, live-action, DSLR photography, real film still, or cinematic realism.
+- Use anime-style visual language consistent with the preset.
+- Avoid chibi, overly cute, fantasy, magical, idol-like, or exaggerated action styling unless explicitly supported.
+
+If the preset indicates cinematic realism:
+- Do NOT describe anime, manga, cartoon, illustration, cel shading, or drawn artwork.
+- Use realistic Japanese drama visual language.
+
+If the preset is elderly-focused:
+- Avoid overly young faces.
+- Avoid idol-like beauty.
+- Avoid fashion that makes elderly characters look unrealistically youthful.
+- Use dignified, emotionally grounded, age-appropriate design.
+
+If the preset defines specific colors, rendering style, line quality, lighting, or camera rules, apply them consistently throughout the output.
 
 ━━━━━━━━━━━━━━━━━━
 ## VISUAL TRANSLATION LOGIC
 ━━━━━━━━━━━━━━━━━━
+
+Follow this process internally:
+
 1. Read the global_context and chapters from the final synthesis.
-2. Identify the emotional tone, genre, recurring motifs, and most representative conflict.
-3. Define a consistent global visual language.
-4. Create character designs only for recurring or important characters.
-5. Define recurring environments.
-6. Create a visual plan for each chapter without changing chapter structure.
-7. Create one hero image package that best represents the full story.
-8. Write one clean, production-ready image prompt for the hero image.
+2. Identify the genre, sub-genre, emotional tone, recurring motifs, and central conflict.
+3. Identify the most important recurring characters.
+4. Identify recurring or important environments.
+5. Define a consistent global visual language.
+6. Create character designs only for recurring or important characters.
+7. Create environment designs only for locations that matter visually.
+8. Create a visual plan for each chapter without changing chapter structure.
+9. Identify the strongest hero-image conflict in the entire story.
+10. Create one hero image package that best represents the full video.
+11. Write one clean, production-ready image prompt for that hero image.
 
 ━━━━━━━━━━━━━━━━━━
-## OUTPUT FORMAT (STRICT JSON)
+## HERO IMAGE PURPOSE
 ━━━━━━━━━━━━━━━━━━
+
+The hero image must represent the entire video as one static image.
+
+It should:
+- Communicate the core conflict without text
+- Show the emotional center of the story
+- Be strong enough to be used as the only visual for the whole video
+- Remain visually interesting during prolonged viewing
+- Contain layered storytelling
+- Include foreground, midground, and background depth when appropriate
+- Show readable facial expressions and body language
+- Contain environmental clues that support the story
+- Avoid flat, empty, generic, or portrait-only compositions
+- Avoid overly symbolic images if a concrete dramatic scene is available
+- Avoid calm scenes unless the story has no clear confrontation
+- Avoid making the image too visually cluttered
+
+━━━━━━━━━━━━━━━━━━
+## HERO CONFLICT SELECTION
+━━━━━━━━━━━━━━━━━━
+
+The hero image must be selected from the strongest visual conflict in the story.
+
+Prioritize the scene, implied moment, or visual tableau with the highest storytelling value:
+
+1. Direct confrontation
+2. Betrayal reveal
+3. Hidden truth exposed
+4. Family rupture
+5. Mother-in-law vs daughter-in-law pressure
+6. Husband/wife conflict
+7. Workplace accusation or humiliation
+8. Public exposure
+9. Legal, divorce, inheritance, or property dispute
+10. Financial betrayal
+11. Revenge reversal
+12. Emotional collapse after a shocking discovery
+13. A decisive moment where the power dynamic changes
+
+Do NOT choose a calm, generic, symbolic, or portrait-only image unless the story has no clear confrontation.
+
+The hero concept must clearly answer:
+- Who is attacking, accusing, hiding, regretting, or collapsing emotionally?
+- Who holds power in the scene?
+- Who is isolated or cornered?
+- What visible gesture, object, or environment communicates the conflict?
+- What makes this moment representative of the whole video?
+- Why would a viewer want to keep looking at this image during a long audio video?
+
+━━━━━━━━━━━━━━━━━━
+## EVIDENCE OBJECT RULE
+━━━━━━━━━━━━━━━━━━
+
+If the story contains or strongly implies a concrete proof object, use it as a visible storytelling anchor.
+
+Examples:
+- DNA test result
+- divorce papers
+- smartphone message
+- affair photo
+- inheritance document
+- property deed
+- loan contract
+- resignation letter
+- company email
+- bankbook
+- envelope of money
+- house key
+- family photo
+- medical document
+- surveillance photo
+- receipt
+- business card
+- handwritten letter
+- hospital document
+- school document
+- workplace file
+- apartment contract
+
+Rules:
+- The evidence object should be visible but must NOT contain readable text.
+- Do not invent an evidence object if the story does not support one.
+- If multiple evidence objects exist, choose the one with the clearest visual storytelling value.
+- Place the evidence object where it helps the viewer understand the conflict.
+- The evidence object should support the scene, not dominate it unless the story is specifically about that object.
+
+━━━━━━━━━━━━━━━━━━
+## CHARACTER BLOCKING RULES
+━━━━━━━━━━━━━━━━━━
+
+For the hero image, describe how characters are positioned in the frame.
+
+Use visual blocking to show:
+- power imbalance
+- accusation
+- avoidance
+- emotional isolation
+- betrayal
+- shock
+- shame
+- anger
+- guilt
+- quiet collapse
+- reversal of control
+
+Prefer a narrative tableau when appropriate:
+- Foreground: the most emotionally affected character or the evidence object
+- Midground: the main confrontation
+- Background: secondary character reaction or environmental clue
+
+Use gaze direction intentionally:
+- A character glaring can show accusation.
+- A character looking away can show guilt or avoidance.
+- A character looking down can show shame or defeat.
+- A character staring at evidence can show shock.
+- A character standing apart can show isolation.
+
+Do not overcrowd the image.
+Use only characters that are important to the core conflict.
+
+━━━━━━━━━━━━━━━━━━
+## JAPANESE DRAMA VISUAL LOGIC
+━━━━━━━━━━━━━━━━━━
+
+For Japanese family drama:
+- Use domestic spaces such as living room, dining room, kitchen, genkan entrance, hospital corridor, family restaurant, apartment hallway, or traditional family home when supported.
+- Show emotional pressure through posture, distance, silence, and household details.
+- Use objects like family photos, tea cups, dining table, documents, bags, shoes at the entrance, or phone screens as subtle story clues.
+
+For mother-in-law / daughter-in-law conflict:
+- Show generational pressure, family hierarchy, tense domestic space, and the husband’s passive or conflicted position if relevant.
+- Avoid cartoonish villain expressions.
+- Use stern gestures, controlling posture, and spatial dominance.
+
+For office drama:
+- Use conference rooms, office desks, company corridors, elevators, file folders, laptops, ID cards, and formal clothing.
+- Show social pressure through group positioning, accusation, isolation, or public embarrassment.
+
+For betrayal / affair / divorce drama:
+- Use documents, phones, photos, wedding rings, bedroom/living room separation, or cold domestic lighting.
+- Show the moment of discovery or confrontation rather than aftermath alone.
+
+For inheritance / property / money conflict:
+- Use documents, envelopes, bankbooks, property files, family tables, tense meetings, or formal family gatherings.
+- Show power through who controls the document or sits at the head of the table.
+
+For revenge / reversal / karmic justice:
+- Show the moment where the former victim gains composure and the aggressor loses control.
+- Avoid exaggerated victory poses.
+- Make the reversal emotionally satisfying but grounded.
+
+For elderly-focused stories:
+- Use softer but still emotionally clear staging.
+- Avoid making elderly characters helpless unless the story requires it.
+- Show dignity, regret, family tension, loneliness, or reconciliation through restrained body language.
+
+━━━━━━━━━━━━━━━━━━
+## HERO IMAGE PROMPT STRUCTURE
+━━━━━━━━━━━━━━━━━━
+
+The final hero_image_package.prompt must be a single clean image-generation prompt.
+
+It must include:
+- Visual style from the preset
+- 16:9 wide composition
+- Main characters with consistent appearance
+- Foreground / midground / background staging
+- Character power dynamic
+- Visible evidence object if supported
+- Emotionally charged body language
+- Japanese cultural or environmental context
+- Lighting and color mood
+- Camera angle and lens feel
+- Environmental details that support prolonged viewing
+- Clear instruction that there is no text, no subtitles, no captions, no logos, no UI
+
+The prompt must:
+- Be directly usable in an image-generation step
+- Be written in English
+- Be specific and concrete
+- Avoid vague phrases like "dramatic scene" without explaining what is visible
+- Avoid placeholders
+- Avoid JSON inside the prompt string
+- Avoid mentioning the final synthesis or internal analysis
+- Avoid requesting readable text on documents or screens
+
+━━━━━━━━━━━━━━━━━━
+## HERO IMAGE RETENTION STRATEGY
+━━━━━━━━━━━━━━━━━━
+
+Because this image may be shown for a long audio video, it should support prolonged viewing.
+
+Use:
+- layered composition
+- visible emotional tension
+- subtle background clues
+- clear character relationships
+- readable facial expressions
+- meaningful props
+- atmospheric lighting
+- environment details that imply a larger story
+- enough visual density to reward repeated viewing
+
+Avoid:
+- empty background
+- single face close-up with no story context
+- static lineup of characters
+- generic sad person by a window
+- vague symbolic imagery
+- cluttered scenes with too many unrelated objects
+- overly complex crowd scenes
+
+━━━━━━━━━━━━━━━━━━
+## CHARACTER DESIGN REQUIREMENTS
+━━━━━━━━━━━━━━━━━━
+
+Create character designs only for recurring or important characters.
+
+Each character design should be specific enough to support image consistency across multiple image-generation steps.
+
+For each character:
+- Keep age range appropriate to the story
+- Use Japanese cultural and social context when relevant
+- Define hair, face, body type, wardrobe, and emotional range
+- Add a signature visual trait when useful
+- Add do-not-change consistency rules
+- Avoid overdesigning characters with unsupported details
+- Avoid turning normal people into fantasy, idol, or fashion-model characters unless supported by the story
+
+Character confidence:
+- 0.9 to 1.0: strongly grounded in the synthesis
+- 0.7 to 0.89: reasonably inferred from role and context
+- 0.5 to 0.69: partially inferred
+- below 0.5: uncertain and should be noted in quality
+
+━━━━━━━━━━━━━━━━━━
+## ENVIRONMENT DESIGN REQUIREMENTS
+━━━━━━━━━━━━━━━━━━
+
+Define only important recurring or visually meaningful locations.
+
+For each location:
+- Describe the physical space
+- Describe mood
+- Describe recurring visual elements
+- Describe cultural context when relevant
+- Keep environments consistent across chapters
+- Do not invent luxurious or extreme locations unless supported
+
+━━━━━━━━━━━━━━━━━━
+## CHAPTER VISUAL PLAN REQUIREMENTS
+━━━━━━━━━━━━━━━━━━
+
+Create one visual plan per chapter.
+
+Do NOT split or merge chapters.
+Do NOT alter line_start, line_end, or source_segment_ids.
+Do NOT change the story.
+
+For each chapter:
+- Translate the chapter into a visual goal
+- Use consistent characters and environments
+- Describe the scene visually
+- Define composition, lighting, color, emotion, and avoid rules
+- Keep the visual plan useful for downstream scene/image generation
+- If a chapter is internal, reflective, or summary-heavy, convert it into a grounded visual moment that represents the emotional state without inventing new plot events
+
+━━━━━━━━━━━━━━━━━━
+## NEGATIVE PROMPT REQUIREMENTS
+━━━━━━━━━━━━━━━━━━
+
+The negative_prompt must include general image safety and quality exclusions.
+
+Always include:
+- no text
+- no captions
+- no subtitles
+- no speech bubbles
+- no logos
+- no watermark
+- no UI
+- no readable documents
+- no readable phone screen text
+- no distorted hands
+- no extra fingers
+- no duplicate faces
+- no deformed anatomy
+- no blurry face
+- no low-resolution
+- no random extra characters
+- no unrelated objects
+- no exaggerated horror
+- no gore
+- no sexualized content
+
+If the style is anime, also avoid:
+- no chibi style
+- no overly cute style
+- no magical effects
+- no fantasy costume
+- no idol styling
+- no childish adult appearance
+
+If the style is cinematic realism, also avoid:
+- no anime
+- no manga
+- no cartoon
+- no illustration
+- no plastic skin
+- no over-glamour lighting
+
+━━━━━━━━━━━━━━━━━━
+## OUTPUT FORMAT
+━━━━━━━━━━━━━━━━━━
+
 Return ONLY valid JSON.
 No markdown.
 No commentary.
 No extra text.
+No trailing commas.
+No undefined values.
+All string values must be in English.
 
-Schema:
+Use this exact schema:
 
 {
   "video_id": string,
   "style": {
     "name": string,
-    "preset": string
+    "preset": string,
+    "style_summary": string
   },
   "visual_bible": {
     "overall_mood": string,
+    "genre_visual_direction": string,
     "color_palette": [string],
     "lighting_style": string,
     "camera_language": [string],
     "composition_rules": [string],
     "texture_and_materials": [string],
+    "visual_motifs": [string],
     "visual_consistency_rules": [string]
   },
   "character_designs": [
@@ -973,11 +1509,18 @@ Schema:
       "character_id": string,
       "name": string,
       "role": string,
+      "importance": "primary" | "secondary" | "supporting",
       "age_range": string,
       "appearance": string,
+      "face_features": string,
+      "hair": string,
+      "body_type": string,
       "wardrobe": string,
+      "signature_prop": string,
       "expression_range": [string],
+      "body_language": [string],
       "consistency_notes": string,
+      "do_not_change": [string],
       "confidence": number
     }
   ],
@@ -988,17 +1531,19 @@ Schema:
         "name": string,
         "description": string,
         "mood": string,
-        "recurring_visual_elements": [string]
+        "recurring_visual_elements": [string],
+        "cultural_context": string,
+        "consistency_notes": string
       }
     ],
     "time_period": string,
-    "cultural_context": string
+    "overall_cultural_context": string
   },
   "chapter_visual_plan": [
     {
       "chapter_id": string,
       "line_start": number,
-      "line_end": number, 
+      "line_end": number,
       "source_segment_ids": ["string"],
       "visual_goal": string,
       "scene_description": string,
@@ -1009,11 +1554,14 @@ Schema:
       "location_id": string,
       "emotion_to_show": string,
       "visual_keywords": [string],
+      "scene_image_prompt_brief": string,
       "avoid": [string]
     }
   ],
   "hero_image_package": {
     "concept": string,
+    "conflict_type": string,
+    "climactic_moment": string,
     "narrative_purpose": string,
     "why_this_works_for_full_video": string,
     "composition": string,
@@ -1022,13 +1570,28 @@ Schema:
     "environment": string,
     "emotion": string,
     "visual_density": string,
+    "evidence_object": {
+      "object": string,
+      "visual_role": string,
+      "placement": string,
+      "confidence": number
+    },
+    "character_blocking": {
+      "foreground": string,
+      "midground": string,
+      "background": string,
+      "power_dynamic": string,
+      "gaze_direction": string
+    },
     "viewer_retention_strategy": [string],
     "prompt": string,
     "negative_prompt": string
   },
   "quality": {
+    "story_grounded_visuals": [string],
     "assumptions": [string],
     "uncertain_visual_details": [string],
+    "possible_risks": [string],
     "confidence": number
   }
 }
@@ -1036,17 +1599,20 @@ Schema:
 ━━━━━━━━━━━━━━━━━━
 ## STYLE
 ━━━━━━━━━━━━━━━━━━
-- Write all text values in English
-- Use concise, production-ready visual language
-- Avoid poetic wording
-- Prefer concrete visual descriptors
-- Make the hero image prompt directly reusable in an image-generation step
+
+- Write all text values in English.
+- Use concise, production-ready visual language.
+- Avoid poetic wording.
+- Prefer concrete visual descriptors.
+- Prefer emotionally readable scenes over abstract symbolism.
+- Make the hero image prompt directly reusable in an image-generation step.
+- Keep the output stable, structured, and easy to consume programmatically.
 `;
 
 export const promptCreateScenePromptsForChapter = chapterSceneInput => `
 You are a Senior Scene Planner and AI Image Prompt Designer for Japanese narrative video production.
 
-Your task is to transform ONE chapter-level visual plan into 1–3 visually meaningful scene image prompts with exact transcript line ranges.
+Your task is to transform ONE chapter-level visual plan into a natural sequence of visually meaningful scene image prompts with exact transcript line ranges.
 
 ━━━━━━━━━━━━━━━━━━
 ## ROLE
@@ -1059,12 +1625,18 @@ This is NOT global visual bible creation.
 This is NOT metadata generation.
 
 Your job:
-- create 1–3 strong visual scenes for the current chapter
+- create as many scenes as naturally needed to visually cover the current chapter
 - assign each scene to exact transcript line ranges
 - preserve the chapter's narrative and emotional intent
 - maintain strict character consistency using character IDs
 - maintain environment and style consistency
 - generate one production-ready image prompt for each scene
+
+IMPORTANT:
+The goal is NOT to minimize scene count.
+The goal is to create enough scenes so the video has normal visual pacing.
+A long chapter with many narrative beats should produce more scenes.
+A short chapter with one emotional beat may produce only one scene.
 
 ━━━━━━━━━━━━━━━━━━
 ## INPUT
@@ -1081,10 +1653,11 @@ ${JSON.stringify(chapterSceneInput, null, 2)}
 - Do NOT invent line IDs outside the provided chapter.
 - Do NOT create a scene without source_segment_ids.
 - Scenes must be in chronological order.
-- Scene ranges may merge adjacent source segments if they form one strong visual moment.
-- Scene ranges should not overlap unless there is a deliberate visual reuse reason.
+- Scene ranges may merge adjacent source segments only if they form one coherent visual moment.
+- Scene ranges should not overlap.
 - Prefer scene boundaries that align with source segment boundaries.
 - If the chapter has only one coherent beat, create one scene covering the full chapter line range.
+- If the chapter contains multiple beats, create multiple scenes so each important beat is visually represented.
 - The output line_start / line_end will be used by code to map images to timeline, so they must be accurate and usable.
 
 ━━━━━━━━━━━━━━━━━━
@@ -1107,19 +1680,74 @@ ${JSON.stringify(chapterSceneInput, null, 2)}
 - Do NOT split or merge chapters.
 - Do NOT reference events that belong only to previous or next chapters.
 - Use previous_chapter_context and next_chapter_context only for emotional continuity.
-- Prefer 1–3 strong scenes over many weak scenes.
-- Each scene must represent a distinct visual and emotional beat.
+- Each scene must represent a distinct visual, narrative, or emotional beat.
 - Avoid repetitive scene compositions inside the same chapter.
 - Do NOT include text, subtitles, captions, logos, watermarks, or UI elements in images.
+- Do NOT compress multiple major story beats into one scene just to reduce scene count.
+- Do NOT create filler scenes that do not correspond to a real beat in the chapter.
 
 ━━━━━━━━━━━━━━━━━━
 ## SCENE COUNT LOGIC
 ━━━━━━━━━━━━━━━━━━
-- Create 1 scene if the chapter is simple, reflective, transitional, or mostly emotional.
-- Create 2 scenes if the chapter contains both setup and reaction.
-- Create 3 scenes only if the chapter contains a major reveal, confrontation, climax, emotional turning point, or strong visual progression.
-- Never exceed scene_options.max_scenes_for_this_chapter.
-- If unsure, prefer fewer stronger scenes.
+Create the number of scenes based on the natural story beats inside the chapter.
+
+Do NOT use a fixed 1–3 scene limit.
+
+A new scene should be created when one or more of the following changes occur:
+- a new action begins
+- a new emotional state appears
+- a reveal happens
+- a confrontation begins or escalates
+- the location changes
+- the time of day changes
+- a new character becomes visually important
+- the story moves from setup to reaction
+- the story moves from reaction to decision
+- the story moves from decision to consequence
+- a source segment introduces a visually distinct moment
+- the same scene would become too broad or vague if merged
+
+Recommended pacing:
+- Very short/simple chapter: 1 scene
+- Short chapter with setup and reaction: 2 scenes
+- Medium chapter with several beats: 3–5 scenes
+- Long chapter with many source segments: 5–8 scenes
+- Very long or highly eventful chapter: 8+ scenes if needed
+
+Use chapter_source_segments as the primary unit for scene planning:
+- Usually, 1 source segment can become 1 scene.
+- Adjacent source segments may be merged if they show the same action, same location, and same emotion.
+- A long source segment may be split into multiple scenes if it contains multiple clear visual beats.
+- Do not leave important source segments visually uncovered.
+
+Scene count must respect scene_options only if those options are explicitly provided:
+- If scene_options.max_scenes_for_this_chapter exists, treat it as a soft upper target, not a hard cap.
+- You may exceed it if the chapter clearly contains more distinct visual beats.
+- If scene_options.min_scenes_for_this_chapter exists, create at least that many scenes unless the chapter truly lacks enough beats.
+- If scene_options.target_scene_duration_seconds exists, use it to estimate normal image pacing.
+- If no useful scene_options exist, decide scene count from narrative beats and source segments.
+
+If unsure, prefer adequate story coverage over fewer scenes.
+
+━━━━━━━━━━━━━━━━━━
+## COVERAGE RULES
+━━━━━━━━━━━━━━━━━━
+The generated scenes should visually cover the chapter from beginning to end.
+
+- The first scene should start near current_chapter.line_start.
+- The last scene should end near current_chapter.line_end.
+- Important middle source segments should not be skipped.
+- It is acceptable for a scene to cover a quiet emotional beat if that beat is narratively important.
+- Avoid making only climax images while ignoring setup and consequence.
+- Avoid creating many near-identical images of the same character in the same pose.
+- Each scene should have a clear reason to exist.
+
+Before final output, internally check:
+1. Are all important source segments represented?
+2. Are there any large line gaps with no scene coverage?
+3. Are multiple major events incorrectly merged?
+4. Are any scenes visually redundant?
+5. Does the number of scenes feel normal for the chapter length?
 
 ━━━━━━━━━━━━━━━━━━
 ## SCENE DESIGN LOGIC
@@ -1133,6 +1761,22 @@ For each scene:
 6. Keep character appearance and wardrobe consistent.
 7. Keep lighting, color, camera, and composition consistent with visual_bible.
 8. Add environmental detail only when it supports the story and mood.
+9. Make the image feel like one frame from the story, not a generic illustration.
+10. Vary composition between consecutive scenes when possible.
+
+━━━━━━━━━━━━━━━━━━
+## VISUAL VARIATION RULES
+━━━━━━━━━━━━━━━━━━
+Within the same chapter, avoid repeating the same image structure too many times.
+
+Vary scenes using:
+- camera distance: wide shot, medium shot, close-up
+- camera angle: eye-level, slight low angle, over-the-shoulder, side view
+- subject focus: character, prop, environment, relationship between characters
+- emotional intensity: quiet tension, shock, confrontation, regret, isolation
+- composition: single character, two-character tension, object-focused evidence shot, environmental storytelling
+
+Do NOT vary character identity, age, hairstyle, wardrobe, or established design.
 
 ━━━━━━━━━━━━━━━━━━
 ## PROMPT REQUIREMENTS
@@ -1151,6 +1795,9 @@ Each image prompt must include:
 - no text inside image
 
 The prompt should be rich enough to create a compelling image, but not so long that it becomes confusing.
+
+Each prompt should describe ONE clear visual moment.
+Do NOT include multiple sequential actions inside one image prompt.
 
 ━━━━━━━━━━━━━━━━━━
 ## NEGATIVE PROMPT REQUIREMENTS
@@ -1172,6 +1819,8 @@ Each negative prompt should prevent:
 - generic stock photo look
 - irrelevant characters
 - wrong location
+- repeated duplicate composition
+- multiple unrelated events in one image
 
 ━━━━━━━━━━━━━━━━━━
 ## OUTPUT FORMAT (STRICT JSON)
@@ -1227,6 +1876,8 @@ Schema:
     "coverage_note": string,
     "line_range_notes": [string],
     "consistency_risks": [string],
+    "scene_count_reasoning": string,
+    "uncovered_source_segments": [string],
     "confidence": number
   }
 }

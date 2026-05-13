@@ -29,7 +29,7 @@ const __filename = fileURLToPath(import.meta.url);
  * @returns {Promise<Awaited<ReturnType<typeof prepareVideoInfo>>>}
  */
 export async function testPrepareVideoInfo({ url, prepareOptions = {} } = {}) {
-  const resolvedUrl = 'https://www.youtube.com/watch?v=RiCjgENl6jg';
+  const resolvedUrl = 'https://www.youtube.com/watch?v=oLsEBs0eo9o';
   //  url ?? process.env.TEST_PREPARE_VIDEO_URL;
   if (!resolvedUrl || String(resolvedUrl).trim() === '') {
     throw new Error('testPrepareVideoInfo: thiếu URL — truyền argv[2], hoặc { url }, hoặc biến môi trường TEST_PREPARE_VIDEO_URL.');

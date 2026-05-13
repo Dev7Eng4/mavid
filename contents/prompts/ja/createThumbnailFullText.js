@@ -484,8 +484,8 @@ No explanation.
     "mobile_readability_required": true
   },
   "validation": {
-    "L1_to_L4_are_13_to_21_japanese_chars": true,
-    "L5_is_8_to_16_japanese_chars": true,
+    "L1_to_L4_are_15_to_21_japanese_chars": true,
+    "L5_is_10_to_16_japanese_chars": true,
     "thumbnail_copy_has_no_forbidden_brackets": true,
     "thumbnail_copy_has_no_japanese_comma_or_period": true,
     "allowed_punctuation_is_used_carefully": true,

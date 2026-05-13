@@ -117,7 +117,6 @@ export async function generateFlowThumbnailFromGemini({
       outPath: path.join(outputDir, 'flow-thumbnail.jpg'),
     });
   } else if (thumbnailPromptKey === 'jaThumbnailHorizontal') {
-    console.log('🚀 ~ generateFlowThumbnailFromGemini ~ thumbnailPromptKey2:', thumbnailPromptKey);
     await generateAnalysisAndTextForThumbnailHorizontal({
       prompts,
       title,
@@ -126,7 +125,6 @@ export async function generateFlowThumbnailFromGemini({
       logTag,
     });
   } else if (thumbnailPromptKey === 'jaThumbnailVertical') {
-    console.log('🚀 ~ generateFlowThumbnailFromGemini ~ thumbnailPromptKey3:', thumbnailPromptKey);
     await generateBottomTextThumbnailJaVertical({
       prompts,
       title,
@@ -137,7 +135,6 @@ export async function generateFlowThumbnailFromGemini({
   } else {
     const { build, isNeedImage } = resolveThumbnailPromptBuilder(prompts, thumbnailPromptKey);
     const flowPrompt = build(title, summary);
-    console.log('🚀 ~ generateFlowThumbnailFromGemini ~ thumbnailPromptKey4:', flowPrompt);
     await runCreateThumbnailFlow({
       prompt: flowPrompt,
       pathSave: outputDir,
