@@ -4,6 +4,8 @@
 import fs from 'fs';
 import path from 'path';
 import { GPM_API_DEFAULT_ORIGIN } from '../constants/gpmApi.js';
+import { getChannelConfig } from '../api/channels/getChannelConfig.js';
+import { getChannelDirPath } from '../api/urls/getListAllPaths.js';
 
 /**
  * Chuẩn hóa base GPM → origin cho Playwright (bỏ hậu tố /api/v3 nếu có).
@@ -245,7 +247,8 @@ async function readVideoIdsWithStatusDone(channelAbs, durBounds) {
  * @param {number | null} maxUploads
  * @param {string[] | null | undefined} folderNamesOrder
  */
-export async function listUploadJobs(channelAbs, id, maxUploads, folderNamesOrder) {
+export async function listUploadJobs(channelFolder, id, maxUploads, folderNamesOrder) {
+  const channelAbs = getChannelDirPath(channelFolder);
   if (!fs.existsSync(channelAbs)) throw new Error(`Không tìm thấy thư mục kênh: ${channelAbs}`);
 
   if (Array.isArray(folderNamesOrder) && folderNamesOrder.length > 0) {
@@ -270,7 +273,7 @@ export async function listUploadJobs(channelAbs, id, maxUploads, folderNamesOrde
   }
 
   // ──── Logic mới: đọc Excel → status "Đã tạo video" + duration filter → video ID → folder + .mp4 ────
-  const durBounds = getDurationBoundsFromConfig(channelAbs, id);
+  const durBounds = getDurationBoundsFromConfig(channelFolder, id);
   if (durBounds) {
     console.log(
       `[upload-jobs] Duration filter: from ${durBounds.durationMinuteFrom} phút, to ${durBounds.durationMinuteTo ?? 'không giới hạn'} phút`

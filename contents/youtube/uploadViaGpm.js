@@ -63,7 +63,6 @@ export default async function main(raw = {}) {
   const scheduleEmail = raw.email.trim();
 
   const gpmProfileId = await resolveGpmProfileIdByEmail(scheduleEmail);
-  console.log('🚀 ~ main ~ gpmProfileId:', gpmProfileId);
 
   if (!gpmProfileId) {
     logToLogsPage(`[upload] Không tìm thấy profile GPM cho email ${scheduleEmail}`, 'error');
@@ -83,7 +82,7 @@ export default async function main(raw = {}) {
   const channelAbs = getChannelDirPath(channelFolder);
 
   const jobs = await listUploadJobs(
-    channelAbs,
+    channelFolder,
     raw.id,
     maxUploads,
     uploadFolderNames && uploadFolderNames.length > 0 ? uploadFolderNames : null
@@ -101,14 +100,14 @@ export default async function main(raw = {}) {
     logToLogsPage(`[upload] Channel ${channelFolder} - Email ${scheduleEmail} - ${message}`, 'error');
   };
 
-  console.log(`[upload] Kênh «${channelFolder}»: ${jobs.length} video — GPM profile ${gpmProfileId}`);
+  // console.log(`[upload] Kênh «${channelFolder}»: ${jobs.length} video — GPM profile ${gpmProfileId}`);
 
   /** @type {Array<{ date: string, time: string, iso: string }> | null} */
   let publishSchedule = null;
   /** `uploadedVideos` trong config trước batch (cho addRelatedVideo). */
   let baselineUploadedVideosFromConfig = 0;
   try {
-    const { schedule, settings } = getYoutubePublishPlan({
+    const { schedule, settings } = await getYoutubePublishPlan({
       channelFolder,
       id: raw.id,
       uploadCount: jobs.length,
@@ -118,7 +117,7 @@ export default async function main(raw = {}) {
     baselineUploadedVideosFromConfig = Number.isFinite(Number(settings?.uploadedVideos))
       ? Math.max(0, Math.floor(Number(settings.uploadedVideos)))
       : 0;
-    console.log(`[upload] getYoutubePublishPlan: ${schedule.length} mốc (email «${scheduleEmail}»).`);
+    // console.log(`[upload] getYoutubePublishPlan: ${schedule.length} mốc (email «${scheduleEmail}»).`);
   } catch (e) {
     console.warn('[upload] getYoutubePublishPlan:', e instanceof Error ? e.message : e);
   }
