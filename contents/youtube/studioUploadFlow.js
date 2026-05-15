@@ -31,7 +31,7 @@ function getVideoDurationSeconds(mp4Path) {
     const out = execFileSync(
       'ffprobe',
       ['-v', 'error', '-show_entries', 'format=duration', '-of', 'default=noprint_wrappers=1:nokey=1', mp4Path],
-      { encoding: 'utf-8' }
+      { encoding: 'utf-8' },
     ).trim();
     const n = parseFloat(out);
     return Number.isFinite(n) && n > 0 ? n : null;
@@ -168,9 +168,9 @@ export async function fillVideoDetails(page, videoFolderPath, showErrorLogs) {
 
   const meta = await getMetaInfo(videoFolderPath);
 
-  const title = meta.titleGemini || '';
-  const description = meta.descriptionGemini || '';
-  const tags = [meta.tagsGemini, meta.tags].filter(Boolean).join(', ');
+  const title = meta.seoTitle || '';
+  const description = meta.seoDescription || '';
+  const tags = '';
 
   await page.waitForTimeout(getRandomNumber(200));
 
@@ -206,7 +206,7 @@ export async function fillVideoDetails(page, videoFolderPath, showErrorLogs) {
   if (boxUpload) {
     await page.mouse.move(
       boxUpload.x + boxUpload.width / 2 + (Math.random() * 20 - 10),
-      boxUpload.y + boxUpload.height / 2 + (Math.random() * 20 - 10)
+      boxUpload.y + boxUpload.height / 2 + (Math.random() * 20 - 10),
     );
   }
 
@@ -370,7 +370,7 @@ export async function chooseVisibility(page, ctx) {
   if (boxUpload) {
     await page.mouse.move(
       boxUpload.x + boxUpload.width / 2 + (Math.random() * 20 - 10),
-      boxUpload.y + boxUpload.height / 2 + (Math.random() * 20 - 10)
+      boxUpload.y + boxUpload.height / 2 + (Math.random() * 20 - 10),
     );
   }
 

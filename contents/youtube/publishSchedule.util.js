@@ -283,8 +283,7 @@ export async function getYoutubePublishPlan({ channelFolder, id, uploadCount }) 
   const timesForAlgo = publishTimesNormalized;
   const spacing = calendarSpacingDaysForPreset(preset);
   /** Neo chu kỳ config (latestUpload*) hoặc suất đã tính; `null` = chưa có anchor từ config. */
-  let intervalRef =
-    spacing > 0 && hasParsableLatestUpload(base) ? latestUploadMoment(base) : null;
+  let intervalRef = spacing > 0 && hasParsableLatestUpload(base) ? latestUploadMoment(base) : null;
 
   for (let i = 0; i < n; i++) {
     let when;

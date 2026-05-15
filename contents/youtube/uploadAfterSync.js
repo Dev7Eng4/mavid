@@ -11,6 +11,7 @@ import path from 'path';
 import { CHANNEL_CONFIG_FILENAME, getChannelDirPath, getListMappingPath } from '../api/urls/getListAllPaths.js';
 import { CHANNELS } from '../constants/channel.js';
 import { pickChronologicallyLatestSlot } from './publishScheduleByDuration.util.js';
+import { getChannelConfig } from '../api/channels/getChannelConfig.js';
 
 export const MAVID_CHANNEL_CONFIG_FILENAME = CHANNEL_CONFIG_FILENAME;
 
