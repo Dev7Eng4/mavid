@@ -1,10 +1,10 @@
-import { AUDIO_DRAMA_CONFIG } from './audioDrama';
-import { GARDENING_CONFIG } from './gardening';
-import { GENERAL_FINANCE_CONFIG } from './generalFinance';
-import { SENIOR_FINANCE_CONFIG } from './seniorFinance';
-import { SENIOR_HEALTH_CONFIG } from './seniorHealth';
-import { SENIOR_LIFESTYLE_CONFIG } from './seniorLifestyle';
-import { SOFT_STORY_CONFIG } from './softStory';
+import { AUDIO_DRAMA_CONFIG } from './audioDrama.js';
+import { GARDENING_CONFIG } from './gardening.js';
+import { GENERAL_FINANCE_CONFIG } from './generalFinance.js';
+import { SENIOR_FINANCE_CONFIG } from './seniorFinance.js';
+import { SENIOR_HEALTH_CONFIG } from './seniorHealth.js';
+import { SENIOR_LIFESTYLE_CONFIG } from './seniorLifestyle.js';
+import { SOFT_STORY_CONFIG } from './softStory.js';
 
 export const NICHE_CONFIGS = {
   japanese_audio_drama: AUDIO_DRAMA_CONFIG,

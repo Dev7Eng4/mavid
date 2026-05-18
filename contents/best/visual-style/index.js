@@ -1,9 +1,9 @@
-import { ANIME_STYLE_CONFIG } from './anime';
-import { CINEMATIC_STYLE_CONFIG } from './cinematic';
-import { DOCUMENTARY_PHOTO_STYLE_CONFIG } from './documentaryPhoto';
-import { EDUCATIONAL_ILLUSTRATION_STYLE_CONFIG } from './educationalIllustration';
-import { SEMI_REALISTIC_ILLUSTRATION_STYLE_CONFIG } from './semiRealisticIllustration';
-import { SOFT_ANIME_STYLE_CONFIG } from './softAnime';
+import { ANIME_STYLE_CONFIG } from './anime.js';
+import { CINEMATIC_STYLE_CONFIG } from './cinematic.js';
+import { DOCUMENTARY_PHOTO_STYLE_CONFIG } from './documentaryPhoto.js';
+import { EDUCATIONAL_ILLUSTRATION_STYLE_CONFIG } from './educationalIllustration.js';
+import { SEMI_REALISTIC_ILLUSTRATION_STYLE_CONFIG } from './semiRealisticIllustration.js';
+import { SOFT_ANIME_STYLE_CONFIG } from './softAnime.js';
 
 export const VISUAL_STYLE_CONFIGS = {
   cinematic: CINEMATIC_STYLE_CONFIG,
