@@ -26,8 +26,8 @@ const STOCK_ASSETS_DIR = path.join(ROOT, 'assets', 'visual-resource', 'stock');
 const SKIP_START_SEC = 120;
 /** Bỏ bao nhiêu giây cuối video stock */
 const SKIP_END_SEC = 120;
-/** Hệ số slowdown (video gốc sẽ chậm đi bấy nhiêu lần) */
-const SLOWMO_FACTOR = STOCK_VIDEO.SLOWMO_FACTOR || 3;
+/** Hệ số slowdown stock clip (video gốc chậm đi bấy nhiêu lần; clip visual đã bake sẵn, segment dùng slowmoFactor=1) */
+const SLOWMO_FACTOR = 2;
 /** Hệ số zoom so với canvas trước khi crop (1.4 = phóng 140%, tương đương zoom ~+40%) */
 const ZOOM_FACTOR = 1.4;
 
@@ -78,7 +78,7 @@ function parseDurationToSeconds(duration) {
 function getEffectiveDuration(durationSec) {
   const n = Number(durationSec);
   if (!Number.isFinite(n) || n <= 0) return 0;
-  const usable = Math.max(0, n - SKIP_START_SEC - SKIP_END_SEC);
+  const usable = Math.max(0, n);
   return usable * SLOWMO_FACTOR;
 }
 
@@ -102,6 +102,7 @@ async function selectAndMarkStockVideo(targetDurationSec) {
   const allVideos = await getListAllVisuals();
 
   const withLink = allVideos.filter(v => v && String(v.link ?? '').trim());
+  console.log('🚀 ~ selectAndMarkStockVideo ~ withLink:', withLink);
 
   if (withLink.length === 0) {
     console.warn('[StockVisual] Không tìm thấy video stock nào.');
@@ -109,7 +110,9 @@ async function selectAndMarkStockVideo(targetDurationSec) {
   }
 
   const eligible = withLink.filter(v => {
+    console.log('🚀 ~ selectAndMarkStockVideo ~ v:', v.duration);
     const durationSec = parseDurationToSeconds(v.duration);
+    console.log('🚀 ~ selectAndMarkStockVideo ~ durationSec:', durationSec);
     return getEffectiveDuration(durationSec) >= targetDurationSec;
   });
 
@@ -243,7 +246,7 @@ async function prepareStockClip(rawVideoPath, targetDuration, outputDir) {
 
   console.log(
     `[StockVisual] Xử lý clip: bỏ ${SKIP_START_SEC}s đầu, lấy ${sourceDuration.toFixed(1)}s gốc → ` +
-      `slowdown ×${SLOWMO_FACTOR} = ${targetDuration.toFixed(1)}s, zoom ${ZOOM_FACTOR * 100}% → crop ${CANVAS_W}×${CANVAS_H}`,
+      `slowdown ×${SLOWMO_FACTOR} = ${targetDuration.toFixed(1)}s, zoom ${ZOOM_FACTOR * 100}% → crop ${CANVAS_W}×${CANVAS_H}`
   );
 
   // `-t` phải đứng trước `-i` để giới hạn độ dài **nguồn** (giây gốc sau -ss).

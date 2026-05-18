@@ -79,7 +79,7 @@ async function waitForCdpPort(host, port, { timeoutMs = 120000, pollMs = 400 } =
         () => {
           socket.destroy();
           resolve(true);
-        },
+        }
       );
       const t = Math.min(2500, Math.max(200, pollMs * 2));
       socket.setTimeout(t);
@@ -181,7 +181,7 @@ export function resolveGpmChromiumExecutable(profileDir, dataRoot, preferredExe)
   }
 
   throw new Error(
-    'Không tìm thấy trình duyệt GPM (browser.exe / chrome.exe). Trong tab GPM hãy «Chọn browser GPM», hoặc đặt biến môi trường GPM_CHROMIUM_PATH trỏ tới file .exe của GPM.',
+    'Không tìm thấy trình duyệt GPM (browser.exe / chrome.exe). Trong tab GPM hãy «Chọn browser GPM», hoặc đặt biến môi trường GPM_CHROMIUM_PATH trỏ tới file .exe của GPM.'
   );
 }
 
@@ -275,7 +275,7 @@ export async function startGpmProfile(profileId, options = {}) {
 
   if (!addr || typeof addr !== 'string' || !String(addr).trim()) {
     throw new Error(
-      'GPM không trả `remote_debugging_address` hoặc `remote_debugging_port` trong `data`. Kiểm tra profile / GPM đang chạy.',
+      'GPM không trả `remote_debugging_address` hoặc `remote_debugging_port` trong `data`. Kiểm tra profile / GPM đang chạy.'
     );
   }
 
@@ -336,6 +336,7 @@ export async function stopGpmProfile(profileId, options = {}) {
 export async function connectPlaywrightToGpmProfile(profileId, options = {}) {
   const { cdpWaitTimeoutMs, cdpPollMs, ...startOpts } = options;
   const gpm = await startGpmProfile(profileId, startOpts);
+  console.log('🚀 ~ connectPlaywrightToGpmProfile ~ gpm:', gpm);
   const { host, port } = cdpUrlToHostPort(gpm.cdpHttpUrl);
   const waitMs = Number.isFinite(Number(cdpWaitTimeoutMs)) && Number(cdpWaitTimeoutMs) > 0 ? Number(cdpWaitTimeoutMs) : 120000;
   const poll = Number.isFinite(Number(cdpPollMs)) && Number(cdpPollMs) > 0 ? Number(cdpPollMs) : 400;
