@@ -342,7 +342,7 @@ export async function main(
     targetPlatform: 'youtube',
     videoDurationSeconds,
     concurrency: 1,
-  }
+  },
 ) {
   const videoContext = {
     niche_id: resolvedConfig.niche.id,

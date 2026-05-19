@@ -28,10 +28,7 @@
           "scene_function": "daily_life_example",
           "visual_priority": "high",
           "image_usage": "chapter_opening",
-          "characters_or_subjects": [
-            "Fresh tofu",
-            "Miso soup"
-          ],
+          "characters_or_subjects": ["Fresh tofu", "Miso soup"],
           "environment_id": "env_cozy_dining_room",
           "emotion_or_mood": "warm, calm, traditional",
           "visual_description": "A beautiful, fresh block of textured cotton tofu served in a clean, shallow ceramic dish, placed alongside a small steaming bowl of miso soup on a light oak dining table.",
@@ -63,9 +60,7 @@
           "scene_function": "problem_intro",
           "visual_priority": "medium",
           "image_usage": "main_video_scene",
-          "characters_or_subjects": [
-            "Kind Elderly Japanese Couple"
-          ],
+          "characters_or_subjects": ["Kind Elderly Japanese Couple"],
           "environment_id": "env_cozy_dining_room",
           "emotion_or_mood": "curious, warm, respectful",
           "visual_description": "An elderly Japanese man and woman sitting together at their clean dining table, looking toward each other with curious, calm expressions, reflecting on their daily meals.",
@@ -127,10 +122,7 @@
           "scene_function": "bad_habit_example",
           "visual_priority": "high",
           "image_usage": "chapter_opening",
-          "characters_or_subjects": [
-            "Cold tofu",
-            "Soy sauce stream"
-          ],
+          "characters_or_subjects": ["Cold tofu", "Soy sauce stream"],
           "environment_id": "env_cozy_dining_room",
           "emotion_or_mood": "vivid but calm, cautious",
           "visual_description": "A dark stream of soy sauce cascading over a pristine block of cold tofu inside a shallow white ceramic dish. The dark fluid pools slightly at the base, with green chopped scallions resting on top.",
@@ -161,11 +153,7 @@
           "scene_function": "good_habit_example",
           "visual_priority": "medium",
           "image_usage": "main_video_scene",
-          "characters_or_subjects": [
-            "Senior citizen hand",
-            "Small dipping dish",
-            "Tofu piece"
-          ],
+          "characters_or_subjects": ["Senior citizen hand", "Small dipping dish", "Tofu piece"],
           "environment_id": "env_cozy_dining_room",
           "emotion_or_mood": "trustworthy, clean, instructive",
           "visual_description": "Neat, elderly hands using bamboo chopsticks to hold a single cut square of tofu, gently touching only its bottom corner into a tiny separate ceramic saucer containing a shallow splash of low-sodium sauce.",
@@ -177,9 +165,7 @@
           "continuity_notes": [
             "Ensures the hands look senior-friendly (appropriate aging with dignity) rather than excessively young or frail."
           ],
-          "safety_notes": [
-            "Demonstrates a positive lifestyle alternative cleanly without violating any prompt safety constraints."
-          ],
+          "safety_notes": ["Demonstrates a positive lifestyle alternative cleanly without violating any prompt safety constraints."],
           "transition_note": "Provides a clean palate cleanser before shifting to the Rank 4 chemical threat topic."
         },
         {
@@ -196,10 +182,7 @@
           "scene_function": "bad_habit_example",
           "visual_priority": "high",
           "image_usage": "main_video_scene",
-          "characters_or_subjects": [
-            "Mapo tofu dish",
-            "Rice bowl"
-          ],
+          "characters_or_subjects": ["Mapo tofu dish", "Rice bowl"],
           "environment_id": "env_japanese_home_kitchen",
           "emotion_or_mood": "warm, appealing but cautious",
           "visual_description": "A traditional ceramic bowl containing simmering Mapo Tofu with a distinctly glossy, oily red-brown sauce coating the white cubes, topped with green garnishes and sitting next to a simple bowl of plain white rice.",
@@ -208,9 +191,7 @@
           "composition": "Centered, well-balanced food layout showcasing a realistic, heavy domestic stir-fry texture in low-contrast tones.",
           "image_prompt": "A clear object-focused scene of a classic ceramic bowl filled with freshly cooked Mapo Tofu, featuring soft white tofu cubes coated in a glossy red-brown sauce, rising gentle wisps of steam, served on a table next to a small bowl of steaming white rice, soft Japanese anime illustration, senior-friendly style, warm home lighting, clean background, low contrast, easy-to-understand composition, 16:9 composition, high quality, highly detailed, no text, no subtitles, no watermark",
           "negative_prompt": "dark horror mood, aggressive expression, cellular level view, molecules, chemical diagrams, age progression, photorealistic, 3D render, text, Japanese text, English text, subtitles, watermark, logo, sign, distorted fingers, messy environment",
-          "continuity_notes": [
-            "Keeps the kitchen backdrop elements matching the organized layout defined in the environment bible."
-          ],
+          "continuity_notes": ["Keeps the kitchen backdrop elements matching the organized layout defined in the environment bible."],
           "safety_notes": [
             "Explicitly avoids showing chemical symbols, molecular charts, wrinkled skin diagrams, or brain decline symbols for AGEs, maintaining a safe and respectful presentation of an everyday home cooking scenario."
           ],
@@ -259,9 +240,7 @@
           "scene_function": "problem_intro",
           "visual_priority": "high",
           "image_usage": "chapter_opening",
-          "characters_or_subjects": [
-            "Tofu packages on a shelf"
-          ],
+          "characters_or_subjects": ["Tofu packages on a shelf"],
           "environment_id": "env_cozy_dining_room",
           "emotion_or_mood": "clean, senior-friendly, curious",
           "visual_description": "A close-up view of a supermarket refrigerated shelf containing neat, clean plastic containers of fresh tofu. The packages are text-free and abstract, showing clean blocks through transparent film.",
@@ -270,9 +249,7 @@
           "composition": "An easy-to-understand composition focused on the supermarket options, leaving clear negative space for text layout safety.",
           "image_prompt": "A gentle medium shot of a clean supermarket refrigerated grocery aisle shelf containing neatly arranged plastic packages of fresh tofu, transparent packaging revealing white tofu blocks inside without any readable words or labels, soft Japanese anime illustration, senior-friendly style, clean and calm atmosphere, peaceful natural light, easy-to-understand composition, 16:9 composition, high quality, highly detailed, no text, no subtitles, no watermark",
           "negative_prompt": "dark horror mood, photorealistic, 3D render, text, Japanese text, English text, barcodes, prices, labels, subtitles, watermark, logo, sign, distorted hands, extra fingers, messy environment",
-          "continuity_notes": [
-            "Keeps the soft anime palette and tone perfectly aligned with previous chapter context."
-          ],
+          "continuity_notes": ["Keeps the soft anime palette and tone perfectly aligned with previous chapter context."],
           "safety_notes": [
             "All labels on packages must be abstract shapes to respect the absolute ban on readable written text inside graphic areas."
           ],
@@ -292,10 +269,7 @@
           "scene_function": "food_example",
           "visual_priority": "high",
           "image_usage": "main_video_scene",
-          "characters_or_subjects": [
-            "Artisan kitchen hands",
-            "Tofu mold with white cloth"
-          ],
+          "characters_or_subjects": ["Artisan kitchen hands", "Tofu mold with white cloth"],
           "environment_id": "env_japanese_home_kitchen",
           "emotion_or_mood": "calm, clean, informative",
           "visual_description": "Grounded artisan kitchen hands pressing down on a traditional wooden tofu mold wrapped in clean white linen fabric, as transparent water drops slowly filter out from the sides.",
@@ -326,10 +300,7 @@
           "scene_function": "good_habit_example",
           "visual_priority": "very_high",
           "image_usage": "main_video_scene",
-          "characters_or_subjects": [
-            "Fresh tofu block",
-            "Flowing tap water"
-          ],
+          "characters_or_subjects": ["Fresh tofu block", "Flowing tap water"],
           "environment_id": "env_japanese_home_kitchen",
           "emotion_or_mood": "clean, refreshing, safe",
           "visual_description": "A beautiful, firm block of white cotton tofu sitting in a stainless steel mesh strainer, being washed under a steady stream of sparkling clean running tap water over a kitchen sink.",
@@ -338,9 +309,7 @@
           "composition": "Low contrast, crisp subject presentation focusing completely on the hygiene method while maintaining uncluttered negative space.",
           "image_prompt": "A clear object-focused scene of a firm square block of fresh white tofu resting inside a clean metal mesh strainer, being gently rinsed under a stream of sparkling clear water from a modern kitchen tap, clean steel kitchen sink basin below, soft Japanese anime illustration, senior-friendly style, clean and refreshing atmosphere, peaceful natural light, highly detailed, 16:9 composition, no text, no subtitles, no watermark",
           "negative_prompt": "toxic green water, cartoon bacteria monsters, dirty sink, dark horror mood, photorealistic, 3D render, text, subtitles, watermark, logo, sign, distorted hands",
-          "continuity_notes": [
-            "Tofu block displays the subtle rough linen texture of Momen tofu as outlined in the subject bible."
-          ],
+          "continuity_notes": ["Tofu block displays the subtle rough linen texture of Momen tofu as outlined in the subject bible."],
           "safety_notes": [
             "Abides strictly by the prompt restrictions; water is rendered naturally clear without any toxic colors, bacterial graphics, or clinical alarmism to avoid causing fear to the senior demographic."
           ],
@@ -360,10 +329,7 @@
           "scene_function": "bad_habit_example",
           "visual_priority": "medium",
           "image_usage": "summary_scene",
-          "characters_or_subjects": [
-            "Miso soup pot",
-            "Simmering tofu cubes"
-          ],
+          "characters_or_subjects": ["Miso soup pot", "Simmering tofu cubes"],
           "environment_id": "env_japanese_home_kitchen",
           "environment_name": "Warm Japanese Home Kitchen",
           "emotion_or_mood": "warm, familiar, cautious",
@@ -424,9 +390,7 @@
           "scene_function": "good_habit_example",
           "visual_priority": "high",
           "image_usage": "chapter_opening",
-          "characters_or_subjects": [
-            "Healthy senior woman"
-          ],
+          "characters_or_subjects": ["Healthy senior woman"],
           "environment_id": "env_cozy_dining_room",
           "emotion_or_mood": "warm, senior-friendly, trustworthy",
           "visual_description": "A healthy elderly Japanese woman with soft silver hair styled in a clean bob, wearing a light cream blouse and linen apron, smiling warmly at her dining table. A clean, fresh block of cotton tofu sits in a small ceramic dish beside a teacup.",
@@ -459,9 +423,7 @@
           "scene_function": "calm_summary",
           "visual_priority": "high",
           "image_usage": "main_video_scene",
-          "characters_or_subjects": [
-            "Wise older gentleman"
-          ],
+          "characters_or_subjects": ["Wise older gentleman"],
           "environment_id": "env_cozy_dining_room",
           "emotion_or_mood": "calm, clear-headed, hopeful",
           "visual_description": "An elderly Japanese man with short grey hair and a light-brown cardigan, looking active and relaxed while holding an unreadable, small open notebook, smiling gently near a clean window.",
@@ -470,9 +432,7 @@
           "composition": "Uncluttered medium shot with clear focus on the subject, utilizing soft pastel and warm beige backgrounds to frame stable domestic health.",
           "image_prompt": "A simple lifestyle composition of an elderly Japanese man with short, neat grey hair and a calm, content smile, wearing a soft light-brown cardigan, holding a small open notebook with completely unreadable text lines, sitting in a quiet sunlit living room with a light wood background, soft Japanese anime illustration, senior-friendly style, warm and calm atmosphere, gentle afternoon light, clean background, 16:9 composition, high quality, highly detailed, no text, no subtitles, no watermark",
           "negative_prompt": "dark horror mood, confused expression, distress, brain medical diagrams, clinical context, letters, readable text, charts, numbers, teenage character, chibi, photorealistic, 3D render, watermark, logo",
-          "continuity_notes": [
-            "Follows the male subject profile from the recurring subject bible for visual cohesion across chapters."
-          ],
+          "continuity_notes": ["Follows the male subject profile from the recurring subject bible for visual cohesion across chapters."],
           "safety_notes": [
             "Stops any representation of dementia or Alzheimer's symptoms by presenting a healthy, active senior.",
             "Ensures any visible lines inside the notebook are purely abstract and unreadable, blocking fake text anomalies."
@@ -522,10 +482,7 @@
           "scene_function": "food_example",
           "visual_priority": "very_high",
           "image_usage": "chapter_opening",
-          "characters_or_subjects": [
-            "Dry Koya-tofu squares",
-            "Wicker basket"
-          ],
+          "characters_or_subjects": ["Dry Koya-tofu squares", "Wicker basket"],
           "environment_id": "env_japanese_home_kitchen",
           "emotion_or_mood": "clean, senior-friendly, curious",
           "visual_description": "Small, dry, pale-yellow sponge-like rectangular blocks of freeze-dried Koya-tofu neatly stacked inside a shallow wicker basket resting on a bright wooden kitchen countertop.",
@@ -558,9 +515,7 @@
           "scene_function": "good_habit_example",
           "visual_priority": "high",
           "image_usage": "main_video_scene",
-          "characters_or_subjects": [
-            "Kind Elderly Japanese Couple"
-          ],
+          "characters_or_subjects": ["Kind Elderly Japanese Couple"],
           "environment_id": "env_japanese_home_kitchen",
           "emotion_or_mood": "warm, calm, trustworthy",
           "visual_description": "An elderly Japanese man and woman working together contentedly at a bright kitchen counter, preparing healthy traditional ingredients under inviting natural light.",
@@ -622,10 +577,7 @@
           "scene_function": "good_habit_example",
           "visual_priority": "high",
           "image_usage": "chapter_opening",
-          "characters_or_subjects": [
-            "Fresh assorted mushrooms",
-            "Tofu pieces"
-          ],
+          "characters_or_subjects": ["Fresh assorted mushrooms", "Tofu pieces"],
           "environment_id": "env_japanese_home_kitchen",
           "emotion_or_mood": "warm, delicious, clean",
           "visual_description": "Plump fresh shiitake mushrooms, delicate shimeji clusters, and freshly cut firm white tofu cubes elegantly arranged on a light wood kitchen cutting board.",
@@ -657,10 +609,7 @@
           "scene_function": "procedure_steps",
           "visual_priority": "high",
           "image_usage": "main_video_scene",
-          "characters_or_subjects": [
-            "Microwave",
-            "Plate of tofu"
-          ],
+          "characters_or_subjects": ["Microwave", "Plate of tofu"],
           "environment_id": "env_japanese_home_kitchen",
           "emotion_or_mood": "easy to understand, calm, helpful",
           "visual_description": "Dignified senior hands putting a plain white ceramic dish containing a fresh block of tofu inside a warm, lit residential microwave appliance.",
@@ -722,11 +671,7 @@
           "scene_function": "procedure_steps",
           "visual_priority": "very_high",
           "image_usage": "chapter_opening",
-          "characters_or_subjects": [
-            "Cooking pot",
-            "Beaten egg stream",
-            "Tofu blocks"
-          ],
+          "characters_or_subjects": ["Cooking pot", "Beaten egg stream", "Tofu blocks"],
           "environment_id": "env_japanese_home_kitchen",
           "emotion_or_mood": "instructive, clean, warm",
           "visual_description": "A beautiful stream of raw beaten egg liquid pouring down from a small ceramic bowl into a shallow pan, wrapping gently around simmering pale-yellow Koya-tofu squares as thin wisps of steam rise from the boiling dashi broth.",
@@ -758,9 +703,7 @@
           "scene_function": "food_example",
           "visual_priority": "high",
           "image_usage": "main_video_scene",
-          "characters_or_subjects": [
-            "Koya no Tamagotoji dish"
-          ],
+          "characters_or_subjects": ["Koya no Tamagotoji dish"],
           "environment_id": "env_cozy_dining_room",
           "emotion_or_mood": "warm, delicious, comforting",
           "visual_description": "A traditional patterned ceramic bowl filled with cooked Koya-tofu egg simmer. A fluffy, soft yellow layer of egg is beautifully folded around porous tofu squares, garnished with fresh herbs and rising thin wisps of hot steam.",
@@ -821,11 +764,7 @@
           "scene_function": "calm_summary",
           "visual_priority": "high",
           "image_usage": "chapter_opening",
-          "characters_or_subjects": [
-            "Tofu",
-            "Mushrooms",
-            "Egg illustrations"
-          ],
+          "characters_or_subjects": ["Tofu", "Mushrooms", "Egg illustrations"],
           "environment_id": "env_japanese_home_kitchen",
           "emotion_or_mood": "trustworthy, easy to understand, clean",
           "visual_description": "An organized, artistic arrangement on a light wooden table featuring a block of white cotton tofu, fresh shiitake mushrooms, and a clean ceramic bowl with whole eggs, creating a holistic lifestyle recap layout.",
@@ -858,9 +797,7 @@
           "scene_function": "daily_life_example",
           "visual_priority": "high",
           "image_usage": "main_video_scene",
-          "characters_or_subjects": [
-            "Kind Elderly Japanese Couple"
-          ],
+          "characters_or_subjects": ["Kind Elderly Japanese Couple"],
           "environment_id": "env_cozy_dining_room",
           "emotion_or_mood": "warm, senior-friendly, supportive",
           "visual_description": "The friendly elderly man in his light-brown cardigan and the gray-haired woman in her cream blouse sitting comfortably next to each other at their oak table, looking cheerfully at a sleek tablet screen that shows an unreadable, glowing abstract UI pattern.",
@@ -915,10 +852,7 @@
         },
         "recommended_scene_count": 1,
         "actual_scene_count": 2,
-        "scene_ids": [
-          "sc_001",
-          "sc_002"
-        ]
+        "scene_ids": ["sc_001", "sc_002"]
       },
       {
         "chapter_id": "ch_002",
@@ -929,11 +863,7 @@
         },
         "recommended_scene_count": 2,
         "actual_scene_count": 3,
-        "scene_ids": [
-          "sc_003",
-          "sc_004",
-          "sc_005"
-        ]
+        "scene_ids": ["sc_003", "sc_004", "sc_005"]
       },
       {
         "chapter_id": "ch_003",
@@ -944,12 +874,7 @@
         },
         "recommended_scene_count": 3,
         "actual_scene_count": 4,
-        "scene_ids": [
-          "sc_006",
-          "sc_007",
-          "sc_008",
-          "sc_009"
-        ]
+        "scene_ids": ["sc_006", "sc_007", "sc_008", "sc_009"]
       },
       {
         "chapter_id": "ch_004",
@@ -960,10 +885,7 @@
         },
         "recommended_scene_count": 2,
         "actual_scene_count": 2,
-        "scene_ids": [
-          "sc_010",
-          "sc_011"
-        ]
+        "scene_ids": ["sc_010", "sc_011"]
       },
       {
         "chapter_id": "ch_005",
@@ -974,10 +896,7 @@
         },
         "recommended_scene_count": 1,
         "actual_scene_count": 2,
-        "scene_ids": [
-          "sc_012",
-          "sc_013"
-        ]
+        "scene_ids": ["sc_012", "sc_013"]
       },
       {
         "chapter_id": "ch_006",
@@ -988,10 +907,7 @@
         },
         "recommended_scene_count": 2,
         "actual_scene_count": 2,
-        "scene_ids": [
-          "sc_014",
-          "sc_015"
-        ]
+        "scene_ids": ["sc_014", "sc_015"]
       },
       {
         "chapter_id": "ch_007",
@@ -1002,10 +918,7 @@
         },
         "recommended_scene_count": 2,
         "actual_scene_count": 2,
-        "scene_ids": [
-          "sc_016",
-          "sc_017"
-        ]
+        "scene_ids": ["sc_016", "sc_017"]
       },
       {
         "chapter_id": "ch_008",
@@ -1016,10 +929,7 @@
         },
         "recommended_scene_count": 1,
         "actual_scene_count": 2,
-        "scene_ids": [
-          "sc_018",
-          "sc_019"
-        ]
+        "scene_ids": ["sc_018", "sc_019"]
       }
     ],
     "scenes": [
@@ -1037,10 +947,7 @@
         "scene_function": "daily_life_example",
         "visual_priority": "high",
         "image_usage": "chapter_opening",
-        "characters_or_subjects": [
-          "Fresh tofu",
-          "Miso soup"
-        ],
+        "characters_or_subjects": ["Fresh tofu", "Miso soup"],
         "environment_id": "env_cozy_dining_room",
         "emotion_or_mood": "warm, calm, traditional",
         "visual_description": "A beautiful, fresh block of textured cotton tofu served in a clean, shallow ceramic dish, placed alongside a small steaming bowl of miso soup on a light oak dining table.",
@@ -1075,9 +982,7 @@
         "scene_function": "problem_intro",
         "visual_priority": "medium",
         "image_usage": "main_video_scene",
-        "characters_or_subjects": [
-          "Kind Elderly Japanese Couple"
-        ],
+        "characters_or_subjects": ["Kind Elderly Japanese Couple"],
         "environment_id": "env_cozy_dining_room",
         "emotion_or_mood": "curious, warm, respectful",
         "visual_description": "An elderly Japanese man and woman sitting together at their clean dining table, looking toward each other with curious, calm expressions, reflecting on their daily meals.",
@@ -1113,10 +1018,7 @@
         "scene_function": "bad_habit_example",
         "visual_priority": "high",
         "image_usage": "chapter_opening",
-        "characters_or_subjects": [
-          "Cold tofu",
-          "Soy sauce stream"
-        ],
+        "characters_or_subjects": ["Cold tofu", "Soy sauce stream"],
         "environment_id": "env_cozy_dining_room",
         "emotion_or_mood": "vivid but calm, cautious",
         "visual_description": "A dark stream of soy sauce cascading over a pristine block of cold tofu inside a shallow white ceramic dish. The dark fluid pools slightly at the base, with green chopped scallions resting on top.",
@@ -1150,11 +1052,7 @@
         "scene_function": "good_habit_example",
         "visual_priority": "medium",
         "image_usage": "main_video_scene",
-        "characters_or_subjects": [
-          "Senior citizen hand",
-          "Small dipping dish",
-          "Tofu piece"
-        ],
+        "characters_or_subjects": ["Senior citizen hand", "Small dipping dish", "Tofu piece"],
         "environment_id": "env_cozy_dining_room",
         "emotion_or_mood": "trustworthy, clean, instructive",
         "visual_description": "Neat, elderly hands using bamboo chopsticks to hold a single cut square of tofu, gently touching only its bottom corner into a tiny separate ceramic saucer containing a shallow splash of low-sodium sauce.",
@@ -1166,9 +1064,7 @@
         "continuity_notes": [
           "Ensures the hands look senior-friendly (appropriate aging with dignity) rather than excessively young or frail."
         ],
-        "safety_notes": [
-          "Demonstrates a positive lifestyle alternative cleanly without violating any prompt safety constraints."
-        ],
+        "safety_notes": ["Demonstrates a positive lifestyle alternative cleanly without violating any prompt safety constraints."],
         "transition_note": "Provides a clean palate cleanser before shifting to the Rank 4 chemical threat topic.",
         "scene_id": "sc_004",
         "original_local_scene_id": "ch_002_sc_002",
@@ -1188,10 +1084,7 @@
         "scene_function": "bad_habit_example",
         "visual_priority": "high",
         "image_usage": "main_video_scene",
-        "characters_or_subjects": [
-          "Mapo tofu dish",
-          "Rice bowl"
-        ],
+        "characters_or_subjects": ["Mapo tofu dish", "Rice bowl"],
         "environment_id": "env_japanese_home_kitchen",
         "emotion_or_mood": "warm, appealing but cautious",
         "visual_description": "A traditional ceramic bowl containing simmering Mapo Tofu with a distinctly glossy, oily red-brown sauce coating the white cubes, topped with green garnishes and sitting next to a simple bowl of plain white rice.",
@@ -1200,9 +1093,7 @@
         "composition": "Centered, well-balanced food layout showcasing a realistic, heavy domestic stir-fry texture in low-contrast tones.",
         "image_prompt": "A clear object-focused scene of a classic ceramic bowl filled with freshly cooked Mapo Tofu, featuring soft white tofu cubes coated in a glossy red-brown sauce, rising gentle wisps of steam, served on a table next to a small bowl of steaming white rice, soft Japanese anime illustration, senior-friendly style, warm home lighting, clean background, low contrast, easy-to-understand composition, 16:9 composition, high quality, highly detailed, no text, no subtitles, no watermark",
         "negative_prompt": "dark horror mood, aggressive expression, cellular level view, molecules, chemical diagrams, age progression, photorealistic, 3D render, text, Japanese text, English text, subtitles, watermark, logo, sign, distorted fingers, messy environment",
-        "continuity_notes": [
-          "Keeps the kitchen backdrop elements matching the organized layout defined in the environment bible."
-        ],
+        "continuity_notes": ["Keeps the kitchen backdrop elements matching the organized layout defined in the environment bible."],
         "safety_notes": [
           "Explicitly avoids showing chemical symbols, molecular charts, wrinkled skin diagrams, or brain decline symbols for AGEs, maintaining a safe and respectful presentation of an everyday home cooking scenario."
         ],
@@ -1225,9 +1116,7 @@
         "scene_function": "problem_intro",
         "visual_priority": "high",
         "image_usage": "chapter_opening",
-        "characters_or_subjects": [
-          "Tofu packages on a shelf"
-        ],
+        "characters_or_subjects": ["Tofu packages on a shelf"],
         "environment_id": "env_cozy_dining_room",
         "emotion_or_mood": "clean, senior-friendly, curious",
         "visual_description": "A close-up view of a supermarket refrigerated shelf containing neat, clean plastic containers of fresh tofu. The packages are text-free and abstract, showing clean blocks through transparent film.",
@@ -1236,9 +1125,7 @@
         "composition": "An easy-to-understand composition focused on the supermarket options, leaving clear negative space for text layout safety.",
         "image_prompt": "A gentle medium shot of a clean supermarket refrigerated grocery aisle shelf containing neatly arranged plastic packages of fresh tofu, transparent packaging revealing white tofu blocks inside without any readable words or labels, soft Japanese anime illustration, senior-friendly style, clean and calm atmosphere, peaceful natural light, easy-to-understand composition, 16:9 composition, high quality, highly detailed, no text, no subtitles, no watermark",
         "negative_prompt": "dark horror mood, photorealistic, 3D render, text, Japanese text, English text, barcodes, prices, labels, subtitles, watermark, logo, sign, distorted hands, extra fingers, messy environment",
-        "continuity_notes": [
-          "Keeps the soft anime palette and tone perfectly aligned with previous chapter context."
-        ],
+        "continuity_notes": ["Keeps the soft anime palette and tone perfectly aligned with previous chapter context."],
         "safety_notes": [
           "All labels on packages must be abstract shapes to respect the absolute ban on readable written text inside graphic areas."
         ],
@@ -1261,10 +1148,7 @@
         "scene_function": "food_example",
         "visual_priority": "high",
         "image_usage": "main_video_scene",
-        "characters_or_subjects": [
-          "Artisan kitchen hands",
-          "Tofu mold with white cloth"
-        ],
+        "characters_or_subjects": ["Artisan kitchen hands", "Tofu mold with white cloth"],
         "environment_id": "env_japanese_home_kitchen",
         "emotion_or_mood": "calm, clean, informative",
         "visual_description": "Grounded artisan kitchen hands pressing down on a traditional wooden tofu mold wrapped in clean white linen fabric, as transparent water drops slowly filter out from the sides.",
@@ -1298,10 +1182,7 @@
         "scene_function": "good_habit_example",
         "visual_priority": "very_high",
         "image_usage": "main_video_scene",
-        "characters_or_subjects": [
-          "Fresh tofu block",
-          "Flowing tap water"
-        ],
+        "characters_or_subjects": ["Fresh tofu block", "Flowing tap water"],
         "environment_id": "env_japanese_home_kitchen",
         "emotion_or_mood": "clean, refreshing, safe",
         "visual_description": "A beautiful, firm block of white cotton tofu sitting in a stainless steel mesh strainer, being washed under a steady stream of sparkling clean running tap water over a kitchen sink.",
@@ -1310,9 +1191,7 @@
         "composition": "Low contrast, crisp subject presentation focusing completely on the hygiene method while maintaining uncluttered negative space.",
         "image_prompt": "A clear object-focused scene of a firm square block of fresh white tofu resting inside a clean metal mesh strainer, being gently rinsed under a stream of sparkling clear water from a modern kitchen tap, clean steel kitchen sink basin below, soft Japanese anime illustration, senior-friendly style, clean and refreshing atmosphere, peaceful natural light, highly detailed, 16:9 composition, no text, no subtitles, no watermark",
         "negative_prompt": "toxic green water, cartoon bacteria monsters, dirty sink, dark horror mood, photorealistic, 3D render, text, subtitles, watermark, logo, sign, distorted hands",
-        "continuity_notes": [
-          "Tofu block displays the subtle rough linen texture of Momen tofu as outlined in the subject bible."
-        ],
+        "continuity_notes": ["Tofu block displays the subtle rough linen texture of Momen tofu as outlined in the subject bible."],
         "safety_notes": [
           "Abides strictly by the prompt restrictions; water is rendered naturally clear without any toxic colors, bacterial graphics, or clinical alarmism to avoid causing fear to the senior demographic."
         ],
@@ -1335,10 +1214,7 @@
         "scene_function": "bad_habit_example",
         "visual_priority": "medium",
         "image_usage": "summary_scene",
-        "characters_or_subjects": [
-          "Miso soup pot",
-          "Simmering tofu cubes"
-        ],
+        "characters_or_subjects": ["Miso soup pot", "Simmering tofu cubes"],
         "environment_id": "env_japanese_home_kitchen",
         "environment_name": "Warm Japanese Home Kitchen",
         "emotion_or_mood": "warm, familiar, cautious",
@@ -1373,9 +1249,7 @@
         "scene_function": "good_habit_example",
         "visual_priority": "high",
         "image_usage": "chapter_opening",
-        "characters_or_subjects": [
-          "Healthy senior woman"
-        ],
+        "characters_or_subjects": ["Healthy senior woman"],
         "environment_id": "env_cozy_dining_room",
         "emotion_or_mood": "warm, senior-friendly, trustworthy",
         "visual_description": "A healthy elderly Japanese woman with soft silver hair styled in a clean bob, wearing a light cream blouse and linen apron, smiling warmly at her dining table. A clean, fresh block of cotton tofu sits in a small ceramic dish beside a teacup.",
@@ -1411,9 +1285,7 @@
         "scene_function": "calm_summary",
         "visual_priority": "high",
         "image_usage": "main_video_scene",
-        "characters_or_subjects": [
-          "Wise older gentleman"
-        ],
+        "characters_or_subjects": ["Wise older gentleman"],
         "environment_id": "env_cozy_dining_room",
         "emotion_or_mood": "calm, clear-headed, hopeful",
         "visual_description": "An elderly Japanese man with short grey hair and a light-brown cardigan, looking active and relaxed while holding an unreadable, small open notebook, smiling gently near a clean window.",
@@ -1422,9 +1294,7 @@
         "composition": "Uncluttered medium shot with clear focus on the subject, utilizing soft pastel and warm beige backgrounds to frame stable domestic health.",
         "image_prompt": "A simple lifestyle composition of an elderly Japanese man with short, neat grey hair and a calm, content smile, wearing a soft light-brown cardigan, holding a small open notebook with completely unreadable text lines, sitting in a quiet sunlit living room with a light wood background, soft Japanese anime illustration, senior-friendly style, warm and calm atmosphere, gentle afternoon light, clean background, 16:9 composition, high quality, highly detailed, no text, no subtitles, no watermark",
         "negative_prompt": "dark horror mood, confused expression, distress, brain medical diagrams, clinical context, letters, readable text, charts, numbers, teenage character, chibi, photorealistic, 3D render, watermark, logo",
-        "continuity_notes": [
-          "Follows the male subject profile from the recurring subject bible for visual cohesion across chapters."
-        ],
+        "continuity_notes": ["Follows the male subject profile from the recurring subject bible for visual cohesion across chapters."],
         "safety_notes": [
           "Stops any representation of dementia or Alzheimer's symptoms by presenting a healthy, active senior.",
           "Ensures any visible lines inside the notebook are purely abstract and unreadable, blocking fake text anomalies."
@@ -1448,10 +1318,7 @@
         "scene_function": "food_example",
         "visual_priority": "very_high",
         "image_usage": "chapter_opening",
-        "characters_or_subjects": [
-          "Dry Koya-tofu squares",
-          "Wicker basket"
-        ],
+        "characters_or_subjects": ["Dry Koya-tofu squares", "Wicker basket"],
         "environment_id": "env_japanese_home_kitchen",
         "emotion_or_mood": "clean, senior-friendly, curious",
         "visual_description": "Small, dry, pale-yellow sponge-like rectangular blocks of freeze-dried Koya-tofu neatly stacked inside a shallow wicker basket resting on a bright wooden kitchen countertop.",
@@ -1487,9 +1354,7 @@
         "scene_function": "good_habit_example",
         "visual_priority": "high",
         "image_usage": "main_video_scene",
-        "characters_or_subjects": [
-          "Kind Elderly Japanese Couple"
-        ],
+        "characters_or_subjects": ["Kind Elderly Japanese Couple"],
         "environment_id": "env_japanese_home_kitchen",
         "emotion_or_mood": "warm, calm, trustworthy",
         "visual_description": "An elderly Japanese man and woman working together contentedly at a bright kitchen counter, preparing healthy traditional ingredients under inviting natural light.",
@@ -1525,10 +1390,7 @@
         "scene_function": "good_habit_example",
         "visual_priority": "high",
         "image_usage": "chapter_opening",
-        "characters_or_subjects": [
-          "Fresh assorted mushrooms",
-          "Tofu pieces"
-        ],
+        "characters_or_subjects": ["Fresh assorted mushrooms", "Tofu pieces"],
         "environment_id": "env_japanese_home_kitchen",
         "emotion_or_mood": "warm, delicious, clean",
         "visual_description": "Plump fresh shiitake mushrooms, delicate shimeji clusters, and freshly cut firm white tofu cubes elegantly arranged on a light wood kitchen cutting board.",
@@ -1563,10 +1425,7 @@
         "scene_function": "procedure_steps",
         "visual_priority": "high",
         "image_usage": "main_video_scene",
-        "characters_or_subjects": [
-          "Microwave",
-          "Plate of tofu"
-        ],
+        "characters_or_subjects": ["Microwave", "Plate of tofu"],
         "environment_id": "env_japanese_home_kitchen",
         "emotion_or_mood": "easy to understand, calm, helpful",
         "visual_description": "Dignified senior hands putting a plain white ceramic dish containing a fresh block of tofu inside a warm, lit residential microwave appliance.",
@@ -1602,11 +1461,7 @@
         "scene_function": "procedure_steps",
         "visual_priority": "very_high",
         "image_usage": "chapter_opening",
-        "characters_or_subjects": [
-          "Cooking pot",
-          "Beaten egg stream",
-          "Tofu blocks"
-        ],
+        "characters_or_subjects": ["Cooking pot", "Beaten egg stream", "Tofu blocks"],
         "environment_id": "env_japanese_home_kitchen",
         "emotion_or_mood": "instructive, clean, warm",
         "visual_description": "A beautiful stream of raw beaten egg liquid pouring down from a small ceramic bowl into a shallow pan, wrapping gently around simmering pale-yellow Koya-tofu squares as thin wisps of steam rise from the boiling dashi broth.",
@@ -1641,9 +1496,7 @@
         "scene_function": "food_example",
         "visual_priority": "high",
         "image_usage": "main_video_scene",
-        "characters_or_subjects": [
-          "Koya no Tamagotoji dish"
-        ],
+        "characters_or_subjects": ["Koya no Tamagotoji dish"],
         "environment_id": "env_cozy_dining_room",
         "emotion_or_mood": "warm, delicious, comforting",
         "visual_description": "A traditional patterned ceramic bowl filled with cooked Koya-tofu egg simmer. A fluffy, soft yellow layer of egg is beautifully folded around porous tofu squares, garnished with fresh herbs and rising thin wisps of hot steam.",
@@ -1678,11 +1531,7 @@
         "scene_function": "calm_summary",
         "visual_priority": "high",
         "image_usage": "chapter_opening",
-        "characters_or_subjects": [
-          "Tofu",
-          "Mushrooms",
-          "Egg illustrations"
-        ],
+        "characters_or_subjects": ["Tofu", "Mushrooms", "Egg illustrations"],
         "environment_id": "env_japanese_home_kitchen",
         "emotion_or_mood": "trustworthy, easy to understand, clean",
         "visual_description": "An organized, artistic arrangement on a light wooden table featuring a block of white cotton tofu, fresh shiitake mushrooms, and a clean ceramic bowl with whole eggs, creating a holistic lifestyle recap layout.",
@@ -1718,9 +1567,7 @@
         "scene_function": "daily_life_example",
         "visual_priority": "high",
         "image_usage": "main_video_scene",
-        "characters_or_subjects": [
-          "Kind Elderly Japanese Couple"
-        ],
+        "characters_or_subjects": ["Kind Elderly Japanese Couple"],
         "environment_id": "env_cozy_dining_room",
         "emotion_or_mood": "warm, senior-friendly, supportive",
         "visual_description": "The friendly elderly man in his light-brown cardigan and the gray-haired woman in her cream blouse sitting comfortably next to each other at their oak table, looking cheerfully at a sleek tablet screen that shows an unreadable, glowing abstract UI pattern.",
