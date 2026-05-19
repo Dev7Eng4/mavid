@@ -1,5 +1,8 @@
 /**
- * Test Step 1: đọc file .srt trong `downloads/` → chunk → gửi LLM → validate JSON.
+ * Test pipeline best: Step 1 → Step 2.
+ *
+ * Step 1: đọc file .srt trong `downloads/` → chunk → gửi LLM → validate JSON.
+ * Step 2: tổng hợp chunk analyses → final content analysis (một lần gọi LLM).
  *
  * Chạy từ root repo:
  *   node contents/best/test.js
@@ -25,7 +28,9 @@ import { openChatPage, sendPromptWithRetry, stripJsonCodeFence, validateJsonResp
 import { openChromeProfile } from '../scripts/makeChromeProfile.js';
 import { getSrtDurationInMinutes, parseSrtToObjects } from '../utils/srt.util.js';
 import { getSubtitleFile } from '../makeFromAudio/shared.js';
+import { resolveVideoConfig } from './resolveNicheAndStyle.js';
 import runStep1 from './step1/index.js';
+import { main as runStep2 } from './step2/index.js';
 
 const __filename = fileURLToPath(import.meta.url);
 
@@ -114,7 +119,9 @@ export function loadTranscriptFromDownloads(downloadsDir = PATHS.DOWNLOADS) {
  * @param {number} [options.profile]
  * @param {boolean} [options.closeBrowser=true]
  * @param {string|null} [options.outputPath] — ghi JSON kết quả; null = `<downloads>/<tên-srt>.step1.json`
- * @returns {Promise<{ outputPath: string, chunkCount: number, lineCount: number, srtPath: string, chunkAnalyses: object[] }>}
+ * @param {import('playwright').BrowserContext} [options.browserContext] — tái dùng context từ lần mở trước
+ * @param {import('playwright').Page} [options.page]
+ * @returns {Promise<{ outputPath: string, chunkCount: number, lineCount: number, srtPath: string, chunkAnalyses: object[], niche: string, visualStyle: string, language: string, videoDurationSeconds: number, browserContext?: import('playwright').BrowserContext, page?: import('playwright').Page }>}
  */
 export async function testStep1(options = {}) {
   const {
@@ -126,6 +133,8 @@ export async function testStep1(options = {}) {
     profile = defaultProfile(),
     closeBrowser = true,
     outputPath = null,
+    browserContext: existingContext = null,
+    page: existingPage = null,
   } = options;
 
   const { srtPath, transcriptLines, videoDurationSeconds } = loadTranscriptFromDownloads(downloadsDir);
@@ -139,7 +148,12 @@ export async function testStep1(options = {}) {
   console.log('[testStep1] Ước lượng thời lượng:', videoDurationSeconds, 'giây');
   console.log('[testStep1] niche:', niche, '| visualStyle:', visualStyle, '| language:', language);
 
-  const { context, page } = await openChromeProfile({ profile, visible: true });
+  const ownsBrowser = existingContext == null;
+  let context = existingContext;
+  let page = existingPage;
+  if (ownsBrowser) {
+    ({ context, page } = await openChromeProfile({ profile, visible: true }));
+  }
 
   const chunkAnalyses = [];
   let chunkIndex = 0;
@@ -172,8 +186,7 @@ export async function testStep1(options = {}) {
     });
 
     const srtBaseName = path.basename(srtPath, path.extname(srtPath));
-    const resolvedOutputPath =
-      outputPath ?? path.join(path.dirname(srtPath), `${srtBaseName}.step1.json`);
+    const resolvedOutputPath = outputPath ?? path.join(path.dirname(srtPath), `${srtBaseName}.step1.json`);
 
     fs.mkdirSync(path.dirname(resolvedOutputPath), { recursive: true });
     fs.writeFileSync(
@@ -206,6 +219,11 @@ export async function testStep1(options = {}) {
       lineCount: transcriptLines.length,
       srtPath,
       chunkAnalyses,
+      niche,
+      visualStyle,
+      language,
+      videoDurationSeconds,
+      ...(closeBrowser ? {} : { browserContext: context, page }),
     };
   } finally {
     if (previousCallAI === undefined) {
@@ -218,6 +236,184 @@ export async function testStep1(options = {}) {
       await context.close().catch(() => {});
     }
   }
+}
+
+/**
+ * @param {object} [options]
+ * @param {object[]} [options.chunkAnalyses]
+ * @param {string} [options.step1OutputPath] — đọc chunkAnalyses + meta từ file step1
+ * @param {string} [options.srtPath] — dùng để đặt tên file output step2
+ * @param {string} [options.niche]
+ * @param {string} [options.visualStyle]
+ * @param {string} [options.language]
+ * @param {number} [options.videoDurationSeconds]
+ * @param {number} [options.profile]
+ * @param {boolean} [options.closeBrowser=true]
+ * @param {string|null} [options.outputPath] — null = `<downloads>/<tên-srt>.step2.json`
+ * @param {import('playwright').BrowserContext} [options.browserContext]
+ * @param {import('playwright').Page} [options.page]
+ * @returns {Promise<{ outputPath: string, srtPath: string, finalAnalysis: object }>}
+ */
+export async function testStep2(options = {}) {
+  const {
+    chunkAnalyses: chunkAnalysesInput = null,
+    step1OutputPath = null,
+    srtPath: srtPathInput = null,
+    niche = process.env.BEST_STEP1_NICHE || 'japanese_audio_drama',
+    visualStyle = process.env.BEST_STEP1_VISUAL_STYLE || 'cinematic',
+    language = process.env.BEST_STEP1_LANGUAGE || 'ja',
+    videoDurationSeconds = null,
+    profile = defaultProfile(),
+    closeBrowser = true,
+    outputPath = null,
+    browserContext: existingContext = null,
+    page: existingPage = null,
+  } = options;
+
+  let chunkAnalyses = chunkAnalysesInput;
+  let srtPath = srtPathInput;
+  let resolvedNiche = niche;
+  let resolvedVisualStyle = visualStyle;
+  let resolvedLanguage = language;
+  let resolvedVideoDurationSeconds = videoDurationSeconds;
+
+  if (step1OutputPath) {
+    const saved = JSON.parse(fs.readFileSync(step1OutputPath, 'utf8'));
+    chunkAnalyses = saved.chunkAnalyses;
+    const meta = saved.meta ?? {};
+    srtPath = srtPath ?? meta.srtPath;
+    resolvedNiche = meta.niche ?? resolvedNiche;
+    resolvedVisualStyle = meta.visualStyle ?? resolvedVisualStyle;
+    resolvedLanguage = meta.language ?? resolvedLanguage;
+    resolvedVideoDurationSeconds = meta.videoDurationSeconds ?? resolvedVideoDurationSeconds;
+  }
+
+  if (!Array.isArray(chunkAnalyses) || chunkAnalyses.length === 0) {
+    throw new Error('testStep2: thiếu chunkAnalyses (truyền trực tiếp hoặc qua step1OutputPath)');
+  }
+
+  if (resolvedVideoDurationSeconds == null) {
+    throw new Error('testStep2: thiếu videoDurationSeconds');
+  }
+
+  if (!srtPath) {
+    throw new Error('testStep2: thiếu srtPath (truyền trực tiếp hoặc lấy từ meta step1)');
+  }
+
+  console.log('[testStep2] Chunk analyses:', chunkAnalyses.length);
+  console.log('[testStep2] niche:', resolvedNiche, '| visualStyle:', resolvedVisualStyle, '| language:', resolvedLanguage);
+  console.log('[testStep2] Thời lượng:', resolvedVideoDurationSeconds, 'giây');
+
+  const resolvedConfig = resolveVideoConfig({
+    niche: resolvedNiche,
+    visualStyle: resolvedVisualStyle,
+    videoDurationSeconds: resolvedVideoDurationSeconds,
+    language: resolvedLanguage,
+  });
+
+  const ownsBrowser = existingContext == null;
+  let context = existingContext;
+  let page = existingPage;
+  if (ownsBrowser) {
+    ({ context, page } = await openChromeProfile({ profile, visible: true }));
+  }
+
+  let finalAnalysis = null;
+  const previousCallAI = globalThis.callAI;
+
+  try {
+    if (ownsBrowser) {
+      await openChatPage(page, { thinkingMode: false });
+    }
+
+    globalThis.callAI = async prompt => {
+      console.log('[testStep2] Gửi prompt final analysis…');
+
+      const raw = await sendPromptWithRetry(page, prompt, {
+        requireCodeBlock: false,
+        validate: validateJsonResponse,
+        maxRetries: 2,
+        retryDelayMs: 3000,
+        label: '[best/step2]',
+      });
+      const result = stripJsonCodeFence(raw);
+      finalAnalysis = JSON.parse(result);
+      return result;
+    };
+
+    await runStep2(chunkAnalyses, resolvedConfig, {
+      language: resolvedLanguage,
+      videoDurationSeconds: resolvedVideoDurationSeconds,
+    });
+
+    if (!finalAnalysis) {
+      throw new Error('testStep2: không nhận được kết quả từ LLM');
+    }
+
+    const srtBaseName = path.basename(srtPath, path.extname(srtPath));
+    const resolvedOutputPath = outputPath ?? path.join(path.dirname(srtPath), `${srtBaseName}.step2.json`);
+
+    fs.mkdirSync(path.dirname(resolvedOutputPath), { recursive: true });
+    fs.writeFileSync(
+      resolvedOutputPath,
+      JSON.stringify(
+        {
+          meta: {
+            srtPath,
+            step1ChunkCount: chunkAnalyses.length,
+            videoDurationSeconds: resolvedVideoDurationSeconds,
+            niche: resolvedNiche,
+            visualStyle: resolvedVisualStyle,
+            language: resolvedLanguage,
+          },
+          finalAnalysis,
+        },
+        null,
+        2
+      ),
+      'utf8'
+    );
+
+    console.log('[testStep2] Đã ghi:', resolvedOutputPath);
+
+    return {
+      outputPath: resolvedOutputPath,
+      srtPath,
+      finalAnalysis,
+    };
+  } finally {
+    if (previousCallAI === undefined) {
+      delete globalThis.callAI;
+    } else {
+      globalThis.callAI = previousCallAI;
+    }
+
+    if (closeBrowser && ownsBrowser) {
+      await context.close().catch(() => {});
+    }
+  }
+}
+
+/**
+ * Chạy Step 1 rồi Step 2 trong cùng một phiên Chrome.
+ * @param {object} [options]
+ * @returns {Promise<{ step1: object, step2: object }>}
+ */
+export async function testBestPipeline(options = {}) {
+  const step1 = await testStep1({ ...options, closeBrowser: false });
+  const step2 = await testStep2({
+    ...options,
+    chunkAnalyses: step1.chunkAnalyses,
+    srtPath: step1.srtPath,
+    niche: step1.niche,
+    visualStyle: step1.visualStyle,
+    language: step1.language,
+    videoDurationSeconds: step1.videoDurationSeconds,
+    browserContext: step1.browserContext,
+    page: step1.page,
+    closeBrowser: options.closeBrowser !== false,
+  });
+  return { step1, step2 };
 }
 
 function parseMaxChunks(argvValue) {
@@ -238,10 +434,10 @@ async function main() {
 
   try {
     const maxChunks = parseMaxChunks(maxChunksArg);
-    const summary = await testStep1({ downloadsDir, maxChunks });
-    console.log('[testStep1] Hoàn thành —', summary.chunkCount, 'chunk,', summary.lineCount, 'dòng.');
+    const { step1, step2 } = await testBestPipeline({ downloadsDir, maxChunks });
+    console.log('[test] Hoàn thành — step1:', step1.chunkCount, 'chunk,', step1.lineCount, 'dòng | step2:', step2.outputPath);
   } catch (err) {
-    console.error('[testStep1] Lỗi:', err);
+    console.error('[test] Lỗi:', err);
     process.exitCode = 1;
   }
 }

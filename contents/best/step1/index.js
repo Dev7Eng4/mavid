@@ -1,3 +1,6 @@
+import { openChatPage, sendPromptWithRetry } from '../../llm/browser.util.js';
+import { validateJsonResponse } from '../../llm/text.util.js';
+import openChromeProfile from '../../scripts/makeChromeProfile.js';
 import { resolveVideoConfig } from '../resolveNicheAndStyle.js';
 import { promptStep1ChunkAnalysis } from './prompt.js';
 import { validateStep1Output } from './validate.js';
@@ -79,6 +82,7 @@ const pickStep1Rules = resolvedConfig => {
 
 export default async function main(
   transcriptLines,
+  resolvedConfig,
   options = {
     niche: 'japanese_audio_drama',
     visualStyle: 'cinematic',
@@ -100,12 +104,6 @@ export default async function main(
     language: 'ja',
   });
 
-  const resolvedConfig = resolveVideoConfig({
-    niche: options.niche,
-    visualStyle: options.visualStyle,
-    videoDurationSeconds: options.videoDurationSeconds,
-  });
-
   const step1Rules = pickStep1Rules(resolvedConfig);
 
   let previousContext = {
@@ -119,6 +117,10 @@ export default async function main(
   };
 
   const chunkAnalyses = [];
+
+  const { context, page } = await openChromeProfile({ profile: 1, visible: true });
+
+  await openChatPage(page, { thinkingMode: false });
 
   for (const chunk of chunks) {
     const prompt = promptStep1ChunkAnalysis({
@@ -134,9 +136,16 @@ export default async function main(
       transcriptChunk: chunk,
     });
 
-    const result = await callAI(prompt);
+    const result = await sendPromptWithRetry(page, prompt, {
+      requireCodeBlock: false,
+      validate: validateJsonResponse,
+      maxRetries: 2,
+      retryDelayMs: 3000,
+      label: `[best/step1] Chunk ${chunk.chunk_id}`,
+    });
 
     const parsed = JSON.parse(result);
+    console.log('🚀 ~ main ~ parsed:', parsed);
 
     validateStep1Output(parsed);
 
@@ -147,4 +156,8 @@ export default async function main(
       ...parsed.continuity_context_for_next_chunk,
     };
   }
+
+  await context.close();
+
+  return chunkAnalyses;
 }

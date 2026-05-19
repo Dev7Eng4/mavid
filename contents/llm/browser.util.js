@@ -1,6 +1,7 @@
 import { LLM_PROVIDER } from './provider.js';
 import { openGeminiPage, sendPromptToGemini, sendPromptToGeminiWithRetry } from './gemini/browser.util.js';
 import { openGptPage, sendPromptToGpt, sendPromptToGptWithRetry } from './gpt/browser.util.js';
+import openChromeProfile from '../scripts/makeChromeProfile.js';
 
 /**
  * @param {import('playwright').Page} page
