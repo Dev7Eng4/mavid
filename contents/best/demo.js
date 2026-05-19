@@ -11,6 +11,7 @@ import { resolveVideoConfig } from './resolveNicheAndStyle.js';
 import runStep1 from './step1/index.js';
 import { main as runStep2 } from './step2/index.js';
 import { main as runStep3 } from './step3/index.js';
+import { main as runStep4 } from './step4/index.js';
 import { NICHE_CONFIGS } from './niche-config/index.js';
 import { VISUAL_STYLE_CONFIGS } from './visual-style/index.js';
 
@@ -71,8 +72,17 @@ export function loadTranscriptFromDownloads(downloadsDir = PATHS.DOWNLOADS) {
   return { srtPath, transcriptLines, videoDurationSeconds };
 }
 
+function saveStep4Result(srtPath, resultStep4) {
+  const srtBaseName = path.basename(srtPath, path.extname(srtPath));
+  const outputPath = path.join(path.dirname(srtPath), `${srtBaseName}.step4.json`);
+  fs.mkdirSync(path.dirname(outputPath), { recursive: true });
+  fs.writeFileSync(outputPath, JSON.stringify({ ...resultStep4 }, null, 2), 'utf8');
+  console.log(`✅ Đã lưu step4: ${outputPath}`);
+  return outputPath;
+}
+
 export async function demo() {
-  const { transcriptLines, videoDurationSeconds } = loadTranscriptFromDownloads();
+  const { srtPath, transcriptLines, videoDurationSeconds } = loadTranscriptFromDownloads();
   console.log('🚀 ~ demo ~ transcriptLines:', transcriptLines);
 
   const resolvedConfig = resolveVideoConfig({
@@ -97,6 +107,13 @@ export async function demo() {
     videoDurationSeconds: videoDurationSeconds,
   });
   console.log('🚀 ~ demo ~ resultStep3:', resultStep3);
+
+  const resultStep4 = await runStep4(chunkAnalyses, resultStep2, resultStep3, resolvedConfig, {
+    videoDurationSeconds: videoDurationSeconds,
+  });
+  console.log('🚀 ~ demo ~ resultStep4:', resultStep4);
+
+  saveStep4Result(srtPath, resultStep4);
 }
 
 demo();

@@ -82,6 +82,8 @@ export async function main(
     label: `[best/step3] Visual Bible and Hero Image`,
   });
 
+  await context.close();
+
   const visualPackage = JSON.parse(result);
 
   validateStep3Output(visualPackage);
