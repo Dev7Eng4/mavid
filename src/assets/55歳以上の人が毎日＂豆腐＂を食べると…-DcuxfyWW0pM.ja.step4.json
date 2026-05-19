@@ -1,0 +1,1758 @@
+{
+  "chapter_scene_plans": [
+    {
+      "step": "step_4_create_chapter_scenes",
+      "chapter_id": "ch_001",
+      "chapter_index": 1,
+      "chapter_scene_summary": {
+        "chapter_line_range": {
+          "start_line_id": 1,
+          "end_line_id": 54
+        },
+        "recommended_scene_count": 1,
+        "actual_scene_count": 2,
+        "coverage_strategy": "The recommended scene count was 1, but since this chapter sets up the core thesis of the entire countdown video (covering lines 1 to 54) and transitions from a calm traditional breakfast setting to the discovery of hidden health risks, splitting it into 2 distinct scenes ensures optimal visual flow. Scene 1 establishes the comforting baseline with traditional tofu, and Scene 2 visually introduces the concept of unconscious cooking habits turning it into a wellness hazard."
+      },
+      "scenes": [
+        {
+          "local_scene_id": "ch_001_sc_001",
+          "chapter_id": "ch_001",
+          "chapter_index": 1,
+          "scene_index_in_chapter": 1,
+          "line_range": {
+            "start_line_id": 1,
+            "end_line_id": 9
+          },
+          "scene_title": "The Comfort of Traditional Japanese Tofu",
+          "scene_summary": "A cozy and inviting breakfast setting introducing fresh cotton tofu on a Japanese home dining table, establishing a familiar lifestyle atmosphere for the audience.",
+          "scene_function": "daily_life_example",
+          "visual_priority": "high",
+          "image_usage": "chapter_opening",
+          "characters_or_subjects": [
+            "Fresh tofu",
+            "Miso soup"
+          ],
+          "environment_id": "env_cozy_dining_room",
+          "emotion_or_mood": "warm, calm, traditional",
+          "visual_description": "A beautiful, fresh block of textured cotton tofu served in a clean, shallow ceramic dish, placed alongside a small steaming bowl of miso soup on a light oak dining table.",
+          "camera": "calm close-up",
+          "lighting": "soft morning sunlight",
+          "composition": "Clear object-focused scene with clean negative space on the left side for title graphics safety.",
+          "image_prompt": "A calm close-up of a fresh square block of traditional Japanese cotton tofu with a rough linen-pressed surface texture, beautifully presented in a shallow white ceramic dish, placed next to a warm bowl of steaming miso soup on a light oak dining table, soft morning sunlight filtering through, cozy morning dining area, soft Japanese anime illustration, senior-friendly style, warm and calm atmosphere, gentle natural light, clean background, 16:9 composition, high quality, highly detailed, no text, no subtitles, no watermark",
+          "negative_prompt": "dark horror mood, aggressive expression, overly dramatic crying, teenage anime character, chibi, overly cute childish style, photorealistic, 3D render, text, Japanese text, English text, subtitles, watermark, logo, sign, distorted hands, extra fingers, messy environment, dark shadows, high contrast",
+          "continuity_notes": [
+            "Matches the 'Fresh Cotton Tofu (Momen)' asset specifications from the recurring subject bible.",
+            "Aligns with the 'Cozy Morning Dining Area' design rules."
+          ],
+          "safety_notes": [
+            "Maintains a safe, non-threatening daily routine atmosphere to introduce the topic without triggering instant medical panic."
+          ],
+          "transition_note": "Smoothly sets the peaceful domestic tone before shifting to the educational warning."
+        },
+        {
+          "local_scene_id": "ch_001_sc_002",
+          "chapter_id": "ch_001",
+          "chapter_index": 1,
+          "scene_index_in_chapter": 2,
+          "line_range": {
+            "start_line_id": 10,
+            "end_line_id": 54
+          },
+          "scene_title": "The Hidden Risk of Unconscious Habits",
+          "scene_summary": "An elderly couple sits at the dining table, looking thoughtful and slightly curious as they learn about how simple preparation habits can impact health.",
+          "scene_function": "problem_intro",
+          "visual_priority": "medium",
+          "image_usage": "main_video_scene",
+          "characters_or_subjects": [
+            "Kind Elderly Japanese Couple"
+          ],
+          "environment_id": "env_cozy_dining_room",
+          "emotion_or_mood": "curious, warm, respectful",
+          "visual_description": "An elderly Japanese man and woman sitting together at their clean dining table, looking toward each other with curious, calm expressions, reflecting on their daily meals.",
+          "camera": "gentle medium shot",
+          "lighting": "peaceful natural light",
+          "composition": "Simple lifestyle composition with both characters looking healthy and active, placed comfortably in their home environment.",
+          "image_prompt": "A gentle medium shot of a kind elderly Japanese couple in their late 60s, a man with neat grey hair wearing a light-brown cardigan and a woman with silver hair in a clean bob wearing a cream blouse, sitting at a sunlit dining table looking curious and thoughtful, warm home dining room, peaceful natural light, soft Japanese anime illustration, senior-friendly character design, warm and calm atmosphere, gentle facial expressions, clean background, easy-to-understand composition, respectful depiction of elderly Japanese people, 16:9 composition, no text, no subtitles, no watermark",
+          "negative_prompt": "dark horror mood, aggressive expression, overly dramatic crying, sad expression, frail, weak, teenage anime character, chibi, overly cute childish style, photorealistic, 3D render, text, Japanese text, English text, subtitles, watermark, logo, distorted hands, extra fingers",
+          "continuity_notes": [
+            "Ensures characters strictly follow the 'Kind Elderly Japanese Couple' descriptors in clothing and expression.",
+            "Maintains background continuity with the warm wooden dining room tones from Scene 1."
+          ],
+          "safety_notes": [
+            "Avoids any visual depictions of illness, pain, or medical charts.",
+            "Ensures characters look completely dignified, healthy, and alert while being introduced to the wellness warning."
+          ],
+          "transition_note": "Concludes the introductory chapter by visually anchoring the audience's attention to the upcoming countdown."
+        }
+      ],
+      "quality_check": {
+        "chapter_covered": true,
+        "scene_count_reasonable": true,
+        "all_scenes_inside_chapter_range": true,
+        "line_ranges_are_ordered": true,
+        "no_timestamps_invented": true,
+        "all_scenes_have_image_prompts": true,
+        "prompts_follow_visual_bible": true,
+        "no_text_in_image_prompts": true,
+        "negative_prompts_included": true,
+        "ready_for_merge": true,
+        "warnings": []
+      }
+    },
+    {
+      "step": "step_4_create_chapter_scenes",
+      "chapter_id": "ch_002",
+      "chapter_index": 2,
+      "chapter_scene_summary": {
+        "chapter_line_range": {
+          "start_line_id": 55,
+          "end_line_id": 142
+        },
+        "recommended_scene_count": 2,
+        "actual_scene_count": 3,
+        "coverage_strategy": "The chapter details two major dietary traps (sodium overload at Rank 5 and AGE compounds at Rank 4) along with an actionable practical solution. To thoroughly map this highly visual content without leaving major narrative gaps, three scenes have been generated: Scene 1 captures the excessive soy sauce habit (lines 55-100), Scene 2 demonstrates the positive dipping alternative (lines 101-107), and Scene 3 addresses the biochemical risk of oily/sugary preparations using an illustrative home-cooked Mapo Tofu presentation (lines 108-142)."
+      },
+      "scenes": [
+        {
+          "local_scene_id": "ch_002_sc_001",
+          "chapter_id": "ch_002",
+          "chapter_index": 2,
+          "scene_index_in_chapter": 1,
+          "line_range": {
+            "start_line_id": 55,
+            "end_line_id": 100
+          },
+          "scene_title": "Rank 5: The Excess Sodium Overload on Cold Tofu",
+          "scene_summary": "Visually showcases a continuous, dark stream of soy sauce being heavily poured directly over a clean block of cold silken tofu, emphasizing the risk of unconscious over-seasoning.",
+          "scene_function": "bad_habit_example",
+          "visual_priority": "high",
+          "image_usage": "chapter_opening",
+          "characters_or_subjects": [
+            "Cold tofu",
+            "Soy sauce stream"
+          ],
+          "environment_id": "env_cozy_dining_room",
+          "emotion_or_mood": "vivid but calm, cautious",
+          "visual_description": "A dark stream of soy sauce cascading over a pristine block of cold tofu inside a shallow white ceramic dish. The dark fluid pools slightly at the base, with green chopped scallions resting on top.",
+          "camera": "calm close-up",
+          "lighting": "soft morning sunlight",
+          "composition": "A clear, object-focused macro shot showing the pouring action clearly, leaving clean negative space on the left side for title card safety.",
+          "image_prompt": "A calm close-up shot of dark soy sauce being heavily poured from a small pitcher onto a pristine white block of cold tofu, finely chopped green scallions scattered on top, a small dark pool forming inside a shallow ceramic plate on a light wood dining table, soft Japanese anime illustration, senior-friendly style, vivid but calm atmosphere, gentle natural light, clean background, 16:9 composition, high quality, highly detailed, no text, no subtitles, no watermark",
+          "negative_prompt": "dark horror mood, aggressive expression, overly dramatic crying, teenage anime character, chibi, overly cute childish style, photorealistic, 3D render, text, Japanese text, English text, subtitles, watermark, logo, sign, distorted hands, extra fingers, medical charts, blood, arteries",
+          "continuity_notes": [
+            "Keeps the light wood surface and home dining setting aligned with the domestic look introduced in previous chapters."
+          ],
+          "safety_notes": [
+            "Depicts the food habit realistically without showing scary biological diagrams of clogged arteries, blood pressure metrics, or distressed human expressions, abiding by the health niche restrictions."
+          ],
+          "transition_note": "Visually locks in the common mistake before moving to the corrective cooking habit."
+        },
+        {
+          "local_scene_id": "ch_002_sc_002",
+          "chapter_id": "ch_002",
+          "chapter_index": 2,
+          "scene_index_in_chapter": 2,
+          "line_range": {
+            "start_line_id": 101,
+            "end_line_id": 107
+          },
+          "scene_title": "The Corrective Action: Gentle Dipping Technique",
+          "scene_summary": "An instructive culinary detail showing the hands of an elderly individual carefully holding a small piece of tofu with chopsticks and lightly dipping a corner into a small, separate seasoning plate.",
+          "scene_function": "good_habit_example",
+          "visual_priority": "medium",
+          "image_usage": "main_video_scene",
+          "characters_or_subjects": [
+            "Senior citizen hand",
+            "Small dipping dish",
+            "Tofu piece"
+          ],
+          "environment_id": "env_cozy_dining_room",
+          "emotion_or_mood": "trustworthy, clean, instructive",
+          "visual_description": "Neat, elderly hands using bamboo chopsticks to hold a single cut square of tofu, gently touching only its bottom corner into a tiny separate ceramic saucer containing a shallow splash of low-sodium sauce.",
+          "camera": "simple lifestyle composition",
+          "lighting": "gentle afternoon light",
+          "composition": "An elegant, steady close-up focusing perfectly on the hands and dishes, providing an easy-to-understand tutorial layout.",
+          "image_prompt": "A simple lifestyle composition focusing on the gentle hands of an older person using bamboo chopsticks to lift a small square piece of white tofu, carefully dipping just the bottom edge into a tiny separate patterned ceramic saucer containing dark seasoning, set on a clean wooden tabletop, soft Japanese anime illustration, senior-friendly style, warm and calm atmosphere, gentle afternoon light, clean background, 16:9 composition, high quality, highly detailed, no text, no subtitles, no watermark",
+          "negative_prompt": "dark horror mood, photorealistic, 3D render, text, Japanese text, English text, subtitles, watermark, logo, sign, distorted hands, extra fingers, hyper-stylized features, messy environment",
+          "continuity_notes": [
+            "Ensures the hands look senior-friendly (appropriate aging with dignity) rather than excessively young or frail."
+          ],
+          "safety_notes": [
+            "Demonstrates a positive lifestyle alternative cleanly without violating any prompt safety constraints."
+          ],
+          "transition_note": "Provides a clean palate cleanser before shifting to the Rank 4 chemical threat topic."
+        },
+        {
+          "local_scene_id": "ch_002_sc_003",
+          "chapter_id": "ch_002",
+          "chapter_index": 2,
+          "scene_index_in_chapter": 3,
+          "line_range": {
+            "start_line_id": 108,
+            "end_line_id": 142
+          },
+          "scene_title": "Rank 4: The Glycation Compound Hazard (Mapo Tofu)",
+          "scene_summary": "Illustrates a beautifully presented but heavily glazed bowl of Mapo Tofu, creating context around the combination of high sugars and heavy cooking oils that generate AGEs.",
+          "scene_function": "bad_habit_example",
+          "visual_priority": "high",
+          "image_usage": "main_video_scene",
+          "characters_or_subjects": [
+            "Mapo tofu dish",
+            "Rice bowl"
+          ],
+          "environment_id": "env_japanese_home_kitchen",
+          "emotion_or_mood": "warm, appealing but cautious",
+          "visual_description": "A traditional ceramic bowl containing simmering Mapo Tofu with a distinctly glossy, oily red-brown sauce coating the white cubes, topped with green garnishes and sitting next to a simple bowl of plain white rice.",
+          "camera": "clear object-focused scene",
+          "lighting": "warm home lighting",
+          "composition": "Centered, well-balanced food layout showcasing a realistic, heavy domestic stir-fry texture in low-contrast tones.",
+          "image_prompt": "A clear object-focused scene of a classic ceramic bowl filled with freshly cooked Mapo Tofu, featuring soft white tofu cubes coated in a glossy red-brown sauce, rising gentle wisps of steam, served on a table next to a small bowl of steaming white rice, soft Japanese anime illustration, senior-friendly style, warm home lighting, clean background, low contrast, easy-to-understand composition, 16:9 composition, high quality, highly detailed, no text, no subtitles, no watermark",
+          "negative_prompt": "dark horror mood, aggressive expression, cellular level view, molecules, chemical diagrams, age progression, photorealistic, 3D render, text, Japanese text, English text, subtitles, watermark, logo, sign, distorted fingers, messy environment",
+          "continuity_notes": [
+            "Keeps the kitchen backdrop elements matching the organized layout defined in the environment bible."
+          ],
+          "safety_notes": [
+            "Explicitly avoids showing chemical symbols, molecular charts, wrinkled skin diagrams, or brain decline symbols for AGEs, maintaining a safe and respectful presentation of an everyday home cooking scenario."
+          ],
+          "transition_note": "Finishes the chapter on an informative, cautionary note, preparing the viewer for the next set of lifestyle tips."
+        }
+      ],
+      "quality_check": {
+        "chapter_covered": true,
+        "scene_count_reasonable": true,
+        "all_scenes_inside_chapter_range": true,
+        "line_ranges_are_ordered": true,
+        "no_timestamps_invented": true,
+        "all_scenes_have_image_prompts": true,
+        "prompts_follow_visual_bible": true,
+        "no_text_in_image_prompts": true,
+        "negative_prompts_included": true,
+        "ready_for_merge": true,
+        "warnings": []
+      }
+    },
+    {
+      "step": "step_4_create_chapter_scenes",
+      "chapter_id": "ch_003",
+      "chapter_index": 3,
+      "chapter_scene_summary": {
+        "chapter_line_range": {
+          "start_line_id": 143,
+          "end_line_id": 256
+        },
+        "recommended_scene_count": 3,
+        "actual_scene_count": 4,
+        "coverage_strategy": "Because the chapter carries a 'very_high' visual potential and covers critical educational segments—ranging from the nutritional distinction of silken vs. cotton tofu, to food safety/hygiene steps regarding packaging water, to nutrient leaching during boiling—adding one extra scene ensures all key points (Ranks 3, 2, and 1) are cleanly represented without large narrative gaps. Scene 1 sets up the supermarket choice backdrop, Scene 2 details the dehydration process that concentrates nutrients in cotton tofu, Scene 3 visualizes the important step of rinsing away the preservation fluid, and Scene 4 shows the leaching pitfall during boiling."
+      },
+      "scenes": [
+        {
+          "local_scene_id": "ch_003_sc_001",
+          "chapter_id": "ch_003",
+          "chapter_index": 3,
+          "scene_index_in_chapter": 1,
+          "line_range": {
+            "start_line_id": 143,
+            "end_line_id": 160
+          },
+          "scene_title": "Rank 3: The Supermarket Tofu Dilemma",
+          "scene_summary": "A clean supermarket shelf setting displaying packaged blocks of both fresh silken and cotton tofu, setting up the common senior choice misstep.",
+          "scene_function": "problem_intro",
+          "visual_priority": "high",
+          "image_usage": "chapter_opening",
+          "characters_or_subjects": [
+            "Tofu packages on a shelf"
+          ],
+          "environment_id": "env_cozy_dining_room",
+          "emotion_or_mood": "clean, senior-friendly, curious",
+          "visual_description": "A close-up view of a supermarket refrigerated shelf containing neat, clean plastic containers of fresh tofu. The packages are text-free and abstract, showing clean blocks through transparent film.",
+          "camera": "gentle medium shot",
+          "lighting": "peaceful natural light",
+          "composition": "An easy-to-understand composition focused on the supermarket options, leaving clear negative space for text layout safety.",
+          "image_prompt": "A gentle medium shot of a clean supermarket refrigerated grocery aisle shelf containing neatly arranged plastic packages of fresh tofu, transparent packaging revealing white tofu blocks inside without any readable words or labels, soft Japanese anime illustration, senior-friendly style, clean and calm atmosphere, peaceful natural light, easy-to-understand composition, 16:9 composition, high quality, highly detailed, no text, no subtitles, no watermark",
+          "negative_prompt": "dark horror mood, photorealistic, 3D render, text, Japanese text, English text, barcodes, prices, labels, subtitles, watermark, logo, sign, distorted hands, extra fingers, messy environment",
+          "continuity_notes": [
+            "Keeps the soft anime palette and tone perfectly aligned with previous chapter context."
+          ],
+          "safety_notes": [
+            "All labels on packages must be abstract shapes to respect the absolute ban on readable written text inside graphic areas."
+          ],
+          "transition_note": "Transitions from a shopper's perspective into the traditional culinary method."
+        },
+        {
+          "local_scene_id": "ch_003_sc_002",
+          "chapter_id": "ch_003",
+          "chapter_index": 3,
+          "scene_index_in_chapter": 2,
+          "line_range": {
+            "start_line_id": 161,
+            "end_line_id": 179
+          },
+          "scene_title": "The Miracle of Pressing Cotton Tofu",
+          "scene_summary": "Visually illustrates the traditional dehydration method that concentrates crucial calcium, protein, and iron inside cotton tofu.",
+          "scene_function": "food_example",
+          "visual_priority": "high",
+          "image_usage": "main_video_scene",
+          "characters_or_subjects": [
+            "Artisan kitchen hands",
+            "Tofu mold with white cloth"
+          ],
+          "environment_id": "env_japanese_home_kitchen",
+          "emotion_or_mood": "calm, clean, informative",
+          "visual_description": "Grounded artisan kitchen hands pressing down on a traditional wooden tofu mold wrapped in clean white linen fabric, as transparent water drops slowly filter out from the sides.",
+          "camera": "calm close-up",
+          "lighting": "soft morning sunlight",
+          "composition": "Clear object-focused scene showing the physical extraction of water, illustrating the process clearly to the audience.",
+          "image_prompt": "A calm close-up shot of gentle hands pressing down a wooden tofu press mold wrapped in a clean white linen cloth, clear water droplets slowly filtering out from the wood gaps, set on a bright wooden kitchen workspace countertop, soft Japanese anime illustration, warm and calm atmosphere, soft morning sunlight, clean background, easy-to-understand composition, 16:9 composition, high quality, highly detailed, no text, no subtitles, no watermark",
+          "negative_prompt": "dark horror mood, industrial factory, aggressive expression, photorealistic, 3D render, text, subtitles, watermark, logo, sign, distorted fingers, messy environment",
+          "continuity_notes": [
+            "Maintains consistent wood textures matching the standard kitchen elements defined in the visual consistency rules."
+          ],
+          "safety_notes": [
+            "Does not display data charts or numerical graphics; relies entirely on pure culinary visualization to explain the nutrient density gap."
+          ],
+          "transition_note": "Moves cleanly from product background to the food safety handling step."
+        },
+        {
+          "local_scene_id": "ch_003_sc_003",
+          "chapter_id": "ch_003",
+          "chapter_index": 3,
+          "scene_index_in_chapter": 3,
+          "line_range": {
+            "start_line_id": 180,
+            "end_line_id": 217
+          },
+          "scene_title": "Rank 2 Solution: The Food Safety Rinsing Step",
+          "scene_summary": "Demonstrates the essential household habit of washing a firm block of fresh tofu on a mesh strainer under clean running tap water to remove stagnant packing fluid.",
+          "scene_function": "good_habit_example",
+          "visual_priority": "very_high",
+          "image_usage": "main_video_scene",
+          "characters_or_subjects": [
+            "Fresh tofu block",
+            "Flowing tap water"
+          ],
+          "environment_id": "env_japanese_home_kitchen",
+          "emotion_or_mood": "clean, refreshing, safe",
+          "visual_description": "A beautiful, firm block of white cotton tofu sitting in a stainless steel mesh strainer, being washed under a steady stream of sparkling clean running tap water over a kitchen sink.",
+          "camera": "clear object-focused scene",
+          "lighting": "peaceful natural light",
+          "composition": "Low contrast, crisp subject presentation focusing completely on the hygiene method while maintaining uncluttered negative space.",
+          "image_prompt": "A clear object-focused scene of a firm square block of fresh white tofu resting inside a clean metal mesh strainer, being gently rinsed under a stream of sparkling clear water from a modern kitchen tap, clean steel kitchen sink basin below, soft Japanese anime illustration, senior-friendly style, clean and refreshing atmosphere, peaceful natural light, highly detailed, 16:9 composition, no text, no subtitles, no watermark",
+          "negative_prompt": "toxic green water, cartoon bacteria monsters, dirty sink, dark horror mood, photorealistic, 3D render, text, subtitles, watermark, logo, sign, distorted hands",
+          "continuity_notes": [
+            "Tofu block displays the subtle rough linen texture of Momen tofu as outlined in the subject bible."
+          ],
+          "safety_notes": [
+            "Abides strictly by the prompt restrictions; water is rendered naturally clear without any toxic colors, bacterial graphics, or clinical alarmism to avoid causing fear to the senior demographic."
+          ],
+          "transition_note": "Shifts focus from clean raw preparation to hot stove cooking errors."
+        },
+        {
+          "local_scene_id": "ch_003_sc_004",
+          "chapter_id": "ch_003",
+          "chapter_index": 3,
+          "scene_index_in_chapter": 4,
+          "line_range": {
+            "start_line_id": 218,
+            "end_line_id": 256
+          },
+          "scene_title": "Rank 1: The Boiling Miso Soup Pitfall",
+          "scene_summary": "Shows tofu blocks bubbling extensively inside a pot of miso broth, visually contextualizing how water-soluble nutrients leach into the soup liquid.",
+          "scene_function": "bad_habit_example",
+          "visual_priority": "medium",
+          "image_usage": "summary_scene",
+          "characters_or_subjects": [
+            "Miso soup pot",
+            "Simmering tofu cubes"
+          ],
+          "environment_id": "env_japanese_home_kitchen",
+          "environment_name": "Warm Japanese Home Kitchen",
+          "emotion_or_mood": "warm, familiar, cautious",
+          "visual_description": "A traditional ceramic soup pot sitting on a clean kitchen stovetop burner, filled with amber miso soup broth bubbling gently around cut blocks of white tofu.",
+          "camera": "calm close-up",
+          "lighting": "warm home lighting",
+          "composition": "Centered food composition emphasizing the boiling action, surrounded by the warm beige tones of a senior-friendly home kitchen.",
+          "image_prompt": "A calm close-up shot of a traditional Japanese ceramic soup pot bubbling gently on a clean kitchen stovetop, filled with rich brown miso soup broth and submerged white tofu cubes, soft steam rising gently from the surface, soft Japanese anime illustration, senior-friendly cooking style, warm and familiar atmosphere, warm home lighting, clean background, 16:9 composition, high quality, highly detailed, no text, no subtitles, no watermark",
+          "negative_prompt": "dark horror mood, aggressive boiling, photorealistic, 3D render, text, letters, subtitles, watermark, logo, sign, distorted hands, messy environment, high contrast",
+          "continuity_notes": [
+            "Keeps the cozy domestic atmosphere intact, linking perfectly to the solution sequence that will follow in the next chapter."
+          ],
+          "safety_notes": [
+            "Does not use any medical warning symbols, health advice overlays, or chemical terms inside the prompt, relying completely on everyday kitchen imagery."
+          ],
+          "transition_note": "Concludes the chapter's problem countdown sequence, leading smoothly into the scientific benefits of the next chapter."
+        }
+      ],
+      "quality_check": {
+        "chapter_covered": true,
+        "scene_count_reasonable": true,
+        "all_scenes_inside_chapter_range": true,
+        "line_ranges_are_ordered": true,
+        "no_timestamps_invented": true,
+        "all_scenes_have_image_prompts": true,
+        "prompts_follow_visual_bible": true,
+        "no_text_in_image_prompts": true,
+        "negative_prompts_included": true,
+        "ready_for_merge": true,
+        "warnings": []
+      }
+    },
+    {
+      "step": "step_4_create_chapter_scenes",
+      "chapter_id": "ch_004",
+      "chapter_index": 4,
+      "chapter_scene_summary": {
+        "chapter_line_range": {
+          "start_line_id": 257,
+          "end_line_id": 341
+        },
+        "recommended_scene_count": 2,
+        "actual_scene_count": 2,
+        "coverage_strategy": "The chapter discusses two core biological mechanism themes: structural mobility/bone health through calcium binding (lines 257-300) and neural/cognitive resilience via choline conversion (lines 301-341). Two comprehensive scenes are developed to map these segments, directly adapting the available positive lifestyle visual candidates to avoid clinical imagery or medical panic."
+      },
+      "scenes": [
+        {
+          "local_scene_id": "ch_004_sc_001",
+          "chapter_id": "ch_004",
+          "chapter_index": 4,
+          "scene_index_in_chapter": 1,
+          "line_range": {
+            "start_line_id": 257,
+            "end_line_id": 300
+          },
+          "scene_title": "The First Miracle: Vitality and Bone Structural Reassurance",
+          "scene_summary": "An older Japanese grandmother smiling happily while enjoying a balanced meal at a sunlit table, reflecting the positive outcome of proper calcium integration.",
+          "scene_function": "good_habit_example",
+          "visual_priority": "high",
+          "image_usage": "chapter_opening",
+          "characters_or_subjects": [
+            "Healthy senior woman"
+          ],
+          "environment_id": "env_cozy_dining_room",
+          "emotion_or_mood": "warm, senior-friendly, trustworthy",
+          "visual_description": "A healthy elderly Japanese woman with soft silver hair styled in a clean bob, wearing a light cream blouse and linen apron, smiling warmly at her dining table. A clean, fresh block of cotton tofu sits in a small ceramic dish beside a teacup.",
+          "camera": "gentle medium shot",
+          "lighting": "soft morning sunlight",
+          "composition": "Asymmetrical composition with the cheerful character on the right, providing clean, uncluttered negative space on the left half for text layouts.",
+          "image_prompt": "A gentle medium shot of a healthy elderly Japanese woman with elegant silver hair and a serene, smiling expression sitting at a bright wooden dining table, a traditional breakfast set with a fresh block of textured cotton tofu in a shallow side dish nearby, soft morning sunlight illuminating the dining space, soft Japanese anime illustration, senior-friendly character design, warm and calm atmosphere, clean background, 16:9 composition, high quality, highly detailed, no text, no subtitles, no watermark",
+          "negative_prompt": "dark horror mood, sad expression, crying, frail, medical machinery, hospital setting, anatomical bone diagrams, teenage anime character, chibi, photorealistic, 3D render, text, subtitles, watermark, logo, sign, distorted fingers",
+          "continuity_notes": [
+            "Maintains alignment with the female subject's profile from the recurring subject bible.",
+            "Ensures the tofu block displays the linen-pressed texture of cotton tofu."
+          ],
+          "safety_notes": [
+            "Avoids internal skeletal diagrams, medical charts, or diagnostic terms to fulfill health niche requirements.",
+            "The scene frames osteoporosis prevention entirely through proactive, dignified wellness behavior."
+          ],
+          "transition_note": "Establishes structural vitality before transitioning to brain health and memory support."
+        },
+        {
+          "local_scene_id": "ch_004_sc_002",
+          "chapter_id": "ch_004",
+          "chapter_index": 4,
+          "scene_index_in_chapter": 2,
+          "line_range": {
+            "start_line_id": 301,
+            "end_line_id": 341
+          },
+          "scene_title": "The Third Miracle: Cognitive Support and Clear Memory",
+          "scene_summary": "A wise, clear-headed older gentleman looking relaxed while reviewing a small handwritten notebook in a sunlit room, visualizing mental clarity.",
+          "scene_function": "calm_summary",
+          "visual_priority": "high",
+          "image_usage": "main_video_scene",
+          "characters_or_subjects": [
+            "Wise older gentleman"
+          ],
+          "environment_id": "env_cozy_dining_room",
+          "emotion_or_mood": "calm, clear-headed, hopeful",
+          "visual_description": "An elderly Japanese man with short grey hair and a light-brown cardigan, looking active and relaxed while holding an unreadable, small open notebook, smiling gently near a clean window.",
+          "camera": "simple lifestyle composition",
+          "lighting": "gentle afternoon light",
+          "composition": "Uncluttered medium shot with clear focus on the subject, utilizing soft pastel and warm beige backgrounds to frame stable domestic health.",
+          "image_prompt": "A simple lifestyle composition of an elderly Japanese man with short, neat grey hair and a calm, content smile, wearing a soft light-brown cardigan, holding a small open notebook with completely unreadable text lines, sitting in a quiet sunlit living room with a light wood background, soft Japanese anime illustration, senior-friendly style, warm and calm atmosphere, gentle afternoon light, clean background, 16:9 composition, high quality, highly detailed, no text, no subtitles, no watermark",
+          "negative_prompt": "dark horror mood, confused expression, distress, brain medical diagrams, clinical context, letters, readable text, charts, numbers, teenage character, chibi, photorealistic, 3D render, watermark, logo",
+          "continuity_notes": [
+            "Follows the male subject profile from the recurring subject bible for visual cohesion across chapters."
+          ],
+          "safety_notes": [
+            "Stops any representation of dementia or Alzheimer's symptoms by presenting a healthy, active senior.",
+            "Ensures any visible lines inside the notebook are purely abstract and unreadable, blocking fake text anomalies."
+          ],
+          "transition_note": "Concludes the biological mechanism summary, prepping the viewer for the superfood upgrade in Chapter 5."
+        }
+      ],
+      "quality_check": {
+        "chapter_covered": true,
+        "scene_count_reasonable": true,
+        "all_scenes_inside_chapter_range": true,
+        "line_ranges_are_ordered": true,
+        "no_timestamps_invented": true,
+        "all_scenes_have_image_prompts": true,
+        "prompts_follow_visual_bible": true,
+        "no_text_in_image_prompts": true,
+        "negative_prompts_included": true,
+        "ready_for_merge": true,
+        "warnings": []
+      }
+    },
+    {
+      "step": "step_4_create_chapter_scenes",
+      "chapter_id": "ch_005",
+      "chapter_index": 5,
+      "chapter_scene_summary": {
+        "chapter_line_range": {
+          "start_line_id": 342,
+          "end_line_id": 401
+        },
+        "recommended_scene_count": 1,
+        "actual_scene_count": 2,
+        "coverage_strategy": "Although the recommended count was 1, this chapter possesses a very_high visual_potential and shifts the narrative toward a proactive dietary solution. It spans two major conceptually distinct topic points: the physical introduction of freeze-dried Koya-tofu (lines 342-379) and the complex biochemical mechanism of its resistant protein functioning as an internal cleaner (lines 380-401). Splitting this into two scenes ensures the viewer can process the physical ingredient appearance first before learning about its metabolic actions through a supportive lifestyle setting."
+      },
+      "scenes": [
+        {
+          "local_scene_id": "ch_005_sc_001",
+          "chapter_id": "ch_005",
+          "chapter_index": 5,
+          "scene_index_in_chapter": 1,
+          "line_range": {
+            "start_line_id": 342,
+            "end_line_id": 379
+          },
+          "scene_title": "Introducing the Nutritional Powerhouse: Koya-Tofu",
+          "scene_summary": "A beautiful close-up introducing the unique dry texture of Koya-tofu squares neatly arranged in a wicker basket, illustrating the nutritional comparison point.",
+          "scene_function": "food_example",
+          "visual_priority": "very_high",
+          "image_usage": "chapter_opening",
+          "characters_or_subjects": [
+            "Dry Koya-tofu squares",
+            "Wicker basket"
+          ],
+          "environment_id": "env_japanese_home_kitchen",
+          "emotion_or_mood": "clean, senior-friendly, curious",
+          "visual_description": "Small, dry, pale-yellow sponge-like rectangular blocks of freeze-dried Koya-tofu neatly stacked inside a shallow wicker basket resting on a bright wooden kitchen countertop.",
+          "camera": "calm close-up",
+          "lighting": "soft morning sunlight",
+          "composition": "Clear object-focused composition with a shallow depth of field, leaving clean negative space on the left side of the frame for text card overlays.",
+          "image_prompt": "A calm close-up shot of dry, pale-yellow sponge-like rectangular blocks of traditional Japanese freeze-dried Koya-tofu stacked neatly inside a shallow wicker basket, resting on a bright wooden kitchen countertop, soft morning sunlight illuminating the detailed matte texture of the tofu blocks, soft Japanese anime illustration, senior-friendly style, clean and calm atmosphere, clean background, 16:9 composition, high quality, highly detailed, no text, no subtitles, no watermark",
+          "negative_prompt": "dark horror mood, aggressive expression, wet tofu, commercial plastic packaging, labels, prices, barcodes, photorealistic, 3D render, text, Japanese text, English text, subtitles, watermark, logo, sign, distorted hands, extra fingers",
+          "continuity_notes": [
+            "Matches the 'Traditional Dried Koya-Tofu Blocks' assets from the recurring subject bible perfectly.",
+            "Maintains consistency with the wood and warm beige undertones of the kitchen setting."
+          ],
+          "safety_notes": [
+            "Keeps commercial plastic packaging out of the frame and displays the food naturally in traditional kitchenware to maintain an aesthetic, clean lifestyle focus.",
+            "Avoids numerical data graphics or charts overlaying the image."
+          ],
+          "transition_note": "Visually showcases the superfood ingredient before explaining its biological lipid-cleansing functionality."
+        },
+        {
+          "local_scene_id": "ch_005_sc_002",
+          "chapter_id": "ch_005",
+          "chapter_index": 5,
+          "scene_index_in_chapter": 2,
+          "line_range": {
+            "start_line_id": 380,
+            "end_line_id": 401
+          },
+          "scene_title": "The Safe Internal Sweep: Resistant Protein Benefits",
+          "scene_summary": "An elderly couple prepares their meals together happily in a sunlit kitchen, representing active life and clean health habits.",
+          "scene_function": "good_habit_example",
+          "visual_priority": "high",
+          "image_usage": "main_video_scene",
+          "characters_or_subjects": [
+            "Kind Elderly Japanese Couple"
+          ],
+          "environment_id": "env_japanese_home_kitchen",
+          "emotion_or_mood": "warm, calm, trustworthy",
+          "visual_description": "An elderly Japanese man and woman working together contentedly at a bright kitchen counter, preparing healthy traditional ingredients under inviting natural light.",
+          "camera": "gentle medium shot",
+          "lighting": "peaceful natural light",
+          "composition": "Balanced mid-shot composition featuring both senior individuals looking active, healthy, and happy, surrounded by clear wood textures and soft pastel kitchen surfaces.",
+          "image_prompt": "A gentle medium shot of a kind elderly Japanese couple working together in a bright home kitchen, the man with neat short grey hair and a soft cardigan, and the woman with styled silver hair and a linen apron, both displaying smiling and content expressions as they prepare healthy ingredients on a clean counter, soft Japanese anime illustration, senior-friendly character design, warm and calm atmosphere, peaceful natural light, warm beige tones, clean background, 16:9 composition, high quality, highly detailed, no text, no subtitles, no watermark",
+          "negative_prompt": "dark horror mood, aggressive expression, crying, frail, medical charts, anatomy diagrams, fiber strands sweeping out organs, digestive tract illustration, obesity graphics, teenage anime character, chibi, photorealistic, 3D render, text, subtitles, watermark, logo",
+          "continuity_notes": [
+            "Maintains strict subject apparel and character look continuity as locked in the character/subject bibles.",
+            "Keeps the airy, clean home kitchen environment properties uniform."
+          ],
+          "safety_notes": [
+            "Abides completely by the safety restrictions regarding internal anatomy or biochemical processes: replaces any clinical digestive tract or fat-trapping visualizations with a wholesome, dignified depiction of health preservation lifestyle routines.",
+            "Avoids any treatment guarantee imagery."
+          ],
+          "transition_note": "Concludes the superfood mechanism explanation on an uplifting note, flowing naturally into the combination recipe advice of the next chapter."
+        }
+      ],
+      "quality_check": {
+        "chapter_covered": true,
+        "scene_count_reasonable": true,
+        "all_scenes_inside_chapter_range": true,
+        "line_ranges_are_ordered": true,
+        "no_timestamps_invented": true,
+        "all_scenes_have_image_prompts": true,
+        "prompts_follow_visual_bible": true,
+        "no_text_in_image_prompts": true,
+        "negative_prompts_included": true,
+        "ready_for_merge": true,
+        "warnings": []
+      }
+    },
+    {
+      "step": "step_4_create_chapter_scenes",
+      "chapter_id": "ch_006",
+      "chapter_index": 6,
+      "chapter_scene_summary": {
+        "chapter_line_range": {
+          "start_line_id": 402,
+          "end_line_id": 456
+        },
+        "recommended_scene_count": 2,
+        "actual_scene_count": 2,
+        "coverage_strategy": "The chapter discusses two distinct, practical kitchen synergy concepts: pairing tofu with vitamin D-rich mushrooms to maximize calcium assimilation (lines 402-433) and mildly microwaving tofu to support digestion and metabolic circulation (lines 434-456). Two targeted, high-priority scenes are created to cleanly represent these two steps sequentially without text overlays or clinical visuals."
+      },
+      "scenes": [
+        {
+          "local_scene_id": "ch_006_sc_001",
+          "chapter_id": "ch_006",
+          "chapter_index": 6,
+          "scene_index_in_chapter": 1,
+          "line_range": {
+            "start_line_id": 402,
+            "end_line_id": 433
+          },
+          "scene_title": "Optimized Pairings: Fresh Tofu and Vitamin D Mushrooms",
+          "scene_summary": "Visually showcases a clean culinary arrangement of freshly sliced shiitake and shimeji mushroom clusters next to cut cubes of white cotton tofu on a wooden cutting board.",
+          "scene_function": "good_habit_example",
+          "visual_priority": "high",
+          "image_usage": "chapter_opening",
+          "characters_or_subjects": [
+            "Fresh assorted mushrooms",
+            "Tofu pieces"
+          ],
+          "environment_id": "env_japanese_home_kitchen",
+          "emotion_or_mood": "warm, delicious, clean",
+          "visual_description": "Plump fresh shiitake mushrooms, delicate shimeji clusters, and freshly cut firm white tofu cubes elegantly arranged on a light wood kitchen cutting board.",
+          "camera": "calm close-up",
+          "lighting": "soft morning sunlight",
+          "composition": "Object-focused macro arrangement utilizing a clean, uncluttered depth of field focus to leave ample negative space on the left side of the frame for text safe area compliance.",
+          "image_prompt": "A calm close-up shot of raw culinary ingredients arranged on a light wood cutting board, featuring beautifully sliced fresh shiitake mushrooms, delicate shimeji mushroom clusters, and cleanly cut square blocks of white cotton tofu, set in a bright home kitchen, soft morning sunlight casting soft shadows, soft Japanese anime illustration, senior-friendly style, clean and warm atmosphere, high quality, 16:9 composition, no text, no subtitles, no watermark",
+          "negative_prompt": "dark horror mood, aggressive expression, cooked stir-fry, plastic wrap, commercial labels, pricing text, photorealistic, 3D render, text, Japanese text, English text, subtitles, watermark, logo, sign, distorted hands, extra fingers",
+          "continuity_notes": [
+            "Ensures the tofu blocks maintain the subtle cotton texture profile required for Momen tofu consistency.",
+            "Aligns with the natural wood and bright domestic undertones specified in the environment bible."
+          ],
+          "safety_notes": [
+            "Fulfills health safety restrictions by presenting the nutritional catalytic synergy using whole, natural food pairings rather than medical absorption charts or anatomical diagrams."
+          ],
+          "transition_note": "Locks in the ideal pairing habit before introducing the thermal cooking step."
+        },
+        {
+          "local_scene_id": "ch_006_sc_002",
+          "chapter_id": "ch_006",
+          "chapter_index": 6,
+          "scene_index_in_chapter": 2,
+          "line_range": {
+            "start_line_id": 434,
+            "end_line_id": 456
+          },
+          "scene_title": "Mild Warming: Protecting Digestion and Circulation",
+          "scene_summary": "Shows an older person's hands placing a ceramic plate with a block of soft tofu into a clean, modern home microwave to illustrate the simple warming habit.",
+          "scene_function": "procedure_steps",
+          "visual_priority": "high",
+          "image_usage": "main_video_scene",
+          "characters_or_subjects": [
+            "Microwave",
+            "Plate of tofu"
+          ],
+          "environment_id": "env_japanese_home_kitchen",
+          "emotion_or_mood": "easy to understand, calm, helpful",
+          "visual_description": "Dignified senior hands putting a plain white ceramic dish containing a fresh block of tofu inside a warm, lit residential microwave appliance.",
+          "camera": "simple lifestyle composition",
+          "lighting": "warm home lighting",
+          "composition": "Clear, low-contrast composition focusing on the safe kitchen action, with soft interior appliance light highlighting the dish.",
+          "image_prompt": "A simple lifestyle composition showing the gentle, graceful hands of an older person placing a white ceramic plate with a block of fresh tofu inside a clean modern home microwave oven, a soft interior warm light illuminating the appliance cabin, set in a bright cozy kitchen corner, soft Japanese anime illustration, senior-friendly style, warm and helpful atmosphere, easy-to-understand layout, 16:9 composition, no text, no subtitles, no watermark",
+          "negative_prompt": "digital timer text, numbers, buttons with readable words, flashing displays, dark horror mood, photorealistic, 3D render, text, Japanese text, English text, subtitles, watermark, logo, sign, distorted fingers, extra fingers",
+          "continuity_notes": [
+            "Ensures the kitchen counter and cabinetry context aligns perfectly with the layout rules from previous kitchen scenes.",
+            "The hands should look appropriately aged and dignified, showing healthy senior parameters."
+          ],
+          "safety_notes": [
+            "Avoids displaying explicit time numbers (like 1:00 or 2:00) or text characters on the microwave panel to honor the absolute rule against text overlays in graphic items.",
+            "Frames stomach protection entirely through safe, comforting domestic workflow elements."
+          ],
+          "transition_note": "Concludes the everyday habit optimization chapter, leading smoothly into the top-rated culinary reveal of Chapter 7."
+        }
+      ],
+      "quality_check": {
+        "chapter_covered": true,
+        "scene_count_reasonable": true,
+        "all_scenes_inside_chapter_range": true,
+        "line_ranges_are_ordered": true,
+        "no_timestamps_invented": true,
+        "all_scenes_have_image_prompts": true,
+        "prompts_follow_visual_bible": true,
+        "no_text_in_image_prompts": true,
+        "negative_prompts_included": true,
+        "ready_for_merge": true,
+        "warnings": []
+      }
+    },
+    {
+      "step": "step_4_create_chapter_scenes",
+      "chapter_id": "ch_007",
+      "chapter_index": 7,
+      "chapter_scene_summary": {
+        "chapter_line_range": {
+          "start_line_id": 457,
+          "end_line_id": 488
+        },
+        "recommended_scene_count": 2,
+        "actual_scene_count": 2,
+        "coverage_strategy": "The chapter details the top-rated preparation method for seniors: Koya-tofu egg simmer. To optimize educational retention, the narrative is split into two chronological kitchen steps that match the strong visual candidates: Scene 1 shows the active preparation process of pouring the binding egg over simmering tofu to capture leached nutrients (lines 457-482), and Scene 2 provides a comforting close-up of the finished meal presentation ready for consumption at the dining table (lines 483-488)."
+      },
+      "scenes": [
+        {
+          "local_scene_id": "ch_007_sc_001",
+          "chapter_id": "ch_007",
+          "chapter_index": 7,
+          "scene_index_in_chapter": 1,
+          "line_range": {
+            "start_line_id": 457,
+            "end_line_id": 482
+          },
+          "scene_title": "The Ultimate Nutrient Binding Action",
+          "scene_summary": "A close-up shot on a kitchen stovetop burner showing a smooth stream of beaten golden egg liquid being poured evenly over simmering rectangular blocks of Koya-tofu inside a pan.",
+          "scene_function": "procedure_steps",
+          "visual_priority": "very_high",
+          "image_usage": "chapter_opening",
+          "characters_or_subjects": [
+            "Cooking pot",
+            "Beaten egg stream",
+            "Tofu blocks"
+          ],
+          "environment_id": "env_japanese_home_kitchen",
+          "emotion_or_mood": "instructive, clean, warm",
+          "visual_description": "A beautiful stream of raw beaten egg liquid pouring down from a small ceramic bowl into a shallow pan, wrapping gently around simmering pale-yellow Koya-tofu squares as thin wisps of steam rise from the boiling dashi broth.",
+          "camera": "calm close-up",
+          "lighting": "soft morning sunlight",
+          "composition": "A high-clarity food preparation scene focusing strictly on the pan and pouring motion, keeping the background softly out of focus to ensure ample safe room for title layouts.",
+          "image_prompt": "A calm close-up shot of a traditional shallow pan on a home kitchen stovetop, a smooth golden stream of beaten egg liquid being poured from a small ceramic bowl over simmering rectangular cubes of pale-yellow Koya-tofu, gentle steam rising from the clear bubbling dashi broth, soft Japanese anime illustration style, senior-friendly presentation, warm and instructive atmosphere, soft morning sunlight, clean background, 16:9 composition, high quality, highly detailed, no text, no subtitles, no watermark",
+          "negative_prompt": "dark horror mood, aggressive expression, teenage character, chibi, childish style, photorealistic, 3D render, text, letters, Japanese text, English text, subtitles, watermark, logo, sign, distorted hands, extra fingers, messy kitchen",
+          "continuity_notes": [
+            "Perfectly maps the signature hero moment highlighted in the Step 3 visual package.",
+            "Ensures the tofu blocks accurately match the dry-then-simmered matte spongy texture criteria for freeze-dried Koya-tofu."
+          ],
+          "safety_notes": [
+            "Illustrates nutritional retention using clear cooking techniques rather than displaying intrusive medical explanations, fake clinical data charts, or authoritative medical prescription text."
+          ],
+          "transition_note": "Visually showcases the core action before demonstrating the final nutritional combination outcome."
+        },
+        {
+          "local_scene_id": "ch_007_sc_002",
+          "chapter_id": "ch_007",
+          "chapter_index": 7,
+          "scene_index_in_chapter": 2,
+          "line_range": {
+            "start_line_id": 483,
+            "end_line_id": 488
+          },
+          "scene_title": "The Perfect Synergy: Finished Koya no Tamagotoji",
+          "scene_summary": "A close-up of a warm Japanese ceramic bowl holding fresh, steaming Koya no Tamagotoji, ready to eat on a sunlit tabletop.",
+          "scene_function": "food_example",
+          "visual_priority": "high",
+          "image_usage": "main_video_scene",
+          "characters_or_subjects": [
+            "Koya no Tamagotoji dish"
+          ],
+          "environment_id": "env_cozy_dining_room",
+          "emotion_or_mood": "warm, delicious, comforting",
+          "visual_description": "A traditional patterned ceramic bowl filled with cooked Koya-tofu egg simmer. A fluffy, soft yellow layer of egg is beautifully folded around porous tofu squares, garnished with fresh herbs and rising thin wisps of hot steam.",
+          "camera": "clear object-focused scene",
+          "lighting": "gentle afternoon light",
+          "composition": "Appetizing food presentation centered on the lower-right third of a light wood dining tabletop, with the sunlit garden background out of focus.",
+          "image_prompt": "A clear object-focused scene of a traditional Japanese ceramic bowl filled with steaming hot Koya-tofu simmered with egg, a soft golden egg layer folded beautifully over spongy rectangular tofu blocks, rising gentle steam, placed on a light wood tabletop inside a cozy dining room, soft Japanese anime illustration, senior-friendly style, appetizing and warm atmosphere, gentle afternoon light, clean background, low contrast, 16:9 composition, high quality, highly detailed, no text, no subtitles, no watermark",
+          "negative_prompt": "dark horror mood, high contrast, harsh shadows, photorealistic, 3D render, text, Japanese text, English text, letters, numerals, symbols, subtitles, watermark, logo, sign, messy table",
+          "continuity_notes": [
+            "Maintains consistent light wood dining table surfaces and ceramic aesthetics aligned with the environment bible rules."
+          ],
+          "safety_notes": [
+            "Replaces abstract bone density claims or vitamin absorption processes with clean, appetizing culinary results to maintain compliance with health niche restrictions.",
+            "Ensures no text overlays or symbols slip into the design."
+          ],
+          "transition_note": "Finishes the highest-ranked practical guide segment on a deeply satisfying note, transitioning directly into the final chapter recap."
+        }
+      ],
+      "quality_check": {
+        "chapter_covered": true,
+        "scene_count_reasonable": true,
+        "all_scenes_inside_chapter_range": true,
+        "line_ranges_are_ordered": true,
+        "no_timestamps_invented": true,
+        "all_scenes_have_image_prompts": true,
+        "prompts_follow_visual_bible": true,
+        "no_text_in_image_prompts": true,
+        "negative_prompts_included": true,
+        "ready_for_merge": true,
+        "warnings": []
+      }
+    },
+    {
+      "step": "step_4_create_chapter_scenes",
+      "chapter_id": "ch_008",
+      "chapter_index": 8,
+      "chapter_scene_summary": {
+        "chapter_line_range": {
+          "start_line_id": 489,
+          "end_line_id": 543
+        },
+        "recommended_scene_count": 1,
+        "actual_scene_count": 2,
+        "coverage_strategy": "The final chapter contains two distinctly separate narrative moments: a look-back executive video summary of the dietary rules (lines 489-499) and a final interactive audience engagement outro call to action (lines 500-543). To prevent visual stagnation and allow both content units to express their independent goals cleanly, the recommended scene count has been adjusted to 2. Scene 1 presents a clean, abstract recipe motif backdrop for the list recap, and Scene 2 provides an engaging character-centric shot showing the couple interacting with their online community."
+      },
+      "scenes": [
+        {
+          "local_scene_id": "ch_008_sc_001",
+          "chapter_id": "ch_008",
+          "chapter_index": 8,
+          "scene_index_in_chapter": 1,
+          "line_range": {
+            "start_line_id": 489,
+            "end_line_id": 499
+          },
+          "scene_title": "Executive Summary: The Mindful Tofu Habits",
+          "scene_summary": "An educational summary layout illustrating natural components like fresh tofu blocks, mushrooms, and an egg beautifully arranged, providing a clear visual anchor for the rules recap.",
+          "scene_function": "calm_summary",
+          "visual_priority": "high",
+          "image_usage": "chapter_opening",
+          "characters_or_subjects": [
+            "Tofu",
+            "Mushrooms",
+            "Egg illustrations"
+          ],
+          "environment_id": "env_japanese_home_kitchen",
+          "emotion_or_mood": "trustworthy, easy to understand, clean",
+          "visual_description": "An organized, artistic arrangement on a light wooden table featuring a block of white cotton tofu, fresh shiitake mushrooms, and a clean ceramic bowl with whole eggs, creating a holistic lifestyle recap layout.",
+          "camera": "clear object-focused scene",
+          "lighting": "soft morning sunlight",
+          "composition": "Asymmetrical composition with the key ingredients clustered on the right third of the 16:9 widescreen frame, establishing an extensive, uncluttered left side safe area for dynamic subtitle text or point list layout graphics.",
+          "image_prompt": "A clear object-focused scene of healthy cooking ingredients arranged elegantly on a light oak table, featuring a firm square block of cotton tofu in a low-contrast ceramic plate, sliced fresh shiitake mushrooms, and a small wicker basket holding whole raw eggs, soft morning sunlight casting long gentle shadows, soft Japanese anime illustration style, senior-friendly presentation, trustworthy and clean atmosphere, highly detailed composition, 16:9 composition, no text, no subtitles, no watermark",
+          "negative_prompt": "dark horror mood, list charts, overlay lines, graphic symbols, written words, letters, labels, text items, subtitles, numbers, price tags, photorealistic, 3D render, watermark, logo, sign, distorted hands, extra fingers",
+          "continuity_notes": [
+            "Aligns with the 'Fresh Cotton Tofu (Momen)' rough pressed linen texture style detailed in the recurring subject bible.",
+            "Maintains consistency across wood grains and soft pastel tones used in previous cooking segments."
+          ],
+          "safety_notes": [
+            "Does not feature explicit printed text rules, warning crosses, ticks, or diagrams, ensuring completely abstract food representation to avoid text rendering glitches.",
+            "Maintains a supportive wellness tone, avoiding scary medical references."
+          ],
+          "transition_note": "Gives the viewer a comprehensive summary before concluding with the interactive community greeting."
+        },
+        {
+          "local_scene_id": "ch_008_sc_002",
+          "chapter_id": "ch_008",
+          "chapter_index": 8,
+          "scene_index_in_chapter": 2,
+          "line_range": {
+            "start_line_id": 500,
+            "end_line_id": 543
+          },
+          "scene_title": "Community Outro: Sharing a Glowing Senior Life",
+          "scene_summary": "The kind elderly Japanese couple sits happily in their sunlit dining area looking down at a portable tablet device together, smiling gently, matching the engagement invitation to write in the comments section.",
+          "scene_function": "daily_life_example",
+          "visual_priority": "high",
+          "image_usage": "main_video_scene",
+          "characters_or_subjects": [
+            "Kind Elderly Japanese Couple"
+          ],
+          "environment_id": "env_cozy_dining_room",
+          "emotion_or_mood": "warm, senior-friendly, supportive",
+          "visual_description": "The friendly elderly man in his light-brown cardigan and the gray-haired woman in her cream blouse sitting comfortably next to each other at their oak table, looking cheerfully at a sleek tablet screen that shows an unreadable, glowing abstract UI pattern.",
+          "camera": "gentle medium shot",
+          "lighting": "peaceful natural light",
+          "composition": "A warm family scene featuring the active couple centered cleanly in a cozy home environment, showing views of a sunlit garden through sliding doors in the background.",
+          "image_prompt": "A gentle medium shot of a kind elderly Japanese couple sitting together at a light oak dining table, the man with neat grey hair and a light-brown cardigan and the woman with silver hair in a bob wearing a clean cream blouse, both smiling warmly as they look at a modern tablet computer screen held on the table, the screen displaying a blurred abstract UI layout with completely unreadable details, soft focus sunlit garden view through glass windows in the background, soft Japanese anime illustration, senior-friendly character design, warm and supportive atmosphere, peaceful natural light, 16:9 composition, high quality, highly detailed, no text, no subtitles, no watermark",
+          "negative_prompt": "readable words, computer text, overlay characters, notification icons, comments text, digital numbers, dark horror mood, sad expression, crying, frail, weak state, teenage anime character, chibi style, photorealistic, 3D render, subtitles, watermark, logo, sign, distorted fingers, extra hands",
+          "continuity_notes": [
+            "Strictly preserves the locked facial expressions, clothing styles, hair colors, and age range metrics for the recurring couple characters.",
+            "Keeps the light-filled dining space uniform with Chapter 1 layout architecture."
+          ],
+          "safety_notes": [
+            "Fulfills the absolute formatting toolkit rules by keeping any graphics, labels, UI panels, or details on the tablet screen entirely blurred, generic, and unreadable.",
+            "Presents digital community engagement using active, healthy, and highly capable senior models to reinforce target group dignity."
+          ],
+          "transition_note": "Concludes the entire automated health presentation with an inviting, peaceful visual frame."
+        }
+      ],
+      "quality_check": {
+        "chapter_covered": true,
+        "scene_count_reasonable": true,
+        "all_scenes_inside_chapter_range": true,
+        "line_ranges_are_ordered": true,
+        "no_timestamps_invented": true,
+        "all_scenes_have_image_prompts": true,
+        "prompts_follow_visual_bible": true,
+        "no_text_in_image_prompts": true,
+        "negative_prompts_included": true,
+        "ready_for_merge": true,
+        "warnings": []
+      }
+    }
+  ],
+  "final_scene_plan": {
+    "step": "step_4_scene_planning",
+    "scene_plan_summary": {
+      "total_chapters": 8,
+      "total_scenes": 19,
+      "line_coverage": {
+        "start_line_id": 1,
+        "end_line_id": 543
+      }
+    },
+    "chapter_scene_breakdown": [
+      {
+        "chapter_id": "ch_001",
+        "chapter_index": 1,
+        "chapter_line_range": {
+          "start_line_id": 1,
+          "end_line_id": 54
+        },
+        "recommended_scene_count": 1,
+        "actual_scene_count": 2,
+        "scene_ids": [
+          "sc_001",
+          "sc_002"
+        ]
+      },
+      {
+        "chapter_id": "ch_002",
+        "chapter_index": 2,
+        "chapter_line_range": {
+          "start_line_id": 55,
+          "end_line_id": 142
+        },
+        "recommended_scene_count": 2,
+        "actual_scene_count": 3,
+        "scene_ids": [
+          "sc_003",
+          "sc_004",
+          "sc_005"
+        ]
+      },
+      {
+        "chapter_id": "ch_003",
+        "chapter_index": 3,
+        "chapter_line_range": {
+          "start_line_id": 143,
+          "end_line_id": 256
+        },
+        "recommended_scene_count": 3,
+        "actual_scene_count": 4,
+        "scene_ids": [
+          "sc_006",
+          "sc_007",
+          "sc_008",
+          "sc_009"
+        ]
+      },
+      {
+        "chapter_id": "ch_004",
+        "chapter_index": 4,
+        "chapter_line_range": {
+          "start_line_id": 257,
+          "end_line_id": 341
+        },
+        "recommended_scene_count": 2,
+        "actual_scene_count": 2,
+        "scene_ids": [
+          "sc_010",
+          "sc_011"
+        ]
+      },
+      {
+        "chapter_id": "ch_005",
+        "chapter_index": 5,
+        "chapter_line_range": {
+          "start_line_id": 342,
+          "end_line_id": 401
+        },
+        "recommended_scene_count": 1,
+        "actual_scene_count": 2,
+        "scene_ids": [
+          "sc_012",
+          "sc_013"
+        ]
+      },
+      {
+        "chapter_id": "ch_006",
+        "chapter_index": 6,
+        "chapter_line_range": {
+          "start_line_id": 402,
+          "end_line_id": 456
+        },
+        "recommended_scene_count": 2,
+        "actual_scene_count": 2,
+        "scene_ids": [
+          "sc_014",
+          "sc_015"
+        ]
+      },
+      {
+        "chapter_id": "ch_007",
+        "chapter_index": 7,
+        "chapter_line_range": {
+          "start_line_id": 457,
+          "end_line_id": 488
+        },
+        "recommended_scene_count": 2,
+        "actual_scene_count": 2,
+        "scene_ids": [
+          "sc_016",
+          "sc_017"
+        ]
+      },
+      {
+        "chapter_id": "ch_008",
+        "chapter_index": 8,
+        "chapter_line_range": {
+          "start_line_id": 489,
+          "end_line_id": 543
+        },
+        "recommended_scene_count": 1,
+        "actual_scene_count": 2,
+        "scene_ids": [
+          "sc_018",
+          "sc_019"
+        ]
+      }
+    ],
+    "scenes": [
+      {
+        "local_scene_id": "ch_001_sc_001",
+        "chapter_id": "ch_001",
+        "chapter_index": 1,
+        "scene_index_in_chapter": 1,
+        "line_range": {
+          "start_line_id": 1,
+          "end_line_id": 9
+        },
+        "scene_title": "The Comfort of Traditional Japanese Tofu",
+        "scene_summary": "A cozy and inviting breakfast setting introducing fresh cotton tofu on a Japanese home dining table, establishing a familiar lifestyle atmosphere for the audience.",
+        "scene_function": "daily_life_example",
+        "visual_priority": "high",
+        "image_usage": "chapter_opening",
+        "characters_or_subjects": [
+          "Fresh tofu",
+          "Miso soup"
+        ],
+        "environment_id": "env_cozy_dining_room",
+        "emotion_or_mood": "warm, calm, traditional",
+        "visual_description": "A beautiful, fresh block of textured cotton tofu served in a clean, shallow ceramic dish, placed alongside a small steaming bowl of miso soup on a light oak dining table.",
+        "camera": "calm close-up",
+        "lighting": "soft morning sunlight",
+        "composition": "Clear object-focused scene with clean negative space on the left side for title graphics safety.",
+        "image_prompt": "A calm close-up of a fresh square block of traditional Japanese cotton tofu with a rough linen-pressed surface texture, beautifully presented in a shallow white ceramic dish, placed next to a warm bowl of steaming miso soup on a light oak dining table, soft morning sunlight filtering through, cozy morning dining area, soft Japanese anime illustration, senior-friendly style, warm and calm atmosphere, gentle natural light, clean background, 16:9 composition, high quality, highly detailed, no text, no subtitles, no watermark",
+        "negative_prompt": "dark horror mood, aggressive expression, overly dramatic crying, teenage anime character, chibi, overly cute childish style, photorealistic, 3D render, text, Japanese text, English text, subtitles, watermark, logo, sign, distorted hands, extra fingers, messy environment, dark shadows, high contrast",
+        "continuity_notes": [
+          "Matches the 'Fresh Cotton Tofu (Momen)' asset specifications from the recurring subject bible.",
+          "Aligns with the 'Cozy Morning Dining Area' design rules."
+        ],
+        "safety_notes": [
+          "Maintains a safe, non-threatening daily routine atmosphere to introduce the topic without triggering instant medical panic."
+        ],
+        "transition_note": "Smoothly sets the peaceful domestic tone before shifting to the educational warning.",
+        "scene_id": "sc_001",
+        "original_local_scene_id": "ch_001_sc_001",
+        "global_scene_index": 1
+      },
+      {
+        "local_scene_id": "ch_001_sc_002",
+        "chapter_id": "ch_001",
+        "chapter_index": 1,
+        "scene_index_in_chapter": 2,
+        "line_range": {
+          "start_line_id": 10,
+          "end_line_id": 54
+        },
+        "scene_title": "The Hidden Risk of Unconscious Habits",
+        "scene_summary": "An elderly couple sits at the dining table, looking thoughtful and slightly curious as they learn about how simple preparation habits can impact health.",
+        "scene_function": "problem_intro",
+        "visual_priority": "medium",
+        "image_usage": "main_video_scene",
+        "characters_or_subjects": [
+          "Kind Elderly Japanese Couple"
+        ],
+        "environment_id": "env_cozy_dining_room",
+        "emotion_or_mood": "curious, warm, respectful",
+        "visual_description": "An elderly Japanese man and woman sitting together at their clean dining table, looking toward each other with curious, calm expressions, reflecting on their daily meals.",
+        "camera": "gentle medium shot",
+        "lighting": "peaceful natural light",
+        "composition": "Simple lifestyle composition with both characters looking healthy and active, placed comfortably in their home environment.",
+        "image_prompt": "A gentle medium shot of a kind elderly Japanese couple in their late 60s, a man with neat grey hair wearing a light-brown cardigan and a woman with silver hair in a clean bob wearing a cream blouse, sitting at a sunlit dining table looking curious and thoughtful, warm home dining room, peaceful natural light, soft Japanese anime illustration, senior-friendly character design, warm and calm atmosphere, gentle facial expressions, clean background, easy-to-understand composition, respectful depiction of elderly Japanese people, 16:9 composition, no text, no subtitles, no watermark",
+        "negative_prompt": "dark horror mood, aggressive expression, overly dramatic crying, sad expression, frail, weak, teenage anime character, chibi, overly cute childish style, photorealistic, 3D render, text, Japanese text, English text, subtitles, watermark, logo, distorted hands, extra fingers",
+        "continuity_notes": [
+          "Ensures characters strictly follow the 'Kind Elderly Japanese Couple' descriptors in clothing and expression.",
+          "Maintains background continuity with the warm wooden dining room tones from Scene 1."
+        ],
+        "safety_notes": [
+          "Avoids any visual depictions of illness, pain, or medical charts.",
+          "Ensures characters look completely dignified, healthy, and alert while being introduced to the wellness warning."
+        ],
+        "transition_note": "Concludes the introductory chapter by visually anchoring the audience's attention to the upcoming countdown.",
+        "scene_id": "sc_002",
+        "original_local_scene_id": "ch_001_sc_002",
+        "global_scene_index": 2
+      },
+      {
+        "local_scene_id": "ch_002_sc_001",
+        "chapter_id": "ch_002",
+        "chapter_index": 2,
+        "scene_index_in_chapter": 1,
+        "line_range": {
+          "start_line_id": 55,
+          "end_line_id": 100
+        },
+        "scene_title": "Rank 5: The Excess Sodium Overload on Cold Tofu",
+        "scene_summary": "Visually showcases a continuous, dark stream of soy sauce being heavily poured directly over a clean block of cold silken tofu, emphasizing the risk of unconscious over-seasoning.",
+        "scene_function": "bad_habit_example",
+        "visual_priority": "high",
+        "image_usage": "chapter_opening",
+        "characters_or_subjects": [
+          "Cold tofu",
+          "Soy sauce stream"
+        ],
+        "environment_id": "env_cozy_dining_room",
+        "emotion_or_mood": "vivid but calm, cautious",
+        "visual_description": "A dark stream of soy sauce cascading over a pristine block of cold tofu inside a shallow white ceramic dish. The dark fluid pools slightly at the base, with green chopped scallions resting on top.",
+        "camera": "calm close-up",
+        "lighting": "soft morning sunlight",
+        "composition": "A clear, object-focused macro shot showing the pouring action clearly, leaving clean negative space on the left side for title card safety.",
+        "image_prompt": "A calm close-up shot of dark soy sauce being heavily poured from a small pitcher onto a pristine white block of cold tofu, finely chopped green scallions scattered on top, a small dark pool forming inside a shallow ceramic plate on a light wood dining table, soft Japanese anime illustration, senior-friendly style, vivid but calm atmosphere, gentle natural light, clean background, 16:9 composition, high quality, highly detailed, no text, no subtitles, no watermark",
+        "negative_prompt": "dark horror mood, aggressive expression, overly dramatic crying, teenage anime character, chibi, overly cute childish style, photorealistic, 3D render, text, Japanese text, English text, subtitles, watermark, logo, sign, distorted hands, extra fingers, medical charts, blood, arteries",
+        "continuity_notes": [
+          "Keeps the light wood surface and home dining setting aligned with the domestic look introduced in previous chapters."
+        ],
+        "safety_notes": [
+          "Depicts the food habit realistically without showing scary biological diagrams of clogged arteries, blood pressure metrics, or distressed human expressions, abiding by the health niche restrictions."
+        ],
+        "transition_note": "Visually locks in the common mistake before moving to the corrective cooking habit.",
+        "scene_id": "sc_003",
+        "original_local_scene_id": "ch_002_sc_001",
+        "global_scene_index": 3
+      },
+      {
+        "local_scene_id": "ch_002_sc_002",
+        "chapter_id": "ch_002",
+        "chapter_index": 2,
+        "scene_index_in_chapter": 2,
+        "line_range": {
+          "start_line_id": 101,
+          "end_line_id": 107
+        },
+        "scene_title": "The Corrective Action: Gentle Dipping Technique",
+        "scene_summary": "An instructive culinary detail showing the hands of an elderly individual carefully holding a small piece of tofu with chopsticks and lightly dipping a corner into a small, separate seasoning plate.",
+        "scene_function": "good_habit_example",
+        "visual_priority": "medium",
+        "image_usage": "main_video_scene",
+        "characters_or_subjects": [
+          "Senior citizen hand",
+          "Small dipping dish",
+          "Tofu piece"
+        ],
+        "environment_id": "env_cozy_dining_room",
+        "emotion_or_mood": "trustworthy, clean, instructive",
+        "visual_description": "Neat, elderly hands using bamboo chopsticks to hold a single cut square of tofu, gently touching only its bottom corner into a tiny separate ceramic saucer containing a shallow splash of low-sodium sauce.",
+        "camera": "simple lifestyle composition",
+        "lighting": "gentle afternoon light",
+        "composition": "An elegant, steady close-up focusing perfectly on the hands and dishes, providing an easy-to-understand tutorial layout.",
+        "image_prompt": "A simple lifestyle composition focusing on the gentle hands of an older person using bamboo chopsticks to lift a small square piece of white tofu, carefully dipping just the bottom edge into a tiny separate patterned ceramic saucer containing dark seasoning, set on a clean wooden tabletop, soft Japanese anime illustration, senior-friendly style, warm and calm atmosphere, gentle afternoon light, clean background, 16:9 composition, high quality, highly detailed, no text, no subtitles, no watermark",
+        "negative_prompt": "dark horror mood, photorealistic, 3D render, text, Japanese text, English text, subtitles, watermark, logo, sign, distorted hands, extra fingers, hyper-stylized features, messy environment",
+        "continuity_notes": [
+          "Ensures the hands look senior-friendly (appropriate aging with dignity) rather than excessively young or frail."
+        ],
+        "safety_notes": [
+          "Demonstrates a positive lifestyle alternative cleanly without violating any prompt safety constraints."
+        ],
+        "transition_note": "Provides a clean palate cleanser before shifting to the Rank 4 chemical threat topic.",
+        "scene_id": "sc_004",
+        "original_local_scene_id": "ch_002_sc_002",
+        "global_scene_index": 4
+      },
+      {
+        "local_scene_id": "ch_002_sc_003",
+        "chapter_id": "ch_002",
+        "chapter_index": 2,
+        "scene_index_in_chapter": 3,
+        "line_range": {
+          "start_line_id": 108,
+          "end_line_id": 142
+        },
+        "scene_title": "Rank 4: The Glycation Compound Hazard (Mapo Tofu)",
+        "scene_summary": "Illustrates a beautifully presented but heavily glazed bowl of Mapo Tofu, creating context around the combination of high sugars and heavy cooking oils that generate AGEs.",
+        "scene_function": "bad_habit_example",
+        "visual_priority": "high",
+        "image_usage": "main_video_scene",
+        "characters_or_subjects": [
+          "Mapo tofu dish",
+          "Rice bowl"
+        ],
+        "environment_id": "env_japanese_home_kitchen",
+        "emotion_or_mood": "warm, appealing but cautious",
+        "visual_description": "A traditional ceramic bowl containing simmering Mapo Tofu with a distinctly glossy, oily red-brown sauce coating the white cubes, topped with green garnishes and sitting next to a simple bowl of plain white rice.",
+        "camera": "clear object-focused scene",
+        "lighting": "warm home lighting",
+        "composition": "Centered, well-balanced food layout showcasing a realistic, heavy domestic stir-fry texture in low-contrast tones.",
+        "image_prompt": "A clear object-focused scene of a classic ceramic bowl filled with freshly cooked Mapo Tofu, featuring soft white tofu cubes coated in a glossy red-brown sauce, rising gentle wisps of steam, served on a table next to a small bowl of steaming white rice, soft Japanese anime illustration, senior-friendly style, warm home lighting, clean background, low contrast, easy-to-understand composition, 16:9 composition, high quality, highly detailed, no text, no subtitles, no watermark",
+        "negative_prompt": "dark horror mood, aggressive expression, cellular level view, molecules, chemical diagrams, age progression, photorealistic, 3D render, text, Japanese text, English text, subtitles, watermark, logo, sign, distorted fingers, messy environment",
+        "continuity_notes": [
+          "Keeps the kitchen backdrop elements matching the organized layout defined in the environment bible."
+        ],
+        "safety_notes": [
+          "Explicitly avoids showing chemical symbols, molecular charts, wrinkled skin diagrams, or brain decline symbols for AGEs, maintaining a safe and respectful presentation of an everyday home cooking scenario."
+        ],
+        "transition_note": "Finishes the chapter on an informative, cautionary note, preparing the viewer for the next set of lifestyle tips.",
+        "scene_id": "sc_005",
+        "original_local_scene_id": "ch_002_sc_003",
+        "global_scene_index": 5
+      },
+      {
+        "local_scene_id": "ch_003_sc_001",
+        "chapter_id": "ch_003",
+        "chapter_index": 3,
+        "scene_index_in_chapter": 1,
+        "line_range": {
+          "start_line_id": 143,
+          "end_line_id": 160
+        },
+        "scene_title": "Rank 3: The Supermarket Tofu Dilemma",
+        "scene_summary": "A clean supermarket shelf setting displaying packaged blocks of both fresh silken and cotton tofu, setting up the common senior choice misstep.",
+        "scene_function": "problem_intro",
+        "visual_priority": "high",
+        "image_usage": "chapter_opening",
+        "characters_or_subjects": [
+          "Tofu packages on a shelf"
+        ],
+        "environment_id": "env_cozy_dining_room",
+        "emotion_or_mood": "clean, senior-friendly, curious",
+        "visual_description": "A close-up view of a supermarket refrigerated shelf containing neat, clean plastic containers of fresh tofu. The packages are text-free and abstract, showing clean blocks through transparent film.",
+        "camera": "gentle medium shot",
+        "lighting": "peaceful natural light",
+        "composition": "An easy-to-understand composition focused on the supermarket options, leaving clear negative space for text layout safety.",
+        "image_prompt": "A gentle medium shot of a clean supermarket refrigerated grocery aisle shelf containing neatly arranged plastic packages of fresh tofu, transparent packaging revealing white tofu blocks inside without any readable words or labels, soft Japanese anime illustration, senior-friendly style, clean and calm atmosphere, peaceful natural light, easy-to-understand composition, 16:9 composition, high quality, highly detailed, no text, no subtitles, no watermark",
+        "negative_prompt": "dark horror mood, photorealistic, 3D render, text, Japanese text, English text, barcodes, prices, labels, subtitles, watermark, logo, sign, distorted hands, extra fingers, messy environment",
+        "continuity_notes": [
+          "Keeps the soft anime palette and tone perfectly aligned with previous chapter context."
+        ],
+        "safety_notes": [
+          "All labels on packages must be abstract shapes to respect the absolute ban on readable written text inside graphic areas."
+        ],
+        "transition_note": "Transitions from a shopper's perspective into the traditional culinary method.",
+        "scene_id": "sc_006",
+        "original_local_scene_id": "ch_003_sc_001",
+        "global_scene_index": 6
+      },
+      {
+        "local_scene_id": "ch_003_sc_002",
+        "chapter_id": "ch_003",
+        "chapter_index": 3,
+        "scene_index_in_chapter": 2,
+        "line_range": {
+          "start_line_id": 161,
+          "end_line_id": 179
+        },
+        "scene_title": "The Miracle of Pressing Cotton Tofu",
+        "scene_summary": "Visually illustrates the traditional dehydration method that concentrates crucial calcium, protein, and iron inside cotton tofu.",
+        "scene_function": "food_example",
+        "visual_priority": "high",
+        "image_usage": "main_video_scene",
+        "characters_or_subjects": [
+          "Artisan kitchen hands",
+          "Tofu mold with white cloth"
+        ],
+        "environment_id": "env_japanese_home_kitchen",
+        "emotion_or_mood": "calm, clean, informative",
+        "visual_description": "Grounded artisan kitchen hands pressing down on a traditional wooden tofu mold wrapped in clean white linen fabric, as transparent water drops slowly filter out from the sides.",
+        "camera": "calm close-up",
+        "lighting": "soft morning sunlight",
+        "composition": "Clear object-focused scene showing the physical extraction of water, illustrating the process clearly to the audience.",
+        "image_prompt": "A calm close-up shot of gentle hands pressing down a wooden tofu press mold wrapped in a clean white linen cloth, clear water droplets slowly filtering out from the wood gaps, set on a bright wooden kitchen workspace countertop, soft Japanese anime illustration, warm and calm atmosphere, soft morning sunlight, clean background, easy-to-understand composition, 16:9 composition, high quality, highly detailed, no text, no subtitles, no watermark",
+        "negative_prompt": "dark horror mood, industrial factory, aggressive expression, photorealistic, 3D render, text, subtitles, watermark, logo, sign, distorted fingers, messy environment",
+        "continuity_notes": [
+          "Maintains consistent wood textures matching the standard kitchen elements defined in the visual consistency rules."
+        ],
+        "safety_notes": [
+          "Does not display data charts or numerical graphics; relies entirely on pure culinary visualization to explain the nutrient density gap."
+        ],
+        "transition_note": "Moves cleanly from product background to the food safety handling step.",
+        "scene_id": "sc_007",
+        "original_local_scene_id": "ch_003_sc_002",
+        "global_scene_index": 7
+      },
+      {
+        "local_scene_id": "ch_003_sc_003",
+        "chapter_id": "ch_003",
+        "chapter_index": 3,
+        "scene_index_in_chapter": 3,
+        "line_range": {
+          "start_line_id": 180,
+          "end_line_id": 217
+        },
+        "scene_title": "Rank 2 Solution: The Food Safety Rinsing Step",
+        "scene_summary": "Demonstrates the essential household habit of washing a firm block of fresh tofu on a mesh strainer under clean running tap water to remove stagnant packing fluid.",
+        "scene_function": "good_habit_example",
+        "visual_priority": "very_high",
+        "image_usage": "main_video_scene",
+        "characters_or_subjects": [
+          "Fresh tofu block",
+          "Flowing tap water"
+        ],
+        "environment_id": "env_japanese_home_kitchen",
+        "emotion_or_mood": "clean, refreshing, safe",
+        "visual_description": "A beautiful, firm block of white cotton tofu sitting in a stainless steel mesh strainer, being washed under a steady stream of sparkling clean running tap water over a kitchen sink.",
+        "camera": "clear object-focused scene",
+        "lighting": "peaceful natural light",
+        "composition": "Low contrast, crisp subject presentation focusing completely on the hygiene method while maintaining uncluttered negative space.",
+        "image_prompt": "A clear object-focused scene of a firm square block of fresh white tofu resting inside a clean metal mesh strainer, being gently rinsed under a stream of sparkling clear water from a modern kitchen tap, clean steel kitchen sink basin below, soft Japanese anime illustration, senior-friendly style, clean and refreshing atmosphere, peaceful natural light, highly detailed, 16:9 composition, no text, no subtitles, no watermark",
+        "negative_prompt": "toxic green water, cartoon bacteria monsters, dirty sink, dark horror mood, photorealistic, 3D render, text, subtitles, watermark, logo, sign, distorted hands",
+        "continuity_notes": [
+          "Tofu block displays the subtle rough linen texture of Momen tofu as outlined in the subject bible."
+        ],
+        "safety_notes": [
+          "Abides strictly by the prompt restrictions; water is rendered naturally clear without any toxic colors, bacterial graphics, or clinical alarmism to avoid causing fear to the senior demographic."
+        ],
+        "transition_note": "Shifts focus from clean raw preparation to hot stove cooking errors.",
+        "scene_id": "sc_008",
+        "original_local_scene_id": "ch_003_sc_003",
+        "global_scene_index": 8
+      },
+      {
+        "local_scene_id": "ch_003_sc_004",
+        "chapter_id": "ch_003",
+        "chapter_index": 3,
+        "scene_index_in_chapter": 4,
+        "line_range": {
+          "start_line_id": 218,
+          "end_line_id": 256
+        },
+        "scene_title": "Rank 1: The Boiling Miso Soup Pitfall",
+        "scene_summary": "Shows tofu blocks bubbling extensively inside a pot of miso broth, visually contextualizing how water-soluble nutrients leach into the soup liquid.",
+        "scene_function": "bad_habit_example",
+        "visual_priority": "medium",
+        "image_usage": "summary_scene",
+        "characters_or_subjects": [
+          "Miso soup pot",
+          "Simmering tofu cubes"
+        ],
+        "environment_id": "env_japanese_home_kitchen",
+        "environment_name": "Warm Japanese Home Kitchen",
+        "emotion_or_mood": "warm, familiar, cautious",
+        "visual_description": "A traditional ceramic soup pot sitting on a clean kitchen stovetop burner, filled with amber miso soup broth bubbling gently around cut blocks of white tofu.",
+        "camera": "calm close-up",
+        "lighting": "warm home lighting",
+        "composition": "Centered food composition emphasizing the boiling action, surrounded by the warm beige tones of a senior-friendly home kitchen.",
+        "image_prompt": "A calm close-up shot of a traditional Japanese ceramic soup pot bubbling gently on a clean kitchen stovetop, filled with rich brown miso soup broth and submerged white tofu cubes, soft steam rising gently from the surface, soft Japanese anime illustration, senior-friendly cooking style, warm and familiar atmosphere, warm home lighting, clean background, 16:9 composition, high quality, highly detailed, no text, no subtitles, no watermark",
+        "negative_prompt": "dark horror mood, aggressive boiling, photorealistic, 3D render, text, letters, subtitles, watermark, logo, sign, distorted hands, messy environment, high contrast",
+        "continuity_notes": [
+          "Keeps the cozy domestic atmosphere intact, linking perfectly to the solution sequence that will follow in the next chapter."
+        ],
+        "safety_notes": [
+          "Does not use any medical warning symbols, health advice overlays, or chemical terms inside the prompt, relying completely on everyday kitchen imagery."
+        ],
+        "transition_note": "Concludes the chapter's problem countdown sequence, leading smoothly into the scientific benefits of the next chapter.",
+        "scene_id": "sc_009",
+        "original_local_scene_id": "ch_003_sc_004",
+        "global_scene_index": 9
+      },
+      {
+        "local_scene_id": "ch_004_sc_001",
+        "chapter_id": "ch_004",
+        "chapter_index": 4,
+        "scene_index_in_chapter": 1,
+        "line_range": {
+          "start_line_id": 257,
+          "end_line_id": 300
+        },
+        "scene_title": "The First Miracle: Vitality and Bone Structural Reassurance",
+        "scene_summary": "An older Japanese grandmother smiling happily while enjoying a balanced meal at a sunlit table, reflecting the positive outcome of proper calcium integration.",
+        "scene_function": "good_habit_example",
+        "visual_priority": "high",
+        "image_usage": "chapter_opening",
+        "characters_or_subjects": [
+          "Healthy senior woman"
+        ],
+        "environment_id": "env_cozy_dining_room",
+        "emotion_or_mood": "warm, senior-friendly, trustworthy",
+        "visual_description": "A healthy elderly Japanese woman with soft silver hair styled in a clean bob, wearing a light cream blouse and linen apron, smiling warmly at her dining table. A clean, fresh block of cotton tofu sits in a small ceramic dish beside a teacup.",
+        "camera": "gentle medium shot",
+        "lighting": "soft morning sunlight",
+        "composition": "Asymmetrical composition with the cheerful character on the right, providing clean, uncluttered negative space on the left half for text layouts.",
+        "image_prompt": "A gentle medium shot of a healthy elderly Japanese woman with elegant silver hair and a serene, smiling expression sitting at a bright wooden dining table, a traditional breakfast set with a fresh block of textured cotton tofu in a shallow side dish nearby, soft morning sunlight illuminating the dining space, soft Japanese anime illustration, senior-friendly character design, warm and calm atmosphere, clean background, 16:9 composition, high quality, highly detailed, no text, no subtitles, no watermark",
+        "negative_prompt": "dark horror mood, sad expression, crying, frail, medical machinery, hospital setting, anatomical bone diagrams, teenage anime character, chibi, photorealistic, 3D render, text, subtitles, watermark, logo, sign, distorted fingers",
+        "continuity_notes": [
+          "Maintains alignment with the female subject's profile from the recurring subject bible.",
+          "Ensures the tofu block displays the linen-pressed texture of cotton tofu."
+        ],
+        "safety_notes": [
+          "Avoids internal skeletal diagrams, medical charts, or diagnostic terms to fulfill health niche requirements.",
+          "The scene frames osteoporosis prevention entirely through proactive, dignified wellness behavior."
+        ],
+        "transition_note": "Establishes structural vitality before transitioning to brain health and memory support.",
+        "scene_id": "sc_010",
+        "original_local_scene_id": "ch_004_sc_001",
+        "global_scene_index": 10
+      },
+      {
+        "local_scene_id": "ch_004_sc_002",
+        "chapter_id": "ch_004",
+        "chapter_index": 4,
+        "scene_index_in_chapter": 2,
+        "line_range": {
+          "start_line_id": 301,
+          "end_line_id": 341
+        },
+        "scene_title": "The Third Miracle: Cognitive Support and Clear Memory",
+        "scene_summary": "A wise, clear-headed older gentleman looking relaxed while reviewing a small handwritten notebook in a sunlit room, visualizing mental clarity.",
+        "scene_function": "calm_summary",
+        "visual_priority": "high",
+        "image_usage": "main_video_scene",
+        "characters_or_subjects": [
+          "Wise older gentleman"
+        ],
+        "environment_id": "env_cozy_dining_room",
+        "emotion_or_mood": "calm, clear-headed, hopeful",
+        "visual_description": "An elderly Japanese man with short grey hair and a light-brown cardigan, looking active and relaxed while holding an unreadable, small open notebook, smiling gently near a clean window.",
+        "camera": "simple lifestyle composition",
+        "lighting": "gentle afternoon light",
+        "composition": "Uncluttered medium shot with clear focus on the subject, utilizing soft pastel and warm beige backgrounds to frame stable domestic health.",
+        "image_prompt": "A simple lifestyle composition of an elderly Japanese man with short, neat grey hair and a calm, content smile, wearing a soft light-brown cardigan, holding a small open notebook with completely unreadable text lines, sitting in a quiet sunlit living room with a light wood background, soft Japanese anime illustration, senior-friendly style, warm and calm atmosphere, gentle afternoon light, clean background, 16:9 composition, high quality, highly detailed, no text, no subtitles, no watermark",
+        "negative_prompt": "dark horror mood, confused expression, distress, brain medical diagrams, clinical context, letters, readable text, charts, numbers, teenage character, chibi, photorealistic, 3D render, watermark, logo",
+        "continuity_notes": [
+          "Follows the male subject profile from the recurring subject bible for visual cohesion across chapters."
+        ],
+        "safety_notes": [
+          "Stops any representation of dementia or Alzheimer's symptoms by presenting a healthy, active senior.",
+          "Ensures any visible lines inside the notebook are purely abstract and unreadable, blocking fake text anomalies."
+        ],
+        "transition_note": "Concludes the biological mechanism summary, prepping the viewer for the superfood upgrade in Chapter 5.",
+        "scene_id": "sc_011",
+        "original_local_scene_id": "ch_004_sc_002",
+        "global_scene_index": 11
+      },
+      {
+        "local_scene_id": "ch_005_sc_001",
+        "chapter_id": "ch_005",
+        "chapter_index": 5,
+        "scene_index_in_chapter": 1,
+        "line_range": {
+          "start_line_id": 342,
+          "end_line_id": 379
+        },
+        "scene_title": "Introducing the Nutritional Powerhouse: Koya-Tofu",
+        "scene_summary": "A beautiful close-up introducing the unique dry texture of Koya-tofu squares neatly arranged in a wicker basket, illustrating the nutritional comparison point.",
+        "scene_function": "food_example",
+        "visual_priority": "very_high",
+        "image_usage": "chapter_opening",
+        "characters_or_subjects": [
+          "Dry Koya-tofu squares",
+          "Wicker basket"
+        ],
+        "environment_id": "env_japanese_home_kitchen",
+        "emotion_or_mood": "clean, senior-friendly, curious",
+        "visual_description": "Small, dry, pale-yellow sponge-like rectangular blocks of freeze-dried Koya-tofu neatly stacked inside a shallow wicker basket resting on a bright wooden kitchen countertop.",
+        "camera": "calm close-up",
+        "lighting": "soft morning sunlight",
+        "composition": "Clear object-focused composition with a shallow depth of field, leaving clean negative space on the left side of the frame for text card overlays.",
+        "image_prompt": "A calm close-up shot of dry, pale-yellow sponge-like rectangular blocks of traditional Japanese freeze-dried Koya-tofu stacked neatly inside a shallow wicker basket, resting on a bright wooden kitchen countertop, soft morning sunlight illuminating the detailed matte texture of the tofu blocks, soft Japanese anime illustration, senior-friendly style, clean and calm atmosphere, clean background, 16:9 composition, high quality, highly detailed, no text, no subtitles, no watermark",
+        "negative_prompt": "dark horror mood, aggressive expression, wet tofu, commercial plastic packaging, labels, prices, barcodes, photorealistic, 3D render, text, Japanese text, English text, subtitles, watermark, logo, sign, distorted hands, extra fingers",
+        "continuity_notes": [
+          "Matches the 'Traditional Dried Koya-Tofu Blocks' assets from the recurring subject bible perfectly.",
+          "Maintains consistency with the wood and warm beige undertones of the kitchen setting."
+        ],
+        "safety_notes": [
+          "Keeps commercial plastic packaging out of the frame and displays the food naturally in traditional kitchenware to maintain an aesthetic, clean lifestyle focus.",
+          "Avoids numerical data graphics or charts overlaying the image."
+        ],
+        "transition_note": "Visually showcases the superfood ingredient before explaining its biological lipid-cleansing functionality.",
+        "scene_id": "sc_012",
+        "original_local_scene_id": "ch_005_sc_001",
+        "global_scene_index": 12
+      },
+      {
+        "local_scene_id": "ch_005_sc_002",
+        "chapter_id": "ch_005",
+        "chapter_index": 5,
+        "scene_index_in_chapter": 2,
+        "line_range": {
+          "start_line_id": 380,
+          "end_line_id": 401
+        },
+        "scene_title": "The Safe Internal Sweep: Resistant Protein Benefits",
+        "scene_summary": "An elderly couple prepares their meals together happily in a sunlit kitchen, representing active life and clean health habits.",
+        "scene_function": "good_habit_example",
+        "visual_priority": "high",
+        "image_usage": "main_video_scene",
+        "characters_or_subjects": [
+          "Kind Elderly Japanese Couple"
+        ],
+        "environment_id": "env_japanese_home_kitchen",
+        "emotion_or_mood": "warm, calm, trustworthy",
+        "visual_description": "An elderly Japanese man and woman working together contentedly at a bright kitchen counter, preparing healthy traditional ingredients under inviting natural light.",
+        "camera": "gentle medium shot",
+        "lighting": "peaceful natural light",
+        "composition": "Balanced mid-shot composition featuring both senior individuals looking active, healthy, and happy, surrounded by clear wood textures and soft pastel kitchen surfaces.",
+        "image_prompt": "A gentle medium shot of a kind elderly Japanese couple working together in a bright home kitchen, the man with neat short grey hair and a soft cardigan, and the woman with styled silver hair and a linen apron, both displaying smiling and content expressions as they prepare healthy ingredients on a clean counter, soft Japanese anime illustration, senior-friendly character design, warm and calm atmosphere, peaceful natural light, warm beige tones, clean background, 16:9 composition, high quality, highly detailed, no text, no subtitles, no watermark",
+        "negative_prompt": "dark horror mood, aggressive expression, crying, frail, medical charts, anatomy diagrams, fiber strands sweeping out organs, digestive tract illustration, obesity graphics, teenage anime character, chibi, photorealistic, 3D render, text, subtitles, watermark, logo",
+        "continuity_notes": [
+          "Maintains strict subject apparel and character look continuity as locked in the character/subject bibles.",
+          "Keeps the airy, clean home kitchen environment properties uniform."
+        ],
+        "safety_notes": [
+          "Abides completely by the safety restrictions regarding internal anatomy or biochemical processes: replaces any clinical digestive tract or fat-trapping visualizations with a wholesome, dignified depiction of health preservation lifestyle routines.",
+          "Avoids any treatment guarantee imagery."
+        ],
+        "transition_note": "Concludes the superfood mechanism explanation on an uplifting note, flowing naturally into the combination recipe advice of the next chapter.",
+        "scene_id": "sc_013",
+        "original_local_scene_id": "ch_005_sc_002",
+        "global_scene_index": 13
+      },
+      {
+        "local_scene_id": "ch_006_sc_001",
+        "chapter_id": "ch_006",
+        "chapter_index": 6,
+        "scene_index_in_chapter": 1,
+        "line_range": {
+          "start_line_id": 402,
+          "end_line_id": 433
+        },
+        "scene_title": "Optimized Pairings: Fresh Tofu and Vitamin D Mushrooms",
+        "scene_summary": "Visually showcases a clean culinary arrangement of freshly sliced shiitake and shimeji mushroom clusters next to cut cubes of white cotton tofu on a wooden cutting board.",
+        "scene_function": "good_habit_example",
+        "visual_priority": "high",
+        "image_usage": "chapter_opening",
+        "characters_or_subjects": [
+          "Fresh assorted mushrooms",
+          "Tofu pieces"
+        ],
+        "environment_id": "env_japanese_home_kitchen",
+        "emotion_or_mood": "warm, delicious, clean",
+        "visual_description": "Plump fresh shiitake mushrooms, delicate shimeji clusters, and freshly cut firm white tofu cubes elegantly arranged on a light wood kitchen cutting board.",
+        "camera": "calm close-up",
+        "lighting": "soft morning sunlight",
+        "composition": "Object-focused macro arrangement utilizing a clean, uncluttered depth of field focus to leave ample negative space on the left side of the frame for text safe area compliance.",
+        "image_prompt": "A calm close-up shot of raw culinary ingredients arranged on a light wood cutting board, featuring beautifully sliced fresh shiitake mushrooms, delicate shimeji mushroom clusters, and cleanly cut square blocks of white cotton tofu, set in a bright home kitchen, soft morning sunlight casting soft shadows, soft Japanese anime illustration, senior-friendly style, clean and warm atmosphere, high quality, 16:9 composition, no text, no subtitles, no watermark",
+        "negative_prompt": "dark horror mood, aggressive expression, cooked stir-fry, plastic wrap, commercial labels, pricing text, photorealistic, 3D render, text, Japanese text, English text, subtitles, watermark, logo, sign, distorted hands, extra fingers",
+        "continuity_notes": [
+          "Ensures the tofu blocks maintain the subtle cotton texture profile required for Momen tofu consistency.",
+          "Aligns with the natural wood and bright domestic undertones specified in the environment bible."
+        ],
+        "safety_notes": [
+          "Fulfills health safety restrictions by presenting the nutritional catalytic synergy using whole, natural food pairings rather than medical absorption charts or anatomical diagrams."
+        ],
+        "transition_note": "Locks in the ideal pairing habit before introducing the thermal cooking step.",
+        "scene_id": "sc_014",
+        "original_local_scene_id": "ch_006_sc_001",
+        "global_scene_index": 14
+      },
+      {
+        "local_scene_id": "ch_006_sc_002",
+        "chapter_id": "ch_006",
+        "chapter_index": 6,
+        "scene_index_in_chapter": 2,
+        "line_range": {
+          "start_line_id": 434,
+          "end_line_id": 456
+        },
+        "scene_title": "Mild Warming: Protecting Digestion and Circulation",
+        "scene_summary": "Shows an older person's hands placing a ceramic plate with a block of soft tofu into a clean, modern home microwave to illustrate the simple warming habit.",
+        "scene_function": "procedure_steps",
+        "visual_priority": "high",
+        "image_usage": "main_video_scene",
+        "characters_or_subjects": [
+          "Microwave",
+          "Plate of tofu"
+        ],
+        "environment_id": "env_japanese_home_kitchen",
+        "emotion_or_mood": "easy to understand, calm, helpful",
+        "visual_description": "Dignified senior hands putting a plain white ceramic dish containing a fresh block of tofu inside a warm, lit residential microwave appliance.",
+        "camera": "simple lifestyle composition",
+        "lighting": "warm home lighting",
+        "composition": "Clear, low-contrast composition focusing on the safe kitchen action, with soft interior appliance light highlighting the dish.",
+        "image_prompt": "A simple lifestyle composition showing the gentle, graceful hands of an older person placing a white ceramic plate with a block of fresh tofu inside a clean modern home microwave oven, a soft interior warm light illuminating the appliance cabin, set in a bright cozy kitchen corner, soft Japanese anime illustration, senior-friendly style, warm and helpful atmosphere, easy-to-understand layout, 16:9 composition, no text, no subtitles, no watermark",
+        "negative_prompt": "digital timer text, numbers, buttons with readable words, flashing displays, dark horror mood, photorealistic, 3D render, text, Japanese text, English text, subtitles, watermark, logo, sign, distorted fingers, extra fingers",
+        "continuity_notes": [
+          "Ensures the kitchen counter and cabinetry context aligns perfectly with the layout rules from previous kitchen scenes.",
+          "The hands should look appropriately aged and dignified, showing healthy senior parameters."
+        ],
+        "safety_notes": [
+          "Avoids displaying explicit time numbers (like 1:00 or 2:00) or text characters on the microwave panel to honor the absolute rule against text overlays in graphic items.",
+          "Frames stomach protection entirely through safe, comforting domestic workflow elements."
+        ],
+        "transition_note": "Concludes the everyday habit optimization chapter, leading smoothly into the top-rated culinary reveal of Chapter 7.",
+        "scene_id": "sc_015",
+        "original_local_scene_id": "ch_006_sc_002",
+        "global_scene_index": 15
+      },
+      {
+        "local_scene_id": "ch_007_sc_001",
+        "chapter_id": "ch_007",
+        "chapter_index": 7,
+        "scene_index_in_chapter": 1,
+        "line_range": {
+          "start_line_id": 457,
+          "end_line_id": 482
+        },
+        "scene_title": "The Ultimate Nutrient Binding Action",
+        "scene_summary": "A close-up shot on a kitchen stovetop burner showing a smooth stream of beaten golden egg liquid being poured evenly over simmering rectangular blocks of Koya-tofu inside a pan.",
+        "scene_function": "procedure_steps",
+        "visual_priority": "very_high",
+        "image_usage": "chapter_opening",
+        "characters_or_subjects": [
+          "Cooking pot",
+          "Beaten egg stream",
+          "Tofu blocks"
+        ],
+        "environment_id": "env_japanese_home_kitchen",
+        "emotion_or_mood": "instructive, clean, warm",
+        "visual_description": "A beautiful stream of raw beaten egg liquid pouring down from a small ceramic bowl into a shallow pan, wrapping gently around simmering pale-yellow Koya-tofu squares as thin wisps of steam rise from the boiling dashi broth.",
+        "camera": "calm close-up",
+        "lighting": "soft morning sunlight",
+        "composition": "A high-clarity food preparation scene focusing strictly on the pan and pouring motion, keeping the background softly out of focus to ensure ample safe room for title layouts.",
+        "image_prompt": "A calm close-up shot of a traditional shallow pan on a home kitchen stovetop, a smooth golden stream of beaten egg liquid being poured from a small ceramic bowl over simmering rectangular cubes of pale-yellow Koya-tofu, gentle steam rising from the clear bubbling dashi broth, soft Japanese anime illustration style, senior-friendly presentation, warm and instructive atmosphere, soft morning sunlight, clean background, 16:9 composition, high quality, highly detailed, no text, no subtitles, no watermark",
+        "negative_prompt": "dark horror mood, aggressive expression, teenage character, chibi, childish style, photorealistic, 3D render, text, letters, Japanese text, English text, subtitles, watermark, logo, sign, distorted hands, extra fingers, messy kitchen",
+        "continuity_notes": [
+          "Perfectly maps the signature hero moment highlighted in the Step 3 visual package.",
+          "Ensures the tofu blocks accurately match the dry-then-simmered matte spongy texture criteria for freeze-dried Koya-tofu."
+        ],
+        "safety_notes": [
+          "Illustrates nutritional retention using clear cooking techniques rather than displaying intrusive medical explanations, fake clinical data charts, or authoritative medical prescription text."
+        ],
+        "transition_note": "Visually showcases the core action before demonstrating the final nutritional combination outcome.",
+        "scene_id": "sc_016",
+        "original_local_scene_id": "ch_007_sc_001",
+        "global_scene_index": 16
+      },
+      {
+        "local_scene_id": "ch_007_sc_002",
+        "chapter_id": "ch_007",
+        "chapter_index": 7,
+        "scene_index_in_chapter": 2,
+        "line_range": {
+          "start_line_id": 483,
+          "end_line_id": 488
+        },
+        "scene_title": "The Perfect Synergy: Finished Koya no Tamagotoji",
+        "scene_summary": "A close-up of a warm Japanese ceramic bowl holding fresh, steaming Koya no Tamagotoji, ready to eat on a sunlit tabletop.",
+        "scene_function": "food_example",
+        "visual_priority": "high",
+        "image_usage": "main_video_scene",
+        "characters_or_subjects": [
+          "Koya no Tamagotoji dish"
+        ],
+        "environment_id": "env_cozy_dining_room",
+        "emotion_or_mood": "warm, delicious, comforting",
+        "visual_description": "A traditional patterned ceramic bowl filled with cooked Koya-tofu egg simmer. A fluffy, soft yellow layer of egg is beautifully folded around porous tofu squares, garnished with fresh herbs and rising thin wisps of hot steam.",
+        "camera": "clear object-focused scene",
+        "lighting": "gentle afternoon light",
+        "composition": "Appetizing food presentation centered on the lower-right third of a light wood dining tabletop, with the sunlit garden background out of focus.",
+        "image_prompt": "A clear object-focused scene of a traditional Japanese ceramic bowl filled with steaming hot Koya-tofu simmered with egg, a soft golden egg layer folded beautifully over spongy rectangular tofu blocks, rising gentle steam, placed on a light wood tabletop inside a cozy dining room, soft Japanese anime illustration, senior-friendly style, appetizing and warm atmosphere, gentle afternoon light, clean background, low contrast, 16:9 composition, high quality, highly detailed, no text, no subtitles, no watermark",
+        "negative_prompt": "dark horror mood, high contrast, harsh shadows, photorealistic, 3D render, text, Japanese text, English text, letters, numerals, symbols, subtitles, watermark, logo, sign, messy table",
+        "continuity_notes": [
+          "Maintains consistent light wood dining table surfaces and ceramic aesthetics aligned with the environment bible rules."
+        ],
+        "safety_notes": [
+          "Replaces abstract bone density claims or vitamin absorption processes with clean, appetizing culinary results to maintain compliance with health niche restrictions.",
+          "Ensures no text overlays or symbols slip into the design."
+        ],
+        "transition_note": "Finishes the highest-ranked practical guide segment on a deeply satisfying note, transitioning directly into the final chapter recap.",
+        "scene_id": "sc_017",
+        "original_local_scene_id": "ch_007_sc_002",
+        "global_scene_index": 17
+      },
+      {
+        "local_scene_id": "ch_008_sc_001",
+        "chapter_id": "ch_008",
+        "chapter_index": 8,
+        "scene_index_in_chapter": 1,
+        "line_range": {
+          "start_line_id": 489,
+          "end_line_id": 499
+        },
+        "scene_title": "Executive Summary: The Mindful Tofu Habits",
+        "scene_summary": "An educational summary layout illustrating natural components like fresh tofu blocks, mushrooms, and an egg beautifully arranged, providing a clear visual anchor for the rules recap.",
+        "scene_function": "calm_summary",
+        "visual_priority": "high",
+        "image_usage": "chapter_opening",
+        "characters_or_subjects": [
+          "Tofu",
+          "Mushrooms",
+          "Egg illustrations"
+        ],
+        "environment_id": "env_japanese_home_kitchen",
+        "emotion_or_mood": "trustworthy, easy to understand, clean",
+        "visual_description": "An organized, artistic arrangement on a light wooden table featuring a block of white cotton tofu, fresh shiitake mushrooms, and a clean ceramic bowl with whole eggs, creating a holistic lifestyle recap layout.",
+        "camera": "clear object-focused scene",
+        "lighting": "soft morning sunlight",
+        "composition": "Asymmetrical composition with the key ingredients clustered on the right third of the 16:9 widescreen frame, establishing an extensive, uncluttered left side safe area for dynamic subtitle text or point list layout graphics.",
+        "image_prompt": "A clear object-focused scene of healthy cooking ingredients arranged elegantly on a light oak table, featuring a firm square block of cotton tofu in a low-contrast ceramic plate, sliced fresh shiitake mushrooms, and a small wicker basket holding whole raw eggs, soft morning sunlight casting long gentle shadows, soft Japanese anime illustration style, senior-friendly presentation, trustworthy and clean atmosphere, highly detailed composition, 16:9 composition, no text, no subtitles, no watermark",
+        "negative_prompt": "dark horror mood, list charts, overlay lines, graphic symbols, written words, letters, labels, text items, subtitles, numbers, price tags, photorealistic, 3D render, watermark, logo, sign, distorted hands, extra fingers",
+        "continuity_notes": [
+          "Aligns with the 'Fresh Cotton Tofu (Momen)' rough pressed linen texture style detailed in the recurring subject bible.",
+          "Maintains consistency across wood grains and soft pastel tones used in previous cooking segments."
+        ],
+        "safety_notes": [
+          "Does not feature explicit printed text rules, warning crosses, ticks, or diagrams, ensuring completely abstract food representation to avoid text rendering glitches.",
+          "Maintains a supportive wellness tone, avoiding scary medical references."
+        ],
+        "transition_note": "Gives the viewer a comprehensive summary before concluding with the interactive community greeting.",
+        "scene_id": "sc_018",
+        "original_local_scene_id": "ch_008_sc_001",
+        "global_scene_index": 18
+      },
+      {
+        "local_scene_id": "ch_008_sc_002",
+        "chapter_id": "ch_008",
+        "chapter_index": 8,
+        "scene_index_in_chapter": 2,
+        "line_range": {
+          "start_line_id": 500,
+          "end_line_id": 543
+        },
+        "scene_title": "Community Outro: Sharing a Glowing Senior Life",
+        "scene_summary": "The kind elderly Japanese couple sits happily in their sunlit dining area looking down at a portable tablet device together, smiling gently, matching the engagement invitation to write in the comments section.",
+        "scene_function": "daily_life_example",
+        "visual_priority": "high",
+        "image_usage": "main_video_scene",
+        "characters_or_subjects": [
+          "Kind Elderly Japanese Couple"
+        ],
+        "environment_id": "env_cozy_dining_room",
+        "emotion_or_mood": "warm, senior-friendly, supportive",
+        "visual_description": "The friendly elderly man in his light-brown cardigan and the gray-haired woman in her cream blouse sitting comfortably next to each other at their oak table, looking cheerfully at a sleek tablet screen that shows an unreadable, glowing abstract UI pattern.",
+        "camera": "gentle medium shot",
+        "lighting": "peaceful natural light",
+        "composition": "A warm family scene featuring the active couple centered cleanly in a cozy home environment, showing views of a sunlit garden through sliding doors in the background.",
+        "image_prompt": "A gentle medium shot of a kind elderly Japanese couple sitting together at a light oak dining table, the man with neat grey hair and a light-brown cardigan and the woman with silver hair in a bob wearing a clean cream blouse, both smiling warmly as they look at a modern tablet computer screen held on the table, the screen displaying a blurred abstract UI layout with completely unreadable details, soft focus sunlit garden view through glass windows in the background, soft Japanese anime illustration, senior-friendly character design, warm and supportive atmosphere, peaceful natural light, 16:9 composition, high quality, highly detailed, no text, no subtitles, no watermark",
+        "negative_prompt": "readable words, computer text, overlay characters, notification icons, comments text, digital numbers, dark horror mood, sad expression, crying, frail, weak state, teenage anime character, chibi style, photorealistic, 3D render, subtitles, watermark, logo, sign, distorted fingers, extra hands",
+        "continuity_notes": [
+          "Strictly preserves the locked facial expressions, clothing styles, hair colors, and age range metrics for the recurring couple characters.",
+          "Keeps the light-filled dining space uniform with Chapter 1 layout architecture."
+        ],
+        "safety_notes": [
+          "Fulfills the absolute formatting toolkit rules by keeping any graphics, labels, UI panels, or details on the tablet screen entirely blurred, generic, and unreadable.",
+          "Presents digital community engagement using active, healthy, and highly capable senior models to reinforce target group dignity."
+        ],
+        "transition_note": "Concludes the entire automated health presentation with an inviting, peaceful visual frame.",
+        "scene_id": "sc_019",
+        "original_local_scene_id": "ch_008_sc_002",
+        "global_scene_index": 19
+      }
+    ],
+    "quality_check": {
+      "all_chapters_covered": true,
+      "all_scenes_have_line_ranges": true,
+      "line_ranges_are_ordered": true,
+      "no_timestamps_invented": true,
+      "all_scenes_have_image_prompts": true,
+      "all_prompts_have_no_text_rule": true,
+      "negative_prompts_included": true,
+      "ready_for_image_generation": true,
+      "warnings": []
+    }
+  }
+}
