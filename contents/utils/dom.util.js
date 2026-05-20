@@ -86,7 +86,6 @@ export async function moveToTopLeft(
 
 export const clickElement = async (page, selector, isXpath = false, isElement = false) => {
   const element = isElement ? selector : isXpath ? page.locator(`xpath=${selector}`) : selectElement(page, selector);
-  console.log('🚀 ~ clickElement ~ element:', element);
 
   const box = await element.boundingBox();
 

@@ -19,6 +19,26 @@ async function superClear(page, context) {
   }
 }
 
+export async function openFlow(page, projectId) {
+  let internalProjectId = projectId;
+
+  if (!projectId) {
+    await page.goto(FLOW_SETTINGS.FLOW_URL, { waitUntil: 'domcontentloaded', timeout: 30000 });
+
+    await clickElement(page, FLOW_SELECTOR.btnNewProject, true);
+
+    internalProjectId = await getProjectId(page);
+  } else {
+    await page.goto(`${FLOW_SETTINGS.FLOW_PROJECT_URL}/${projectId}`, { waitUntil: 'domcontentloaded', timeout: 30000 });
+  }
+  await page.waitForTimeout(1000);
+  await page.keyboard.press('Escape');
+  await closeAnyPopup(page);
+  // await setupFlow(page);
+
+  return internalProjectId;
+}
+
 export async function openFlowPage({ profile = 1, projectId }) {
   const { context, page } = await openChromeProfile({ profile, visible: true });
 
@@ -112,7 +132,7 @@ export async function attachImage(page, pathSave) {
             return btn && !btn.disabled;
           },
           FLOW_SELECTOR.btnCreateHaveImage,
-          { timeout: 60000 },
+          { timeout: 60000 }
         );
         console.log('✅ Nút đã sẵn sàng!');
 
@@ -133,7 +153,30 @@ export async function inputPromptCreateImage(page, prompt) {
   await page.keyboard.press('Enter');
 }
 
-async function getResponseImage({ page, projectId, folder, exportName }) {
+async function getProjectId(page) {
+  const [response] = await Promise.all([
+    page.waitForResponse(
+      async res => {
+        const isMatch = res.url().includes(`https://labs.google/fx/api/trpc/project.createProject`);
+
+        if (isMatch) return true;
+
+        return false;
+      },
+      { timeout: 3 * 60 * 1000 }
+    ),
+  ]);
+
+  const data = await response.json();
+  const projectId = data?.result?.data?.json?.result?.projectId;
+
+  if (!projectId) throw new Error('Không lấy được projectId từ flow', response);
+
+  return projectId;
+}
+
+export async function getResponseImage({ page, projectId, folder, exportName }) {
+  console.log('🚀 ~ getResponseImage ~ exportName:', exportName);
   const [response] = await Promise.all([
     page.waitForResponse(
       async res => {
@@ -153,11 +196,12 @@ async function getResponseImage({ page, projectId, folder, exportName }) {
         }
         return false;
       },
-      { timeout: 3 * 60 * 1000 },
+      { timeout: 3 * 60 * 1000 }
     ),
   ]);
 
   const data = await response.json();
+  console.log('🚀 ~ getResponseImage ~ data:', exportName, data);
   const imageUrl = data?.media[0]?.image?.generatedImage?.fifeUrl;
   if (!imageUrl) throw new Error('Không lấy được ảnh từ flow', response);
 
@@ -183,7 +227,7 @@ export async function generateImageWithFlow(
   exportName,
   setting = {},
   isNeedImage = false,
-  pathOldImage,
+  pathOldImage
 ) {
   const cfg = { ...flowSettings, ...setting };
 

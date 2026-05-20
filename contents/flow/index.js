@@ -4,4 +4,4 @@
 export { FLOW_SELECTOR } from './selectors.js';
 export { resolveFlowChromeProfile } from './chromeProfile.util.js';
 export { FLOW_DOWNLOADS_DIR } from './paths.util.js';
-export { openFlowPage, generateImageWithFlow, attachImage, generateImage } from './browser.util.js';
+export { openFlowPage, generateImageWithFlow, attachImage } from './browser.util.js';

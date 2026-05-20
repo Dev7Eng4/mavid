@@ -86,8 +86,8 @@ export async function demo() {
   console.log('🚀 ~ demo ~ transcriptLines:', transcriptLines);
 
   const resolvedConfig = resolveVideoConfig({
-    niche: 'senior_health_japan',
-    visualStyle: 'soft_anime',
+    niche: 'personal_finance_social_security_retirement_japan',
+    visualStyle: 'semi_realistic_illustration',
     videoDurationSeconds: videoDurationSeconds,
   });
 

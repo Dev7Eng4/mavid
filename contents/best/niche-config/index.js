@@ -1,6 +1,7 @@
 import { AUDIO_DRAMA_CONFIG } from './audioDrama.js';
 import { GARDENING_CONFIG } from './gardening.js';
 import { GENERAL_FINANCE_CONFIG } from './generalFinance.js';
+import { PERSONAL_FINANCE_SOCIAL_SECURITY_RETIREMENT_JAPAN_CONFIG } from './personalFinanceSocialSecurityRetirement.js';
 import { SENIOR_FINANCE_CONFIG } from './seniorFinance.js';
 import { SENIOR_GERIATRIC_NUTRITION_CONFIG } from './seniorGeriatricNutrition.js';
 import { SENIOR_HEALTH_CONFIG } from './seniorHealth.js';
@@ -16,4 +17,5 @@ export const NICHE_CONFIGS = {
   gardening_japan: GARDENING_CONFIG,
   senior_lifestyle_japan: SENIOR_LIFESTYLE_CONFIG,
   senior_geriatric_nutrition_japan: SENIOR_GERIATRIC_NUTRITION_CONFIG,
+  personal_finance_social_security_retirement_japan: PERSONAL_FINANCE_SOCIAL_SECURITY_RETIREMENT_JAPAN_CONFIG,
 };
