@@ -24,9 +24,12 @@ You are a native Japanese professional editor specializing **EXCLUSIVELY** in co
 ━━━━━━━━━━━━━━━━━━
 * Return the result in the format: [index] Corrected text
 * Keep the exact same line breaks as the input.
-* Output the result inside **ONE single code block**.
+* Output raw valid JSON only.
+* Do not wrap in markdown code block.
 * **DO NOT** add any explanations, greetings, or introductory text.
+* Do not add comments.
 * The content must remain **100% Japanese**.
+
 
 ━━━━━━━━━━━━━━━━━━
 **INPUT DATA**
@@ -358,9 +361,9 @@ If the batch contains clear shifts, create multiple micro_segments.
 ## OUTPUT FORMAT
 ━━━━━━━━━━━━━━━━━━
 Return ONLY valid JSON.
-No markdown.
-No explanation.
-No extra text.
+Do not wrap in markdown code block.
+Do not add explanation.
+Do not add comments.
 
 Schema:
 
@@ -504,9 +507,9 @@ Prefer fewer, stronger sections over many weak sections.
 ## OUTPUT FORMAT (STRICT JSON)
 ━━━━━━━━━━━━━━━━━━
 Return ONLY valid JSON.
-No markdown.
-No explanation.
-No extra text.
+Do not wrap in markdown code block.
+Do not add explanation.
+Do not add comments.
 
 Schema:
 
@@ -734,10 +737,10 @@ Follow this reasoning process internally:
 ## OUTPUT FORMAT (STRICT JSON)
 ━━━━━━━━━━━━━━━━━━
 Return ONLY valid JSON.
-No markdown.
+Do not wrap in markdown code block.
 No code fences.
-No explanations.
-No extra text.
+Do not add explanation.
+Do not add comments.
 
 The first character must be { and the last character must be }.
 
@@ -1477,9 +1480,9 @@ If the style is cinematic realism, also avoid:
 ━━━━━━━━━━━━━━━━━━
 
 Return ONLY valid JSON.
-No markdown.
-No commentary.
-No extra text.
+Do not wrap in markdown code block.
+Do not add explanation.
+Do not add comments.
 No trailing commas.
 No undefined values.
 All string values must be in English.
@@ -1826,9 +1829,9 @@ Each negative prompt should prevent:
 ## OUTPUT FORMAT (STRICT JSON)
 ━━━━━━━━━━━━━━━━━━
 Return ONLY valid JSON.
-No markdown.
-No commentary.
-No extra text.
+Do not wrap in markdown code block.
+Do not add explanation.
+Do not add comments.
 
 Schema:
 
