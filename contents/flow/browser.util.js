@@ -2,6 +2,7 @@
  * Playwright: mở project Flow, cấu hình scene, gửi prompt, lấy ảnh từ API batchGenerateImages.
  */
 import fs from 'fs';
+import os from 'os';
 import path from 'path';
 import { openChromeProfile } from '../scripts/makeChromeProfile.js';
 import { delay, clickElement } from '../utils/dom.util.js';
@@ -47,9 +48,9 @@ export async function openFlowPage({ profile = 1, projectId }) {
 
   await page.keyboard.press('Escape');
 
-  await closeAnyPopup(page);
+  // await closeAnyPopup(page);
 
-  await setupFlow(page);
+  // await setupFlow(page);
 
   return { context, page };
 }
@@ -173,6 +174,47 @@ async function getProjectId(page) {
   if (!projectId) throw new Error('Không lấy được projectId từ flow', response);
 
   return projectId;
+}
+
+const PC_DOWNLOADS_DIR = path.join(os.homedir(), 'Downloads');
+const IMAGE_EXT_RE = /\.(jpe?g|png|webp)$/i;
+
+/** Tìm file ảnh trong thư mục Downloads của PC theo tên (basename, không phân biệt hoa thường). */
+function findImageInPcDownloads(name) {
+  if (!name || !fs.existsSync(PC_DOWNLOADS_DIR)) return null;
+
+  const trimmed = String(name).trim();
+  const exactPath = path.join(PC_DOWNLOADS_DIR, trimmed);
+  if (fs.existsSync(exactPath) && IMAGE_EXT_RE.test(trimmed)) {
+    return exactPath;
+  }
+
+  const lowerBase = path.parse(trimmed).name.toLowerCase();
+  for (const f of fs.readdirSync(PC_DOWNLOADS_DIR)) {
+    if (!IMAGE_EXT_RE.test(f)) continue;
+    if (path.parse(f).name.toLowerCase() === lowerBase) {
+      return path.join(PC_DOWNLOADS_DIR, f);
+    }
+  }
+  return null;
+}
+
+/**
+ * Tìm ảnh có tên `name` trong Downloads của PC, copy vào `folderPath`.
+ * @param {string} name — tên file hoặc basename (không bắt buộc đuôi)
+ * @param {string} folderPath — thư mục đích
+ * @returns {string} đường dẫn file đã copy
+ */
+export function copyImageToFolder(name, folderPath) {
+  const imagePath = findImageInPcDownloads(name);
+  if (!imagePath) {
+    throw new Error(`copyImageToFolder: không tìm thấy ảnh "${name}" trong ${PC_DOWNLOADS_DIR}`);
+  }
+
+  fs.mkdirSync(folderPath, { recursive: true });
+  const destPath = path.join(folderPath, path.basename(imagePath));
+  fs.copyFileSync(imagePath, destPath);
+  return destPath;
 }
 
 export async function getResponseImage({ page, projectId, folder, exportName }) {

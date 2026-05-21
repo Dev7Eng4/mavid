@@ -1,0 +1,124 @@
+{
+  "scenes": [
+    {
+      "scene_id": "S001",
+      "beat_id": "B001",
+      "source_line_ids": [1, 2, 3, 4, 5, 6, 7, 8, 9],
+      "scene_type": "hook_problem",
+      "narrative_purpose": "Introduce tofu as a very common everyday Japanese food and set a familiar household context before revealing the hidden issue.",
+      "on_screen_text": ["冷蔵庫に豆腐ある？", "身近な健康食"],
+      "main_visual": "Warm Japanese home kitchen with an open refrigerator showing tofu packs clearly, and a dining table with tofu dishes like miso soup and hiyayakko, conveying everyday normal life",
+      "supporting_elements": [
+        "elderly Japanese couple at dining table",
+        "tofu pack inside refrigerator",
+        "soft morning sunlight through kitchen window"
+      ],
+      "layout": "16:9 wide composition, refrigerator on left, dining table on right, clean balanced spacing with empty center for text overlay",
+      "mood": "warm, calm, familiar, educational",
+      "text_priority": "high"
+    }
+  ]
+}
+
+
+{
+"scenes": [
+{
+"scene_id": "S002",
+"beat_id": "B002",
+"source_line_ids": [10, 11, 12, 13, 14, 15, 16, 17, 18],
+"scene_type": "warning",
+"narrative_purpose": "Show a strong warning that even good intentions in eating tofu can harm health if done incorrectly, creating shock and attention.",
+"on_screen_text": [
+"良かれが危険に",
+"なることも"
+],
+"main_visual": "Split-screen composition: left side shows fresh healthy tofu in a bright kitchen, right side shows the same tofu turning into a warning symbol with subtle red caution overlay, representing negative health impact",
+"supporting_elements": [
+"balance scale tilted toward warning side",
+"faded medical warning icon",
+"elderly couple looking surprised"
+],
+"layout": "Left-right split composition with clear contrast, center divider glowing faint red, text placed at top center for visibility",
+"mood": "serious, cautionary, slightly dramatic but clean and educational",
+"text_priority": "high"
+}
+]
+}
+
+
+{
+"scenes": [
+{
+"scene_id": "S003",
+"beat_id": "B003",
+"source_line_ids": [19, 20, 21, 22, 23, 24, 25],
+"scene_type": "concept_explanation",
+"narrative_purpose": "Explain the concept that tofu itself is neutral, and its health impact depends on how it is eaten, including seasoning habits like soy sauce usage.",
+"on_screen_text": [
+"食べ方で変わる",
+"健康への影響"
+],
+"main_visual": "A clean infographic-style balance scale in the center: left side shows tofu labeled as healthy food, right side shows a warning symbol labeled as harmful impact, with soy sauce pouring from above shifting the balance",
+"supporting_elements": [
+"balance scale in center",
+"soy sauce bottle pouring line",
+"elderly silhouette representing health"
+],
+"layout": "Centered balance scale composition with symmetrical left-right visual balance, soy sauce flow diagonally from top corner",
+"mood": "educational, neutral but cautionary, clear and structured",
+"text_priority": "high"
+}
+]
+}
+
+{
+"scenes": [
+{
+"scene_id": "S004",
+"beat_id": "B004",
+"source_line_ids": [26, 27, 28, 29, 30, 31, 32, 33],
+"scene_type": "concept_explanation",
+"narrative_purpose": "Show that common cooking habits like making miso soup may unintentionally reduce tofu’s nutritional value, questioning everyday assumptions.",
+"on_screen_text": [
+"いつもの調理で",
+"栄養が減る？"
+],
+"main_visual": "Clean kitchen scene showing a pot of miso soup being prepared with tofu inside, while subtle glowing nutrient particles are shown visually drifting away from the tofu into the air and down the drain, representing nutrient loss",
+"supporting_elements": [
+"elderly Japanese couple observing cooking",
+"tofu cubes in miso soup pot",
+"soft glowing particle effects representing nutrients"
+],
+"layout": "Kitchen scene left side with cooking pot, right side simplified infographic overlay showing nutrient flow escaping, central space reserved for text",
+"mood": "educational, slightly cautionary, clean and informative",
+"text_priority": "high"
+}
+]
+}
+
+
+{
+"scenes": [
+{
+"scene_id": "S005",
+"beat_id": "B005",
+"source_line_ids": [34, 35, 36, 37, 38, 39, 40, 41],
+"scene_type": "comparison",
+"narrative_purpose": "Explain that tofu type and handling method (water tofu vs koya tofu) can change perceived nutritional value, using a clear comparison.",
+"on_screen_text": [
+"豆腐の種類で",
+"栄養は変わる"
+],
+"main_visual": "Split supermarket shelf scene: left side shows fresh tofu in water pack being discarded with water drain symbol, right side shows koya tofu (brown dried tofu) highlighted as nutrient-rich with glowing effect, clean infographic comparison style",
+"supporting_elements": [
+"supermarket shelf display",
+"discarded tofu water pack icon",
+"highlight glow around koya tofu"
+],
+"layout": "Left-right split comparison layout with clear separation line, product shelves aligned horizontally, text placed top center",
+"mood": "informative, comparative, clean educational tone",
+"text_priority": "high"
+}
+]
+}

@@ -15,4 +15,13 @@ export const FLOW_SELECTOR = {
   btnCreate: '/html/body/div[1]/div[1]/div[5]/div/div/div/div/div[2]/div[2]/button[2]',
   btnCreateHaveImage: '/html/body/div[1]/div[1]/div[5]/div/div/div[3]/div[2]/button[2]',
   textbox: 'div[role="textbox"]',
+
+  // tools — nút có icon Material apps_spark_2 + nhãn ẩn "Tools"
+  btnTools: 'button:has(i.google-symbols:text-is("apps_spark_2"))',
+  btnToolsWrapper: '/html/body/div[1]/div[1]/div[4]/div[1]/div[6]/button',
+
+  /** iframe chứa UI tool MaVid (sau khi mở MavidMedia). */
+  toolIframe: 'iframe',
+  toolEditorPrompt: 'textarea#mavid-editor-prompt',
+  btnToolGenerate: 'button#mavid-create',
 };

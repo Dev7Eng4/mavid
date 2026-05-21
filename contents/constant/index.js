@@ -16,6 +16,6 @@ export const VIDEO_MAKE_OPTION = {
 
 export const FLOW_SETTINGS = {
   FLOW_URL: 'https://labs.google/fx/tools/flow',
-  FLOW_PROJECT_URL: 'https://labs.google/fx/vi/tools/flow/project',
+  FLOW_PROJECT_URL: 'https://labs.google/fx/tools/flow/project',
   FLOW_PROJECT_ID: '8a071d30-32db-4e34-9151-6fbc2b12705e',
 };
