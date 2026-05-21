@@ -11,6 +11,7 @@ import { FLOW_SELECTOR } from './selectors.js';
 import { resolveFlowChromeProfile } from './chromeProfile.util.js';
 import { FLOW_DOWNLOADS_DIR } from './paths.util.js';
 import { FLOW_SETTINGS } from '../constant/index.js';
+import { openMyTool } from './createMediaWithTool.js';
 
 async function superClear(page, context) {
   try {
@@ -133,7 +134,7 @@ export async function attachImage(page, pathSave) {
             return btn && !btn.disabled;
           },
           FLOW_SELECTOR.btnCreateHaveImage,
-          { timeout: 60000 }
+          { timeout: 60000 },
         );
         console.log('✅ Nút đã sẵn sàng!');
 
@@ -164,7 +165,7 @@ async function getProjectId(page) {
 
         return false;
       },
-      { timeout: 3 * 60 * 1000 }
+      { timeout: 3 * 60 * 1000 },
     ),
   ]);
 
@@ -217,42 +218,226 @@ export function copyImageToFolder(name, folderPath) {
   return destPath;
 }
 
-export async function getResponseImage({ page, projectId, folder, exportName }) {
-  console.log('🚀 ~ getResponseImage ~ exportName:', exportName);
-  const [response] = await Promise.all([
-    page.waitForResponse(
-      async res => {
-        const isMatch = res.url().includes(`https://aisandbox-pa.googleapis.com/v1/projects/${projectId}/flowMedia:batchGenerateImages`);
-        if (isMatch) {
-          if (res.status() === 403) {
-            await superClear(page, context);
-            throw new Error('Lỗi 403: Bạn không có quyền truy cập hoặc bị chặn!');
-          }
-          if (res.status() === 400) {
-            throw new Error(`Lỗi vi phạm chính sách tạo ảnh`);
-          }
-          if (res.status() > 400) {
-            throw new Error(`Server trả lỗi: ${res.status()}`);
-          }
-          return true;
-        }
-        return false;
-      },
-      { timeout: 3 * 60 * 1000 }
-    ),
-  ]);
+function batchGenerateImagesUrl(projectId) {
+  return `https://aisandbox-pa.googleapis.com/v1/projects/${projectId}/flowMedia:batchGenerateImages`;
+}
 
-  const data = await response.json();
-  console.log('🚀 ~ getResponseImage ~ data:', exportName, data);
-  const imageUrl = data?.media[0]?.image?.generatedImage?.fifeUrl;
-  if (!imageUrl) throw new Error('Không lấy được ảnh từ flow', response);
+function isBatchGenerateImagesUrl(url, projectId) {
+  return String(url).includes(batchGenerateImagesUrl(projectId));
+}
 
+function extractImageUrlsFromBatchData(data) {
+  const media = data?.media ?? [];
+  return media.map(m => m?.image?.generatedImage?.fifeUrl).filter(Boolean);
+}
+
+async function saveImageFromUrl(imageUrl, folder, exportName) {
   const imageData = await fetch(imageUrl);
   const imageBuffer = await imageData.arrayBuffer();
   const imageBase64 = Buffer.from(imageBuffer).toString('base64');
   const base64OutputPath = path.join(folder, `${exportName}.jpg`);
   fs.mkdirSync(folder, { recursive: true });
   fs.writeFileSync(base64OutputPath, imageBase64, 'base64');
+  return base64OutputPath;
+}
+
+async function saveImageFromBatchData(data, folder, exportName) {
+  const imageUrl = extractImageUrlsFromBatchData(data)[0];
+  if (!imageUrl) {
+    throw new Error(`Không lấy được ảnh từ flow cho ${exportName}`);
+  }
+  return saveImageFromUrl(imageUrl, folder, exportName);
+}
+
+/**
+ * Ghép cặp request POST ↔ response batchGenerateImages, lưu từng ảnh ngay khi API trả về.
+ * Tránh lỗi N× waitForResponse bị response cũ/trùng chiếm slot hoặc chỉ lưu sau khi tất cả xong.
+ *
+ * @param {object} params
+ * @param {import('playwright').Page} params.page
+ * @param {string} params.projectId
+ * @param {string} params.folder
+ * @param {Array<{ name: string }>} params.prompts — thứ tự `name` khớp thứ tự request POST
+ * @param {() => Promise<void>} params.trigger
+ * @param {number} [params.timeoutMs=180000] — timeout cơ bản; tự cộng thêm theo số ảnh
+ * @returns {Promise<{ saved: Array<{ exportName: string, path: string }>, failed: Array<{ exportName: string, reason: string, status?: number }>, total: number, downloaded: number, errors: number }>}
+ */
+export async function getResponseImages({ page, projectId, folder, prompts, trigger, timeoutMs = 3 * 60 * 1000 }) {
+  if (!prompts?.length) {
+    return { saved: [], failed: [], total: 0, downloaded: 0, errors: 0 };
+  }
+
+  const expected = prompts.length;
+  const nameQueue = prompts.map(p => p.name);
+  /** @type {Map<import('playwright').Request, string>} */
+  const requestToName = new Map();
+  const saved = [];
+  /** @type {Array<{ exportName: string, reason: string, status?: number }>} */
+  const failed = [];
+  let armed = false;
+  let inFlight = 0;
+  let settled = false;
+
+  return new Promise((resolve, reject) => {
+    const totalTimeoutMs = timeoutMs + expected * 2 * 60 * 1000;
+
+    const buildResult = () => ({
+      saved: [...saved],
+      failed: [...failed],
+      total: expected,
+      downloaded: saved.length,
+      errors: failed.length,
+    });
+
+    const logProgress = () => {
+      console.log(`📊 Tiến độ: ${saved.length} thành công / ${failed.length} lỗi / ${expected} tổng`);
+    };
+
+    const isProcessed = exportName => saved.some(s => s.exportName === exportName) || failed.some(f => f.exportName === exportName);
+
+    const recordFailure = (exportName, reason, status) => {
+      if (isProcessed(exportName)) return;
+      failed.push({
+        exportName,
+        reason,
+        ...(status != null && { status }),
+      });
+      console.warn(`❌ [${exportName}] ${reason}`);
+      logProgress();
+    };
+
+    const markRemainingFailed = reason => {
+      const remaining = [...nameQueue, ...requestToName.values()];
+      nameQueue.length = 0;
+      requestToName.clear();
+      for (const exportName of remaining) {
+        recordFailure(exportName, reason);
+      }
+    };
+
+    const finish = fn => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      page.off('request', onRequest);
+      page.off('response', onResponse);
+      fn();
+    };
+
+    const tryResolve = () => {
+      if (saved.length + failed.length >= expected && inFlight === 0) {
+        logProgress();
+        console.log('✅ Đã xử lý xong tất cả prompts');
+        finish(() => resolve(buildResult()));
+      }
+    };
+
+    const timer = setTimeout(() => {
+      markRemainingFailed('timeout — không hoàn tất request/response');
+      if (saved.length + failed.length > 0) {
+        console.warn(`⚠️ Timeout — kết thúc với ${saved.length} thành công, ${failed.length} lỗi`);
+        finish(() => resolve(buildResult()));
+        return;
+      }
+      finish(() => reject(new Error(`Timeout ${totalTimeoutMs}ms: không nhận response batchGenerateImages nào`)));
+    }, totalTimeoutMs);
+
+    const onRequest = req => {
+      if (!armed || settled) return;
+      if (req.method() !== 'POST') return;
+      if (!isBatchGenerateImagesUrl(req.url(), projectId)) return;
+
+      const exportName = nameQueue.shift();
+      if (!exportName) {
+        console.warn('⚠️ batchGenerateImages request thừa — không còn tên export');
+        return;
+      }
+      requestToName.set(req, exportName);
+      console.log(`📤 [${exportName}] batchGenerateImages request (${expected - nameQueue.length}/${expected})`);
+    };
+
+    const onResponse = async res => {
+      if (settled) return;
+      const req = res.request();
+      const exportName = requestToName.get(req);
+      if (!exportName) return;
+
+      requestToName.delete(req);
+      inFlight++;
+
+      try {
+        const status = res.status();
+        if (status === 403) {
+          recordFailure(exportName, '403 — không có quyền truy cập hoặc bị chặn', 403);
+          return;
+        }
+        if (status === 400) {
+          recordFailure(exportName, '400 — vi phạm chính sách tạo ảnh', 400);
+          return;
+        }
+        if (status > 400) {
+          recordFailure(exportName, `server trả lỗi ${status}`, status);
+          return;
+        }
+
+        const data = await res.json();
+        const urls = extractImageUrlsFromBatchData(data);
+        console.log('🚀 ~ getResponseImages ~ data:', exportName, data);
+
+        if (!urls.length) {
+          recordFailure(exportName, 'response không có URL ảnh');
+          return;
+        }
+
+        const extraNames = [exportName];
+        while (extraNames.length < urls.length && nameQueue.length > 0) {
+          extraNames.push(nameQueue.shift());
+        }
+
+        for (let i = 0; i < urls.length; i++) {
+          if (saved.length + failed.length >= expected) break;
+          const name = extraNames[i] ?? `${exportName}-${i + 1}`;
+          if (isProcessed(name)) continue;
+
+          try {
+            const filePath = await saveImageFromUrl(urls[i], folder, name);
+            saved.push({ exportName: name, path: filePath });
+            console.log(`✅ Đã lưu ${name}.jpg (${saved.length}/${expected})`);
+            logProgress();
+          } catch (err) {
+            recordFailure(name, err.message || 'lỗi lưu file');
+          }
+        }
+      } catch (err) {
+        recordFailure(exportName, err.message || 'lỗi xử lý response');
+      } finally {
+        inFlight--;
+        tryResolve();
+      }
+    };
+
+    page.on('request', onRequest);
+    page.on('response', onResponse);
+
+    armed = true;
+    Promise.resolve()
+      .then(() => trigger())
+      .catch(err => finish(() => reject(err)));
+  });
+}
+
+export async function getResponseImage({ page, projectId, folder, exportName, trigger }) {
+  const { saved, failed } = await getResponseImages({
+    page,
+    projectId,
+    folder,
+    prompts: [{ name: exportName }],
+    trigger: trigger ?? (() => Promise.resolve()),
+  });
+
+  if (saved[0]) return saved[0];
+  if (failed[0]) throw new Error(`[${exportName}] ${failed[0].reason}`);
+  return null;
 }
 
 /**
@@ -269,7 +454,7 @@ export async function generateImageWithFlow(
   exportName,
   setting = {},
   isNeedImage = false,
-  pathOldImage
+  pathOldImage,
 ) {
   const cfg = { ...flowSettings, ...setting };
 
@@ -283,8 +468,16 @@ export async function generateImageWithFlow(
     if (isNeedImage) {
       await attachImage(page, pathSave);
     }
-    await inputPromptCreateImage(page, prompt);
-    await getResponseImage({ page, projectId: cfg.FLOW_PROJECT_ID, folder: pathSave, exportName });
+
+    // await openMyTool(page);
+
+    await getResponseImages({
+      page,
+      projectId: cfg.FLOW_PROJECT_ID,
+      folder: pathSave,
+      prompts: [{ name: exportName }],
+      trigger: () => inputPromptCreateImage(page, prompt),
+    });
   } catch (error) {
     console.error('❌ Lỗi: Tạo ảnh flow:', error);
     throw error;

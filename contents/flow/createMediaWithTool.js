@@ -12,7 +12,7 @@ async function initMouseTracking(page) {
         window.__mouseX = e.clientX;
         window.__mouseY = e.clientY;
       },
-      { passive: true }
+      { passive: true },
     );
     window.__mouseX = innerWidth / 2;
     window.__mouseY = innerHeight / 2;
@@ -121,16 +121,43 @@ export async function openMyTool(page) {
 
   await page.waitForTimeout(4000);
   await delay(380, 580);
+
+  console.log('🔄 Đang chờ UI MaVid trong iframe...');
+  await waitForMaVidToolFrame(page);
 }
 
-/** FrameLocator tool MaVid — editor và nút generate nằm trong iframe. */
+/** Locator iframe đầu tiên trên trang. */
+function getFirstIframe(page) {
+  return page.locator(FLOW_SELECTOR.toolIframe).first();
+}
+
+/** FrameLocator — nội dung bên trong iframe đầu tiên. */
 function getToolFrame(page) {
-  return page.frameLocator(FLOW_SELECTOR.toolIframe);
+  return getFirstIframe(page).contentFrame();
+}
+
+/** Chờ có iframe, rồi editor MaVid trong iframe đầu tiên. */
+export async function waitForMaVidToolFrame(page, timeoutMs = 60000) {
+  const iframe = getFirstIframe(page);
+  await iframe.waitFor({ state: 'attached', timeout: timeoutMs });
+
+  const iframes = page.locator(FLOW_SELECTOR.toolIframe);
+  const count = await iframes.count();
+  console.log(`📦 Số iframe: ${count} — dùng iframe đầu tiên`);
+  for (let i = 0; i < count; i++) {
+    const el = iframes.nth(i);
+    const title = (await el.getAttribute('title')) ?? '';
+    const src = (await el.getAttribute('src')) ?? '';
+    console.log(`   [${i}] title="${title}" src=${src ? `${src.slice(0, 60)}…` : '(rỗng)'}`);
+  }
+
+  const editor = getToolFrame(page).locator(FLOW_SELECTOR.toolEditorPrompt);
+  await editor.waitFor({ state: 'visible', timeout: timeoutMs });
 }
 
 /**
  * @param {import('playwright').Page} page
- * @param {string} selector — selector trong document iframe (không gồm `iframe >>`)
+ * @param {string} selector — selector trong document iframe
  */
 function getToolLocator(page, selector) {
   return getToolFrame(page).locator(selector);
@@ -154,4 +181,6 @@ export async function startCreate(page, prompts) {
   const btnGenerate = getToolLocator(page, FLOW_SELECTOR.btnToolGenerate);
   await btnGenerate.waitFor({ state: 'visible', timeout: 30000 });
   await clickElement(page, btnGenerate, false, true);
+
+  // await delay(10000);
 }

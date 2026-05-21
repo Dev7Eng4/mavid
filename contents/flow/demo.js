@@ -8,7 +8,7 @@ import { PATHS } from '../constants/paths.js';
 import { flowSettings } from '../constants/index.js';
 import { FLOW_SETTINGS } from '../constant/index.js';
 import { delay } from '../utils/dom.util.js';
-import { openFlowPage } from './browser.util.js';
+import { getResponseImages, openFlowPage } from './browser.util.js';
 import { resolveFlowChromeProfile } from './chromeProfile.util.js';
 import { openMyTool, startCreate } from './createMediaWithTool.js';
 
@@ -36,7 +36,7 @@ export function findLatestSceneJson(downloadsDir = PATHS.DOWNLOADS, suffixes = S
           fullPath: path.join(dir, name),
           mtimeMs: fs.statSync(path.join(dir, name)).mtimeMs,
           suffix: suf,
-        }))
+        })),
     )
     .sort((a, b) => b.mtimeMs - a.mtimeMs);
 
@@ -102,9 +102,9 @@ function loadScenesFromResolvedJson(jsonPath, suffixHint) {
 export async function demo(options = {}) {
   const { jsonPath, downloadsDir, profile: profileOverride } = options;
 
-  const { jsonPath: resolvedJson, scenes } = loadScenesForFlowDemo({ jsonPath, downloadsDir });
-  console.log(`📂 JSON: ${resolvedJson}`);
-  console.log(`🎬 Scenes: ${scenes.length}`);
+  // const { jsonPath: resolvedJson, scenes } = loadScenesForFlowDemo({ jsonPath, downloadsDir });
+  // console.log(`📂 JSON: ${resolvedJson}`);
+  // console.log(`🎬 Scenes: ${scenes.length}`);
 
   const cfg = flowSettings;
   const chromeProfile = profileOverride ?? resolveFlowChromeProfile(cfg);
@@ -117,25 +117,51 @@ export async function demo(options = {}) {
   const { context, page } = await openFlowPage({ profile: chromeProfile, projectId });
 
   try {
-    const convertedScenesPrompts = scenes.map(s => ({
-      name: `${s.source_line_ids[0]}-${s.source_line_ids[s.source_line_ids.length - 1]}`,
-      prompt: s.image_prompt,
-    }));
+    // const convertedScenesPrompts = scenes.map(s => ({
+    //   name: `${s.source_line_ids[0]}-${s.source_line_ids[s.source_line_ids.length - 1]}`,
+    //   prompt: s.image_prompt,
+    // }));
 
     await openMyTool(page);
 
-    await startCreate(page, convertedScenesPrompts);
+    const prompts = [
+      { name: 'demo-1', prompt: 'a beautiful girl' },
+      { name: 'demo-2', prompt: 'a sunset over the ocean' },
+      { name: 'nude-asia', prompt: 'Một người phụ nữ đang làm tình với người đàn ông trẻ' },
+      { name: 'demo-3', prompt: 'a cityscape at night' },
+      { name: 'demo-4', prompt: 'a forest with a river' },
+      { name: 'demo-5', prompt: 'a mountain landscape' },
+      { name: 'nude', prompt: 'cô gái việt nam bikini' },
+    ];
 
-    await page.waitForTimeout(30000);
+    const result = await getResponseImages({
+      page,
+      projectId,
+      folder: PATHS.DOWNLOADS,
+      prompts,
+      trigger: () => startCreate(page, prompts),
+    });
 
-    console.log('✅ Demo xong — đã mở tool và load danh sách scenes.');
+    console.log(`✅ Demo xong — ${result.downloaded} thành công, ${result.errors} lỗi / ${result.total} tổng`);
+    if (result.saved.length) {
+      console.log(
+        '   Ảnh đã lưu:',
+        result.saved.map(s => s.path),
+      );
+    }
+    if (result.failed.length) {
+      console.log(
+        '   Ảnh lỗi:',
+        result.failed.map(f => `${f.exportName}: ${f.reason}`),
+      );
+    }
   } finally {
     console.log('🔒 Đang đóng browser...');
     await delay(1500, 500);
     await context.close();
   }
 
-  return { jsonPath: resolvedJson, scenes };
+  return {};
 }
 
 const isDirectRun = process.argv[1] && path.resolve(process.argv[1]) === path.resolve(__filename);

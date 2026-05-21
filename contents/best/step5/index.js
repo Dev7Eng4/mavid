@@ -4,7 +4,7 @@ import { fileURLToPath } from 'url';
 
 import { PATHS } from '../../constants/paths.js';
 import { PROFILES_LOGIN } from '../../constants/playwright-profile.js';
-import { getResponseImage, inputPromptCreateImage, openFlow } from '../../flow/browser.util.js';
+import { getResponseImages, inputPromptCreateImage, openFlow } from '../../flow/browser.util.js';
 import openChromeProfile from '../../scripts/makeChromeProfile.js';
 import { delay } from '../../utils/dom.util.js';
 
@@ -136,8 +136,13 @@ export async function main(scenes) {
       }
 
       console.log('🚀 ~ main ~ name:', name);
-      await inputPromptCreateImage(page, prompt);
-      getResponseImage({ page, projectId, folder: dir, exportName: name });
+      await getResponseImages({
+        page,
+        projectId,
+        folder: dir,
+        prompts: [{ name }],
+        trigger: () => inputPromptCreateImage(page, prompt),
+      });
     }
   } catch (error) {
     console.error(error);

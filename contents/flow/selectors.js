@@ -20,7 +20,7 @@ export const FLOW_SELECTOR = {
   btnTools: 'button:has(i.google-symbols:text-is("apps_spark_2"))',
   btnToolsWrapper: '/html/body/div[1]/div[1]/div[4]/div[1]/div[6]/button',
 
-  /** iframe chứa UI tool MaVid (sau khi mở MavidMedia). */
+  /** iframe tool — dùng `iframe` đầu tiên trên page (`.first()` trong createMediaWithTool). */
   toolIframe: 'iframe',
   toolEditorPrompt: 'textarea#mavid-editor-prompt',
   btnToolGenerate: 'button#mavid-create',
