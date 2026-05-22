@@ -1,4 +1,7 @@
+import { openChromeProfile } from '../scripts/makeChromeProfile.js';
 import { clickElement, delay, humanScroll } from '../utils/dom.util.js';
+import { getResponseImages, openFlow } from './browser.util.js';
+import { FLOW_DOWNLOADS_DIR } from './paths.util.js';
 import { FLOW_SELECTOR } from './selectors.js';
 
 /** Theo dõi vị trí chuột trên page (dùng cho đường di chuyển tự nhiên hơn). */
@@ -12,7 +15,7 @@ async function initMouseTracking(page) {
         window.__mouseX = e.clientX;
         window.__mouseY = e.clientY;
       },
-      { passive: true },
+      { passive: true }
     );
     window.__mouseX = innerWidth / 2;
     window.__mouseY = innerHeight / 2;
@@ -183,4 +186,49 @@ export async function startCreate(page, prompts) {
   await clickElement(page, btnGenerate, false, true);
 
   // await delay(10000);
+}
+
+/**
+ * Mở Chrome + Flow, gửi batch prompt qua MaVid tool, lưu ảnh theo `name`.
+ * @param {object} params
+ * @param {Array<{ name: string, prompt: string }>} params.prompts
+ * @param {string} [params.pathSave]
+ * @param {number} [params.profile=1]
+ */
+export async function createBatchMedia({ prompts, pathSave = FLOW_DOWNLOADS_DIR, profile = 1 }) {
+  const { context, page } = await openChromeProfile({ profile, visible: true });
+
+  try {
+    const projectId = await openFlow(page);
+
+    await openMyTool(page);
+
+    const result = await getResponseImages({
+      page,
+      projectId,
+      folder: pathSave,
+      prompts,
+      trigger: () => startCreate(page, prompts),
+    });
+
+    if (result.saved.length) {
+      console.log(
+        '   Ảnh đã lưu:',
+        result.saved.map(s => s.path)
+      );
+    }
+    if (result.failed.length) {
+      console.log(
+        '   Ảnh lỗi:',
+        result.failed.map(f => `${f.exportName}: ${f.reason}`)
+      );
+    }
+
+    console.log(`✅ Batch xong — ${result.downloaded} thành công, ${result.errors} lỗi / ${result.total} tổng`);
+    return result;
+  } finally {
+    console.log('🔒 Đang đóng browser...');
+    await delay(1500, 500);
+    await context.close();
+  }
 }

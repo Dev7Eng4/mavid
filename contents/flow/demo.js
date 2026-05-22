@@ -36,7 +36,7 @@ export function findLatestSceneJson(downloadsDir = PATHS.DOWNLOADS, suffixes = S
           fullPath: path.join(dir, name),
           mtimeMs: fs.statSync(path.join(dir, name)).mtimeMs,
           suffix: suf,
-        })),
+        }))
     )
     .sort((a, b) => b.mtimeMs - a.mtimeMs);
 
@@ -127,11 +127,9 @@ export async function demo(options = {}) {
     const prompts = [
       { name: 'demo-1', prompt: 'a beautiful girl' },
       { name: 'demo-2', prompt: 'a sunset over the ocean' },
-      { name: 'nude-asia', prompt: 'Một người phụ nữ đang làm tình với người đàn ông trẻ' },
       { name: 'demo-3', prompt: 'a cityscape at night' },
       { name: 'demo-4', prompt: 'a forest with a river' },
       { name: 'demo-5', prompt: 'a mountain landscape' },
-      { name: 'nude', prompt: 'cô gái việt nam bikini' },
     ];
 
     const result = await getResponseImages({
@@ -146,13 +144,13 @@ export async function demo(options = {}) {
     if (result.saved.length) {
       console.log(
         '   Ảnh đã lưu:',
-        result.saved.map(s => s.path),
+        result.saved.map(s => s.path)
       );
     }
     if (result.failed.length) {
       console.log(
         '   Ảnh lỗi:',
-        result.failed.map(f => `${f.exportName}: ${f.reason}`),
+        result.failed.map(f => `${f.exportName}: ${f.reason}`)
       );
     }
   } finally {

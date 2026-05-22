@@ -49,9 +49,9 @@ export async function openFlowPage({ profile = 1, projectId }) {
 
   await page.keyboard.press('Escape');
 
-  // await closeAnyPopup(page);
+  await closeAnyPopup(page);
 
-  // await setupFlow(page);
+  await setupFlow(page);
 
   return { context, page };
 }
@@ -134,7 +134,7 @@ export async function attachImage(page, pathSave) {
             return btn && !btn.disabled;
           },
           FLOW_SELECTOR.btnCreateHaveImage,
-          { timeout: 60000 },
+          { timeout: 60000 }
         );
         console.log('✅ Nút đã sẵn sàng!');
 
@@ -165,7 +165,7 @@ async function getProjectId(page) {
 
         return false;
       },
-      { timeout: 3 * 60 * 1000 },
+      { timeout: 3 * 60 * 1000 }
     ),
   ]);
 
@@ -454,7 +454,7 @@ export async function generateImageWithFlow(
   exportName,
   setting = {},
   isNeedImage = false,
-  pathOldImage,
+  pathOldImage
 ) {
   const cfg = { ...flowSettings, ...setting };
 
