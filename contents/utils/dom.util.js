@@ -27,7 +27,7 @@ export async function moveToTopLeft(
     minDelay: 8,
     maxDelay: 20,
     overshoot: true,
-  }
+  },
 ) {
   const { steps = 60, minDelay = 8, maxDelay = 20, overshoot = true } = options;
 
@@ -45,7 +45,7 @@ export async function moveToTopLeft(
         window.__mouseX = e.clientX;
         window.__mouseY = e.clientY;
       },
-      { once: false }
+      { once: false },
     );
   });
 
@@ -145,6 +145,85 @@ export async function humanScroll(page, distance) {
   }
 
   // Đôi khi người thật dừng lại đọc nội dung
+  if (Math.random() < 0.3) {
+    await page.waitForTimeout(400 + Math.random() * 600);
+  }
+}
+
+export async function humanScrollUp(page, distance) {
+  const tickSize = 80 + Math.random() * 40; // ~80-120px mỗi tick
+  const ticks = Math.ceil(distance / tickSize);
+
+  for (let i = 0; i < ticks; i++) {
+    const amount = tickSize + Math.random() * 20;
+    await page.mouse.wheel(0, -amount);
+
+    // Delay giữa các tick: không đều, đôi khi dừng nhẹ
+    await page.waitForTimeout(30 + Math.random() * 60);
+  }
+}
+
+/**
+ * Cuộn vùng chat (container scrollable) thay vì wheel trên editor.
+ * Tìm ancestor scrollable từ anchor, scrollBy từng tick, rồi đặt chuột vào vùng chat.
+ * @param {import('playwright').Page} page
+ * @param {number} distance
+ * @param {{ up?: boolean, anchorSelector?: string, fallbackSelectors?: string[] }} [options]
+ */
+export async function humanScrollChat(page, distance, options = {}) {
+  const {
+    up = false,
+    anchorSelector = '.model-response-text',
+    fallbackSelectors = ['infinite-scroller', 'main'],
+  } = options;
+
+  const mousePos = await page.evaluate(
+    ({ anchorSelector, fallbackSelectors, distance, up }) => {
+      let anchor = document.querySelector(anchorSelector);
+      if (!anchor) {
+        const all = document.querySelectorAll(anchorSelector);
+        anchor = all.length ? all[all.length - 1] : null;
+      }
+      if (!anchor) {
+        for (const sel of fallbackSelectors) {
+          anchor = document.querySelector(sel);
+          if (anchor) break;
+        }
+      }
+
+      const scrollEl = anchor ? findScrollableAncestor(anchor) : findScrollableAncestor(document.body);
+
+      const tickSize = 80 + Math.random() * 40;
+      const ticks = Math.ceil(distance / tickSize);
+      const sign = up ? -1 : 1;
+
+      for (let i = 0; i < ticks; i++) {
+        scrollEl.scrollBy(0, sign * (tickSize + Math.random() * 20));
+      }
+
+      const rect = scrollEl.getBoundingClientRect();
+      return {
+        x: rect.left + rect.width * (0.3 + Math.random() * 0.4),
+        y: rect.top + rect.height * (0.2 + Math.random() * 0.35),
+      };
+
+      function findScrollableAncestor(startEl) {
+        let el = startEl;
+        while (el && el !== document.body) {
+          const { overflowY } = getComputedStyle(el);
+          if ((overflowY === 'auto' || overflowY === 'scroll') && el.scrollHeight > el.clientHeight + 1) {
+            return el;
+          }
+          el = el.parentElement;
+        }
+        return document.scrollingElement || document.documentElement;
+      }
+    },
+    { anchorSelector, fallbackSelectors, distance, up },
+  );
+
+  await page.mouse.move(mousePos.x, mousePos.y);
+
   if (Math.random() < 0.3) {
     await page.waitForTimeout(400 + Math.random() * 600);
   }

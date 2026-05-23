@@ -15,10 +15,12 @@ export function stripJsonCodeFence(text) {
  * Validator mặc định cho sendPromptWithRetry khi kỳ vọng JSON.
  * @param {string} raw
  */
-export function validateJsonResponse(raw) {
+export function validateJsonResponse(raw, isJSON = true) {
   const cleaned = stripJsonCodeFence(raw);
   if (!cleaned) {
     throw new Error(`Trả về response rỗng.`);
   }
-  JSON.parse(cleaned);
+  if (isJSON) {
+    JSON.parse(cleaned);
+  }
 }

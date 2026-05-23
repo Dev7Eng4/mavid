@@ -9,7 +9,7 @@ import { delay, clickElement } from '../utils/dom.util.js';
 import { flowSettings } from '../constants/index.js';
 import { FLOW_SELECTOR } from './selectors.js';
 import { resolveFlowChromeProfile } from './chromeProfile.util.js';
-import { FLOW_DOWNLOADS_DIR } from './paths.util.js';
+import { CREATE_IMAGE_TOOL_URI, CREATE_IMAGE_VERSION_TOOL_URI, FLOW_DOWNLOADS_DIR } from './paths.util.js';
 import { FLOW_SETTINGS } from '../constant/index.js';
 import { openMyTool } from './createMediaWithTool.js';
 
@@ -39,6 +39,13 @@ export async function openFlow(page, projectId) {
   // await setupFlow(page);
 
   return internalProjectId;
+}
+
+export async function openFlowTool(page, projectId, isVersion) {
+  const toolUri = isVersion ? CREATE_IMAGE_VERSION_TOOL_URI : CREATE_IMAGE_TOOL_URI;
+
+  page.goto(`${FLOW_SETTINGS.FLOW_PROJECT_URL}/${projectId}/${toolUri}`, { waitUntil: 'domcontentloaded', timeout: 30000 });
+  await page.waitForTimeout(1000);
 }
 
 export async function openFlowPage({ profile = 1, projectId }) {
@@ -134,7 +141,7 @@ export async function attachImage(page, pathSave) {
             return btn && !btn.disabled;
           },
           FLOW_SELECTOR.btnCreateHaveImage,
-          { timeout: 60000 }
+          { timeout: 60000 },
         );
         console.log('✅ Nút đã sẵn sàng!');
 
@@ -165,7 +172,7 @@ async function getProjectId(page) {
 
         return false;
       },
-      { timeout: 3 * 60 * 1000 }
+      { timeout: 3 * 60 * 1000 },
     ),
   ]);
 
@@ -454,7 +461,7 @@ export async function generateImageWithFlow(
   exportName,
   setting = {},
   isNeedImage = false,
-  pathOldImage
+  pathOldImage,
 ) {
   const cfg = { ...flowSettings, ...setting };
 

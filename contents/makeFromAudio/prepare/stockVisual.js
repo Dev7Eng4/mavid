@@ -102,7 +102,6 @@ async function selectAndMarkStockVideo(targetDurationSec) {
   const allVideos = await getListAllVisuals();
 
   const withLink = allVideos.filter(v => v && String(v.link ?? '').trim());
-  console.log('🚀 ~ selectAndMarkStockVideo ~ withLink:', withLink);
 
   if (withLink.length === 0) {
     console.warn('[StockVisual] Không tìm thấy video stock nào.');
@@ -110,9 +109,7 @@ async function selectAndMarkStockVideo(targetDurationSec) {
   }
 
   const eligible = withLink.filter(v => {
-    console.log('🚀 ~ selectAndMarkStockVideo ~ v:', v.duration);
     const durationSec = parseDurationToSeconds(v.duration);
-    console.log('🚀 ~ selectAndMarkStockVideo ~ durationSec:', durationSec);
     return getEffectiveDuration(durationSec) >= targetDurationSec;
   });
 
@@ -246,7 +243,7 @@ async function prepareStockClip(rawVideoPath, targetDuration, outputDir) {
 
   console.log(
     `[StockVisual] Xử lý clip: bỏ ${SKIP_START_SEC}s đầu, lấy ${sourceDuration.toFixed(1)}s gốc → ` +
-      `slowdown ×${SLOWMO_FACTOR} = ${targetDuration.toFixed(1)}s, zoom ${ZOOM_FACTOR * 100}% → crop ${CANVAS_W}×${CANVAS_H}`
+      `slowdown ×${SLOWMO_FACTOR} = ${targetDuration.toFixed(1)}s, zoom ${ZOOM_FACTOR * 100}% → crop ${CANVAS_W}×${CANVAS_H}`,
   );
 
   // `-t` phải đứng trước `-i` để giới hạn độ dài **nguồn** (giây gốc sau -ss).
@@ -288,7 +285,6 @@ export async function prepareStockVisualClip(targetDuration) {
 
   try {
     const link = await selectAndMarkStockVideo(targetDuration);
-    console.log('🚀 ~ prepareStockVisualClip ~ link:', link);
 
     if (!link) {
       return { stockClipPath: null, stockTempDir, hasStock: false };

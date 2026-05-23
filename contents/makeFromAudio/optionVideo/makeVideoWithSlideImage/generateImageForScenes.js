@@ -9,8 +9,8 @@ import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 
-import { PATHS } from '../constants/paths.js';
-import { createBatchMedia } from '../flow/createMediaWithTool.js';
+import { PATHS } from '../../../constants/paths.js';
+import { createBatchMedia } from '../../../flow/createMediaWithTool.js';
 import { imagePromptsManifestPath } from './createPromptImageForScene.js';
 
 /**
@@ -98,12 +98,7 @@ export async function generateImageForScenes(prompts, pathSave) {
   const folder = path.resolve(String(pathSave ?? PATHS.DOWNLOADS));
 
   console.log(`🖼️ Flow batch: ${normalized.length} ảnh → ${folder}`);
-  return createBatchMedia({
-    prompts: {
-      visuals: normalized,
-    },
-    pathSave: folder,
-  });
+  return createBatchMedia({ prompts: normalized, pathSave: folder });
 }
 
 /**

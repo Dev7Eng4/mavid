@@ -6,7 +6,7 @@
   "main": "electron/main.js",
   "scripts": {
     "start": "concurrently -k \"vite --port 5173 --strictPort\" \"nodemon --watch electron --ext js,cjs --exec \\\"npx electron .\\\"\"",
-    "tao-chrome-profile": "node contents/scripts/makeChromeProfile.js",
+    "tao-chrome-profile": "node contents/scripts/makeChromeProfile.js 1",
     "mo-gpm-playwright": "node contents/scripts/openGpmPlaywright.js",
     "lay-thong-tin-youtube": "node -e \"import('./contents/video-info/getInfoChannel.js').then(m=>m.default())\"",
     "tao-batch-video-tu-audio": "node -e \"import('./contents/scripts/createBatchVideo.js').then(m => m.default({ videoType: 'audio' }))\"",

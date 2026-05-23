@@ -126,7 +126,7 @@ export async function generateBottomTextThumbnailJaVertical({
     visualPromptConstant,
   });
 
-  const { context: ctx, page: pg } = await openChromeProfile({ profile: PLAYWRIGHT_PROFILES[0], visible: true });
+  const { context: ctx, page: pg } = await openChromeProfile({ profile: PLAYWRIGHT_PROFILES[4], visible: true });
   /** @type {Record<string, unknown>} */
   let specResult;
   try {

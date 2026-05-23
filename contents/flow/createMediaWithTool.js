@@ -1,6 +1,6 @@
 import { openChromeProfile } from '../scripts/makeChromeProfile.js';
 import { clickElement, delay, humanScroll } from '../utils/dom.util.js';
-import { getResponseImages, openFlow } from './browser.util.js';
+import { getResponseImages, openFlow, openFlowTool } from './browser.util.js';
 import { FLOW_DOWNLOADS_DIR } from './paths.util.js';
 import { FLOW_SELECTOR } from './selectors.js';
 
@@ -15,7 +15,7 @@ async function initMouseTracking(page) {
         window.__mouseX = e.clientX;
         window.__mouseY = e.clientY;
       },
-      { passive: true }
+      { passive: true },
     );
     window.__mouseX = innerWidth / 2;
     window.__mouseY = innerHeight / 2;
@@ -167,23 +167,27 @@ function getToolLocator(page, selector) {
 }
 
 export async function startCreate(page, prompts) {
+  console.log('🔄 Đang start create...');
   const prompt = getToolLocator(page, FLOW_SELECTOR.toolEditorPrompt);
   await prompt.waitFor({ state: 'visible', timeout: 30000 });
-
+  console.log('🔄 Đang click prompt...');
   await clickElement(page, prompt, false, true);
   await delay(1000);
   await page.keyboard.down('Control');
+  console.log('🔄 Đang press A...');
   await page.keyboard.press('A');
+  console.log('🔄 Đang up Control...');
   await page.keyboard.up('Control');
 
   await page.waitForTimeout(300, 500);
 
   await page.keyboard.insertText(JSON.stringify(prompts));
+  console.log('🔄 Đang insert text...');
   await page.keyboard.press('Enter');
 
-  const btnGenerate = getToolLocator(page, FLOW_SELECTOR.btnToolGenerate);
-  await btnGenerate.waitFor({ state: 'visible', timeout: 30000 });
-  await clickElement(page, btnGenerate, false, true);
+  // const btnGenerate = getToolLocator(page, FLOW_SELECTOR.btnToolGenerate);
+  // await btnGenerate.waitFor({ state: 'visible', timeout: 30000 });
+  // await clickElement(page, btnGenerate, false, true);
 
   // await delay(10000);
 }
@@ -196,31 +200,31 @@ export async function startCreate(page, prompts) {
  * @param {number} [params.profile=1]
  */
 export async function createBatchMedia({ prompts, pathSave = FLOW_DOWNLOADS_DIR, profile = 1 }) {
-  const { context, page } = await openChromeProfile({ profile, visible: true });
+  const { context, page } = await openChromeProfile({ profile });
 
   try {
     const projectId = await openFlow(page);
 
-    await openMyTool(page);
+    await openFlowTool(page, projectId, true);
 
     const result = await getResponseImages({
       page,
       projectId,
       folder: pathSave,
-      prompts,
+      prompts: [...prompts.visuals],
       trigger: () => startCreate(page, prompts),
     });
 
     if (result.saved.length) {
       console.log(
         '   Ảnh đã lưu:',
-        result.saved.map(s => s.path)
+        result.saved.map(s => s.path),
       );
     }
     if (result.failed.length) {
       console.log(
         '   Ảnh lỗi:',
-        result.failed.map(f => `${f.exportName}: ${f.reason}`)
+        result.failed.map(f => `${f.exportName}: ${f.reason}`),
       );
     }
 

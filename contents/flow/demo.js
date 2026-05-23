@@ -8,9 +8,10 @@ import { PATHS } from '../constants/paths.js';
 import { flowSettings } from '../constants/index.js';
 import { FLOW_SETTINGS } from '../constant/index.js';
 import { delay } from '../utils/dom.util.js';
-import { getResponseImages, openFlowPage } from './browser.util.js';
+import { getResponseImages, openFlow, openFlowPage, openFlowTool } from './browser.util.js';
 import { resolveFlowChromeProfile } from './chromeProfile.util.js';
 import { openMyTool, startCreate } from './createMediaWithTool.js';
+import openChromeProfile from '../scripts/makeChromeProfile.js';
 
 const __filename = fileURLToPath(import.meta.url);
 
@@ -36,7 +37,7 @@ export function findLatestSceneJson(downloadsDir = PATHS.DOWNLOADS, suffixes = S
           fullPath: path.join(dir, name),
           mtimeMs: fs.statSync(path.join(dir, name)).mtimeMs,
           suffix: suf,
-        }))
+        })),
     )
     .sort((a, b) => b.mtimeMs - a.mtimeMs);
 
@@ -108,13 +109,11 @@ export async function demo(options = {}) {
 
   const cfg = flowSettings;
   const chromeProfile = profileOverride ?? resolveFlowChromeProfile(cfg);
-  const projectId = '8eaafcb3-3541-4870-9302-cf1215f5ecb9';
+  const projectId = '8b48d36e-b457-47c4-8e2b-bd11761b3a52';
 
-  if (!projectId) {
-    throw new Error('demo: thiếu FLOW_PROJECT_ID trong flowSettings / FLOW_SETTINGS');
-  }
+  const { context, page } = await openChromeProfile({ profile: 1, visible: true });
 
-  const { context, page } = await openFlowPage({ profile: chromeProfile, projectId });
+  await openFlow(page, projectId);
 
   try {
     // const convertedScenesPrompts = scenes.map(s => ({
@@ -122,35 +121,41 @@ export async function demo(options = {}) {
     //   prompt: s.image_prompt,
     // }));
 
-    await openMyTool(page);
+    // await openMyTool(page);
+    await openFlowTool(page, projectId, true);
 
-    const prompts = [
-      { name: 'demo-1', prompt: 'a beautiful girl' },
-      { name: 'demo-2', prompt: 'a sunset over the ocean' },
-      { name: 'demo-3', prompt: 'a cityscape at night' },
-      { name: 'demo-4', prompt: 'a forest with a river' },
-      { name: 'demo-5', prompt: 'a mountain landscape' },
-    ];
+    const prompts = {
+      visuals: [
+        { name: 'demo-1', prompt: 'a beautiful girl' },
+        { name: 'demo-2', prompt: 'a sunset over the ocean' },
+        { name: 'demo-3', prompt: 'a cityscape at night' },
+        { name: 'demo-4', prompt: 'a forest with a river' },
+      ],
+    };
+
+    await delay(3000);
 
     const result = await getResponseImages({
       page,
       projectId,
       folder: PATHS.DOWNLOADS,
-      prompts,
+      prompts: prompts.visuals,
       trigger: () => startCreate(page, prompts),
     });
 
     console.log(`✅ Demo xong — ${result.downloaded} thành công, ${result.errors} lỗi / ${result.total} tổng`);
+
+    await delay(15000);
     if (result.saved.length) {
       console.log(
         '   Ảnh đã lưu:',
-        result.saved.map(s => s.path)
+        result.saved.map(s => s.path),
       );
     }
     if (result.failed.length) {
       console.log(
         '   Ảnh lỗi:',
-        result.failed.map(f => `${f.exportName}: ${f.reason}`)
+        result.failed.map(f => `${f.exportName}: ${f.reason}`),
       );
     }
   } finally {

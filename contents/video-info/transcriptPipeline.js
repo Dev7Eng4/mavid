@@ -88,13 +88,8 @@ async function sendUpdateTranscriptChunkWithRetry(page, prompt, chunkIndex, tota
 
   try {
     return await sendPromptWithRetry(page, prompt, {
-      // Transcript update trả "[id] text" plain; không yêu cầu code block.
       requireCodeBlock: false,
-      // Validate đơn giản: response (sau strip fence) không được rỗng.
-      validate: raw => {
-        const cleaned = stripJsonCodeFence(raw).trim();
-        if (!cleaned) throw new Error('Gemini trả về response rỗng.');
-      },
+      isJSON: false,
       maxRetries: Math.max(0, maxAttempts - 1),
       retryDelayMs: baseDelayMs,
       label,
@@ -122,7 +117,7 @@ async function processChunkOnPage(page, chunkObjects, chunkIndex, totalChunks, p
   const prompt = prompts.promptUpdateTranscript(idTextInput);
   const raw = await sendUpdateTranscriptChunkWithRetry(page, prompt, chunkIndex, totalChunks);
 
-  if (!raw || !stripJsonCodeFence(raw).trim()) {
+  if (!raw) {
     console.warn(`[update-transcript] Chunk ${chunkIndex + 1}/${totalChunks}: AI trả về rỗng, giữ nguyên.`);
     return chunkObjects;
   }
@@ -142,8 +137,8 @@ export async function internalUpdateTranscript(rawSrtContent, options = {}) {
     typeof rawSrtContent === 'string'
       ? rawSrtContent
       : Array.isArray(rawSrtContent)
-      ? rawSrtContent.join('\n\n')
-      : String(rawSrtContent ?? '');
+        ? rawSrtContent.join('\n\n')
+        : String(rawSrtContent ?? '');
 
   const cleanedSrt = srtString.trim();
   const allObjects = parseSrtToObjects(cleanedSrt);
@@ -181,7 +176,7 @@ export async function internalUpdateTranscript(rawSrtContent, options = {}) {
   console.log(
     `[update-transcript] Video ${durationMin < 30 ? '< 30' : '>= 30'} phút → mở ${activeConcurrency} Chrome profile (${profileIds
       .slice(0, activeConcurrency)
-      .join(',')}) cho ${totalChunks} chunk...`
+      .join(',')}) cho ${totalChunks} chunk...`,
   );
 
   let nextChunkIndex = 0;
