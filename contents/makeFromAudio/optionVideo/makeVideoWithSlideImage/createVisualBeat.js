@@ -95,26 +95,6 @@ export function createTranscriptSegments(transcript, options = {}) {
 }
 
 /**
- * @param {string} [downloadsDir]
- * @returns {{ srtPath: string, transcript: { id: number, text: string }[], transcriptPath: string }}
- */
-export function loadTranscriptForVisualBeats(downloadsDir = PATHS.DOWNLOADS) {
-  const { srtPath, transcript } = loadTranscriptFromDownloads(downloadsDir);
-  const transcriptPath = transcriptOutputPath(srtPath);
-
-  if (fs.existsSync(transcriptPath)) {
-    const fromFile = parseTranscriptIdText(fs.readFileSync(transcriptPath, 'utf8'));
-    if (fromFile.length === 0) {
-      throw new Error(`loadTranscriptForVisualBeats: file transcript rỗng — ${transcriptPath}`);
-    }
-    return { srtPath, transcript: fromFile, transcriptPath };
-  }
-
-  const savedPath = saveTranscript(srtPath, transcript);
-  return { srtPath, transcript, transcriptPath: savedPath };
-}
-
-/**
  * @param {string} filePath
  * @param {unknown} data
  */
@@ -183,7 +163,7 @@ export async function segmentTranscriptToVisualBeats(transcript, options = {}) {
   } = options;
 
   const segments = createTranscriptSegments(transcript, { batchSize, contextLines });
-  const outputDir = path.dirname(path.resolve(srtPath));
+  console.log('🚀 ~ segmentTranscriptToVisualBeats ~ segments:', segments[0].currentLines[0]);
 
   /** @type {Array<Record<string, unknown>>} */
   const segmentResults = [];
@@ -242,21 +222,9 @@ export async function segmentTranscriptToVisualBeats(transcript, options = {}) {
  * @param {boolean} [options.visible]
  */
 export async function createVisualBeats(options = {}) {
-  const { downloadsDir = PATHS.DOWNLOADS, srtPath: argSrtPath, profile, visible } = options;
+  const { downloadsDir = PATHS.DOWNLOADS, profile, visible } = options;
 
-  const { srtPath, transcript, transcriptPath } = argSrtPath
-    ? {
-        srtPath: path.resolve(argSrtPath),
-        transcript: convertSrtFile(argSrtPath),
-        transcriptPath: transcriptOutputPath(path.resolve(argSrtPath)),
-      }
-    : loadTranscriptForVisualBeats(downloadsDir);
-
-  if (!fs.existsSync(transcriptPath)) {
-    saveTranscript(srtPath, transcript);
-  }
-
-  console.log(`📄 Transcript: ${transcript.length} dòng (${transcriptPath})`);
+  const { srtPath, transcript } = loadTranscriptFromDownloads(downloadsDir);
 
   const result = await segmentTranscriptToVisualBeats(transcript, {
     srtPath,
@@ -268,7 +236,7 @@ export async function createVisualBeats(options = {}) {
   });
 
   console.log(`📦 Manifest: ${result.manifestPath}`);
-  return { transcriptPath, ...result };
+  return { transcriptObjects: transcript, ...result };
 }
 
 export default async function main() {

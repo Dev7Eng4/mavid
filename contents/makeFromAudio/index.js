@@ -10,6 +10,7 @@ import { OUTPUT_DIR, ROOT, resolveLogoFromChannelFolder, resolveDefaultStockFold
 import { OPTIONS_CONTENT } from './constant.js';
 import { makeVideoWithImageNoise } from './optionVideo/makeVideoWithImageNoise.js';
 import { makeVideoWithOverlayImageNoise } from './optionVideo/makeVideoWithOverlayImageNoise.js';
+import { makeVideoWithSlideImage } from './optionVideo/makeVideoWithSlideImage/index.js';
 
 const CHANNELS_ROOT = resolveChannelsDir();
 
@@ -177,6 +178,8 @@ async function main(options = {}) {
           await makeVideoWithImageNoise(perItemOptions);
         } else if (currentOption === VIDEO_MAKE_OPTION.SI) {
           await makeVideoWithOverlayImageNoise(defaultStockFolder, perItemOptions);
+        } else if (currentOption === VIDEO_MAKE_OPTION.AGI) {
+          await makeVideoWithSlideImage(perItemOptions);
         } else {
           console.warn(`[main] Bỏ qua option không hỗ trợ: ${currentOption} (chỉ còn IN | SI).`);
         }

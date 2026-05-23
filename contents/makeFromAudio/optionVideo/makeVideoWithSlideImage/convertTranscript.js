@@ -47,8 +47,8 @@ export function srtContentToTranscript(srtContent) {
   return parseSrtToObjects(srtContent).map((cue, index) => {
     const id = Number.parseInt(cue.id, 10);
     return {
+      ...cue,
       id: Number.isFinite(id) ? id : index + 1,
-      text: cue.text,
     };
   });
 }
@@ -94,27 +94,4 @@ export function loadTranscriptFromDownloads(downloadsDir = PATHS.DOWNLOADS) {
   }
 
   return { srtPath, transcript };
-}
-
-export default async function main() {
-  const argPath = process.argv[2];
-  const { srtPath, transcript } = argPath
-    ? { srtPath: path.resolve(argPath), transcript: convertSrtFile(argPath) }
-    : loadTranscriptFromDownloads();
-
-  const outputPath = saveTranscript(srtPath, transcript);
-  const preview = transcriptToIdText(transcript.slice(0, 3));
-
-  console.log(`📄 SRT: ${srtPath}`);
-  console.log(`✅ ${transcript.length} dòng → ${outputPath}`);
-  console.log(preview);
-  if (transcript.length > 3) console.log('...');
-}
-
-const isMain = process.argv[1] && path.resolve(process.argv[1]) === path.resolve(fileURLToPath(import.meta.url));
-if (isMain) {
-  main().catch(err => {
-    console.error(err.message);
-    process.exit(1);
-  });
 }
