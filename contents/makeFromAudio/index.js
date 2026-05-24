@@ -123,7 +123,7 @@ async function main(options = {}) {
           prompt: options.thumbnailPrompt,
         },
         generateGeneralImage,
-        generateSceneImages,
+        generateSceneImages: false,
       },
     })
       .then(result => ({ result, isolatedDownloadsDir }))
@@ -168,17 +168,18 @@ async function main(options = {}) {
         };
 
         // kiểm tra xem có background.jpg trong isolatedDownloadsDir không
-        const backgroundPath = path.join(isolatedDownloadsDir, 'background.jpg');
-        if (!fs.existsSync(backgroundPath)) {
-          console.warn(`[main] Không tìm thấy background.jpg trong ${isolatedDownloadsDir}`);
-          continue;
-        }
+        // const backgroundPath = path.join(isolatedDownloadsDir, 'background.jpg');
+        // if (!fs.existsSync(backgroundPath)) {
+        //   console.warn(`[main] Không tìm thấy background.jpg trong ${isolatedDownloadsDir}`);
+        //   continue;
+        // }
 
         if (currentOption === VIDEO_MAKE_OPTION.IN) {
           await makeVideoWithImageNoise(perItemOptions);
         } else if (currentOption === VIDEO_MAKE_OPTION.SI) {
           await makeVideoWithOverlayImageNoise(defaultStockFolder, perItemOptions);
         } else if (currentOption === VIDEO_MAKE_OPTION.AGI) {
+          console.log('🔄 Đang tạo visual beats...');
           await makeVideoWithSlideImage(perItemOptions);
         } else {
           console.warn(`[main] Bỏ qua option không hỗ trợ: ${currentOption} (chỉ còn IN | SI).`);
