@@ -137,7 +137,7 @@ numberedTranscript TO PROCESS
 ${numberedTranscript}
 `;
 
-export const promptCreateSceneSpecsFromBeats = beatsJson => `
+export const promptCreateSceneSpecsFromBeatsOld = beatsJson => `
 You are a Japanese senior finance educational video scene designer.
 
 Your task is to convert visual beats into image scene specifications.
@@ -260,7 +260,171 @@ Input beats JSON:
 ${beatsJson}
 `;
 
-export const promptCreateImagePromptsFromSceneSpecs = sceneSpecsJson => `
+export const promptCreateSceneSpecsFromBeats = beatsJson => `
+You are NOT an image generator.
+You must NOT create, render, draw, search, or fetch any image.
+
+You are a JSON scene-spec compiler for a video automation pipeline.
+
+Your only task is to convert each input visual beat into a structured JSON scene specification.
+The output will later be used by another step to write image-generation prompts.
+You are not responsible for generating images.
+
+━━━━━━━━━━━━━━━━━━
+TASK DEFINITION
+━━━━━━━━━━━━━━━━━━
+Input:
+- A JSON object containing visual beats.
+- Each beat may include beat_id, source_line_ids, summary, key idea, or visual direction.
+
+Output:
+- A JSON object containing scene specifications.
+- Each scene specification is metadata only.
+- Each scene must describe what a future image should show.
+- Do not create the image.
+- Do not say that you cannot create images.
+- Do not mention image creation availability, sign-in status, location, tools, or permissions.
+
+For each beat, produce exactly one scene specification.
+
+━━━━━━━━━━━━━━━━━━
+VISUAL STYLE REFERENCE
+━━━━━━━━━━━━━━━━━━
+Use this style only as descriptive metadata inside scene fields:
+
+Japanese senior finance educational video, clean illustrated infographic style, soft anime-realistic, warm but serious, easy-to-understand pension explanation, 16:9 YouTube frame, large readable Japanese text, simple charts, elderly Japanese couple, financial documents, calendar, yen symbols, clean layout, professional TV program style, no clutter.
+
+Negative style constraints:
+no English text, no Chinese text, no Korean text, no watermark, no logo, no messy small text, no distorted hands, no horror, no photorealistic wrinkles exaggeration, no crowded background.
+
+━━━━━━━━━━━━━━━━━━
+SCENE SPEC REQUIREMENTS
+━━━━━━━━━━━━━━━━━━
+Each scene specification must:
+- communicate the source beat visually
+- use simple senior-friendly finance imagery
+- include only simple on-screen Japanese text
+- avoid clutter
+- avoid too many labels
+- avoid complex charts
+- be suitable for a 16:9 Japanese senior finance educational YouTube video
+- stay accurate to the source beat
+- avoid invented pension numbers, ages, laws, or outcomes unless they appear in the input beat
+
+━━━━━━━━━━━━━━━━━━
+ON-SCREEN TEXT RULES
+━━━━━━━━━━━━━━━━━━
+The on_screen_text field must follow these rules:
+
+- Japanese only.
+- 1 or 2 lines only.
+- Each line should be short and readable.
+- Preferred length: 6–14 Japanese characters per line.
+- Maximum length: 18 Japanese characters per line.
+- Do not use English.
+- Do not use Chinese.
+- Do not use Korean.
+- Do not use tiny footnotes.
+- Do not create complex paragraphs.
+- Text should summarize the key idea of the scene.
+- Text must be accurate to the source beat.
+- Do not invent pension numbers, ages, laws, or outcomes unless they appear in the input beat.
+
+Good examples:
+["年金を60歳から", "受け取ると損？"]
+["メリットも", "デメリットもある"]
+["65歳まで待つ？", "60歳から受け取る？"]
+
+Bad examples:
+["繰上げ受給をすると毎月の年金額が減額される可能性があります"]
+["Pension from 60?"]
+["养老金说明"]
+
+━━━━━━━━━━━━━━━━━━
+VISUAL MOTIF RULES
+━━━━━━━━━━━━━━━━━━
+You may use common descriptive motifs such as:
+- elderly Japanese couple
+- pension documents
+- calendar with age number
+- yen symbols
+- bankbook
+- calculator
+- simple bar chart
+- simple line chart
+- balance scale
+- forked road
+- checklist
+- warning sign
+- envelope
+- public office consultation desk
+- kitchen table
+- TV-program style infographic panel
+
+Avoid describing:
+- too many people
+- realistic dark drama
+- horror mood
+- tiny unreadable UI
+- dense spreadsheets
+- exaggerated wrinkles
+- messy room
+- complicated legal documents
+
+━━━━━━━━━━━━━━━━━━
+IMPORTANT ROUTING RULES
+━━━━━━━━━━━━━━━━━━
+This is a text-to-JSON transformation task.
+
+Do not perform image generation.
+Do not search for images.
+Do not ask whether image generation is available.
+Do not mention sign-in status.
+Do not mention account, region, location, or tool limitations.
+Do not apologize for being unable to create images.
+Do not return conversational text.
+Return only the requested JSON.
+
+━━━━━━━━━━━━━━━━━━
+OUTPUT JSON ONLY
+━━━━━━━━━━━━━━━━━━
+Return valid JSON only.
+Do not wrap in markdown code block.
+Do not add explanation.
+Do not add comments.
+Do not add text before or after the JSON.
+
+Schema:
+
+{
+  "scenes": [
+    {
+      "scene_id": "S001",
+      "beat_id": "B001",
+      "source_line_ids": [1, 2, 3],
+      "scene_type": "hook_problem | concept_explanation | comparison | example_case | warning | practical_advice | recap | transition",
+      "narrative_purpose": "English explanation of what this scene specification must communicate",
+      "on_screen_text": [
+        "Japanese line 1",
+        "Japanese line 2"
+      ],
+      "main_visual": "English metadata describing the main visual for a future image",
+      "supporting_elements": [
+        "English metadata element 1",
+        "English metadata element 2"
+      ],
+      "layout": "English metadata describing the layout for a future 16:9 frame",
+      "mood": "English metadata describing the mood",
+      "text_priority": "high | medium"
+    }
+  ]
+}
+
+Input beats JSON:
+${beatsJson}
+`;
+
+export const promptCreateImagePromptsFromSceneSpecs1 = sceneSpecsJson => `
 You are a professional prompt writer for Japanese senior finance educational YouTube images.
 
 Your task is to convert each scene specification into a final image generation prompt.
@@ -337,6 +501,130 @@ OUTPUT SCHEMA:
         "Japanese line 2"
       ],
       "image_prompt": "Final full prompt here"
+    }
+  ]
+}
+
+Scene specs JSON:
+${sceneSpecsJson}
+`;
+
+export const promptCreateImagePromptsFromSceneSpecs = sceneSpecsJson => `
+You are NOT an image generator.
+You must NOT create, render, draw, or describe that you are creating an image.
+
+You are a professional IMAGE PROMPT WRITER.
+Your only task is to convert each scene specification into a final text prompt that will later be sent to a separate image generation model.
+
+You must output JSON only.
+
+━━━━━━━━━━━━━━━━━━
+TASK DEFINITION
+━━━━━━━━━━━━━━━━━━
+Input:
+- A list of scene specifications.
+- Each scene contains scene_id, source_line_ids, visual idea, and on-screen Japanese text.
+
+Your task:
+- For each scene, write ONE final image generation prompt as plain text.
+- The prompt must instruct a future image generation model what image to create.
+- Do not create the image yourself.
+- Do not say "I created".
+- Do not add any explanation outside JSON.
+
+━━━━━━━━━━━━━━━━━━
+GLOBAL VISUAL STYLE TO USE INSIDE EACH GENERATED PROMPT
+━━━━━━━━━━━━━━━━━━
+Japanese senior finance educational video, clean illustrated infographic style, soft anime-realistic, warm but serious, easy-to-understand pension explanation, 16:9 YouTube frame, large readable Japanese text, simple charts, elderly Japanese couple, financial documents, calendar, yen symbols, clean layout, professional TV program style, no clutter.
+
+━━━━━━━━━━━━━━━━━━
+GLOBAL NEGATIVE TO USE INSIDE EACH GENERATED PROMPT
+━━━━━━━━━━━━━━━━━━
+no English text, no Chinese text, no Korean text, no watermark, no logo, no messy small text, no distorted hands, no horror, no photorealistic wrinkles exaggeration, no crowded background.
+
+━━━━━━━━━━━━━━━━━━
+GENERATED IMAGE PROMPT FORMAT
+━━━━━━━━━━━━━━━━━━
+Each image_prompt value must be a single complete prompt string.
+
+Each generated prompt must follow this exact internal structure:
+
+Create a 16:9 Japanese senior finance educational illustration.
+
+Scene: [describe the scene based only on the scene spec]
+
+On-screen Japanese text, large and readable:
+「[exact Japanese text line 1 from scene spec]」
+「[exact Japanese text line 2 from scene spec if available]」
+
+Visual style: [use the global visual style]
+
+Layout: [clear layout instruction for this scene]
+
+Avoid: [use the global negative rules]
+
+━━━━━━━━━━━━━━━━━━
+CRITICAL DISTINCTION
+━━━━━━━━━━━━━━━━━━
+You are only writing the text inside image_prompt.
+You are not generating an image.
+You are not calling an image model.
+You are not producing visual output.
+You are producing JSON data for a later image-generation step.
+
+━━━━━━━━━━━━━━━━━━
+IMPORTANT TEXT RULES
+━━━━━━━━━━━━━━━━━━
+- Each generated prompt must explicitly include this phrase:
+  "On-screen Japanese text, large and readable"
+- Include only the exact Japanese text from scene_specs.
+- Do not invent additional Japanese text.
+- Do not add English labels inside the image.
+- Do not add tiny explanatory captions.
+- Avoid any small text in documents or charts.
+- If documents appear, describe them as generic pension documents with no tiny readable text.
+- Preserve Japanese text exactly as provided.
+- Do not translate Japanese text.
+- Do not rewrite Japanese text.
+
+━━━━━━━━━━━━━━━━━━
+IMAGE PROMPT CONTENT RULES
+━━━━━━━━━━━━━━━━━━
+Inside each image_prompt:
+- Make the image easy to understand in 1 second.
+- Use only 1 main idea per scene.
+- Prefer large symbols: yen mark, calendar, pension envelope, balance scale, checklist, arrows.
+- Use clean TV-program style composition.
+- Keep background simple.
+- Keep character count low: usually 1 elderly person or 1 elderly couple.
+- Use a warm but serious atmosphere.
+- Do not make the characters look frightened, sick, or miserable.
+- Avoid dramatic horror lighting.
+- Avoid cluttered infographic layouts.
+- Avoid dense charts.
+- Avoid small unreadable text.
+
+━━━━━━━━━━━━━━━━━━
+OUTPUT JSON ONLY
+━━━━━━━━━━━━━━━━━━
+Return valid JSON only.
+Do not wrap in markdown code block.
+Do not add explanation.
+Do not add comments.
+Do not add text before or after the JSON.
+
+Schema:
+
+{
+  "image_prompts": [
+    {
+      "scene_id": "S001",
+      "source_line_ids": [1, 2, 3],
+      "on_screen_text": [
+        "Japanese line 1",
+        "Japanese line 2"
+      ],
+      "image_prompt": "Final full prompt text for a future image generation model"
     }
   ]
 }

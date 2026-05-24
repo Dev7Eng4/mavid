@@ -197,7 +197,7 @@ export async function segmentTranscriptToVisualBeats(transcript, options = {}) {
       };
 
       const segmentPath = visualBeatsSegmentPath(srtPath, segment.segmentIndex);
-      saveJsonFile(segmentPath, record);
+      // saveJsonFile(segmentPath, record);
       segmentResults.push(...beatsPayload.beats);
 
       console.log(

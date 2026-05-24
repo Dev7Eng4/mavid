@@ -168,11 +168,14 @@ async function main(options = {}) {
         };
 
         // kiểm tra xem có background.jpg trong isolatedDownloadsDir không
-        // const backgroundPath = path.join(isolatedDownloadsDir, 'background.jpg');
-        // if (!fs.existsSync(backgroundPath)) {
-        //   console.warn(`[main] Không tìm thấy background.jpg trong ${isolatedDownloadsDir}`);
-        //   continue;
-        // }
+
+        if (generateGeneralImage) {
+          const backgroundPath = path.join(isolatedDownloadsDir, 'background.jpg');
+          if (!fs.existsSync(backgroundPath)) {
+            console.warn(`[main] Không tìm thấy background.jpg trong ${isolatedDownloadsDir}`);
+            continue;
+          }
+        }
 
         if (currentOption === VIDEO_MAKE_OPTION.IN) {
           await makeVideoWithImageNoise(perItemOptions);

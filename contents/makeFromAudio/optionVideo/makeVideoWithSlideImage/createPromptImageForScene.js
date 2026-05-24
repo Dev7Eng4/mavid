@@ -1,6 +1,7 @@
 /**
- * Nhận danh sách scene specs → gọi promptCreateImagePromptsFromSceneSpecs theo batch,
- * lưu JSON manifest vào cùng thư mục với file scene-specs / srt.
+ * Nhận danh sách scene specs → gọi promptCreateImagePromptsFromSceneSpecs từng scene,
+ * chạy song song trên nhiều Chrome profile (profile xong scene nào thì lấy scene tiếp theo),
+ * lưu JSON segment + manifest vào cùng thư mục với file scene-specs / srt.
  *
  * Dùng:
  *   node contents/makeVideoSlide/createPromptImageForScene.js
@@ -12,6 +13,7 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 
 import { PATHS } from '../../../constants/paths.js';
+import { PLAYWRIGHT_PROFILES } from '../../../constants/playwright-profile.js';
 import { openChatPage, sendPromptWithRetry } from '../../../llm/browser.util.js';
 import { stripJsonCodeFence, validateJsonResponse } from '../../../llm/text.util.js';
 import openChromeProfile from '../../../scripts/makeChromeProfile.js';
@@ -19,7 +21,7 @@ import { sceneSpecsManifestPath, srtPathFromBeatsManifest } from './createScenes
 import { saveJsonFile } from './createVisualBeat.js';
 import { promptCreateImagePromptsFromSceneSpecs } from './prompts.js';
 
-const SCENES_BATCH_SIZE = 25;
+const IMAGE_PROMPTS_MAX_PROFILES = 5;
 
 /** @param {string} srtPath */
 export function imagePromptsManifestPath(srtPath) {
@@ -74,36 +76,6 @@ export function loadScenesFromFile(filePath) {
 
 /**
  * @param {Record<string, unknown>[]} scenes
- * @param {{ batchSize?: number }} [options]
- */
-export function createSceneBatches(scenes, options = {}) {
-  const batchSize = options.batchSize ?? SCENES_BATCH_SIZE;
-
-  if (!Array.isArray(scenes) || scenes.length === 0) {
-    throw new Error('createSceneBatches: scenes rỗng');
-  }
-
-  /** @type {Array<{ batchIndex: number, startSceneId: string, endSceneId: string, scenes: Record<string, unknown>[] }>} */
-  const batches = [];
-
-  for (let start = 0; start < scenes.length; start += batchSize) {
-    const slice = scenes.slice(start, start + batchSize);
-    const first = /** @type {{ scene_id?: string }} */ (slice[0]);
-    const last = /** @type {{ scene_id?: string }} */ (slice[slice.length - 1]);
-
-    batches.push({
-      batchIndex: batches.length + 1,
-      startSceneId: String(first?.scene_id ?? ''),
-      endSceneId: String(last?.scene_id ?? ''),
-      scenes: slice,
-    });
-  }
-
-  return batches;
-}
-
-/**
- * @param {Record<string, unknown>[]} scenes
  */
 export function buildImagePromptsPrompt(scenes) {
   return promptCreateImagePromptsFromSceneSpecs(JSON.stringify({ scenes }, null, 2));
@@ -122,75 +94,112 @@ export function parseImagePromptsResponse(raw) {
   return parsed;
 }
 
-function defaultLlmProfile() {
-  const fromEnv = process.env.LLM_TEST_PROFILE || process.env.GEMINI_TEST_PROFILE || process.env.GPT_TEST_PROFILE;
-  const n = Number(fromEnv);
-  return Number.isFinite(n) && n > 0 ? n : 2;
-}
-
 /**
  * @param {Record<string, unknown>[]} scenes
  * @param {object} [options]
  * @param {string} [options.srtPath] — đường dẫn .srt (hoặc base tương đương) để đặt tên file output
- * @param {number} [options.profile]
  * @param {boolean} [options.visible]
  * @param {boolean} [options.thinkingMode]
- * @param {number} [options.batchSize]
- * @param {(info: { batchIndex: number, total: number }) => void} [options.onBatchStart]
+ * @param {number} [options.maxProfiles] — số Chrome profile chạy song song (mặc định 5)
+ * @param {(info: { sceneIndex: number, sceneId: string, total: number }) => void} [options.onSceneStart]
  */
 export async function createImagePromptsFromScenes(scenes, options = {}) {
   const {
     srtPath = PATHS.DOWNLOADS,
-    profile = defaultLlmProfile(),
     visible = true,
     thinkingMode = false,
-    batchSize = SCENES_BATCH_SIZE,
-    onBatchStart,
+    maxProfiles = IMAGE_PROMPTS_MAX_PROFILES,
+    onSceneStart,
   } = options;
 
-  // const batches = createSceneBatches(scenes, { batchSize });
+  if (!Array.isArray(scenes) || scenes.length === 0) {
+    throw new Error('createImagePromptsFromScenes: scenes rỗng');
+  }
+
   const outputDir = path.dirname(path.resolve(srtPath));
+  const totalScenes = scenes.length;
+
+  /** @type {(Record<string, unknown>[] | null)[]} */
+  const scenePromptsResults = new Array(totalScenes).fill(null);
+
+  const imagePromptProfiles = PLAYWRIGHT_PROFILES.slice(0, maxProfiles);
+  let nextSceneIndex = 0;
+  const activeConcurrency = Math.min(imagePromptProfiles.length, totalScenes);
+
+  async function workerProfile(workerIndex) {
+    const profileNum = imagePromptProfiles[workerIndex];
+    /** @type {import('playwright').BrowserContext | null} */
+    let ctx = null;
+    try {
+      const opened = await openChromeProfile({ profile: profileNum, visible });
+      ctx = opened.context;
+      const pg = opened.page;
+      let primingDone = false;
+
+      while (true) {
+        const i = nextSceneIndex++;
+        if (i >= totalScenes) break;
+
+        const scene = scenes[i];
+        const sceneId = String(/** @type {{ scene_id?: string }} */ (scene)?.scene_id ?? '');
+        const sceneNum = i + 1;
+        onSceneStart?.({ sceneIndex: sceneNum, sceneId, total: totalScenes });
+
+        try {
+          if (!primingDone) {
+            await openChatPage(pg, { thinkingMode });
+            primingDone = true;
+          }
+
+          const prompt = buildImagePromptsPrompt([scene]);
+          const raw = await sendPromptWithRetry(pg, prompt, {
+            requireCodeBlock: false,
+            validate: validateJsonResponse,
+            maxRetries: 2,
+            retryDelayMs: 3000,
+            label: `[image-prompts] scene ${sceneNum}/${totalScenes} ${sceneId} (profile ${profileNum})`,
+          });
+
+          const payload = parseImagePromptsResponse(raw);
+          const imagePrompts = payload.image_prompts;
+
+          const segmentPath = imagePromptsSegmentPath(srtPath, sceneNum);
+          // saveJsonFile(segmentPath, {
+          //   scene_index: sceneNum,
+          //   scene_id: sceneId,
+          //   image_prompts: imagePrompts,
+          // });
+
+          scenePromptsResults[i] = imagePrompts;
+          console.log(
+            `✅ scene ${sceneNum}/${totalScenes} ${sceneId} → ${path.basename(segmentPath)} (${imagePrompts.length} prompts, profile ${profileNum})`,
+          );
+        } catch (err) {
+          const msg = err instanceof Error ? err.message : String(err);
+          console.warn(`[image-prompts] scene ${sceneNum}/${totalScenes} ${sceneId} lỗi profile ${profileNum}: ${msg}`);
+          scenePromptsResults[i] = null;
+        }
+
+        if (nextSceneIndex < totalScenes) {
+          await pg.waitForTimeout(1000);
+        }
+      }
+    } finally {
+      if (ctx) await ctx.close().catch(() => {});
+    }
+  }
+
+  await Promise.all(Array.from({ length: activeConcurrency }, (_, w) => workerProfile(w)));
+
+  const failedCount = scenePromptsResults.filter(r => r === null).length;
+  if (failedCount > 0) {
+    throw new Error(`createImagePromptsFromScenes: ${failedCount}/${totalScenes} scene thất bại`);
+  }
 
   /** @type {Record<string, unknown>[]} */
   const allImagePrompts = [];
-
-  const { context, page } = await openChromeProfile({ profile, visible });
-
-  try {
-    await openChatPage(page, { thinkingMode });
-
-    for (const scene of scenes) {
-      // onBatchStart?.({ batchIndex: batch.batchIndex, total: batches.length });
-
-      const prompt = buildImagePromptsPrompt(scene);
-      const raw = await sendPromptWithRetry(page, prompt, {
-        requireCodeBlock: false,
-        validate: validateJsonResponse,
-        maxRetries: 2,
-        retryDelayMs: 3000,
-        label: `[image-prompts] scene ${scene.scene_id}`,
-      });
-
-      const payload = parseImagePromptsResponse(raw);
-
-      // const record = {
-      //   batch_index: batch.batchIndex,
-      //   scene_range: {
-      //     start_scene_id: batch.startSceneId,
-      //     end_scene_id: batch.endSceneId,
-      //   },
-      //   scenes: batch.scenes,
-      //   image_prompts: payload.image_prompts,
-      // };
-
-      // const segmentPath = imagePromptsSegmentPath(srtPath, batch.batchIndex);
-      // saveJsonFile(segmentPath, record);
-      allImagePrompts.push(...payload.image_prompts);
-
-      // console.log(`✅ scene ${scene.scene_id} → ${path.basename(segmentPath)} (${payload.image_prompts.length} prompts)`);
-    }
-  } finally {
-    await context.close().catch(() => {});
+  for (const prompts of scenePromptsResults) {
+    allImagePrompts.push(.../** @type {Record<string, unknown>[]} */ (prompts));
   }
 
   const manifestPath = imagePromptsManifestPath(srtPath);
@@ -205,11 +214,11 @@ export async function createImagePromptsFromScenes(scenes, options = {}) {
  * @param {string} [options.srtPath]
  * @param {string} [options.sceneSpecsPath] — file .scene-specs.json
  * @param {Record<string, unknown>[]} [options.scenes] — scenes sẵn có, bỏ qua đọc file
- * @param {number} [options.profile]
  * @param {boolean} [options.visible]
+ * @param {number} [options.maxProfiles]
  */
 export async function createPromptImageForScene(options = {}) {
-  const { downloadsDir = PATHS.DOWNLOADS, srtPath: argSrtPath, sceneSpecsPath, scenes: scenesArg, profile, visible } = options;
+  const { downloadsDir = PATHS.DOWNLOADS, srtPath: argSrtPath, sceneSpecsPath, scenes: scenesArg, visible, maxProfiles } = options;
 
   let srtPath = argSrtPath ? path.resolve(argSrtPath) : null;
   let scenes = scenesArg;
@@ -237,10 +246,10 @@ export async function createPromptImageForScene(options = {}) {
 
   const result = await createImagePromptsFromScenes(scenes, {
     srtPath,
-    profile,
     visible,
-    onBatchStart: ({ batchIndex, total }) => {
-      console.log(`⏳ Đang xử lý batch ${batchIndex}/${total}...`);
+    maxProfiles,
+    onSceneStart: ({ sceneIndex, sceneId, total }) => {
+      console.log(`⏳ Đang xử lý scene ${sceneIndex}/${total} (${sceneId})...`);
     },
   });
 
@@ -268,8 +277,8 @@ export default async function main() {
     const scenes = loadScenesFromFile(argPath);
     await createImagePromptsFromScenes(scenes, {
       srtPath: srtPathFromSceneManifest(argPath),
-      onBatchStart: ({ batchIndex, total }) => {
-        console.log(`⏳ batch ${batchIndex}/${total}...`);
+      onSceneStart: ({ sceneIndex, sceneId, total }) => {
+        console.log(`⏳ scene ${sceneIndex}/${total} (${sceneId})...`);
       },
     });
     return;

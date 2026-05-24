@@ -1,5 +1,6 @@
 /**
- * Nhận danh sách visual beats → gọi promptCreateSceneSpecsFromBeats theo batch,
+ * Nhận danh sách visual beats → gọi promptCreateSceneSpecsFromBeats từng beat,
+ * chạy song song trên nhiều Chrome profile (profile xong beat nào thì lấy beat tiếp theo),
  * lưu JSON segment + manifest vào cùng thư mục với file visual-beats / srt.
  *
  * Dùng:
@@ -12,13 +13,14 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 
 import { PATHS } from '../../../constants/paths.js';
+import { PLAYWRIGHT_PROFILES } from '../../../constants/playwright-profile.js';
 import { openChatPage, sendPromptWithRetry } from '../../../llm/browser.util.js';
 import { stripJsonCodeFence, validateJsonResponse } from '../../../llm/text.util.js';
 import openChromeProfile from '../../../scripts/makeChromeProfile.js';
 import { saveJsonFile, visualBeatsManifestPath } from './createVisualBeat.js';
 import { promptCreateSceneSpecsFromBeats } from './prompts.js';
 
-const BEATS_BATCH_SIZE = 25;
+const SCENE_SPECS_MAX_PROFILES = 5;
 
 /** @param {string} srtPath */
 export function sceneSpecsManifestPath(srtPath) {
@@ -73,36 +75,6 @@ export function loadBeatsFromFile(filePath) {
 
 /**
  * @param {Record<string, unknown>[]} beats
- * @param {{ batchSize?: number }} [options]
- */
-export function createBeatBatches(beats, options = {}) {
-  const batchSize = options.batchSize ?? BEATS_BATCH_SIZE;
-
-  if (!Array.isArray(beats) || beats.length === 0) {
-    throw new Error('createBeatBatches: beats rỗng');
-  }
-
-  /** @type {Array<{ batchIndex: number, startBeatId: string, endBeatId: string, beats: Record<string, unknown>[] }>} */
-  const batches = [];
-
-  for (let start = 0; start < beats.length; start += batchSize) {
-    const slice = beats.slice(start, start + batchSize);
-    const first = /** @type {{ beat_id?: string }} */ (slice[0]);
-    const last = /** @type {{ beat_id?: string }} */ (slice[slice.length - 1]);
-
-    batches.push({
-      batchIndex: batches.length + 1,
-      startBeatId: String(first?.beat_id ?? ''),
-      endBeatId: String(last?.beat_id ?? ''),
-      beats: slice,
-    });
-  }
-
-  return batches;
-}
-
-/**
- * @param {Record<string, unknown>[]} beats
  */
 export function buildSceneSpecsPrompt(beats) {
   return promptCreateSceneSpecsFromBeats(JSON.stringify({ beats }, null, 2));
@@ -132,78 +104,109 @@ export function renumberSceneIds(scenes, startIndex = 1) {
   }));
 }
 
-function defaultLlmProfile() {
-  const fromEnv = process.env.LLM_TEST_PROFILE || process.env.GEMINI_TEST_PROFILE || process.env.GPT_TEST_PROFILE;
-  const n = Number(fromEnv);
-  return Number.isFinite(n) && n > 0 ? n : 2;
-}
-
 /**
  * @param {Record<string, unknown>[]} beats
  * @param {object} [options]
  * @param {string} [options.srtPath] — đường dẫn .srt (hoặc base tương đương) để đặt tên file output
- * @param {number} [options.profile]
  * @param {boolean} [options.visible]
  * @param {boolean} [options.thinkingMode]
- * @param {number} [options.batchSize]
- * @param {(info: { batchIndex: number, total: number }) => void} [options.onBatchStart]
+ * @param {number} [options.maxProfiles] — số Chrome profile chạy song song (mặc định 5)
+ * @param {(info: { beatIndex: number, beatId: string, total: number }) => void} [options.onBeatStart]
  */
 export async function createSceneSpecsFromBeats(beats, options = {}) {
-  const {
-    srtPath = PATHS.DOWNLOADS,
-    profile = defaultLlmProfile(),
-    visible = true,
-    thinkingMode = false,
-    batchSize = BEATS_BATCH_SIZE,
-    onBatchStart,
-  } = options;
+  const { srtPath = PATHS.DOWNLOADS, visible = true, thinkingMode = false, maxProfiles = SCENE_SPECS_MAX_PROFILES, onBeatStart } = options;
 
-  // const batches = createBeatBatches(beats, { batchSize });
-  const outputDir = path.dirname(path.resolve(srtPath));
+  if (!Array.isArray(beats) || beats.length === 0) {
+    throw new Error('createSceneSpecsFromBeats: beats rỗng');
+  }
+
+  const totalBeats = beats.length;
+
+  /** @type {(Record<string, unknown>[] | null)[]} */
+  const beatScenesResults = new Array(totalBeats).fill(null);
+
+  const sceneProfiles = PLAYWRIGHT_PROFILES.slice(0, maxProfiles);
+  let nextBeatIndex = 0;
+  const activeConcurrency = Math.min(sceneProfiles.length, totalBeats);
+
+  async function workerProfile(workerIndex) {
+    const profileNum = sceneProfiles[workerIndex];
+    /** @type {import('playwright').BrowserContext | null} */
+    let ctx = null;
+    try {
+      const opened = await openChromeProfile({ profile: profileNum, visible });
+      ctx = opened.context;
+      const pg = opened.page;
+      let primingDone = false;
+
+      while (true) {
+        const i = nextBeatIndex++;
+        if (i >= totalBeats) break;
+
+        const beat = beats[i];
+        const beatId = String(/** @type {{ beat_id?: string }} */ (beat)?.beat_id ?? '');
+        const beatNum = i + 1;
+        onBeatStart?.({ beatIndex: beatNum, beatId, total: totalBeats });
+
+        try {
+          if (!primingDone) {
+            await openChatPage(pg, { thinkingMode });
+            primingDone = true;
+          }
+
+          const prompt = buildSceneSpecsPrompt([beat]);
+          const raw = await sendPromptWithRetry(pg, prompt, {
+            requireCodeBlock: false,
+            validate: validateJsonResponse,
+            maxRetries: 2,
+            retryDelayMs: 3000,
+            label: `[scene-specs] beat ${beatNum}/${totalBeats} ${beatId} (profile ${profileNum})`,
+          });
+
+          const specsPayload = parseSceneSpecsResponse(raw);
+          const scenes = specsPayload.scenes;
+
+          const segmentPath = sceneSpecsSegmentPath(srtPath, beatNum);
+          // saveJsonFile(segmentPath, {
+          //   beat_index: beatNum,
+          //   beat_id: beatId,
+          //   scenes,
+          // });
+
+          beatScenesResults[i] = scenes;
+          console.log(
+            `✅ beat ${beatNum}/${totalBeats} ${beatId} → ${path.basename(segmentPath)} (${scenes.length} scenes, profile ${profileNum})`,
+          );
+        } catch (err) {
+          const msg = err instanceof Error ? err.message : String(err);
+          console.warn(`[scene-specs] beat ${beatNum}/${totalBeats} ${beatId} lỗi profile ${profileNum}: ${msg}`);
+          beatScenesResults[i] = null;
+        }
+
+        if (nextBeatIndex < totalBeats) {
+          await pg.waitForTimeout(1000);
+        }
+      }
+    } finally {
+      if (ctx) await ctx.close().catch(() => {});
+    }
+  }
+
+  await Promise.all(Array.from({ length: activeConcurrency }, (_, w) => workerProfile(w)));
+
+  const failedCount = beatScenesResults.filter(r => r === null).length;
+  if (failedCount > 0) {
+    throw new Error(`createSceneSpecsFromBeats: ${failedCount}/${totalBeats} beat thất bại`);
+  }
 
   /** @type {Record<string, unknown>[]} */
   const allScenes = [];
   let sceneNumber = 1;
 
-  const { context, page } = await openChromeProfile({ profile, visible });
-
-  try {
-    await openChatPage(page, { thinkingMode });
-
-    for (const beat of beats) {
-      // onBatchStart?.({ batchIndex: batch.batchIndex, total: batches.length });
-
-      const prompt = buildSceneSpecsPrompt(beat);
-      const raw = await sendPromptWithRetry(page, prompt, {
-        requireCodeBlock: false,
-        validate: validateJsonResponse,
-        maxRetries: 2,
-        retryDelayMs: 3000,
-        label: `[scene-specs] beat ${beat.beat_id}`,
-      });
-
-      const specsPayload = parseSceneSpecsResponse(raw);
-      const scenes = renumberSceneIds(specsPayload.scenes, sceneNumber);
-      sceneNumber += scenes.length;
-
-      // const record = {
-      //   batch_index: batch.batchIndex,
-      //   beat_range: {
-      //     start_beat_id: batch.startBeatId,
-      //     end_beat_id: batch.endBeatId,
-      //   },
-      //   beats: batch.beats,
-      //   scenes,
-      // };
-
-      // const segmentPath = sceneSpecsSegmentPath(srtPath, batch.batchIndex);
-      // saveJsonFile(segmentPath, record);
-      allScenes.push(...specsPayload.scenes);
-
-      // console.log(`✅ batch ${batch.batchIndex}/${batches.length} → ${path.basename(segmentPath)} (${scenes.length} scenes)`);
-    }
-  } finally {
-    await context.close().catch(() => {});
+  for (const scenes of beatScenesResults) {
+    const renumbered = renumberSceneIds(/** @type {Record<string, unknown>[]} */ (scenes), sceneNumber);
+    sceneNumber += renumbered.length;
+    allScenes.push(...renumbered);
   }
 
   const manifestPath = sceneSpecsManifestPath(srtPath);
@@ -218,11 +221,11 @@ export async function createSceneSpecsFromBeats(beats, options = {}) {
  * @param {string} [options.srtPath]
  * @param {string} [options.visualBeatsPath] — file .visual-beats.json; nếu không có thì dùng manifest mặc định từ srtPath
  * @param {Record<string, unknown>[]} [options.beats] — beats sẵn có, bỏ qua đọc file
- * @param {number} [options.profile]
  * @param {boolean} [options.visible]
+ * @param {number} [options.maxProfiles]
  */
 export async function createScenesFromBeat(options = {}) {
-  const { downloadsDir = PATHS.DOWNLOADS, srtPath: argSrtPath, visualBeatsPath, beats: beatsArg, profile, visible } = options;
+  const { downloadsDir = PATHS.DOWNLOADS, srtPath: argSrtPath, visualBeatsPath, beats: beatsArg, visible, maxProfiles } = options;
 
   let srtPath = argSrtPath ? path.resolve(argSrtPath) : null;
   let beats = beatsArg;
@@ -250,10 +253,10 @@ export async function createScenesFromBeat(options = {}) {
 
   const result = await createSceneSpecsFromBeats(beats, {
     srtPath,
-    profile,
     visible,
-    onBatchStart: ({ batchIndex, total }) => {
-      console.log(`⏳ Đang xử lý batch ${batchIndex}/${total}...`);
+    maxProfiles,
+    onBeatStart: ({ beatIndex, beatId, total }) => {
+      console.log(`⏳ Đang xử lý beat ${beatIndex}/${total} (${beatId})...`);
     },
   });
 
@@ -281,8 +284,8 @@ export default async function main() {
     const beats = loadBeatsFromFile(argPath);
     await createSceneSpecsFromBeats(beats, {
       srtPath: srtPathFromBeatsManifest(argPath),
-      onBatchStart: ({ batchIndex, total }) => {
-        console.log(`⏳ batch ${batchIndex}/${total}...`);
+      onBeatStart: ({ beatIndex, beatId, total }) => {
+        console.log(`⏳ beat ${beatIndex}/${total} (${beatId})...`);
       },
     });
     return;
