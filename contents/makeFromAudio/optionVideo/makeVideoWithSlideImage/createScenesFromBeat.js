@@ -156,10 +156,7 @@ export async function createSceneSpecsFromBeats(beats, options = {}) {
 
           const prompt = buildSceneSpecsPrompt([beat]);
           const raw = await sendPromptWithRetry(pg, prompt, {
-            requireCodeBlock: false,
             validate: validateJsonResponse,
-            maxRetries: 2,
-            retryDelayMs: 3000,
             label: `[scene-specs] beat ${beatNum}/${totalBeats} ${beatId} (profile ${profileNum})`,
           });
 
@@ -175,7 +172,7 @@ export async function createSceneSpecsFromBeats(beats, options = {}) {
 
           beatScenesResults[i] = scenes;
           console.log(
-            `✅ beat ${beatNum}/${totalBeats} ${beatId} → ${path.basename(segmentPath)} (${scenes.length} scenes, profile ${profileNum})`,
+            `✅ beat ${beatNum}/${totalBeats} ${beatId} → ${path.basename(segmentPath)} (${scenes.length} scenes, profile ${profileNum})`
           );
         } catch (err) {
           const msg = err instanceof Error ? err.message : String(err);
@@ -210,7 +207,7 @@ export async function createSceneSpecsFromBeats(beats, options = {}) {
   }
 
   const manifestPath = sceneSpecsManifestPath(srtPath);
-  saveJsonFile(manifestPath, allScenes);
+  // saveJsonFile(manifestPath, allScenes);
 
   return { manifestPath, scenes: allScenes };
 }
@@ -235,7 +232,7 @@ export async function createScenesFromBeat(options = {}) {
 
     if (!fs.existsSync(beatsFile)) {
       throw new Error(
-        `createScenesFromBeat: không tìm thấy visual beats — ${beatsFile}. Chạy createVisualBeat.js trước hoặc truyền options.beats.`,
+        `createScenesFromBeat: không tìm thấy visual beats — ${beatsFile}. Chạy createVisualBeat.js trước hoặc truyền options.beats.`
       );
     }
 

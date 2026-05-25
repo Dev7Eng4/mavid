@@ -58,9 +58,9 @@ export function imagePromptsToFlowPrompts(imagePrompts) {
   }
 
   return imagePrompts.map((item, index) => {
-    const prompt = String(item?.image_prompt ?? '').trim();
+    const prompt = String(item?.prompt_text ?? '').trim();
     if (!prompt) {
-      throw new Error(`imagePromptsToFlowPrompts: image_prompts[${index}] thiếu image_prompt`);
+      throw new Error(`imagePromptsToFlowPrompts: image_prompts[${index}] thiếu prompt_text`);
     }
     return {
       name: exportNameFromImagePrompt(item),
@@ -98,7 +98,7 @@ export async function generateImageForScenes(prompts, pathSave) {
   const folder = path.resolve(String(pathSave ?? PATHS.DOWNLOADS));
 
   console.log(`🖼️ Flow batch: ${normalized.length} ảnh → ${folder}`);
-  return createBatchMedia({ prompts: normalized, pathSave: folder });
+  return createBatchMedia({ prompts: { visuals: normalized }, pathSave: folder });
 }
 
 /**

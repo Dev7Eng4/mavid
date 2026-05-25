@@ -178,10 +178,7 @@ export async function segmentTranscriptToVisualBeats(transcript, options = {}) {
 
       const prompt = buildVisualBeatsPrompt(segment);
       const raw = await sendPromptWithRetry(page, prompt, {
-        requireCodeBlock: false,
         validate: validateJsonResponse,
-        maxRetries: 2,
-        retryDelayMs: 3000,
         label: `[visual-beats] seg ${String(segment.segmentIndex).padStart(3, '0')}`,
       });
 
@@ -201,7 +198,7 @@ export async function segmentTranscriptToVisualBeats(transcript, options = {}) {
       segmentResults.push(...beatsPayload.beats);
 
       console.log(
-        `✅ segment ${segment.segmentIndex}/${segments.length} → ${path.basename(segmentPath)} (${beatsPayload.beats.length} beats)`,
+        `✅ segment ${segment.segmentIndex}/${segments.length} → ${path.basename(segmentPath)} (${beatsPayload.beats.length} beats)`
       );
     }
   } finally {
@@ -209,7 +206,7 @@ export async function segmentTranscriptToVisualBeats(transcript, options = {}) {
   }
 
   const manifestPath = visualBeatsManifestPath(srtPath);
-  saveJsonFile(manifestPath, segmentResults);
+  // saveJsonFile(manifestPath, segmentResults);
 
   return { manifestPath, segmentResults };
 }

@@ -30,6 +30,12 @@ ${summary}
 TASK:
 Analyze the story and return a single JSON object.
 
+OUTPUT FORMAT:
+Output raw valid JSON only.
+Do not wrap in markdown code block.
+Do not add explanation.
+Do not add comments.
+
 STRICT OUTPUT FORMAT:
 {
   "detected_niche": "",
@@ -139,6 +145,13 @@ IMPORTANT BALANCE RULE:
 - If one line is much shorter than the others, rewrite it.
 - Do not rely on code to scale each top line separately.
 
+OUTPUT FORMAT:
+Output raw valid JSON only.
+Do not wrap in markdown code block.
+Do not add explanation.
+Do not add comments.
+Do not output rejected hook angles.
+
 STRICT OUTPUT FORMAT:
 {
   "thumbnail_copy": {
@@ -167,8 +180,6 @@ STRICT OUTPUT FORMAT:
     "no_unsupported_fact": true
   }
 }
-
-Return valid JSON only.
 `;
 
 export const promptToGenerateVisualPromptForThumbnailHorizontal = (analysisResult, textThumbnailResult) => `
@@ -214,6 +225,13 @@ DESIRED FINAL THUMBNAIL FORMAT:
 
 TASK:
 Return one complete JSON object.
+
+OUTPUT FORMAT:
+Output raw valid JSON only.
+Do not wrap in markdown code block.
+Do not add explanation.
+Do not add comments.
+Do not output rejected hook angles.
 
 STRICT OUTPUT FORMAT:
 {
@@ -352,6 +370,4 @@ The negative_prompt must include:
 - no distorted hands
 - no extra fingers
 - no unreadable signage focus
-
-Return valid JSON only.
 `;

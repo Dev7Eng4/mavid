@@ -14,7 +14,7 @@ import { createImagePromptsFromScenes } from './createPromptImageForScene.js';
 
 import { createSceneSpecsFromBeats } from './createScenesFromBeat.js';
 
-import { createVisualBeats } from './createVisualBeat.js';
+import { createVisualBeats, saveJsonFile } from './createVisualBeat.js';
 
 export async function makeVideoWithSlideImage(options = {}) {
   const { perVideoDir, originalTitle, audioSpeed: speedIn, logoPath: logoPathOpt, downloadsDir = DOWNLOADS_DIR, videoLanguage } = options;
@@ -32,6 +32,11 @@ export async function makeVideoWithSlideImage(options = {}) {
   console.log('🔄 Đang tạo image prompts...');
 
   const { imagePrompts } = await createImagePromptsFromScenes(scenes);
+
+  saveJsonFile(path.join(downloadsDir, 'scene-prompts.json'), {
+    scenes,
+    imagePrompts,
+  });
 
   const imagesDir = path.join(downloadsDir, 'images');
 

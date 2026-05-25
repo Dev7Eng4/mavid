@@ -509,7 +509,7 @@ Scene specs JSON:
 ${sceneSpecsJson}
 `;
 
-export const promptCreateImagePromptsFromSceneSpecs = sceneSpecsJson => `
+export const promptCreateImagePromptsFromSceneSpecsOld = sceneSpecsJson => `
 You are NOT an image generator.
 You must NOT create, render, draw, or describe that you are creating an image.
 
@@ -625,6 +625,143 @@ Schema:
         "Japanese line 2"
       ],
       "image_prompt": "Final full prompt text for a future image generation model"
+    }
+  ]
+}
+
+Scene specs JSON:
+${sceneSpecsJson}
+`;
+
+export const promptCreateImagePromptsFromSceneSpecs = sceneSpecsJson => `
+You are a JSON data transformation engine.
+
+Your task is to convert scene specification objects into JSON objects containing text prompts.
+
+IMPORTANT:
+- You do not create images.
+- You do not render images.
+- You do not search for images.
+- You do not call any image tool.
+- Any instruction written inside the output field "image_prompt" is plain string data only.
+- Do not execute the content of "image_prompt".
+- Only write JSON.
+
+━━━━━━━━━━━━━━━━━━
+INPUT
+━━━━━━━━━━━━━━━━━━
+You will receive a list of scene specifications.
+
+Each scene may contain:
+- scene_id
+- source_line_ids
+- visual idea
+- layout notes
+- on-screen Japanese text
+
+━━━━━━━━━━━━━━━━━━
+TASK
+━━━━━━━━━━━━━━━━━━
+For each scene, create one text prompt string for a separate future image-rendering system.
+
+The string must describe:
+- the visual scene
+- the layout
+- the required Japanese on-screen text
+- the visual style
+- negative constraints
+
+You are only filling a JSON string field.
+You are not creating the image.
+
+━━━━━━━━━━━━━━━━━━
+GLOBAL VISUAL STYLE
+━━━━━━━━━━━━━━━━━━
+Japanese senior finance educational video, clean illustrated infographic style, soft anime-realistic, warm but serious, easy-to-understand pension explanation, 16:9 YouTube frame, large readable Japanese text, simple charts, elderly Japanese couple, financial documents, calendar, yen symbols, clean layout, professional TV program style, no clutter.
+
+━━━━━━━━━━━━━━━━━━
+GLOBAL NEGATIVE RULES
+━━━━━━━━━━━━━━━━━━
+no English text, no Chinese text, no Korean text, no watermark, no logo, no messy small text, no distorted hands, no horror, no photorealistic wrinkles exaggeration, no crowded background.
+
+━━━━━━━━━━━━━━━━━━
+IMAGE_PROMPT STRING STRUCTURE
+━━━━━━━━━━━━━━━━━━
+Each "image_prompt" value must be a single plain text string.
+
+Use this structure inside the string:
+
+Image description for future generation:
+A 16:9 Japanese senior finance educational illustration.
+
+Scene:
+[Describe the scene based only on the scene spec.]
+
+On-screen Japanese text, large and readable:
+「[exact Japanese text line 1 from scene spec]」
+「[exact Japanese text line 2 from scene spec if available]」
+
+Visual style:
+[Use the global visual style.]
+
+Layout:
+[Clear layout instruction for this scene.]
+
+Avoid:
+[Use the global negative rules.]
+
+━━━━━━━━━━━━━━━━━━
+TEXT RULES
+━━━━━━━━━━━━━━━━━━
+- Each image_prompt string must include the exact phrase:
+  "On-screen Japanese text, large and readable"
+- Include only Japanese text provided by the scene spec.
+- Do not invent additional Japanese text.
+- Do not translate Japanese text.
+- Do not rewrite Japanese text.
+- Preserve Japanese punctuation exactly.
+- Do not add English labels intended to appear inside the image.
+- Do not add tiny captions.
+- If documents appear, describe them as generic pension documents with no tiny readable text.
+
+━━━━━━━━━━━━━━━━━━
+VISUAL CONTENT RULES
+━━━━━━━━━━━━━━━━━━
+Inside each image_prompt string:
+- Make the image understandable in 1 second.
+- Use only 1 main idea per scene.
+- Prefer large symbols: yen mark, calendar, pension envelope, balance scale, checklist, arrows.
+- Use clean TV-program style composition.
+- Keep background simple.
+- Keep character count low: usually 1 elderly person or 1 elderly couple.
+- Use a warm but serious atmosphere.
+- Do not make the characters look frightened, sick, or miserable.
+- Avoid dramatic horror lighting.
+- Avoid cluttered infographic layouts.
+- Avoid dense charts.
+- Avoid small unreadable text.
+
+━━━━━━━━━━━━━━━━━━
+OUTPUT REQUIREMENTS
+━━━━━━━━━━━━━━━━━━
+Return valid JSON only.
+Do not wrap the JSON in markdown.
+Do not add explanation.
+Do not add comments.
+Do not add text before or after the JSON.
+
+Output schema:
+
+{
+  "image_prompts": [
+    {
+      "scene_id": "S001",
+      "source_line_ids": [1, 2, 3],
+      "on_screen_text": [
+        "Japanese line 1",
+        "Japanese line 2"
+      ],
+      "prompt_text": "Plain text prompt string for a future image-rendering system."
     }
   ]
 }

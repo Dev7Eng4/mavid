@@ -153,10 +153,7 @@ export async function createImagePromptsFromScenes(scenes, options = {}) {
 
           const prompt = buildImagePromptsPrompt([scene]);
           const raw = await sendPromptWithRetry(pg, prompt, {
-            requireCodeBlock: false,
             validate: validateJsonResponse,
-            maxRetries: 2,
-            retryDelayMs: 3000,
             label: `[image-prompts] scene ${sceneNum}/${totalScenes} ${sceneId} (profile ${profileNum})`,
           });
 
@@ -172,7 +169,9 @@ export async function createImagePromptsFromScenes(scenes, options = {}) {
 
           scenePromptsResults[i] = imagePrompts;
           console.log(
-            `✅ scene ${sceneNum}/${totalScenes} ${sceneId} → ${path.basename(segmentPath)} (${imagePrompts.length} prompts, profile ${profileNum})`,
+            `✅ scene ${sceneNum}/${totalScenes} ${sceneId} → ${path.basename(segmentPath)} (${
+              imagePrompts.length
+            } prompts, profile ${profileNum})`
           );
         } catch (err) {
           const msg = err instanceof Error ? err.message : String(err);
@@ -203,9 +202,19 @@ export async function createImagePromptsFromScenes(scenes, options = {}) {
   }
 
   const manifestPath = imagePromptsManifestPath(srtPath);
-  saveJsonFile(manifestPath, allImagePrompts);
+  // saveJsonFile(manifestPath, allImagePrompts);
 
-  return { manifestPath, imagePrompts: allImagePrompts, outputDir };
+  return {
+    manifestPath,
+    imagePrompts: allImagePrompts.map(p => ({
+      name:
+        p.source_line_ids.length === 1
+          ? `${p.source_line_ids[0]}`
+          : `${p.source_line_ids[0]}-${p.source_line_ids[p.source_line_ids.length - 1]}`,
+      prompt: p.prompt_text,
+    })),
+    outputDir,
+  };
 }
 
 /**
@@ -228,7 +237,7 @@ export async function createPromptImageForScene(options = {}) {
 
     if (!fs.existsSync(specsFile)) {
       throw new Error(
-        `createPromptImageForScene: không tìm thấy scene specs — ${specsFile}. Chạy createScenesFromBeat.js trước hoặc truyền options.scenes.`,
+        `createPromptImageForScene: không tìm thấy scene specs — ${specsFile}. Chạy createScenesFromBeat.js trước hoặc truyền options.scenes.`
       );
     }
 

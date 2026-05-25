@@ -909,9 +909,9 @@ OUTPUT JSON SCHEMA
 ━━━━━━━━━━━━━━━━━━━━
 
 Return valid JSON only.
-Do not use markdown.
-Do not add explanations outside JSON.
-Do not include comments in JSON.
+Do not wrap in markdown code block.
+Do not add explanation.
+Do not add comments.
 
 {
   "detected_niche": "string",
@@ -1277,8 +1277,9 @@ OUTPUT JSON SCHEMA
 ━━━━━━━━━━━━━━━━━━━━
 
 Return valid JSON only.
-Do not use markdown.
-Do not add explanations outside JSON.
+Do not wrap in markdown code block.
+Do not add explanation.
+Do not add comments.
 
 {
   "detected_niche": "string",
