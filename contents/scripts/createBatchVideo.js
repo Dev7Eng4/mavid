@@ -484,6 +484,7 @@ function buildMakeVideoFromAudioOptions(props, channelFolderName) {
  * Sau đó chọn ngẫu nhiên không trùng vị trí trong danh sách, tối đa `maxVideosPerBatch` link.
  */
 async function main(props = {}) {
+  console.log('🚀 ~ main ~ props:', props);
   const channelId = props.channel || process.env.MAVID_CHANNEL;
   console.log('🚀 ~ main ~ channelId:', channelId);
   const mappingId = props.mapping || process.env.MAVID_MAPPING;

@@ -8,7 +8,6 @@
 import fs from 'fs';
 import fsp from 'fs/promises';
 import path from 'path';
-import { resolveChannelsDir } from '../../utils/channelsStoragePath.js';
 import { getListGroupsPath } from '../urls/getListAllPaths.js';
 
 /**
