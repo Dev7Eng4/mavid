@@ -304,8 +304,6 @@ declare global {
       selectVideoStorageFolder: (currentPath?: string | null) => Promise<{ ok: boolean; path: string | null }>;
       listChannels: () => Promise<ChannelFile[]>;
       readChannelData: (filePath: string) => Promise<ChannelData>;
-      /** Chỉ ghi được `channels/index.xlsx` → thực tế `MaVidMedia/channels/index.xlsx`. */
-      writeChannelIndex: (payload: { filePath: string } & ChannelData) => Promise<{ ok: boolean }>;
       readChannelFolderData: (channelFolder: string) => Promise<ChannelFolderDataResult>;
       readMavidChannelConfig: (channelFolder: string) => Promise<MavidChannelConfig | null>;
       writeMavidChannelConfig: (payload: {

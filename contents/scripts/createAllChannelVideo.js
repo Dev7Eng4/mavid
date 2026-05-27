@@ -39,8 +39,10 @@ export async function createAllChannelVideo(options = {}) {
   const { batchProps = {}, stopOnError = false } = options;
 
   const { list = [] } = await getListAllMapping();
+  console.log('🚀 ~ createAllChannelVideo ~ list:', list);
 
   const withEmail = list.filter(row => hasNonEmptyEmail(row.email));
+  console.log('🚀 ~ createAllChannelVideo ~ withEmail:', withEmail);
 
   /** @type {Array<{ channelId: string; mappingId: string; ok: boolean; result?: unknown; error?: string }>} */
   const results = [];
@@ -53,9 +55,7 @@ export async function createAllChannelVideo(options = {}) {
 
     if (!channelId || !mappingId) {
       skipped += 1;
-      console.warn(
-        `[createAllChannelVideo] Bỏ qua mapping thiếu channelId/id (id=${row.id ?? ''}, channelId=${row.channelId ?? ''}).`
-      );
+      console.warn(`[createAllChannelVideo] Bỏ qua mapping thiếu channelId/id (id=${row.id ?? ''}, channelId=${row.channelId ?? ''}).`);
       continue;
     }
 
@@ -83,9 +83,7 @@ export async function createAllChannelVideo(options = {}) {
   const processed = results.length;
   const okCount = results.filter(r => r.ok).length;
 
-  console.log(
-    `\n[createAllChannelVideo] Xong: ${okCount}/${processed} thành công, bỏ qua ${skipped}, tổng có email ${withEmail.length}.`
-  );
+  console.log(`\n[createAllChannelVideo] Xong: ${okCount}/${processed} thành công, bỏ qua ${skipped}, tổng có email ${withEmail.length}.`);
 
   return {
     total: list.length,

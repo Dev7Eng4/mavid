@@ -5,7 +5,7 @@ import { OVERLAY_OPTIONS } from '@contents/constants/overlayOptions.js';
 import type { VideoMakeType } from '../models/channelsIndexSection.model';
 import { VIDEO_MAKE_TYPE } from '../constants';
 
-/** Khớp dropdown trong getInfoChannel / electron write-channel-index */
+/** Khớp dropdown trong getInfoChannel */
 export const INDEX_VIDEO_TYPE_VALUES = ['audio', 'video'] as const;
 /** Giá trị nhãn (dropdown) khớp cột THỜI GIAN VIDEO trong index / getInfoChannel. */
 export const INDEX_VIDEO_DURATION_LABELS = ['Tất cả', '0 - 30 phút', '0 - 60 phút', '30 - 60 phút', 'Từ 30 phút', 'Từ 60 phút'] as const;
@@ -174,7 +174,7 @@ export function buildExtraEnvForIndexChannelRow(
   id: string,
   channelId: string,
   videos: string[],
-  maxVideosPerBatch?: number,
+  maxVideosPerBatch?: number
 ): Record<string, string> {
   const maxBatch = Math.max(1, Math.min(100, Math.floor(Number(maxVideosPerBatch) || 5)));
   const env: Record<string, string> = {
@@ -401,7 +401,7 @@ export function channelAddDialogInitialFromIndexRow(row: ChannelRow): ChannelAdd
 export function buildChannelRowFromAddForm(
   headers: string[],
   input: ChannelAddFormInput,
-  opts?: { preserveChannelFromRow?: ChannelRow | null },
+  opts?: { preserveChannelFromRow?: ChannelRow | null }
 ): { row: ChannelRow; error?: string } {
   const row: ChannelRow = {};
   for (const h of headers) row[h] = '';

@@ -1,8 +1,7 @@
 import ExcelJS from 'exceljs';
 import fs from 'fs';
-import { mapIndexDataToProps } from '../../constants/indexColumnMapping.js';
-import { getListMappingPath } from '../urls/getListAllPaths.js';
 import { CHANNELS } from '../../constants/channel.js';
+import { getListMappingPath } from '../urls/getListAllPaths.js';
 
 /**
  * Trích chuỗi an toàn từ một ô Excel (xử lý rich text / hyperlink / formula / object).
@@ -87,14 +86,15 @@ export const convertChannelRowsToObjects = (rows, columns = CHANNELS) => {
  * @param {string | number} [options.sheet=0] — Index hoặc tên sheet cần đọc (mặc định sheet đầu).
  * @returns {Promise<{ filePath: string, headers: string[], rows: Record<string, unknown>[] }>}
  */
-export async function getListAllMapping({ mapToProps = true, sheet = 0 } = {}) {
+export async function getListAllMapping({ sheet = 0 } = {}) {
   const absPath = getListMappingPath();
 
   if (!fs.existsSync(absPath)) {
-    return { filePath: absPath, headers: [], rows: [] };
+    return { headers: [], rows: [] };
   }
+
   if (fs.statSync(absPath).size === 0) {
-    return { filePath: absPath, headers: [], rows: [] };
+    return { headers: [], rows: [] };
   }
 
   const workbook = new ExcelJS.Workbook();
@@ -103,10 +103,9 @@ export async function getListAllMapping({ mapToProps = true, sheet = 0 } = {}) {
   const ws = typeof sheet === 'string' ? workbook.getWorksheet(sheet) : workbook.worksheets[sheet] ?? workbook.worksheets[0];
 
   const raw = extractSheetData(ws);
-  const data = mapToProps ? mapIndexDataToProps(raw) : raw;
 
   return {
-    list: convertChannelRowsToObjects(data.rows),
+    list: convertChannelRowsToObjects(raw.rows),
   };
 }
 

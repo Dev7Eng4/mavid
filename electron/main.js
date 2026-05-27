@@ -1,16 +1,15 @@
-import { app, BrowserWindow, ipcMain, Menu, globalShortcut, dialog } from 'electron';
-import path from 'path';
 import { spawn } from 'child_process';
+import { app, BrowserWindow, dialog, ipcMain, Menu } from 'electron';
 import fs from 'fs';
+import path from 'path';
 import { fileURLToPath, pathToFileURL } from 'url';
-import { resolveGpmChromiumExecutable } from '../contents/scripts/openGpmPlaywright.js';
-import { getDefaultVideoStorageRoot, MAVID_MEDIA_FOLDER } from '../contents/constants/defaultVideoStorageRoot.js';
-import { mergeAppSettingsObjects, normalizeUserConstantsOverlay } from '../contents/constants/mergeConstantsOverlay.js';
 import { OVERLAY_KEYS } from '../contents/constants/constantsExportKeys.js';
 import { buildConstantsModuleBase, expandAppSettingsIntoModule } from '../contents/constants/constantsModuleBase.js';
-import { getAppSettingsUserJsonPath } from '../contents/constants/userConstantsPaths.js';
-import { mapIndexDataToProps, mapIndexDataToHeaders, mapPropToHeader } from '../contents/constants/indexColumnMapping.js';
+import { getDefaultVideoStorageRoot, MAVID_MEDIA_FOLDER } from '../contents/constants/defaultVideoStorageRoot.js';
 import { GPM_API_DEFAULT_ORIGIN } from '../contents/constants/gpmApi.js';
+import { mergeAppSettingsObjects, normalizeUserConstantsOverlay } from '../contents/constants/mergeConstantsOverlay.js';
+import { getAppSettingsUserJsonPath } from '../contents/constants/userConstantsPaths.js';
+import { resolveGpmChromiumExecutable } from '../contents/scripts/openGpmPlaywright.js';
 
 const VITE_DEV_SERVER_URL = process.env.VITE_DEV_SERVER_URL || 'http://localhost:5173';
 
@@ -1301,107 +1300,6 @@ ipcMain.handle('read-channel-data', async (_event, { filePath }) => {
   const raw = await readSpreadsheetAsChannelData(norm);
   // Map Excel headers (tiếng Việt) → camelCase prop names cho frontend
   return raw;
-});
-
-/**
- * Ghi lại `channels/index.xlsx` từ dữ liệu UI (giữ sheet "Channels", áp lại data validation).
- */
-ipcMain.handle('write-channel-index', async (_event, { filePath, headers, rows }) => {
-  if (!filePath || typeof filePath !== 'string') throw new Error('filePath không hợp lệ.');
-  const { channelsDir, abs: norm } = await resolvePathUnderChannelsDir(filePath);
-  const indexOnly = path.join(channelsDir, 'index.xlsx');
-  if (path.resolve(norm) !== path.resolve(indexOnly)) {
-    throw new Error('Chỉ được ghi channels/index.xlsx (MaVidMedia/channels).');
-  }
-  if (!Array.isArray(headers) || headers.length === 0 || !headers.every(h => typeof h === 'string' && h.trim())) {
-    throw new Error('headers không hợp lệ.');
-  }
-  if (!Array.isArray(rows)) throw new Error('rows không hợp lệ.');
-
-  // Reverse-map: prop names → Excel headers (tiếng Việt)
-  const mapped = mapIndexDataToHeaders({ headers, rows });
-  const excelHeaders = mapped.headers;
-  const excelRows = mapped.rows;
-
-  const { default: ExcelJS } = await import('exceljs');
-  const workbook = new ExcelJS.Workbook();
-  const sheet = workbook.addWorksheet('Channels', { views: [{ state: 'frozen', ySplit: 1 }] });
-  sheet.addRow(excelHeaders);
-
-  for (const row of excelRows) {
-    const values = excelHeaders.map(h => {
-      const v = row?.[h];
-      if (v == null || v === '') return '';
-      return typeof v === 'number' ? v : String(v);
-    });
-    sheet.addRow(values);
-  }
-
-  const colWidths = {
-    CHANNEL: 45,
-    LINK: 60,
-    ID: 40,
-    EMAIL: 45,
-    'KÊNH CỦA TÔI': 36,
-    'LOẠI VIDEO': 18,
-    'THỜI GIAN VIDEO': 18,
-    BACKGROUND: 22,
-    'LAST UPLOAD': 30,
-    STATUS: 12,
-    Group: 28,
-  };
-  sheet.columns = excelHeaders.map(h => ({ width: colWidths[h] ?? 20 }));
-
-  const typeCol = excelHeaders.findIndex(h => normHeaderCell(h) === normHeaderCell('LOẠI VIDEO')) + 1;
-  const thoiGianCol = excelHeaders.findIndex(h => normHeaderCell(h) === normHeaderCell('THỜI GIAN VIDEO')) + 1;
-  const bgCol = excelHeaders.findIndex(h => normHeaderCell(h) === normHeaderCell('BACKGROUND')) + 1;
-  const statusCol = excelHeaders.findIndex(h => normHeaderCell(h) === normHeaderCell('STATUS')) + 1;
-
-  const backgroundsDir = await resolveStockBackgroundsDirFromDisk();
-  let bgOptions = [];
-  if (fs.existsSync(backgroundsDir)) {
-    bgOptions = fs.readdirSync(backgroundsDir).filter(f => fs.statSync(path.join(backgroundsDir, f)).isDirectory());
-  }
-
-  const typeFormula = `"${INDEX_VIDEO_TYPE_OPTIONS.join(',')}"`;
-  const thoiGianFormula = `"${INDEX_THOI_GIAN_OPTIONS.join(',')}"`;
-  const statusFormula = '"INIT,LIVE,STOPPED"';
-
-  for (let r = 2; r <= sheet.rowCount; r++) {
-    if (typeCol > 0) {
-      sheet.getRow(r).getCell(typeCol).dataValidation = {
-        type: 'list',
-        allowBlank: true,
-        formulae: [typeFormula],
-      };
-    }
-    if (thoiGianCol > 0) {
-      sheet.getRow(r).getCell(thoiGianCol).dataValidation = {
-        type: 'list',
-        allowBlank: true,
-        formulae: [thoiGianFormula],
-      };
-    }
-    if (bgCol > 0 && bgOptions.length > 0) {
-      const bgFormula = `"${bgOptions.join(',')}"`;
-      sheet.getRow(r).getCell(bgCol).dataValidation = {
-        type: 'list',
-        allowBlank: true,
-        formulae: [bgFormula],
-      };
-    }
-    if (statusCol > 0) {
-      sheet.getRow(r).getCell(statusCol).dataValidation = {
-        type: 'list',
-        allowBlank: true,
-        formulae: [statusFormula],
-      };
-    }
-  }
-
-  fs.mkdirSync(channelsDir, { recursive: true });
-  await workbook.xlsx.writeFile(norm);
-  return { ok: true };
 });
 
 ipcMain.handle('read-channel-folder-data', async (_event, { channelFolder }) => {
