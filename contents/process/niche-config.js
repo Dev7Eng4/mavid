@@ -1,3 +1,30 @@
+const COMMON_SENIOR_SAFETY_RULES = {
+  factual_safety_rules: [
+    'Use only information supported by the transcript or visual beat.',
+    'Do not invent numbers, dates, laws, pension amounts, medical claims, legal outcomes, or official procedures.',
+    'Do not turn a possibility into a guarantee.',
+    'Preserve uncertainty if the transcript is uncertain.',
+    'Avoid fear exaggeration.',
+    'Avoid real company, bank, police, hospital, or government logos.',
+  ],
+
+  ignored_content_rules: [
+    'generic greeting',
+    'like and subscribe request',
+    'repeated channel introduction',
+    'non-informational filler',
+    'unrelated personal chatter',
+  ],
+
+  general_scene_rules: [
+    'One scene should communicate one clear idea.',
+    'Use senior-friendly simple visuals.',
+    'Avoid clutter and tiny labels.',
+    'Prefer large icons, simple boards, and clear characters.',
+    'Keep source_line_ids unchanged across pipeline.',
+  ],
+};
+
 export const NICHE_CONFIGS = {
   senior_scam_prevention: {
     niche_id: 'senior_scam_prevention',
@@ -302,6 +329,7 @@ export const NICHE_CONFIGS = {
 
     factual_safety_rules: COMMON_SENIOR_SAFETY_RULES.factual_safety_rules,
   },
+
   senior_pension_easy: {
     niche_id: 'senior_pension_easy',
     niche_name_ja: '年金をやさしく解説',
@@ -710,6 +738,7 @@ export const NICHE_CONFIGS = {
 
     factual_safety_rules: COMMON_SENIOR_SAFETY_RULES.factual_safety_rules,
   },
+
   end_of_life_planning: {
     niche_id: 'end_of_life_planning',
     niche_name_ja: '終活の始め方',
@@ -1120,6 +1149,7 @@ export const NICHE_CONFIGS = {
 
     factual_safety_rules: COMMON_SENIOR_SAFETY_RULES.factual_safety_rules,
   },
+
   senior_meal_saving_alone: {
     niche_id: 'senior_meal_saving_alone',
     niche_name_ja: 'シニア一人暮らしの食事節約',
@@ -1471,6 +1501,7 @@ export const NICHE_CONFIGS = {
 
     factual_safety_rules: COMMON_SENIOR_SAFETY_RULES.factual_safety_rules,
   },
+
   medical_expense_saving: {
     niche_id: 'medical_expense_saving',
     niche_name_ja: '高齢者の医療費節約',
@@ -1743,6 +1774,7 @@ export const NICHE_CONFIGS = {
 
     factual_safety_rules: COMMON_SENIOR_SAFETY_RULES.factual_safety_rules,
   },
+
   senior_social_connection: {
     niche_id: 'senior_social_connection',
     niche_name_ja: 'シニアの人間関係・地域参加',
@@ -2023,5 +2055,95 @@ export const NICHE_CONFIGS = {
     },
 
     factual_safety_rules: COMMON_SENIOR_SAFETY_RULES.factual_safety_rules,
+  },
+
+  senior_general_educational: {
+    niche_id: 'senior_general_educational',
+    niche_name_ja: 'シニア向け生活情報',
+    niche_name_vi: 'Thông tin đời sống chung cho senior',
+    audience: 'Japanese seniors 60+',
+    primary_viewer: 'Japanese seniors who want practical daily-life information',
+
+    content_goal: 'Explain practical senior-life information clearly and safely.',
+    emotional_tone: 'calm, practical, trustworthy',
+    trust_level: 'high',
+
+    default_style_id: 'soft_anime_infographic',
+    alternative_style_ids: ['gentle_lifestyle', 'clean_tv_slide'],
+
+    default_text_rendering_mode: 'auto',
+
+    text_policy: {
+      scene_text_usage: 'moderate',
+      preferred_text_modes: ['ai_generated_text', 'minimal_label_text', 'no_text'],
+      no_text_for_visual_types: ['emotional_lifestyle_scene', 'family_discussion_scene'],
+      text_heavy_visual_types: ['checklist_slide', 'comparison_slide', 'warning_slide', 'summary_slide'],
+      max_text_blocks: 3,
+    },
+
+    preferred_beat_types: [
+      'opening_hook',
+      'problem_statement',
+      'basic_explanation',
+      'risk_warning',
+      'checklist',
+      'step_by_step_guide',
+      'summary_takeaway',
+    ],
+
+    scene_rules: {
+      density_level: 'medium',
+      average_scene_duration_sec: 30,
+      preferred_visual_types: [
+        'character_explanation',
+        'checklist_slide',
+        'comparison_slide',
+        'emotional_lifestyle_scene',
+        'summary_slide',
+      ],
+      preferred_layout_types: ['left_text_right_character', 'checklist_board', 'comparison_board', 'summary_board'],
+      preferred_elements: ['elderly Japanese person', 'simple explanation board', 'large icons', 'warm home setting', 'checklist'],
+      forbidden_elements: [
+        'real logos',
+        'fake official seals',
+        'invented numbers',
+        'medical/legal/financial overclaim',
+        'fear exaggeration',
+      ],
+    },
+
+    segmentation_rules: {
+      split_when: [
+        'a new practical point appears',
+        'a warning or condition appears',
+        'a checklist item appears',
+        'the speaker moves from problem to solution',
+      ],
+      merge_when: ['several lines repeat the same idea', 'the lines are generic greeting or subscribe request'],
+      ignore_or_compress: ['generic greeting', 'like and subscribe request', 'repeated channel introduction', 'non-informational filler'],
+    },
+
+    visual_keywords: ['elderly Japanese person', 'senior life', 'simple checklist', 'warm home', 'educational board'],
+
+    thumbnail_rules: {
+      emotional_angle: 'practical concern + helpful solution',
+      title_style: 'simple senior-life explanation',
+      recommended_copy_patterns_ja: ['シニアの基本', '今すぐ確認', '知らないと損', '暮らしの注意'],
+      color_direction: 'warm beige + blue trust + yellow highlight',
+      thumbnail_text_mode: 'ai_generated_text',
+    },
+
+    metadata_rules: {
+      title_patterns_ja: ['シニア向け生活情報をやさしく解説', '高齢者が知っておきたい暮らしのポイント', '老後の生活で確認したい大切なこと'],
+      core_tags_ja: ['シニアライフ', '高齢者 生活', '老後の暮らし', 'シニア向け', '生活情報'],
+      hashtags_ja: ['#シニアライフ', '#高齢者', '#老後の暮らし'],
+    },
+
+    factual_safety_rules: [
+      'Use only information supported by the transcript.',
+      'Do not invent numbers, dates, laws, medical claims, legal claims, or financial advice.',
+      'Avoid fear exaggeration.',
+      'Avoid real logos and fake official symbols.',
+    ],
   },
 };

@@ -1,4 +1,7 @@
-import { PATHS } from '../constants/paths.js';
+import { PLAYWRIGHT_PROFILES } from '../constants/playwright-profile.js';
+import { openChatPage, sendPromptWithRetry } from '../llm/browser.util.js';
+import { validateJsonResponse } from '../llm/text.util.js';
+import openChromeProfile from '../scripts/makeChromeProfile.js';
 import { NICHE_CONFIGS } from './niche-config.js';
 import { STYLE_CONFIGS } from './style-config.js';
 
@@ -283,19 +286,80 @@ export function formatNumberedTranscript(lines) {
   return lines.map(line => `[${line.id}] ${line.text}`).join('\n');
 }
 
-export async function main(transcriptObjects, folder = PATHS.DOWNLOADS) {
+export async function main(transcriptObjects, nicheConfig, styleConfig) {
   const batches = createTranscriptBatchesForParallelVisualBeats(transcriptObjects);
 
-  const prompts = batches.map(batch =>
-    promptExtractVisualBeatsFromTranscriptBatch({
-      batchId: batch.batchId,
-      nicheConfig: NICHE_CONFIGS.senior_scam_prevention,
-      styleConfig: STYLE_CONFIGS.soft_anime_infographic,
-      previousPreviewContext: formatNumberedTranscript(batch.previousLines),
-      currentNumberedTranscript: formatNumberedTranscript(batch.currentLines),
-      nextPreviewContext: formatNumberedTranscript(batch.nextLines),
-    })
-  );
+  const totalBatches = batches.length;
+  const beatsResults = new Array(batches.length).fill(null);
 
-  return batches;
+  const activeConcurrency = Math.min(PLAYWRIGHT_PROFILES.length, batches.length);
+  let nextBatchIndex = 0;
+
+  async function workerProfile(workerIndex) {
+    const profileNum = PLAYWRIGHT_PROFILES[workerIndex];
+    /** @type {import('playwright').BrowserContext | null} */
+    let ctx = null;
+    try {
+      const opened = await openChromeProfile({ profile: profileNum });
+      ctx = opened.context;
+      const pg = opened.page;
+      let primingDone = false;
+
+      while (true) {
+        const i = nextBatchIndex++;
+        if (i >= totalBatches) break;
+
+        const batch = batches[i];
+        const batchId = batch.batchId;
+        const batchIndex = i + 1;
+        console.log(`[create-beats] batch ${batchIndex}/${totalBatches} ${batchId} (profile ${profileNum})`);
+        // onBatchStart?.({ batchIndex, batchId, total: totalBatches });
+
+        try {
+          if (!primingDone) {
+            await openChatPage(pg);
+            primingDone = true;
+          }
+
+          const prompt = promptExtractVisualBeatsFromTranscriptBatch({
+            batchId: batch.batchId,
+            nicheConfig,
+            styleConfig,
+            previousPreviewContext: formatNumberedTranscript(batch.previousLines),
+            currentNumberedTranscript: formatNumberedTranscript(batch.currentLines),
+            nextPreviewContext: formatNumberedTranscript(batch.nextLines),
+          });
+
+          const raw = await sendPromptWithRetry(pg, prompt, {
+            validate: validateJsonResponse,
+            label: `[create-beats] batch ${batchIndex}/${totalBatches} ${batchId} (profile ${profileNum})`,
+          });
+
+          const beatsPayload = JSON.parse(raw);
+          const beats = beatsPayload.visual_beats;
+
+          beatsResults[i] = beats;
+        } catch (err) {
+          const msg = err instanceof Error ? err.message : String(err);
+          console.warn(`[create-beats] batch ${batchIndex}/${totalBatches} ${batchId} lỗi profile ${profileNum}: ${msg}`);
+          beatsResults[i] = null;
+        }
+
+        if (nextBatchIndex < totalBatches) {
+          await pg.waitForTimeout(1000);
+        }
+      }
+    } finally {
+      if (ctx) await ctx.close().catch(() => {});
+    }
+  }
+
+  await Promise.all(Array.from({ length: activeConcurrency }, (_, w) => workerProfile(w)));
+
+  const failedCount = beatsResults.filter(r => r === null).length;
+  if (failedCount > 0) {
+    throw new Error(`createBeats: ${failedCount}/${totalBatches} batch thất bại`);
+  }
+
+  return beatsResults;
 }

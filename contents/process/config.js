@@ -1,5 +1,5 @@
-import { NICHE_CONFIGS } from './niche-config';
-import { STYLE_CONFIGS } from './style-config';
+import { NICHE_CONFIGS } from './niche-config.js';
+import { STYLE_CONFIGS } from './style-config.js';
 
 export const VISUAL_BEAT_TYPES = [
   'opening_hook',

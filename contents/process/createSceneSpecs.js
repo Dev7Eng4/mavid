@@ -1,3 +1,8 @@
+import { PLAYWRIGHT_PROFILES } from '../constants/playwright-profile.js';
+import { openChatPage, sendPromptWithRetry } from '../llm/browser.util.js';
+import { validateJsonResponse } from '../llm/text.util.js';
+import openChromeProfile from '../scripts/makeChromeProfile.js';
+
 export const DEFAULT_SCENE_GENERATION_CONFIG = {
   allow_multiple_scenes_per_beat: false,
   default_scene_per_beat: 1,
@@ -305,7 +310,7 @@ export function createVisualBeatBatchesForSceneSpecs(visualBeats, options = {}) 
   return batches;
 }
 
-export async function main(sceneSpecs, nicheConfig, styleConfig) {
+export async function main(beats, nicheConfig, styleConfig) {
   const projectContext = {
     language: 'ja',
     target_audience: 'Japanese seniors 60+',
@@ -326,21 +331,82 @@ export async function main(sceneSpecs, nicheConfig, styleConfig) {
     prefer_character_plus_infographic: true,
   };
 
-  const batches = createVisualBeatBatchesForSceneSpecs(sceneSpec);
+  const batches = createVisualBeatBatchesForSceneSpecs(beats);
 
-  const prompts = batches.map(spec =>
-    promptCreateSceneSpecsFromVisualBeatsBatch({
-      batchId: spec.batchId,
-      sceneStartIndex: spec.sceneStartIndex,
-      projectContext,
-      nicheConfig,
-      styleConfig,
-      sceneGenerationConfig,
-      previousBeatPreview: spec.previousBeatPreview,
-      currentVisualBeats: spec.currentVisualBeats,
-      nextBeatPreview: spec.nextBeatPreview,
-    })
-  );
+  const totalBatches = batches.length;
+  const sceneSpecsResults = new Array(batches.length).fill(null);
 
-  return prompts;
+  const activeConcurrency = Math.min(PLAYWRIGHT_PROFILES.length, batches.length);
+  let nextBatchIndex = 0;
+
+  async function workerProfile(workerIndex) {
+    const profileNum = PLAYWRIGHT_PROFILES[workerIndex];
+    /** @type {import('playwright').BrowserContext | null} */
+    let ctx = null;
+    try {
+      const opened = await openChromeProfile({ profile: profileNum });
+      ctx = opened.context;
+      const pg = opened.page;
+      let primingDone = false;
+
+      while (true) {
+        const i = nextBatchIndex++;
+        if (i >= totalBatches) break;
+
+        const batch = batches[i];
+        const batchId = batch.batchId;
+        const batchIndex = i + 1;
+        console.log(`[create-scene-specs] batch ${batchIndex}/${totalBatches} ${batchId} (profile ${profileNum})`);
+        // onBatchStart?.({ batchIndex, batchId, total: totalBatches });
+
+        try {
+          if (!primingDone) {
+            await openChatPage(pg);
+            primingDone = true;
+          }
+
+          const prompt = promptCreateSceneSpecsFromVisualBeatsBatch({
+            batchId: batch.batchId,
+            sceneStartIndex: batch.sceneStartIndex,
+            projectContext,
+            nicheConfig,
+            styleConfig,
+            sceneGenerationConfig,
+            previousBeatPreview: batch.previousBeatPreview,
+            currentVisualBeats: batch.currentVisualBeats,
+            nextBeatPreview: batch.nextBeatPreview,
+          });
+
+          const raw = await sendPromptWithRetry(pg, prompt, {
+            validate: validateJsonResponse,
+            label: `[create-scene-specs] batch ${batchIndex}/${totalBatches} ${batchId} (profile ${profileNum})`,
+          });
+
+          const sceneSpecsPayload = JSON.parse(raw);
+          const sceneSpecs = sceneSpecsPayload.scene_specs;
+
+          sceneSpecsResults[i] = sceneSpecs;
+        } catch (err) {
+          const msg = err instanceof Error ? err.message : String(err);
+          console.warn(`[create-scene-specs] batch ${batchIndex}/${totalBatches} ${batchId} lỗi profile ${profileNum}: ${msg}`);
+          sceneSpecsResults[i] = null;
+        }
+
+        if (nextBatchIndex < totalBatches) {
+          await pg.waitForTimeout(1000);
+        }
+      }
+    } finally {
+      if (ctx) await ctx.close().catch(() => {});
+    }
+  }
+
+  await Promise.all(Array.from({ length: activeConcurrency }, (_, w) => workerProfile(w)));
+
+  const failedCount = sceneSpecsResults.filter(r => r === null).length;
+  if (failedCount > 0) {
+    throw new Error(`createSceneSpecs: ${failedCount}/${totalBatches} batch thất bại`);
+  }
+
+  return sceneSpecsResults;
 }
