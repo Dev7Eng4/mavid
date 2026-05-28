@@ -326,7 +326,9 @@ export async function main(sceneSpecs, nicheConfig, styleConfig) {
     prefer_character_plus_infographic: true,
   };
 
-  const prompts = sceneSpecs.map(spec =>
+  const batches = createVisualBeatBatchesForSceneSpecs(sceneSpec);
+
+  const prompts = batches.map(spec =>
     promptCreateSceneSpecsFromVisualBeatsBatch({
       batchId: spec.batchId,
       sceneStartIndex: spec.sceneStartIndex,
