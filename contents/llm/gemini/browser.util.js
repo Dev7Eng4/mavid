@@ -23,7 +23,7 @@ export async function waitForGeminiResponse(page, timeoutMs = 150000) {
   await delay(3000);
 
   // Hướng 3: scroll cố định mỗi lần gửi prompt
-  await scrollGeminiChatBurst(page);
+  // await scrollGeminiChatBurst(page);
 
   let isBtnMicrophoneVisible = false;
   while (!isBtnMicrophoneVisible) {
@@ -35,8 +35,8 @@ export async function waitForGeminiResponse(page, timeoutMs = 150000) {
       break;
     }
 
-    await scrollGeminiChat(page, 200, true);
-    await scrollGeminiChatBurst(page);
+    // await scrollGeminiChat(page, 200, true);
+    // await scrollGeminiChatBurst(page);
   }
 
   const responseLocator = page.locator(GEMINI_SELECTOR.responseBlock).last();

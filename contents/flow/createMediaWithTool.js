@@ -15,7 +15,7 @@ async function initMouseTracking(page) {
         window.__mouseX = e.clientX;
         window.__mouseY = e.clientY;
       },
-      { passive: true },
+      { passive: true }
     );
     window.__mouseX = innerWidth / 2;
     window.__mouseY = innerHeight / 2;
@@ -205,7 +205,7 @@ export async function createBatchMedia({ prompts, pathSave = FLOW_DOWNLOADS_DIR,
   try {
     const projectId = await openFlow(page);
 
-    await openFlowTool(page, projectId, true);
+    await openFlowTool(page, projectId, profile !== 1);
 
     const result = await getResponseImages({
       page,
@@ -218,13 +218,13 @@ export async function createBatchMedia({ prompts, pathSave = FLOW_DOWNLOADS_DIR,
     if (result.saved.length) {
       console.log(
         '   Ảnh đã lưu:',
-        result.saved.map(s => s.path),
+        result.saved.map(s => s.path)
       );
     }
     if (result.failed.length) {
       console.log(
         '   Ảnh lỗi:',
-        result.failed.map(f => `${f.exportName}: ${f.reason}`),
+        result.failed.map(f => `${f.exportName}: ${f.reason}`)
       );
     }
 

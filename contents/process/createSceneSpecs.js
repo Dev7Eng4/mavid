@@ -270,7 +270,7 @@ Return valid JSON only.
 OUTPUT QUALITY RULES
 ━━━━━━━━━━━━━━━━━━
 - Output JSON only.
-- Do not include markdown.
+- Do not wrap in markdown code block.
 - Create scenes only from current_visual_beats.
 - Do not create scenes from previous_beat_preview.
 - Do not create scenes from next_beat_preview.
@@ -284,7 +284,7 @@ OUTPUT QUALITY RULES
 `;
 
 export function createVisualBeatBatchesForSceneSpecs(visualBeats, options = {}) {
-  const { targetBeatsPerBatch = 20, previousBeatPreviewCount = 2, nextBeatPreviewCount = 2 } = options;
+  const { targetBeatsPerBatch = 10, previousBeatPreviewCount = 2, nextBeatPreviewCount = 2 } = options;
 
   const batches = [];
 
@@ -334,6 +334,7 @@ export async function main(beats, nicheConfig, styleConfig) {
   const batches = createVisualBeatBatchesForSceneSpecs(beats);
 
   const totalBatches = batches.length;
+  console.log('🚀 ~ main ~ totalBatches:', totalBatches);
   const sceneSpecsResults = new Array(batches.length).fill(null);
 
   const activeConcurrency = Math.min(PLAYWRIGHT_PROFILES.length, batches.length);
@@ -366,7 +367,7 @@ export async function main(beats, nicheConfig, styleConfig) {
           }
 
           const prompt = promptCreateSceneSpecsFromVisualBeatsBatch({
-            batchId: batch.batchId,
+            batchId,
             sceneStartIndex: batch.sceneStartIndex,
             projectContext,
             nicheConfig,
@@ -408,5 +409,10 @@ export async function main(beats, nicheConfig, styleConfig) {
     throw new Error(`createSceneSpecs: ${failedCount}/${totalBatches} batch thất bại`);
   }
 
-  return sceneSpecsResults;
+  let convertedSceneSpecs = [];
+  for (const sceneSpecs of sceneSpecsResults) {
+    if (!sceneSpecs || sceneSpecs.length === 0) continue;
+    convertedSceneSpecs.push(...sceneSpecs);
+  }
+  return convertedSceneSpecs;
 }

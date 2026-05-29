@@ -1,9 +1,11 @@
 import { PATHS } from '../constants/paths.js';
+import fs from 'fs';
 import { resolveProjectConfigs } from './config.js';
 import { convertTranscript } from './convertTranscript.js';
 import { main as detechNiche } from './detechNiche.js';
 import { main as createBeats } from './createBeats.js';
 import { main as createSceneSpecs } from './createSceneSpecs.js';
+import { main as createImagePrompts } from './createImagePrompt.js';
 
 export async function main(folder = PATHS.DOWNLOADS) {
   const transcriptObjects = await convertTranscript(folder);
@@ -16,10 +18,13 @@ export async function main(folder = PATHS.DOWNLOADS) {
   //   styleId: detectedNiche.style_config,
   // });
 
-  const visualBeatPrompt = await createBeats(transcriptObjects, detectedNiche.niche_config, detectedNiche.style_config);
+  const visualBeats = await createBeats(transcriptObjects, detectedNiche.niche_config, detectedNiche.style_config);
 
-  const sceneSpecsPrompt = await createSceneSpecs(visualBeatPrompt, detectedNiche.niche_config, detectedNiche.style_config);
-  console.log('🚀 ~ main ~ sceneSpecsPrompt:', sceneSpecsPrompt);
+  const sceneSpecs = await createSceneSpecs(visualBeats, detectedNiche.niche_config, detectedNiche.style_config);
+
+  const imageScenePrompts = await createImagePrompts(sceneSpecs, detectedNiche.niche_config, detectedNiche.style_config);
+
+  fs.writeFileSync('imageScenePrompts.json', JSON.stringify(imageScenePrompts, null, 2), 'utf8');
 
   return;
 

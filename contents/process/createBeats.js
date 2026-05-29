@@ -322,7 +322,7 @@ export async function main(transcriptObjects, nicheConfig, styleConfig) {
           }
 
           const prompt = promptExtractVisualBeatsFromTranscriptBatch({
-            batchId: batch.batchId,
+            batchId,
             nicheConfig,
             styleConfig,
             previousPreviewContext: formatNumberedTranscript(batch.previousLines),
@@ -361,5 +361,32 @@ export async function main(transcriptObjects, nicheConfig, styleConfig) {
     throw new Error(`createBeats: ${failedCount}/${totalBatches} batch thất bại`);
   }
 
-  return beatsResults;
+  let convertedBeats = [];
+  for (const beat of beatsResults) {
+    if (beat.length === 0) continue;
+
+    convertedBeats.push(
+      ...beat.map(b => ({
+        beat_id: b.beat_id,
+        source_line_ids: b.source_line_ids,
+        start_line_id: b.start_line_id,
+        end_line_id: b.end_line_id,
+        boundary_status: b.boundary_status,
+        beat_type: b.beat_type,
+        main_message_ja: b.main_message_ja,
+        visual_intent: b.visual_intent,
+        suggested_visual_type: b.suggested_visual_type,
+        content_importance: b.content_importance,
+        scene_density_hint: b.scene_density_hint,
+        requires_chart: b.requires_chart,
+        requires_character: b.requires_character,
+        requires_warning_icon: b.requires_warning_icon,
+        requires_checklist: b.requires_checklist,
+        on_screen_text_seed_ja: b.on_screen_text_seed_ja,
+        notes_for_next_step: b.notes_for_next_step,
+      }))
+    );
+  }
+
+  return convertedBeats;
 }

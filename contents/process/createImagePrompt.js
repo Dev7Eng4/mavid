@@ -1,3 +1,7 @@
+import { PLAYWRIGHT_PROFILES } from '../constants/playwright-profile.js';
+import { openChatPage, sendPromptWithRetry, validateJsonResponse } from '../llm/index.js';
+import openChromeProfile from '../scripts/makeChromeProfile.js';
+
 export const promptCreateImagePromptsFromSceneSpecsBatch = ({
   batchId,
   projectContext,
@@ -230,14 +234,14 @@ OUTPUT QUALITY RULES
 - Preserve source_beat_id exactly.
 - Preserve source_line_ids exactly.
 - Preserve start_line_id and end_line_id exactly.
+- Do not wrap in markdown code block.
 - Do not invent new facts.
-- Do not output markdown.
 - Do not include explanations outside JSON.
 - final_prompt must be ready to send directly to an image generation model.
 `;
 
 export function createSceneSpecBatchesForImagePrompts(sceneSpecs, options = {}) {
-  const { targetScenesPerBatch = 10, previousScenePreviewCount = 1, nextScenePreviewCount = 1 } = options;
+  const { targetScenesPerBatch = 5, previousScenePreviewCount = 1, nextScenePreviewCount = 1 } = options;
 
   const batches = [];
 
@@ -362,22 +366,86 @@ export async function main(sceneSpecs, nicheConfig, styleConfig) {
     },
   };
 
-  const batches = createSceneSpecBatchesForImagePrompts(sceneSpecs, {
-    targetScenesPerBatch: 6,
-    previousScenePreviewCount: 1,
-    nextScenePreviewCount: 1,
-  });
+  const batches = createSceneSpecBatchesForImagePrompts(sceneSpecs);
 
-  const prompts = batches.map(batch =>
-    promptCreateImagePromptsFromSceneSpecsBatch({
-      batchId: batch.batchId,
-      projectContext,
-      nicheConfig,
-      styleConfig,
-      imagePromptConfig,
-      previousScenePreview: batch.previousScenePreview,
-      currentSceneSpecs: batch.currentSceneSpecs,
-      nextScenePreview: batch.nextScenePreview,
-    })
-  );
+  const totalBatches = batches.length;
+  const imagePromptsResults = new Array(batches.length).fill(null);
+
+  const activeConcurrency = Math.min(PLAYWRIGHT_PROFILES.length, batches.length);
+  let nextBatchIndex = 0;
+
+  async function workerProfile(workerIndex) {
+    const profileNum = PLAYWRIGHT_PROFILES[workerIndex];
+    /** @type {import('playwright').BrowserContext | null} */
+    let ctx = null;
+    try {
+      const opened = await openChromeProfile({ profile: profileNum });
+      ctx = opened.context;
+      const pg = opened.page;
+      let primingDone = false;
+
+      while (true) {
+        const i = nextBatchIndex++;
+        if (i >= totalBatches) break;
+
+        const batch = batches[i];
+        const batchId = batch.batchId;
+        const batchIndex = i + 1;
+        console.log(`[create-image-prompts] batch ${batchIndex}/${totalBatches} ${batchId} (profile ${profileNum})`);
+        // onBatchStart?.({ batchIndex, batchId, total: totalBatches });
+
+        try {
+          if (!primingDone) {
+            await openChatPage(pg);
+            primingDone = true;
+          }
+
+          const prompt = promptCreateImagePromptsFromSceneSpecsBatch({
+            batchId,
+            projectContext,
+            nicheConfig,
+            styleConfig,
+            imagePromptConfig,
+            previousScenePreview: batch.previousScenePreview,
+            currentSceneSpecs: batch.currentSceneSpecs,
+            nextScenePreview: batch.nextScenePreview,
+          });
+
+          const raw = await sendPromptWithRetry(pg, prompt, {
+            validate: validateJsonResponse,
+            label: `[create-image-prompts] batch ${batchIndex}/${totalBatches} ${batchId} (profile ${profileNum})`,
+          });
+
+          const imagePromptsPayload = JSON.parse(raw);
+          const imagePrompts = imagePromptsPayload.image_prompts;
+
+          imagePromptsResults[i] = imagePrompts;
+        } catch (err) {
+          const msg = err instanceof Error ? err.message : String(err);
+          console.warn(`[create-image-prompts] batch ${batchIndex}/${totalBatches} ${batchId} lỗi profile ${profileNum}: ${msg}`);
+          imagePromptsResults[i] = null;
+        }
+
+        if (nextBatchIndex < totalBatches) {
+          await pg.waitForTimeout(1000);
+        }
+      }
+    } finally {
+      if (ctx) await ctx.close().catch(() => {});
+    }
+  }
+
+  await Promise.all(Array.from({ length: activeConcurrency }, (_, w) => workerProfile(w)));
+
+  const failedCount = imagePromptsResults.filter(r => r === null).length;
+  if (failedCount > 0) {
+    throw new Error(`createImagePrompts: ${failedCount}/${totalBatches} batch thất bại`);
+  }
+
+  let convertedImagePrompts = [];
+  for (const imagePrompts of imagePromptsResults) {
+    if (!imagePrompts || imagePrompts.length === 0) continue;
+    convertedImagePrompts.push(...imagePrompts);
+  }
+  return convertedImagePrompts;
 }
