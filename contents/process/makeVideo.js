@@ -35,7 +35,6 @@ import { ffmpegSpawnAsync } from '../makeFromAudio/shared.js';
 import {
   SPEAKER_FILTER_VERSION,
   SPEAKER_OUTPUT_NAME,
-  buildPremultiplyAlphaGeq,
   findLatestSourceMp4,
   main as runMakeSpeaker,
 } from './makeSpeacker.js';
@@ -212,7 +211,7 @@ export function buildMakeVideoFilterComplex(opts = {}) {
 
     `[0:v]${padSlide}[slides];` +
 
-    `[1:v]loop=loop=-1:size=32767:start=0,fps=${fps},scale=${speakerMaxW}:-1:flags=lanczos,format=yuva420p,${buildPremultiplyAlphaGeq()}[sp];` +
+    `[1:v]loop=loop=-1:size=32767:start=0,fps=${fps},scale=${speakerMaxW}:-1:flags=lanczos,format=yuva420p[sp];` +
 
     `[slides][sp]overlay=${margin}:main_h-overlay_h-${margin}:format=auto:shortest=1[vout]`;
 

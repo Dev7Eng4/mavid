@@ -46,14 +46,6 @@ const VIDEO_ENCODE_ARGS = [
 const AUDIO_ENCODE_ARGS = ['-an'];
 
 /**
- * Xóa RGB ở pixel trong suốt — tránh hiện đen/đỏ khi overlay.
- * @returns {string}
- */
-export function buildPremultiplyAlphaGeq() {
-  return `geq=r='if(gte(A(X,Y),16),r(X,Y),0)':g='if(gte(A(X,Y),16),g(X,Y),0)':b='if(gte(A(X,Y),16),b(X,Y),0)'`;
-}
-
-/**
  * @returns {string}
  */
 export function buildSpeakerChromakeyFilter() {
@@ -70,7 +62,7 @@ export function buildSpeakerVideoFilter(opts = {}) {
   const cropSide = opts.cropSidePx ?? CROP_SIDE_PX;
   const scaleRatio = opts.scaleRatio ?? SCALE_RATIO;
   const cropSides = `crop=iw-${cropSide * 2}:ih:${cropSide}:0`;
-  const core = `${cropSides},${buildSpeakerChromakeyFilter()},format=yuva420p,${buildPremultiplyAlphaGeq()}`;
+  const core = `${cropSides},${buildSpeakerChromakeyFilter()},format=yuva420p`;
 
   if (scaleRatio >= 1) {
     return core;
