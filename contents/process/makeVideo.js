@@ -35,6 +35,7 @@ import { ffmpegSpawnAsync } from '../makeFromAudio/shared.js';
 import {
   SPEAKER_FILTER_VERSION,
   SPEAKER_OUTPUT_NAME,
+  buildSpeakerOverlayPrepFilter,
   findLatestSourceMp4,
   main as runMakeSpeaker,
 } from './makeSpeacker.js';
@@ -57,9 +58,15 @@ export const SPEAKER_OVERLAY_MAX_W = 360;
 
 
 
-/** Lề trái / dưới overlay speaker (px). */
+/** Lề trái overlay speaker (px). */
 
-export const SPEAKER_OVERLAY_MARGIN = 20;
+export const SPEAKER_OVERLAY_MARGIN_LEFT = 8;
+
+
+
+/** Lề dưới overlay speaker (px). */
+
+export const SPEAKER_OVERLAY_MARGIN_BOTTOM = 20;
 
 
 
@@ -191,7 +198,9 @@ export function buildMakeVideoFilterComplex(opts = {}) {
 
   const speakerMaxW = opts.speakerMaxW ?? SPEAKER_OVERLAY_MAX_W;
 
-  const margin = opts.speakerMargin ?? SPEAKER_OVERLAY_MARGIN;
+  const marginLeft = opts.speakerMarginLeft ?? SPEAKER_OVERLAY_MARGIN_LEFT;
+
+  const marginBottom = opts.speakerMarginBottom ?? SPEAKER_OVERLAY_MARGIN_BOTTOM;
 
   const totalSec = opts.totalSec ?? 0;
 
@@ -211,9 +220,9 @@ export function buildMakeVideoFilterComplex(opts = {}) {
 
     `[0:v]${padSlide}[slides];` +
 
-    `[1:v]loop=loop=-1:size=32767:start=0,fps=${fps},scale=${speakerMaxW}:-1:flags=lanczos,format=yuva420p[sp];` +
+    `[1:v]${buildSpeakerOverlayPrepFilter(fps, speakerMaxW)}[sp];` +
 
-    `[slides][sp]overlay=${margin}:main_h-overlay_h-${margin}:format=auto:shortest=1[vout]`;
+    `[slides][sp]overlay=${marginLeft}:main_h-overlay_h-${marginBottom}:shortest=1[vout]`;
 
   if (withAudio) {
     fc += `;[2:a]aloop=loop=-1:size=2e+09,atrim=0:${totalSec},asetpts=PTS-STARTPTS[aout]`;

@@ -20,10 +20,11 @@ const SWS_FLAGS = 'lanczos+accurate_rnd+full_chroma_int';
 
 export const RED_CHROMAKEY = '0xFF0000';
 export const RED_SIMILARITY = '0.22';
-export const RED_BLEND = '0.08';
+/** blend=0 tránh viền đỏ bán trong suốt (bóng đỏ theo chuyển động). */
+export const RED_BLEND = '0';
 
 /** Tăng khi đổi filter — makeVideo tự tạo lại speaker. */
-export const SPEAKER_FILTER_VERSION = 4;
+export const SPEAKER_FILTER_VERSION = 7;
 
 export const CROP_SIDE_PX = 150;
 export const SCALE_RATIO = 1;
@@ -53,6 +54,37 @@ export function buildSpeakerChromakeyFilter() {
 }
 
 /**
+ * Làm mượt alpha theo không gian (không tmix — tránh bóng đỏ/lag theo chuyển động).
+ * @returns {string}
+ */
+export function buildSmoothSpeakerAlphaFilter() {
+  return (
+    'split[sp_a][sp_b];' +
+    '[sp_b]alphaextract,boxblur=1:1,lut=y=\'min(255,val*2)\',format=gray[sp_mask];' +
+    '[sp_a][sp_mask]alphamerge,format=yuva420p'
+  );
+}
+
+/** @deprecated Dùng buildSmoothSpeakerAlphaFilter */
+export function buildHardenSpeakerAlphaFilter() {
+  return buildSmoothSpeakerAlphaFilter();
+}
+
+/**
+ * Chuỗi filter chuẩn bị overlay speaker trong makeVideo.
+ * @param {number} fps
+ * @param {number} speakerMaxW
+ * @returns {string}
+ */
+export function buildSpeakerOverlayPrepFilter(fps, speakerMaxW) {
+  return (
+    `loop=loop=-1:size=32767:start=0,fps=${fps},` +
+    `format=yuva420p,${buildSmoothSpeakerAlphaFilter()},` +
+    `scale=${speakerMaxW}:-1:flags=lanczos`
+  );
+}
+
+/**
  * @param {object} [opts]
  * @param {number} [opts.cropSidePx]
  * @param {number} [opts.scaleRatio]
@@ -62,7 +94,8 @@ export function buildSpeakerVideoFilter(opts = {}) {
   const cropSide = opts.cropSidePx ?? CROP_SIDE_PX;
   const scaleRatio = opts.scaleRatio ?? SCALE_RATIO;
   const cropSides = `crop=iw-${cropSide * 2}:ih:${cropSide}:0`;
-  const core = `${cropSides},${buildSpeakerChromakeyFilter()},format=yuva420p`;
+  const core =
+    `${cropSides},${buildSpeakerChromakeyFilter()},despill=mix=0.4:red=1,format=yuva420p`;
 
   if (scaleRatio >= 1) {
     return core;

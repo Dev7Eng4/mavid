@@ -11,7 +11,7 @@ export async function main(folder = PATHS.DOWNLOADS) {
   const transcriptObjects = await convertTranscript(folder);
 
   const detectedNiche = await detechNiche(transcriptObjects);
-  console.log('🚀 ~ main ~ detectedNiche:', detectedNiche);
+  fs.writeFileSync('detectedNiche.json', JSON.stringify(detectedNiche, null, 2), 'utf8');
 
   // const { niche_config, style_config } = resolveProjectConfigs({
   //   nicheId: detectedNiche.niche_config,
@@ -19,8 +19,10 @@ export async function main(folder = PATHS.DOWNLOADS) {
   // });
 
   const visualBeats = await createBeats(transcriptObjects, detectedNiche.niche_config, detectedNiche.style_config);
+  fs.writeFileSync('visualBeats.json', JSON.stringify(visualBeats, null, 2), 'utf8');
 
   const sceneSpecs = await createSceneSpecs(visualBeats, detectedNiche.niche_config, detectedNiche.style_config);
+  fs.writeFileSync('sceneSpecs.json', JSON.stringify(sceneSpecs, null, 2), 'utf8');
 
   const imageScenePrompts = await createImagePrompts(sceneSpecs, detectedNiche.niche_config, detectedNiche.style_config);
 
