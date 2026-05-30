@@ -6,6 +6,7 @@ import { main as detechNiche } from './detechNiche.js';
 import { main as createBeats } from './createBeats.js';
 import { main as createSceneSpecs } from './createSceneSpecs.js';
 import { main as createImagePrompts } from './createImagePrompt.js';
+import { main as generateImages } from './generateImages.js';
 
 export async function main(folder = PATHS.DOWNLOADS) {
   const transcriptObjects = await convertTranscript(folder);
@@ -28,19 +29,7 @@ export async function main(folder = PATHS.DOWNLOADS) {
 
   fs.writeFileSync('imageScenePrompts.json', JSON.stringify(imageScenePrompts, null, 2), 'utf8');
 
-  return;
-
-  // Step 4
-  const imagePromptPrompt = promptCreateImagePromptsFromSceneSpecsBatch({
-    batchId,
-    projectContext,
-    nicheConfig: niche_config,
-    styleConfig: style_config,
-    imagePromptConfig,
-    previousScenePreview,
-    currentSceneSpecs,
-    nextScenePreview,
-  });
+  await generateImages(imageScenePrompts, folder);
 }
 
 main();
