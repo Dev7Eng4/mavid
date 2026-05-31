@@ -26,8 +26,10 @@ export async function convertTranscript(folder = PATHS.DOWNLOADS) {
   const transcriptObjects = parseSrtToObjects(transcriptContent).map((cue, index) => {
     const id = Number.parseInt(cue.id, 10);
     return {
-      ...cue,
       id: Number.isFinite(id) ? id : index + 1,
+      text: cue.text.trim(),
+      startTime: cue.timeline.split('-->')[0].trim(),
+      endTime: cue.timeline.split('-->')[1].trim(),
     };
   });
 

@@ -15,6 +15,7 @@ import { fileURLToPath } from 'url';
 
 import { PATHS } from '../constants/paths.js';
 import { ffmpegSpawnAsync } from '../makeFromAudio/shared.js';
+import { STOCK_BG_OUTPUT_NAME } from './prepareStockBackground.js';
 
 const SWS_FLAGS = 'lanczos+accurate_rnd+full_chroma_int';
 
@@ -32,7 +33,7 @@ export const SCALE_RATIO = 1;
 /** ProRes 4444 giữ alpha ổn định hơn WebM VP9. */
 export const SPEAKER_OUTPUT_NAME = 'speaker.mov';
 
-const EXCLUDED_SOURCE_MP4 = new Set(['output.mp4', 'speaker.mp4']);
+const EXCLUDED_SOURCE_MP4 = new Set(['output.mp4', 'speaker.mp4', STOCK_BG_OUTPUT_NAME, '_stock_raw.mp4']);
 
 const VIDEO_ENCODE_ARGS = [
   '-c:v',
@@ -231,6 +232,34 @@ export function removeLegacySpeakerOutputs(dir) {
       } catch {
         /* ignore */
       }
+    }
+  }
+}
+
+/**
+ * @param {string} speakerPath
+ * @param {string} [downloadsDir]
+ * @returns {string[]}
+ */
+export function listSpeakerTempPaths(speakerPath, downloadsDir = PATHS.DOWNLOADS) {
+  const sp = path.resolve(speakerPath);
+  return [sp, `${sp}.version`, path.join(downloadsDir, 'speaker.webm')];
+}
+
+/**
+ * Xóa file tạm speaker sau khi đã ghép output.mp4.
+ * @param {string} speakerPath
+ * @param {string} [downloadsDir]
+ */
+export function removeSpeakerTempFiles(speakerPath, downloadsDir = PATHS.DOWNLOADS) {
+  for (const filePath of listSpeakerTempPaths(speakerPath, downloadsDir)) {
+    try {
+      if (fs.existsSync(filePath)) {
+        fs.unlinkSync(filePath);
+        console.log(`[make-video] Đã xóa file tạm: ${path.basename(filePath)}`);
+      }
+    } catch {
+      /* ignore */
     }
   }
 }

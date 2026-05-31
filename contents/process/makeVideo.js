@@ -10,11 +10,11 @@
 
  *   node contents/process/makeVideo.js [downloadsDir] [output.mp4]
  *
- * Tự chạy makeSpeacker nếu chưa có speaker.webm hoặc video nguồn mới hơn.
+ * Ảnh slideshow lấy từ `downloads/images` (hoặc `{downloadsDir}/images`).
+ * Nền stock (YouTube) tải về `downloads/stock_bg.mp4` — lớp dưới cùng.
+ * Speaker tạm (speaker.mov) và stock (stock_bg.mp4) được xóa sau khi render xong output.
 
  */
-
-
 
 import { execSync } from 'child_process';
 import fs from 'fs';
@@ -24,13 +24,12 @@ import path from 'path';
 
 import { fileURLToPath } from 'url';
 
-
-
 import { STOCK_VIDEO } from '../constants/index.js';
 
 import { PATHS } from '../constants/paths.js';
 
-import { ffmpegSpawnAsync } from '../makeFromAudio/shared.js';
+import { ffmpegSpawnAsync, getAudioFile } from '../makeFromAudio/shared.js';
+import { srtTimestampToMs } from '../utils/srt.util.js';
 
 import {
   SPEAKER_FILTER_VERSION,
@@ -38,47 +37,76 @@ import {
   buildSpeakerOverlayPrepFilter,
   findLatestSourceMp4,
   main as runMakeSpeaker,
+  removeSpeakerTempFiles,
 } from './makeSpeacker.js';
 
+import {
+  buildStockBackgroundPrepFilter,
+  ensureStockBackground,
+  removeStockBackgroundTempFiles,
+  STOCK_VIDEO_URL,
+} from './prepareStockBackground.js';
+import { convertTranscript } from './convertTranscript.js';
+import { main as runMappingImages } from './mappingImages.js';
 
+export { STOCK_VIDEO_URL };
 
 export const IMAGE_DURATION_SEC = 12;
 
 export const OUTPUT_VIDEO_NAME = 'output.mp4';
 
-
-
 const IMAGE_EXT = /\.(jpe?g|png|webp)$/i;
 
+/** Thư mục con chứa ảnh slideshow (bên trong downloads). */
 
+export const SLIDESHOW_IMAGES_SUBDIR = 'images';
+
+/**
+ * @param {string} [downloadsDir]
+ * @returns {string}
+ */
+export function resolveSlideshowImagesDir(downloadsDir = PATHS.DOWNLOADS) {
+  return path.join(downloadsDir, SLIDESHOW_IMAGES_SUBDIR);
+}
+
+/**
+ * Tìm file audio trong downloads (ưu tiên .mp3).
+ * @param {string} downloadsDir
+ * @returns {string}
+ */
+export function resolveDownloadsAudioPath(downloadsDir) {
+  if (!fs.existsSync(downloadsDir)) {
+    throw new Error(`resolveDownloadsAudioPath: không tìm thấy ${downloadsDir}`);
+  }
+
+  const mp3s = fs
+    .readdirSync(downloadsDir)
+    .filter(name => /\.mp3$/i.test(name) && !name.startsWith('.'))
+    .sort((a, b) => a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' }));
+
+  if (mp3s.length) {
+    return path.join(downloadsDir, mp3s[0]);
+  }
+
+  return getAudioFile(downloadsDir);
+}
 
 /** Chiều rộng tối đa overlay speaker (px) trên canvas 1280×720. */
 
 export const SPEAKER_OVERLAY_MAX_W = 360;
 
+/** Lề phải overlay speaker (px). */
 
-
-/** Lề trái overlay speaker (px). */
-
-export const SPEAKER_OVERLAY_MARGIN_LEFT = 8;
-
-
+/** Lệch từ mép phải (px). Giảm giá trị = speaker sang phải thêm. */
+export const SPEAKER_OVERLAY_MARGIN_RIGHT = -25;
 
 /** Lề dưới overlay speaker (px). */
 
 export const SPEAKER_OVERLAY_MARGIN_BOTTOM = 20;
 
+/** Khoảng cách từ khung bảng đến các mép canvas (px) — đều 4 phía. */
 
-
-/** Khoảng cách từ khung bảng đến các mép canvas (px). */
-
-export const FRAME_MARGIN_TOP = 20;
-
-export const FRAME_MARGIN_LEFT = 20;
-
-export const FRAME_MARGIN_BOTTOM = 20;
-
-export const FRAME_MARGIN_RIGHT = 80;
+export const FRAME_MARGIN = 35;
 
 /** Bề rộng vùng viền giữa hai đường (px). */
 
@@ -96,7 +124,67 @@ export const FRAME_OUTLINE_COLOR = 'black';
 
 export const FRAME_OUTLINE_THICKNESS = 2;
 
+/** Tỷ lệ vùng ảnh trong bảng — khớp ảnh slideshow 16:9. */
 
+export const SLIDE_ASPECT_W = 16;
+
+export const SLIDE_ASPECT_H = 9;
+
+/**
+ * Tính layout khung bảng: vùng ảnh bên trong giữ 16:9, scale khít không méo.
+ * Khung (viền cyan) căn giữa trong vùng margin.
+ * @param {object} [opts]
+ * @returns {{
+ *   outerX: number, outerY: number, outerW: number, outerH: number,
+ *   innerX: number, innerY: number, innerW: number, innerH: number,
+ *   innerOutlineX: number, innerOutlineY: number, innerOutlineW: number, innerOutlineH: number,
+ * }}
+ */
+export function computeFrameLayout(opts = {}) {
+  const w = opts.width ?? STOCK_VIDEO.CANVAS_W;
+  const h = opts.height ?? STOCK_VIDEO.CANVAS_H;
+  const margin = opts.frameMargin ?? FRAME_MARGIN;
+  const borderWidth = opts.frameBorderWidth ?? FRAME_BORDER_WIDTH;
+  const outline = opts.frameOutlineThickness ?? FRAME_OUTLINE_THICKNESS;
+  const aspectW = opts.aspectW ?? SLIDE_ASPECT_W;
+  const aspectH = opts.aspectH ?? SLIDE_ASPECT_H;
+
+  const availW = w - margin * 2;
+  const availH = h - margin * 2;
+  const maxInnerW = availW - 2 * borderWidth;
+  const maxInnerH = availH - 2 * borderWidth;
+
+  let innerW = maxInnerW;
+  let innerH = Math.round((innerW * aspectH) / aspectW);
+  if (innerH > maxInnerH) {
+    innerH = maxInnerH;
+    innerW = Math.round((innerH * aspectW) / aspectH);
+  }
+  innerW -= innerW % 2;
+  innerH -= innerH % 2;
+
+  const outerW = innerW + 2 * borderWidth;
+  const outerH = innerH + 2 * borderWidth;
+  const outerX = margin + Math.floor((availW - outerW) / 2);
+  const outerY = margin + Math.floor((availH - outerH) / 2);
+  const innerX = outerX + borderWidth;
+  const innerY = outerY + borderWidth;
+
+  return {
+    outerX,
+    outerY,
+    outerW,
+    outerH,
+    innerX,
+    innerY,
+    innerW,
+    innerH,
+    innerOutlineX: innerX - outline,
+    innerOutlineY: innerY - outline,
+    innerOutlineW: innerW + 2 * outline,
+    innerOutlineH: innerH + 2 * outline,
+  };
+}
 
 /**
 
@@ -107,36 +195,27 @@ export const FRAME_OUTLINE_THICKNESS = 2;
  */
 
 export function isSlideshowImage(name) {
-
   if (!IMAGE_EXT.test(name)) return false;
 
   if (name.startsWith('_') || name.startsWith('.')) return false;
 
   return true;
-
 }
-
-
 
 /**
 
- * Ảnh slideshow trong thư mục, sort theo tên (1-7, 8-12, …).
+ * Ảnh slideshow trong `{downloadsDir}/images`, sort theo tên (1-7, 8-12, …).
 
- * @param {string} [dir]
+ * @param {string} [dir] — thư mục chứa ảnh (mặc định downloads/images)
 
  * @returns {string[]}
 
  */
 
-export function listSlideshowImages(dir = PATHS.DOWNLOADS) {
-
+export function listSlideshowImages(dir = resolveSlideshowImagesDir()) {
   if (!fs.existsSync(dir)) {
-
     throw new Error(`listSlideshowImages: không tìm thấy ${dir}`);
-
   }
-
-
 
   return fs
 
@@ -147,10 +226,7 @@ export function listSlideshowImages(dir = PATHS.DOWNLOADS) {
     .sort((a, b) => a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' }))
 
     .map(name => path.join(dir, name));
-
 }
-
-
 
 /**
 
@@ -164,37 +240,74 @@ export function listSlideshowImages(dir = PATHS.DOWNLOADS) {
 
  */
 
-export function buildImageConcatFileContent(imagePaths, durationSec = IMAGE_DURATION_SEC) {
+/**
+ * @param {string} startTime
+ * @param {string} endTime
+ * @returns {number}
+ */
+export function sceneDurationSec(startTime, endTime) {
+  const startMs = srtTimestampToMs(startTime);
+  const endMs = srtTimestampToMs(endTime);
 
-  if (!imagePaths.length) {
-
-    throw new Error('buildImageConcatFileContent: cần ít nhất một ảnh');
-
+  if (!Number.isFinite(startMs) || !Number.isFinite(endMs)) {
+    throw new Error(`sceneDurationSec: timestamp không hợp lệ (${startTime} → ${endTime})`);
   }
 
+  const sec = (endMs - startMs) / 1000;
+  if (sec <= 0) {
+    throw new Error(`sceneDurationSec: thời lượng <= 0 (${startTime} → ${endTime})`);
+  }
 
+  return Math.round(sec * 1000) / 1000;
+}
+
+/**
+ * @param {Array<{ start: number, end: number, startTime: string, endTime: string, file: string }>} objectImages
+ * @param {string} imagesDir
+ * @returns {Array<{ path: string, durationSec: number }>}
+ */
+export function buildSlidesFromObjectImages(objectImages, imagesDir) {
+  if (!objectImages?.length) {
+    throw new Error('buildSlidesFromObjectImages: cần ít nhất một scene');
+  }
+
+  return objectImages.map(item => {
+    const abs = path.join(imagesDir, item.file);
+    if (!fs.existsSync(abs)) {
+      throw new Error(`buildSlidesFromObjectImages: không tìm thấy ${abs}`);
+    }
+
+    return {
+      path: abs,
+      durationSec: sceneDurationSec(item.startTime, item.endTime),
+    };
+  });
+}
+
+/**
+ * @param {Array<{ path: string, durationSec: number }>} slides
+ * @returns {string}
+ */
+export function buildImageConcatFileContent(slides) {
+  if (!slides.length) {
+    throw new Error('buildImageConcatFileContent: cần ít nhất một ảnh');
+  }
 
   const lines = ['ffconcat version 1.0'];
 
-  for (const abs of imagePaths) {
-
+  for (const { path: abs, durationSec } of slides) {
     const normalized = abs.replace(/\\/g, '/').replace(/'/g, "'\\''");
 
     lines.push(`file '${normalized}'`);
-
     lines.push(`duration ${durationSec}`);
-
   }
 
-  const last = imagePaths[imagePaths.length - 1].replace(/\\/g, '/').replace(/'/g, "'\\''");
+  const last = slides[slides.length - 1].path.replace(/\\/g, '/').replace(/'/g, "'\\''");
 
   lines.push(`file '${last}'`);
 
   return `${lines.join('\n')}\n`;
-
 }
-
-
 
 /**
 
@@ -210,14 +323,14 @@ export function buildImageConcatFileContent(imagePaths, durationSec = IMAGE_DURA
 
  * @param {number} [opts.speakerMargin]
  * @param {number} [opts.totalSec]
- * @param {boolean} [opts.withSpeakerAudio]
+ * @param {boolean} [opts.withAudio]
+ * @param {number} [opts.audioInputIndex]
 
  * @returns {string}
 
  */
 
 export function buildMakeVideoFilterComplex(opts = {}) {
-
   const w = opts.width ?? STOCK_VIDEO.CANVAS_W;
 
   const h = opts.height ?? STOCK_VIDEO.CANVAS_H;
@@ -226,72 +339,53 @@ export function buildMakeVideoFilterComplex(opts = {}) {
 
   const speakerMaxW = opts.speakerMaxW ?? SPEAKER_OVERLAY_MAX_W;
 
-  const marginLeft = opts.speakerMarginLeft ?? SPEAKER_OVERLAY_MARGIN_LEFT;
+  const marginRight = opts.speakerMarginRight ?? SPEAKER_OVERLAY_MARGIN_RIGHT;
 
   const marginBottom = opts.speakerMarginBottom ?? SPEAKER_OVERLAY_MARGIN_BOTTOM;
 
   const totalSec = opts.totalSec ?? 0;
 
-  const withAudio = opts.withSpeakerAudio && totalSec > 0;
+  const withAudio = opts.withAudio && totalSec > 0;
+  const audioInputIndex = opts.audioInputIndex ?? 3;
 
+  const { outerX, outerY, outerW, outerH, innerX, innerY, innerW, innerH } = computeFrameLayout({
+    width: w,
+    height: h,
+  });
 
-
-  const outerX = FRAME_MARGIN_LEFT;
-
-  const outerY = FRAME_MARGIN_TOP;
-
-  const outerW = w - FRAME_MARGIN_LEFT - FRAME_MARGIN_RIGHT;
-
-  const outerH = h - FRAME_MARGIN_TOP - FRAME_MARGIN_BOTTOM;
-
-  const innerX = outerX + FRAME_BORDER_WIDTH;
-
-  const innerY = outerY + FRAME_BORDER_WIDTH;
-
-  const innerW = outerW - 2 * FRAME_BORDER_WIDTH;
-
-  const innerH = outerH - 2 * FRAME_BORDER_WIDTH;
-
-  const innerOutlineX = innerX - FRAME_OUTLINE_THICKNESS;
-
-  const innerOutlineY = innerY - FRAME_OUTLINE_THICKNESS;
-
-  const innerOutlineW = innerW + 2 * FRAME_OUTLINE_THICKNESS;
-
-  const innerOutlineH = innerH + 2 * FRAME_OUTLINE_THICKNESS;
-
-
-
-  const padSlide =
-
-    `scale=${innerW}:${innerH}:force_original_aspect_ratio=decrease:flags=lanczos,` +
-
-    `pad=${w}:${h}:${innerX}+(${innerW}-iw)/2:${innerY}+(${innerH}-ih)/2:color=black,` +
-
-    `setsar=1,fps=${fps},format=yuv420p,` +
-
+  const frameDrawboxes =
     `drawbox=x=${outerX}:y=${outerY}:w=${outerW}:h=${outerH}:color=${FRAME_BORDER_COLOR}:t=${FRAME_BORDER_WIDTH},` +
+    `drawbox=x=${outerX}:y=${outerY}:w=${outerW}:h=${outerH}:color=${FRAME_OUTLINE_COLOR}:t=${FRAME_OUTLINE_THICKNESS}`;
 
-    `drawbox=x=${outerX}:y=${outerY}:w=${outerW}:h=${outerH}:color=${FRAME_OUTLINE_COLOR}:t=${FRAME_OUTLINE_THICKNESS},` +
+  const slideScale = `scale=${innerW}:${innerH}:flags=lanczos,setsar=1,fps=${fps},format=yuv420p`;
 
-    `drawbox=x=${innerOutlineX}:y=${innerOutlineY}:w=${innerOutlineW}:h=${innerOutlineH}:color=${FRAME_OUTLINE_COLOR}:t=${FRAME_OUTLINE_THICKNESS}`;
-
-
+  const stockPrep = buildStockBackgroundPrepFilter(fps, w, h);
 
   let fc =
-
-    `[0:v]${padSlide}[slides];` +
-
-    `[1:v]${buildSpeakerOverlayPrepFilter(fps, speakerMaxW)}[sp];` +
-
-    `[slides][sp]overlay=${marginLeft}:main_h-overlay_h-${marginBottom}:shortest=1[vout]`;
+    `[0:v]${stockPrep}[bg];` +
+    `[1:v]${slideScale}[slide];` +
+    `[bg][slide]overlay=${innerX}:${innerY}:shortest=1[base];` +
+    `[base]${frameDrawboxes}[slides];` +
+    `[2:v]${buildSpeakerOverlayPrepFilter(fps, speakerMaxW)}[sp];` +
+    `[slides][sp]overlay=main_w-overlay_w-${marginRight}:main_h-overlay_h-${marginBottom}:shortest=1[vout]`;
 
   if (withAudio) {
-    fc += `;[2:a]aloop=loop=-1:size=2e+09,atrim=0:${totalSec},asetpts=PTS-STARTPTS[aout]`;
+    fc += `;[${audioInputIndex}:a]atrim=0:${totalSec},asetpts=PTS-STARTPTS[aout]`;
   }
 
   return fc;
+}
 
+/**
+ * Xóa file tạm stock + speaker sau khi ghép output thành công.
+ * @param {object} opts
+ * @param {string} opts.downloadsDir
+ * @param {string} opts.stockPath
+ * @param {string} opts.speakerPath
+ */
+export function cleanupMakeVideoTempFiles(opts) {
+  removeStockBackgroundTempFiles(opts.downloadsDir, opts.stockPath);
+  removeSpeakerTempFiles(opts.speakerPath, opts.downloadsDir);
 }
 
 /**
@@ -300,10 +394,10 @@ export function buildMakeVideoFilterComplex(opts = {}) {
  */
 export function probeHasAudio(filePath) {
   try {
-    execSync(
-      `ffprobe -v error -select_streams a:0 -show_entries stream=codec_type -of csv=p=0 "${filePath}"`,
-      { encoding: 'utf8', stdio: ['pipe', 'pipe', 'pipe'] },
-    );
+    execSync(`ffprobe -v error -select_streams a:0 -show_entries stream=codec_type -of csv=p=0 "${filePath}"`, {
+      encoding: 'utf8',
+      stdio: ['pipe', 'pipe', 'pipe'],
+    });
     return true;
   } catch {
     return false;
@@ -316,16 +410,14 @@ export function probeHasAudio(filePath) {
  */
 export function probeAudioCodec(filePath) {
   try {
-    return execSync(
-      `ffprobe -v error -select_streams a:0 -show_entries stream=codec_name -of csv=p=0 "${filePath}"`,
-      { encoding: 'utf8', stdio: ['pipe', 'pipe', 'pipe'] },
-    ).trim();
+    return execSync(`ffprobe -v error -select_streams a:0 -show_entries stream=codec_name -of csv=p=0 "${filePath}"`, {
+      encoding: 'utf8',
+      stdio: ['pipe', 'pipe', 'pipe'],
+    }).trim();
   } catch {
     return null;
   }
 }
-
-
 
 /**
  * Tạo hoặc tái tạo speaker.webm trước khi ghép video (gọi makeSpeacker).
@@ -358,9 +450,7 @@ export async function ensureSpeakerVideo(options = {}) {
 
   let sourcePath;
   try {
-    sourcePath = options.speakerInputPath
-      ? path.resolve(options.speakerInputPath)
-      : findLatestSourceMp4(downloadsDir);
+    sourcePath = options.speakerInputPath ? path.resolve(options.speakerInputPath) : findLatestSourceMp4(downloadsDir);
   } catch (err) {
     if (fs.existsSync(speakerPath)) {
       console.log(`[make-video] Dùng speaker có sẵn: ${speakerPath}`);
@@ -394,13 +484,13 @@ export async function ensureSpeakerVideo(options = {}) {
   });
 }
 
-
-
 /**
 
  * @param {object} [options]
 
  * @param {string} [options.downloadsDir]
+
+ * @param {string} [options.imagesDir]
 
  * @param {string} [options.outputPath]
 
@@ -408,85 +498,98 @@ export async function ensureSpeakerVideo(options = {}) {
 
  * @param {string[]} [options.imagePaths]
 
+ * @param {Array<{ start: number, end: number, startTime: string, endTime: string, file: string }>} [options.objectImages]
+
  * @param {number} [options.imageDurationSec]
 
  * @param {number} [options.speakerMaxW]
  * @param {string} [options.speakerInputPath]
  * @param {boolean} [options.forceSpeaker]
+ * @param {string} [options.stockUrl]
+ * @param {boolean} [options.forceStock]
+ * @param {string} [options.audioPath]
 
  */
 
 export async function createVideoFromImages(options = {}) {
-
   const downloadsDir = options.downloadsDir ?? PATHS.DOWNLOADS;
+
+  const imagesDir = options.imagesDir ?? resolveSlideshowImagesDir(downloadsDir);
 
   const outputPath = path.resolve(options.outputPath ?? path.join(downloadsDir, OUTPUT_VIDEO_NAME));
 
-  const imagePaths = options.imagePaths ?? listSlideshowImages(downloadsDir);
+  let slides;
 
-  const imageDurationSec = options.imageDurationSec ?? IMAGE_DURATION_SEC;
+  if (options.objectImages?.length) {
+    slides = buildSlidesFromObjectImages(options.objectImages, imagesDir);
+  } else {
+    const imagePaths = options.imagePaths ?? listSlideshowImages(imagesDir);
+    const imageDurationSec = options.imageDurationSec ?? IMAGE_DURATION_SEC;
 
+    if (!imagePaths.length) {
+      throw new Error(`createVideoFromImages: không có ảnh trong ${imagesDir}`);
+    }
 
-
-  if (!imagePaths.length) {
-
-    throw new Error(`createVideoFromImages: không có ảnh trong ${downloadsDir}`);
-
+    slides = imagePaths.map(p => ({ path: p, durationSec: imageDurationSec }));
   }
 
-
-
-  const { speakerPath, sourcePath } = await ensureSpeakerVideo({
+  const { speakerPath } = await ensureSpeakerVideo({
     downloadsDir,
     speakerPath: options.speakerPath,
     speakerInputPath: options.speakerInputPath,
     forceSpeaker: options.forceSpeaker,
   });
 
+  const audioPath = path.resolve(options.audioPath ?? resolveDownloadsAudioPath(downloadsDir));
 
+  if (!fs.existsSync(audioPath)) {
+    throw new Error(`createVideoFromImages: không tìm thấy audio ${audioPath}`);
+  }
 
-  const totalSec = imagePaths.length * imageDurationSec;
+  if (!probeHasAudio(audioPath)) {
+    throw new Error(`createVideoFromImages: file không có stream audio: ${audioPath}`);
+  }
 
-  const concatContent = buildImageConcatFileContent(imagePaths, imageDurationSec);
+  const stockPath = await ensureStockBackground({
+    downloadsDir,
+    stockUrl: options.stockUrl ?? STOCK_VIDEO_URL,
+    forceStock: options.forceStock,
+  });
+
+  const totalSec = slides.reduce((sum, s) => sum + s.durationSec, 0);
+
+  const concatContent = buildImageConcatFileContent(slides);
 
   const concatPath = path.join(os.tmpdir(), `mavid-slideshow-${Date.now()}.ffconcat`);
 
   fs.writeFileSync(concatPath, concatContent, 'utf8');
 
-
-
-  const hasSpeakerAudio = probeHasAudio(sourcePath);
-
   const filterComplex = buildMakeVideoFilterComplex({
-
     speakerMaxW: options.speakerMaxW,
 
     speakerMargin: options.speakerMargin,
 
     totalSec,
 
-    withSpeakerAudio: hasSpeakerAudio,
-
+    withAudio: true,
+    audioInputIndex: 3,
   });
 
+  const durationSummary = slides.map(s => `${s.durationSec}s`).join(', ');
+  console.log(`[make-video] Ảnh: ${slides.length} slide — [${durationSummary}] ≈ ${totalSec}s`);
 
-
-  console.log(`[make-video] Ảnh: ${imagePaths.length} × ${imageDurationSec}s ≈ ${totalSec}s`);
+  console.log(`[make-video] Stock nền: ${stockPath} (loop)`);
 
   console.log(`[make-video] Speaker: ${speakerPath} (loop)`);
 
+  console.log(`[make-video] Audio: ${audioPath}`);
+
   console.log(`[make-video] Output: ${outputPath}`);
 
-
-
   try {
-
     fs.mkdirSync(path.dirname(outputPath), { recursive: true });
 
-
-
     const ffmpegArgs = [
-
       '-hide_banner',
 
       '-loglevel',
@@ -494,6 +597,10 @@ export async function createVideoFromImages(options = {}) {
       'error',
 
       '-y',
+
+      '-i',
+
+      stockPath,
 
       '-f',
 
@@ -510,58 +617,39 @@ export async function createVideoFromImages(options = {}) {
       '-i',
 
       speakerPath,
+    ];
 
-      '-i',
+    ffmpegArgs.push('-i', audioPath);
 
-      sourcePath,
-
+    ffmpegArgs.push(
       '-filter_complex',
 
       filterComplex,
 
       '-map',
 
-      '[vout]',
-    ];
-
-    if (hasSpeakerAudio) {
-      ffmpegArgs.push('-map', '[aout]');
-    }
+      '[vout]'
+    );
 
     ffmpegArgs.push(
-
+      '-map',
+      '[aout]',
       '-c:v',
-
       'libx264',
-
       '-preset',
-
       'medium',
-
       '-crf',
-
       '18',
-
       '-pix_fmt',
-
       'yuv420p',
-
       '-profile:v',
-
       'high',
-
       '-tag:v',
-
       'avc1',
-
       '-c:a',
-
       'aac',
-
       '-b:a',
-
       '192k',
-
       '-movflags',
 
       '+faststart',
@@ -570,33 +658,24 @@ export async function createVideoFromImages(options = {}) {
 
       String(totalSec),
 
-      outputPath,
-
+      outputPath
     );
 
     await ffmpegSpawnAsync(ffmpegArgs);
 
-  } finally {
-
-    try {
-
-      fs.unlinkSync(concatPath);
-
-    } catch {
-
-      /* ignore */
-
+    if (!options.keepTempFiles) {
+      cleanupMakeVideoTempFiles({ downloadsDir, stockPath, speakerPath });
     }
-
+  } finally {
+    try {
+      fs.unlinkSync(concatPath);
+    } catch {
+      /* ignore */
+    }
   }
 
-
-
   return outputPath;
-
 }
-
-
 
 /**
 
@@ -604,44 +683,37 @@ export async function createVideoFromImages(options = {}) {
 
  */
 
-export async function main(options = {}) {
-
-  const out = await createVideoFromImages(options);
+/**
+ * @param {Array<{ start: number, end: number, startTime: string, endTime: string, file: string }>} objectImages
+ * @param {object} [options]
+ */
+export async function main(objectImages, folder) {
+  const out = await createVideoFromImages({ downloadsDir: folder, objectImages });
 
   console.log(`[make-video] Hoàn tất: ${out}`);
 
   return out;
-
 }
-
-
 
 const isMain = process.argv[1] && path.resolve(process.argv[1]) === path.resolve(fileURLToPath(import.meta.url));
 
-
-
 if (isMain) {
-
   const dirArg = process.argv[2];
-
   const outArg = process.argv[3];
+  const downloadsDir = dirArg ? path.resolve(dirArg) : PATHS.DOWNLOADS;
 
-
-
-  main({
-
-    downloadsDir: dirArg ? path.resolve(dirArg) : undefined,
-
-    outputPath: outArg ? path.resolve(outArg) : undefined,
-
-  }).catch(err => {
-
+  (async () => {
+    const transcriptObjects = await convertTranscript(downloadsDir);
+    const imagesDir = resolveSlideshowImagesDir(downloadsDir);
+    const count = fs.readdirSync(imagesDir).filter(isSlideshowImage).length;
+    const objectImages = await runMappingImages(transcriptObjects, downloadsDir, count);
+    return main(objectImages, {
+      downloadsDir,
+      outputPath: outArg ? path.resolve(outArg) : undefined,
+    });
+  })().catch(err => {
     console.error(err.message ?? err);
 
     process.exit(1);
-
   });
-
 }
-
-
