@@ -18,6 +18,7 @@
     "create-batch-video": "node -e \"import('./contents/scripts/createBatchVideo.js').then(m => m.default())\"",
     "tao-thumbnail-flow": "node contents/video-info/thumbnail/createThumbnailFlow.cli.js",
     "download-transcript": "node contents/scripts/downloadTranscript.js",
+    "download-audio": "node contents/scripts/downloadAudio.js",
     "syncProgressToSpreadsheet": "node contents/scripts/syncProgressToSpreadsheet.js",
     "syncVideosToDrive": "node contents/ggdrive/syncVideosToDrive.cli.js",
     "build": "tsc -b && vite build",

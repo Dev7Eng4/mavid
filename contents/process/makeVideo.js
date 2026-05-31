@@ -70,6 +70,34 @@ export const SPEAKER_OVERLAY_MARGIN_BOTTOM = 20;
 
 
 
+/** Khoảng cách từ khung bảng đến các mép canvas (px). */
+
+export const FRAME_MARGIN_TOP = 20;
+
+export const FRAME_MARGIN_LEFT = 20;
+
+export const FRAME_MARGIN_BOTTOM = 20;
+
+export const FRAME_MARGIN_RIGHT = 80;
+
+/** Bề rộng vùng viền giữa hai đường (px). */
+
+export const FRAME_BORDER_WIDTH = 20;
+
+/** Màu vùng viền (cyan), dùng định dạng 0xRRGGBB cho ffmpeg drawbox. */
+
+export const FRAME_BORDER_COLOR = '0x00BFFF';
+
+/** Màu của hai đường viền mỏng (mép ngoài & mép trong). */
+
+export const FRAME_OUTLINE_COLOR = 'black';
+
+/** Bề dày của hai đường viền mỏng (px). */
+
+export const FRAME_OUTLINE_THICKNESS = 2;
+
+
+
 /**
 
  * @param {string} name
@@ -208,11 +236,45 @@ export function buildMakeVideoFilterComplex(opts = {}) {
 
 
 
+  const outerX = FRAME_MARGIN_LEFT;
+
+  const outerY = FRAME_MARGIN_TOP;
+
+  const outerW = w - FRAME_MARGIN_LEFT - FRAME_MARGIN_RIGHT;
+
+  const outerH = h - FRAME_MARGIN_TOP - FRAME_MARGIN_BOTTOM;
+
+  const innerX = outerX + FRAME_BORDER_WIDTH;
+
+  const innerY = outerY + FRAME_BORDER_WIDTH;
+
+  const innerW = outerW - 2 * FRAME_BORDER_WIDTH;
+
+  const innerH = outerH - 2 * FRAME_BORDER_WIDTH;
+
+  const innerOutlineX = innerX - FRAME_OUTLINE_THICKNESS;
+
+  const innerOutlineY = innerY - FRAME_OUTLINE_THICKNESS;
+
+  const innerOutlineW = innerW + 2 * FRAME_OUTLINE_THICKNESS;
+
+  const innerOutlineH = innerH + 2 * FRAME_OUTLINE_THICKNESS;
+
+
+
   const padSlide =
 
-    `scale=${w}:${h}:force_original_aspect_ratio=decrease:flags=lanczos,` +
+    `scale=${innerW}:${innerH}:force_original_aspect_ratio=decrease:flags=lanczos,` +
 
-    `pad=${w}:${h}:(ow-iw)/2:(oh-ih)/2:color=black,setsar=1,fps=${fps},format=yuv420p`;
+    `pad=${w}:${h}:${innerX}+(${innerW}-iw)/2:${innerY}+(${innerH}-ih)/2:color=black,` +
+
+    `setsar=1,fps=${fps},format=yuv420p,` +
+
+    `drawbox=x=${outerX}:y=${outerY}:w=${outerW}:h=${outerH}:color=${FRAME_BORDER_COLOR}:t=${FRAME_BORDER_WIDTH},` +
+
+    `drawbox=x=${outerX}:y=${outerY}:w=${outerW}:h=${outerH}:color=${FRAME_OUTLINE_COLOR}:t=${FRAME_OUTLINE_THICKNESS},` +
+
+    `drawbox=x=${innerOutlineX}:y=${innerOutlineY}:w=${innerOutlineW}:h=${innerOutlineH}:color=${FRAME_OUTLINE_COLOR}:t=${FRAME_OUTLINE_THICKNESS}`;
 
 
 
