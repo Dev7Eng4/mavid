@@ -77,10 +77,10 @@ export async function extractGeminiResponse(page) {
   await responseLocator.waitFor({ state: 'visible', timeout: 5000 });
 
   // if (requireCodeBlock) {
-  //   const specificCodeLocator = responseLocator.locator(GEMINI_SELECTOR.responseCodeBlock);
-  //   if ((await specificCodeLocator.count()) > 0) {
-  //     return { text: (await specificCodeLocator.last().innerText()).trim(), hasCodeBlock: true };
-  //   }
+    const specificCodeLocator = responseLocator.locator(GEMINI_SELECTOR.responseCodeBlock);
+    if ((await specificCodeLocator.count()) > 0) {
+      return { text: (await specificCodeLocator.last().innerText()).trim(), hasCodeBlock: true };
+    }
   // }
 
   return { text: (await responseLocator.innerText()).trim(), hasCodeBlock: false };
