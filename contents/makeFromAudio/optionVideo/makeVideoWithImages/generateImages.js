@@ -1,7 +1,7 @@
 import fs from 'fs';
 import path from 'path';
-import { PROFILES_LOGIN } from '../../../constants/playwright-profile';
-import { createBatchMedia } from '../../../flow/createMediaWithTool';
+import { PROFILES_LOGIN } from '../../../constants/playwright-profile.js';
+import { createBatchMedia } from '../../../flow/createMediaWithTool.js';
 
 export async function main(imagePrompts, folder) {
   const imagesFolder = path.join(folder, 'images');

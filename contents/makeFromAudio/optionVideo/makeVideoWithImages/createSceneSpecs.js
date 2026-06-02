@@ -1,6 +1,6 @@
-import { PLAYWRIGHT_PROFILES } from '../../../constants/playwright-profile';
-import { openChatPage, sendPromptWithRetry, validateJsonResponse } from '../../../llm';
-import openChromeProfile from '../../../scripts/makeChromeProfile';
+import { PLAYWRIGHT_PROFILES } from '../../../constants/playwright-profile.js';
+import { openChatPage, sendPromptWithRetry, validateJsonResponse } from '../../../llm.js';
+import openChromeProfile from '../../../scripts/makeChromeProfile.js';
 
 export const DEFAULT_SCENE_GENERATION_CONFIG = {
   allow_multiple_scenes_per_beat: false,
