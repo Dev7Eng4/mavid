@@ -1,15 +1,12 @@
-import { PATHS } from '../constants/paths.js';
 import fs from 'fs';
 import path from 'path';
-import { resolveProjectConfigs } from './config.js';
 import { convertTranscript } from './convertTranscript.js';
-import { main as detechNiche } from './detechNiche.js';
 import { main as createBeats } from './createBeats.js';
-import { main as createSceneSpecs } from './createSceneSpecs.js';
 import { main as createImagePrompts } from './createImagePrompt.js';
-import { main as generateImages } from './generateImages.js';
-import { main as mappingImages } from './mappingImages.js';
+import { main as createSceneSpecs } from './createSceneSpecs.js';
+import { main as detechNiche } from './detechNiche.js';
 import { main as makeVideo } from './makeVideo.js';
+import { main as mappingImages } from './mappingImages.js';
 import { DOWNLOADS_DIR } from '../../shared.js';
 
 const JPG_EXT = /\.jpe?g$/i;
