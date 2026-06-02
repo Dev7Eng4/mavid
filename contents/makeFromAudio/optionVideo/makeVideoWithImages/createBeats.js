@@ -1,6 +1,5 @@
 import { PLAYWRIGHT_PROFILES } from '../../../constants/playwright-profile.js';
-import { openChatPage, sendPromptWithRetry } from '../../../llm/browser.util.js';
-import { validateJsonResponse } from '../../../llm/text.util.js';
+import { openChatPage, sendPromptWithRetry, validateJsonResponse } from '../../../llm/index.js';
 import openChromeProfile from '../../../scripts/makeChromeProfile.js';
 
 const BEAT_TYPES = [
