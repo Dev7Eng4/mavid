@@ -1,6 +1,7 @@
 /**
 
- * Tạo MP4 từ ảnh (mỗi ảnh 12s) + overlay speaker.mov (alpha) — nền trong suốt, thấy ảnh phía sau.
+ * Tạo MP4 từ ảnh slideshow (duration theo transcript mapping) + overlay speaker.mov (alpha) — nền trong suốt, thấy ảnh phía sau.
+ * Tổng thời lượng output = thời lượng audio; ảnh cuối kéo dài từ startTime đến hết video.
 
  *
 
@@ -28,7 +29,7 @@ import { STOCK_VIDEO } from '../constants/index.js';
 
 import { PATHS } from '../constants/paths.js';
 
-import { ffmpegSpawnAsync, getAudioFile } from '../makeFromAudio/shared.js';
+import { ffmpegSpawnAsync, getAudioDurationSeconds, getAudioFile } from '../makeFromAudio/shared.js';
 import { srtTimestampToMs } from '../utils/srt.util.js';
 
 import {
@@ -264,22 +265,45 @@ export function sceneDurationSec(startTime, endTime) {
 /**
  * @param {Array<{ start: number, end: number, startTime: string, endTime: string, file: string }>} objectImages
  * @param {string} imagesDir
+ * @param {number} audioDurationSec
  * @returns {Array<{ path: string, durationSec: number }>}
  */
-export function buildSlidesFromObjectImages(objectImages, imagesDir) {
+export function buildSlidesFromObjectImages(objectImages, imagesDir, audioDurationSec) {
   if (!objectImages?.length) {
     throw new Error('buildSlidesFromObjectImages: cần ít nhất một scene');
   }
 
-  return objectImages.map(item => {
+  if (!Number.isFinite(audioDurationSec) || audioDurationSec <= 0) {
+    throw new Error(`buildSlidesFromObjectImages: audioDurationSec không hợp lệ (${audioDurationSec})`);
+  }
+
+  const lastIndex = objectImages.length - 1;
+
+  return objectImages.map((item, index) => {
     const abs = path.join(imagesDir, item.file);
     if (!fs.existsSync(abs)) {
       throw new Error(`buildSlidesFromObjectImages: không tìm thấy ${abs}`);
     }
 
+    let durationSec;
+    if (index === lastIndex) {
+      const startMs = srtTimestampToMs(item.startTime);
+      if (!Number.isFinite(startMs)) {
+        throw new Error(`buildSlidesFromObjectImages: startTime không hợp lệ (${item.startTime})`);
+      }
+      durationSec = Math.round((audioDurationSec - startMs / 1000) * 1000) / 1000;
+      if (durationSec <= 0) {
+        throw new Error(
+          `buildSlidesFromObjectImages: ảnh cuối (${item.file}) startTime=${item.startTime} vượt quá thời lượng audio (${audioDurationSec}s)`,
+        );
+      }
+    } else {
+      durationSec = sceneDurationSec(item.startTime, item.endTime);
+    }
+
     return {
       path: abs,
-      durationSec: sceneDurationSec(item.startTime, item.endTime),
+      durationSec,
     };
   });
 }
@@ -518,28 +542,6 @@ export async function createVideoFromImages(options = {}) {
 
   const outputPath = path.resolve(options.outputPath ?? path.join(downloadsDir, OUTPUT_VIDEO_NAME));
 
-  let slides;
-
-  if (options.objectImages?.length) {
-    slides = buildSlidesFromObjectImages(options.objectImages, imagesDir);
-  } else {
-    const imagePaths = options.imagePaths ?? listSlideshowImages(imagesDir);
-    const imageDurationSec = options.imageDurationSec ?? IMAGE_DURATION_SEC;
-
-    if (!imagePaths.length) {
-      throw new Error(`createVideoFromImages: không có ảnh trong ${imagesDir}`);
-    }
-
-    slides = imagePaths.map(p => ({ path: p, durationSec: imageDurationSec }));
-  }
-
-  const { speakerPath } = await ensureSpeakerVideo({
-    downloadsDir,
-    speakerPath: options.speakerPath,
-    speakerInputPath: options.speakerInputPath,
-    forceSpeaker: options.forceSpeaker,
-  });
-
   const audioPath = path.resolve(options.audioPath ?? resolveDownloadsAudioPath(downloadsDir));
 
   if (!fs.existsSync(audioPath)) {
@@ -550,13 +552,52 @@ export async function createVideoFromImages(options = {}) {
     throw new Error(`createVideoFromImages: file không có stream audio: ${audioPath}`);
   }
 
+  const audioDurationSec = await getAudioDurationSeconds(audioPath);
+  if (!Number.isFinite(audioDurationSec) || audioDurationSec <= 0) {
+    throw new Error(`createVideoFromImages: không đọc được thời lượng audio: ${audioPath}`);
+  }
+
+  const totalSec = Math.round(audioDurationSec * 1000) / 1000;
+
+  let slides;
+
+  if (options.objectImages?.length) {
+    slides = buildSlidesFromObjectImages(options.objectImages, imagesDir, totalSec);
+  } else {
+    const imagePaths = options.imagePaths ?? listSlideshowImages(imagesDir);
+    const imageDurationSec = options.imageDurationSec ?? IMAGE_DURATION_SEC;
+
+    if (!imagePaths.length) {
+      throw new Error(`createVideoFromImages: không có ảnh trong ${imagesDir}`);
+    }
+
+    const lastIndex = imagePaths.length - 1;
+    slides = imagePaths.map((p, index) => {
+      let durationSec = imageDurationSec;
+      if (index === lastIndex) {
+        durationSec = Math.round((totalSec - (imagePaths.length - 1) * imageDurationSec) * 1000) / 1000;
+        if (durationSec <= 0) {
+          throw new Error(
+            `createVideoFromImages: thời lượng audio (${totalSec}s) không đủ cho ${imagePaths.length} ảnh × ${imageDurationSec}s`,
+          );
+        }
+      }
+      return { path: p, durationSec };
+    });
+  }
+
+  const { speakerPath } = await ensureSpeakerVideo({
+    downloadsDir,
+    speakerPath: options.speakerPath,
+    speakerInputPath: options.speakerInputPath,
+    forceSpeaker: options.forceSpeaker,
+  });
+
   const stockPath = await ensureStockBackground({
     downloadsDir,
     stockUrl: options.stockUrl ?? STOCK_VIDEO_URL,
     forceStock: options.forceStock,
   });
-
-  const totalSec = slides.reduce((sum, s) => sum + s.durationSec, 0);
 
   const concatContent = buildImageConcatFileContent(slides);
 
@@ -576,7 +617,8 @@ export async function createVideoFromImages(options = {}) {
   });
 
   const durationSummary = slides.map(s => `${s.durationSec}s`).join(', ');
-  console.log(`[make-video] Ảnh: ${slides.length} slide — [${durationSummary}] ≈ ${totalSec}s`);
+  console.log(`[make-video] Ảnh: ${slides.length} slide — [${durationSummary}]`);
+  console.log(`[make-video] Thời lượng audio: ${totalSec}s (output video)`);
 
   console.log(`[make-video] Stock nền: ${stockPath} (loop)`);
 

@@ -101,9 +101,6 @@ export async function main(transcriptObjects, folder, totalScenes) {
   const converted = convertedObjectImages(objectImages);
   const mapped = mapConvertedToTranscriptTimestamps(converted, transcriptObjects);
 
-  console.log(`[mapping-images] ${mapped.length} scene từ ${imagesDir}`);
-  console.log(JSON.stringify(mapped, null, 2));
-
   return mapped;
 }
 
@@ -115,7 +112,7 @@ if (isMain) {
   convertTranscript(folder)
     .then(transcriptObjects => main(transcriptObjects, folder, 10))
     .catch(err => {
-    console.error(err.message ?? err);
-    process.exit(1);
-  });
+      console.error(err.message ?? err);
+      process.exit(1);
+    });
 }

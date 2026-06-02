@@ -10,6 +10,29 @@ import { main as generateImages } from './generateImages.js';
 import { main as mappingImages } from './mappingImages.js';
 import { main as makeVideo } from './makeVideo.js';
 
+const JPG_EXT = /\.jpe?g$/i;
+
+/**
+ * Lọc ra các imagePrompt chưa có ảnh riêng trong objectImages.
+ * Một prompt được coi là thiếu ảnh khi:
+ * - Không có file trùng tên (start-end), hoặc
+ * - Trùng tên với prompt trước đó (nhiều scene cùng line range chỉ map 1 file).
+ * @param {Array<{ name: string, prompt: string }>} imagePrompts
+ * @param {Array<{ file: string }>} objectImages
+ * @returns {Array<{ name: string, prompt: string }>}
+ */
+export function filterImagePromptsWithoutFiles(imagePrompts, objectImages) {
+  const existingNames = new Set(objectImages.map(item => item.file.replace(JPG_EXT, '')));
+  const assignedNames = new Set();
+
+  return imagePrompts.filter(item => {
+    if (!existingNames.has(item.name)) return true;
+    if (assignedNames.has(item.name)) return true;
+    assignedNames.add(item.name);
+    return false;
+  });
+}
+
 export async function main(folder = PATHS.DOWNLOADS) {
   const transcriptObjects = await convertTranscript(folder);
 
@@ -33,7 +56,7 @@ export async function main(folder = PATHS.DOWNLOADS) {
 
   // await generateImages(imageScenePrompts, folder);
 
-  const objectImages = await mappingImages(transcriptObjects, folder, 10);
+  const objectImages = await mappingImages(transcriptObjects, folder, 134);
 
   await makeVideo(objectImages, folder);
 }

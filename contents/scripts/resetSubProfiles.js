@@ -200,7 +200,7 @@ export async function setupMainProfiles() {
       await page.goto('https://www.google.com/', { waitUntil: 'domcontentloaded', timeout: 30000 });
 
       return { context, n };
-    })
+    }),
   );
 
   console.log(`\n[${logPrefix}] Đã mở ${opened.length} cửa sổ Chrome. Nhấn Enter để đóng tất cả.\n`);
