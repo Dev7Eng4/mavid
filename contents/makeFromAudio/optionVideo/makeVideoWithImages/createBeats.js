@@ -1,9 +1,7 @@
-import { PLAYWRIGHT_PROFILES } from '../constants/playwright-profile.js';
-import { openChatPage, sendPromptWithRetry } from '../llm/browser.util.js';
-import { validateJsonResponse } from '../llm/text.util.js';
-import openChromeProfile from '../scripts/makeChromeProfile.js';
-import { NICHE_CONFIGS } from './niche-config.js';
-import { STYLE_CONFIGS } from './style-config.js';
+import { PLAYWRIGHT_PROFILES } from '../../../constants/playwright-profile.js';
+import { openChatPage, sendPromptWithRetry } from '../../../llm/browser.util.js';
+import { validateJsonResponse } from '../../../llm/text.util.js';
+import openChromeProfile from '../../../scripts/makeChromeProfile.js';
 
 const BEAT_TYPES = [
   'opening_hook',
@@ -384,7 +382,7 @@ export async function main(transcriptObjects, nicheConfig, styleConfig) {
         requires_checklist: b.requires_checklist,
         on_screen_text_seed_ja: b.on_screen_text_seed_ja,
         notes_for_next_step: b.notes_for_next_step,
-      }))
+      })),
     );
   }
 

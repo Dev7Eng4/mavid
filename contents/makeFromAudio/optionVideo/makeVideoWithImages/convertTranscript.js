@@ -1,8 +1,8 @@
 import path from 'path';
 import fs from 'fs';
-import { PATHS } from '../constants/paths.js';
-import { getSubtitleFile } from '../makeFromAudio/shared.js';
-import { parseSrtToObjects } from '../utils/srt.util.js';
+import { PATHS } from '../../../constants/paths.js';
+import { parseSrtToObjects } from '../../../utils/srt.util.js';
+import { getSubtitleFile } from '../../shared.js';
 
 export async function convertTranscript(folder = PATHS.DOWNLOADS) {
   const dir = path.resolve(folder);

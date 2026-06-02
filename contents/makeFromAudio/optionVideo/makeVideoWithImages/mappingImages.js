@@ -1,8 +1,8 @@
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import { PATHS } from '../constants/paths.js';
 import { convertTranscript } from './convertTranscript.js';
+import { PATHS } from '../../../constants/paths.js';
 
 const JPG_EXT = /\.jpe?g$/i;
 const FIRST_SCENE_START_TIME = '00:00:00,000';

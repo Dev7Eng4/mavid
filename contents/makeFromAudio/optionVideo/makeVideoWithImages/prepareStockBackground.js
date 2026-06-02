@@ -10,9 +10,9 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import youtubedl from 'youtube-dl-exec';
 
-import { STOCK_VIDEO } from '../constants/index.js';
-import { PATHS } from '../constants/paths.js';
-import { ffmpegSpawnAsync } from '../makeFromAudio/shared.js';
+import { STOCK_VIDEO } from '../../../constants/videoPipelineDefaults.js';
+import { ffmpegSpawnAsync } from '../../shared.js';
+import { PATHS } from '../../../constants/paths.js';
 
 /** URL stock mặc định (YouTube). */
 export const STOCK_VIDEO_URL = 'https://www.youtube.com/watch?v=MPTBT4-r4Fs';
@@ -79,12 +79,9 @@ export async function normalizeStockBackgroundClip(inputPath, outputPath, opts =
   const skipSec = opts.skipSec ?? STOCK_BG_SKIP_SEC;
   const clipSec = opts.clipSec ?? STOCK_BG_CLIP_SEC;
 
-  const vf = [
-    `scale=${w}:${h}:force_original_aspect_ratio=increase:flags=lanczos`,
-    `crop=${w}:${h}`,
-    `fps=${fps}`,
-    'format=yuv420p',
-  ].join(',');
+  const vf = [`scale=${w}:${h}:force_original_aspect_ratio=increase:flags=lanczos`, `crop=${w}:${h}`, `fps=${fps}`, 'format=yuv420p'].join(
+    ',',
+  );
 
   await ffmpegSpawnAsync([
     '-hide_banner',
@@ -144,8 +141,7 @@ export async function ensureStockBackground(options = {}) {
   const outputPath = path.resolve(options.outputPath ?? path.join(downloadsDir, STOCK_BG_OUTPUT_NAME));
   const urlMetaPath = `${outputPath}.url`;
 
-  const urlChanged =
-    fs.existsSync(urlMetaPath) && fs.readFileSync(urlMetaPath, 'utf8').trim() !== stockUrl;
+  const urlChanged = fs.existsSync(urlMetaPath) && fs.readFileSync(urlMetaPath, 'utf8').trim() !== stockUrl;
 
   if (fs.existsSync(outputPath) && !options.forceStock && !urlChanged) {
     console.log(`[stock-bg] Dùng stock có sẵn: ${outputPath}`);

@@ -13,9 +13,9 @@ import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 
-import { PATHS } from '../constants/paths.js';
-import { ffmpegSpawnAsync } from '../makeFromAudio/shared.js';
 import { STOCK_BG_OUTPUT_NAME } from './prepareStockBackground.js';
+import { PATHS } from '../../../constants/paths.js';
+import { ffmpegSpawnAsync } from '../../shared.js';
 
 const SWS_FLAGS = 'lanczos+accurate_rnd+full_chroma_int';
 
@@ -35,14 +35,7 @@ export const SPEAKER_OUTPUT_NAME = 'speaker.mov';
 
 const EXCLUDED_SOURCE_MP4 = new Set(['output.mp4', 'speaker.mp4', STOCK_BG_OUTPUT_NAME, '_stock_raw.mp4']);
 
-const VIDEO_ENCODE_ARGS = [
-  '-c:v',
-  'prores_ks',
-  '-profile:v',
-  '4444',
-  '-pix_fmt',
-  'yuva444p10le',
-];
+const VIDEO_ENCODE_ARGS = ['-c:v', 'prores_ks', '-profile:v', '4444', '-pix_fmt', 'yuva444p10le'];
 
 /** Audio lấy từ nguồn trong makeVideo (tránh lỗi Opus khi loop). */
 const AUDIO_ENCODE_ARGS = ['-an'];
@@ -61,7 +54,7 @@ export function buildSpeakerChromakeyFilter() {
 export function buildSmoothSpeakerAlphaFilter() {
   return (
     'split[sp_a][sp_b];' +
-    '[sp_b]alphaextract,boxblur=1:1,lut=y=\'min(255,val*2)\',format=gray[sp_mask];' +
+    "[sp_b]alphaextract,boxblur=1:1,lut=y='min(255,val*2)',format=gray[sp_mask];" +
     '[sp_a][sp_mask]alphamerge,format=yuva420p'
   );
 }
@@ -95,8 +88,7 @@ export function buildSpeakerVideoFilter(opts = {}) {
   const cropSide = opts.cropSidePx ?? CROP_SIDE_PX;
   const scaleRatio = opts.scaleRatio ?? SCALE_RATIO;
   const cropSides = `crop=iw-${cropSide * 2}:ih:${cropSide}:0`;
-  const core =
-    `${cropSides},${buildSpeakerChromakeyFilter()},despill=mix=0.4:red=1,format=yuva420p`;
+  const core = `${cropSides},${buildSpeakerChromakeyFilter()},despill=mix=0.4:red=1,format=yuva420p`;
 
   if (scaleRatio >= 1) {
     return core;
@@ -122,10 +114,10 @@ export function buildScaleDownFilter(ratio) {
  */
 export function probeSourceVideo(inputPath) {
   try {
-    const raw = execSync(
-      `ffprobe -v error -select_streams v:0 -show_entries stream=width,height,bit_rate -of csv=p=0 "${inputPath}"`,
-      { encoding: 'utf8', stdio: ['pipe', 'pipe', 'pipe'] },
-    ).trim();
+    const raw = execSync(`ffprobe -v error -select_streams v:0 -show_entries stream=width,height,bit_rate -of csv=p=0 "${inputPath}"`, {
+      encoding: 'utf8',
+      stdio: ['pipe', 'pipe', 'pipe'],
+    }).trim();
     const [width, height, bitRate] = raw.split(',').map(v => parseInt(v, 10));
     if (!width || !height) return null;
     return { width, height, bitRate: Number.isFinite(bitRate) && bitRate > 0 ? bitRate : 750_000 };

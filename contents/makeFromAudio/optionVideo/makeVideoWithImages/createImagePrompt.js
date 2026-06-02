@@ -1,6 +1,6 @@
-import { PLAYWRIGHT_PROFILES } from '../constants/playwright-profile.js';
-import { openChatPage, sendPromptWithRetry, validateJsonResponse } from '../llm/index.js';
-import openChromeProfile from '../scripts/makeChromeProfile.js';
+import { PLAYWRIGHT_PROFILES } from '../../../constants/playwright-profile';
+import { openChatPage, sendPromptWithRetry, validateJsonResponse } from '../../../llm';
+import openChromeProfile from '../../../scripts/makeChromeProfile';
 
 export const promptCreateImagePromptsFromSceneSpecsBatch = ({
   batchId,

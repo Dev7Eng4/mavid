@@ -25,13 +25,6 @@ import path from 'path';
 
 import { fileURLToPath } from 'url';
 
-import { STOCK_VIDEO } from '../constants/index.js';
-
-import { PATHS } from '../constants/paths.js';
-
-import { ffmpegSpawnAsync, getAudioDurationSeconds, getAudioFile } from '../makeFromAudio/shared.js';
-import { srtTimestampToMs } from '../utils/srt.util.js';
-
 import {
   SPEAKER_FILTER_VERSION,
   SPEAKER_OUTPUT_NAME,
@@ -49,6 +42,10 @@ import {
 } from './prepareStockBackground.js';
 import { convertTranscript } from './convertTranscript.js';
 import { main as runMappingImages } from './mappingImages.js';
+import { STOCK_VIDEO } from '../../../constants/videoPipelineDefaults.js';
+import { PATHS } from '../../../constants/paths.js';
+import { ffmpegSpawnAsync, getAudioDurationSeconds, getAudioFile } from '../../shared.js';
+import { srtTimestampToMs } from '../../../utils/srt.util.js';
 
 export { STOCK_VIDEO_URL };
 
@@ -670,7 +667,7 @@ export async function createVideoFromImages(options = {}) {
 
       '-map',
 
-      '[vout]'
+      '[vout]',
     );
 
     ffmpegArgs.push(
@@ -700,7 +697,7 @@ export async function createVideoFromImages(options = {}) {
 
       String(totalSec),
 
-      outputPath
+      outputPath,
     );
 
     await ffmpegSpawnAsync(ffmpegArgs);

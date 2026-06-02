@@ -1,9 +1,9 @@
-import { openChatPage, sendPromptWithRetry } from '../llm/browser.util.js';
-import { validateJsonResponse } from '../llm/text.util.js';
-import openChromeProfile from '../scripts/makeChromeProfile.js';
 import { NICHE_CONFIGS } from './niche-config.js';
 import { formatNumberedTranscript } from './createBeats.js';
 import { STYLE_CONFIGS } from './style-config.js';
+import openChromeProfile from '../../../scripts/makeChromeProfile.js';
+import { sendPromptWithRetry } from '../../../llm/browser.util.js';
+import { validateJsonResponse } from '../../../llm/text.util.js';
 
 export const promptDetectSeniorNicheFromTranscript = ({ availableNiches, transcriptSample }) => `
 You are a niche classifier for Japanese senior YouTube educational videos.
