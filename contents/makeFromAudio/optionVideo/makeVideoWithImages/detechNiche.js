@@ -144,15 +144,13 @@ export function createTranscriptSampleForNicheDetection(lines, options = {}) {
 export function createAvailableNichesForDetection() {
   return Object.values(NICHE_CONFIGS).map(niche => ({
     niche_id: niche.niche_id,
-    niche_name_ja: niche.niche_name_ja,
-    niche_name_vi: niche.niche_name_vi,
-    content_goal: niche.content_goal,
-    emotional_tone: niche.emotional_tone,
-    preferred_beat_types: niche.preferred_beat_types,
-    visual_keywords: niche.visual_keywords,
+
+    // emotional_tone: niche.emotional_tone,
+    // preferred_beat_types: niche.preferred_beat_types,
+    // visual_keywords: niche.visual_keywords,
     core_tags_ja: niche.metadata_rules?.core_tags_ja || [],
     default_style_id: niche.default_style_id,
-    default_text_rendering_mode: niche.default_text_rendering_mode,
+    // default_text_rendering_mode: niche.default_text_rendering_mode,
   }));
 }
 
@@ -188,6 +186,7 @@ export function resolveDetectedNicheConfig({
 
 export async function main(transcriptObjects) {
   const availableNiches = createAvailableNichesForDetection();
+  console.log('🚀 ~ main ~ availableNiches:', availableNiches);
   const transcriptSample = createTranscriptSampleForNicheDetection(transcriptObjects);
 
   const prompt = promptDetectSeniorNicheFromTranscript({ availableNiches, transcriptSample });

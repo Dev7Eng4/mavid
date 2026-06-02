@@ -11,6 +11,7 @@ import { OPTIONS_CONTENT } from './constant.js';
 import { makeVideoWithImageNoise } from './optionVideo/makeVideoWithImageNoise.js';
 import { makeVideoWithOverlayImageNoise } from './optionVideo/makeVideoWithOverlayImageNoise.js';
 import { makeVideoWithSlideImage } from './optionVideo/makeVideoWithSlideImage/index.js';
+import { makeVideoWithImages } from './optionVideo/makeVideoWithImages/index.js';
 
 const CHANNELS_ROOT = resolveChannelsDir();
 
@@ -146,7 +147,7 @@ async function main(options = {}) {
 
     if (i + 1 < items.length) {
       console.log(
-        `\n>>> [Pipeline] Bắt đầu tải trước video [${i + 2}/${items.length}] trong lúc đang render video [${i + 1}/${items.length}]...`,
+        `\n>>> [Pipeline] Bắt đầu tải trước video [${i + 2}/${items.length}] trong lúc đang render video [${i + 1}/${items.length}]...`
       );
       nextDownloadPromise = startDownload(i + 1);
     } else {
@@ -182,8 +183,7 @@ async function main(options = {}) {
         } else if (currentOption === VIDEO_MAKE_OPTION.SI) {
           await makeVideoWithOverlayImageNoise(defaultStockFolder, perItemOptions);
         } else if (currentOption === VIDEO_MAKE_OPTION.AGI) {
-          console.log('🔄 Đang tạo visual beats...');
-          await makeVideoWithSlideImage(perItemOptions);
+          await makeVideoWithImages(perItemOptions);
         } else {
           console.warn(`[main] Bỏ qua option không hỗ trợ: ${currentOption} (chỉ còn IN | SI).`);
         }

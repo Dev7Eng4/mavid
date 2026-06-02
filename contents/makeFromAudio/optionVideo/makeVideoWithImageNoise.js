@@ -78,7 +78,7 @@ export async function makeVideoWithImageNoise(options = {}) {
   const originalAudioDuration = await getAudioDurationSeconds(audioPath);
   const audioDurationAfterTempo = originalAudioDuration / speed;
   console.log(
-    `Thời lượng audio: ${originalAudioDuration.toFixed(1)}s, sau atempo (SPEED=${speed}): ${formatClockDuration(audioDurationAfterTempo)}`,
+    `Thời lượng audio: ${originalAudioDuration.toFixed(1)}s, sau atempo (SPEED=${speed}): ${formatClockDuration(audioDurationAfterTempo)}`
   );
 
   let subtitlePath = getSubtitleFile(downloadsDir);
@@ -190,7 +190,7 @@ export async function makeVideoWithImageNoise(options = {}) {
       `crop=${zpW}:${zpH},` +
       `zoompan=z='${zoomExpr}':` +
       `d=${totalFrames}:x='${panX}':y='${panY}':s=${w}x${h}:fps=${fps},` +
-      `format=yuv420p,setsar=1[bg]`,
+      `format=yuv420p,setsar=1[bg]`
   );
 
   let currentVLabel = 'bg';
@@ -203,7 +203,7 @@ export async function makeVideoWithImageNoise(options = {}) {
     const rRadius = n / 2;
     const circleGeq = `if(lte(hypot(X-W/2,Y-H/2),${rRadius}),255,0)`;
     filterParts.push(
-      `[${reactionIndex}:v]setpts=3*PTS,fps=${fps},scale=${n}:${n}:flags=fast_bilinear,format=rgba,geq=r='r(X,Y)':g='g(X,Y)':b='b(X,Y)':a='${circleGeq}'[reaction]`,
+      `[${reactionIndex}:v]setpts=3*PTS,fps=${fps},scale=${n}:${n}:flags=fast_bilinear,format=rgba,geq=r='r(X,Y)':g='g(X,Y)':b='b(X,Y)':a='${circleGeq}'[reaction]`
     );
     filterParts.push(`[${currentVLabel}][reaction]overlay=${reactionX}:${reactionY}:shortest=1[v_under_noise]`);
     currentVLabel = 'v_under_noise';
@@ -214,7 +214,7 @@ export async function makeVideoWithImageNoise(options = {}) {
       filterParts.push(`[${noiseIndex}:v]null[noise]`);
     } else {
       filterParts.push(
-        `[${noiseIndex}:v]fps=${fps},scale=${w}:${h}:flags=fast_bilinear,format=yuva420p,colorkey=0x000000:0.1:0.1,colorchannelmixer=aa=${NOISE_ALPHA}[noise]`,
+        `[${noiseIndex}:v]fps=${fps},scale=${w}:${h}:flags=fast_bilinear,format=yuva420p,colorkey=0x000000:0.1:0.1,colorchannelmixer=aa=${NOISE_ALPHA}[noise]`
       );
     }
     filterParts.push(`[${currentVLabel}][noise]overlay=0:0:shortest=1[v_noised]`);
@@ -248,7 +248,7 @@ export async function makeVideoWithImageNoise(options = {}) {
       const r = Math.floor(LOGO.SIZE / 2);
       const geqExpr = `if(lte(hypot(X-W/2,Y-H/2),${r}),255,0)`;
       filterParts.push(
-        `[${logoIndex}:v]scale=${LOGO.SIZE}:${LOGO.SIZE}:flags=fast_bilinear,format=rgba,geq=r='r(X,Y)':g='g(X,Y)':b='b(X,Y)':a='${geqExpr}'[logo]`,
+        `[${logoIndex}:v]scale=${LOGO.SIZE}:${LOGO.SIZE}:flags=fast_bilinear,format=rgba,geq=r='r(X,Y)':g='g(X,Y)':b='b(X,Y)':a='${geqExpr}'[logo]`
       );
     }
     filterParts.push(`[${currentVLabel}][logo]overlay=main_w-overlay_w-${LOGO.MARGIN_RIGHT}:${LOGO.MARGIN_TOP}[vout_final]`);
@@ -283,7 +283,7 @@ export async function makeVideoWithImageNoise(options = {}) {
     '128k',
     '-t',
     String(audioDurationAfterTempo),
-    outputPath,
+    outputPath
   );
 
   console.log(`Đang merge nội dung Image Noise Pipeline...`);

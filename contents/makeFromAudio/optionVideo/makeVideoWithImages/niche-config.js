@@ -25,6 +25,61 @@ const COMMON_SENIOR_SAFETY_RULES = {
   ],
 };
 
+export const COMMON_SENIOR_FOOD_SAFETY_RULES = {
+  factual_safety_rules: [
+    'Use only information supported by the transcript or visual beat.',
+    'Do not claim that a food cures, prevents, or treats a disease.',
+    'Do not say a food guarantees dementia prevention, blood pressure reduction, blood sugar control, or weight loss.',
+    'Do not replace medical treatment, medication, or professional dietary advice.',
+    'Use cautious wording for health benefits, such as supports, may help, or is associated with.',
+    'Do not invent nutrient amounts, calories, grams, percentages, or medical thresholds unless provided.',
+    'For disease-related topics, include caution that people with medical conditions should consult a doctor or dietitian when appropriate.',
+    'Avoid fear exaggeration and food shaming.',
+    'Avoid extreme before/after health transformation claims.',
+  ],
+
+  ignored_content_rules: [
+    'generic greeting',
+    'like and subscribe request',
+    'repeated channel introduction',
+    'non-informational filler',
+    'unrelated personal story without nutrition value',
+  ],
+
+  general_scene_rules: [
+    'One scene should communicate one practical food or nutrition idea.',
+    'Use senior-friendly simple visuals.',
+    'Use familiar Japanese foods when possible.',
+    'Avoid cluttered food tables.',
+    'Avoid tiny nutrition labels.',
+    'Prefer simple plates, bowls, shopping baskets, kitchen scenes, and checklist boards.',
+    'Do not show medical cure imagery.',
+  ],
+
+  forbidden_health_claims_ja: [
+    '治る',
+    '完治',
+    '必ず防ぐ',
+    '絶対に改善',
+    '薬はいらない',
+    '医者いらず',
+    '血管が完全に若返る',
+    '認知症を完全予防',
+    '血糖値が必ず下がる',
+    '高血圧が治る',
+  ],
+
+  safer_health_phrases_ja: [
+    '意識したい',
+    '取り入れたい',
+    'サポートする',
+    '役立つ可能性がある',
+    '摂りすぎに注意',
+    '無理なく続ける',
+    '医師に相談',
+  ],
+};
+
 export const NICHE_CONFIGS = {
   senior_scam_prevention: {
     niche_id: 'senior_scam_prevention',
@@ -2145,5 +2200,1450 @@ export const NICHE_CONFIGS = {
       'Avoid fear exaggeration.',
       'Avoid real logos and fake official symbols.',
     ],
+  },
+
+  senior_healthy_foods_general: {
+    niche_id: 'senior_healthy_foods_general',
+    niche_name_ja: '高齢者の健康食',
+    niche_name_vi: 'Thực phẩm sức khỏe cho người già',
+    audience: 'Japanese seniors 60+ interested in healthy eating',
+    primary_viewer: 'Japanese seniors who want simple daily food habits for healthy aging',
+
+    content_goal: 'Explain senior-friendly healthy foods and daily eating habits in a practical, non-medical, easy-to-understand way.',
+    emotional_tone: 'warm, practical, reassuring',
+    trust_level: 'high',
+
+    default_style_id: 'gentle_lifestyle',
+    alternative_style_ids: ['soft_anime_infographic', 'simple_3d_infographic', 'clean_tv_slide'],
+
+    default_text_rendering_mode: 'no_text',
+
+    text_policy: {
+      scene_text_usage: 'moderate',
+      preferred_text_modes: ['no_text', 'minimal_label_text', 'ai_generated_text'],
+      no_text_for_visual_types: ['food_lifestyle_scene', 'emotional_lifestyle_scene'],
+      text_heavy_visual_types: ['checklist_slide', 'comparison_slide', 'summary_slide'],
+      max_text_blocks: 2,
+    },
+
+    preferred_beat_types: [
+      'opening_hook',
+      'problem_statement',
+      'basic_explanation',
+      'checklist',
+      'example_case',
+      'important_condition',
+      'summary_takeaway',
+    ],
+
+    scene_rules: {
+      density_level: 'medium',
+      average_scene_duration_sec: 28,
+      preferred_visual_types: ['food_lifestyle_scene', 'checklist_slide', 'character_explanation', 'comparison_slide', 'summary_slide'],
+      preferred_layout_types: [
+        'emotional_lifestyle_scene',
+        'checklist_board',
+        'left_text_right_character',
+        'comparison_board',
+        'summary_board',
+      ],
+      preferred_elements: [
+        'elderly Japanese person preparing a simple meal',
+        'Japanese home kitchen',
+        'balanced meal tray',
+        'rice bowl',
+        'miso soup',
+        'grilled fish',
+        'vegetables',
+        'tofu',
+        'natto',
+        'shopping basket',
+        'simple food checklist',
+      ],
+      forbidden_elements: [
+        'medical cure imagery',
+        'hospital treatment scene',
+        'medicine replacement claim',
+        'extreme diet',
+        'fear-based food warning',
+        'unrealistic luxury meal',
+        'spoiled food',
+      ],
+    },
+
+    segmentation_rules: {
+      split_when: [
+        'a new food or ingredient appears',
+        'a new eating habit appears',
+        'a nutrient or food function is explained',
+        'a caution about overeating or medical condition appears',
+        'a checklist or practical tip begins',
+        'the speaker moves from problem to food suggestion',
+      ],
+      merge_when: [
+        'several lines repeat the same food benefit',
+        'the lines only express general encouragement without a new food idea',
+        'the lines list similar foods without separate explanation',
+      ],
+      ignore_or_compress: COMMON_SENIOR_FOOD_SAFETY_RULES.ignored_content_rules,
+    },
+
+    visual_keywords: [
+      'elderly Japanese person cooking',
+      'balanced Japanese meal',
+      'miso soup',
+      'grilled fish',
+      'vegetables',
+      'tofu',
+      'natto',
+      'healthy senior meal',
+    ],
+
+    thumbnail_rules: {
+      emotional_angle: 'healthy aging + simple daily food',
+      title_style: 'food list + senior health support + caution',
+      recommended_copy_patterns_ja: ['高齢者の健康食', '毎日食べたい', '老後の体を守る', '食べ方に注意'],
+      color_direction: 'warm kitchen tone + green healthy accent + yellow highlight',
+      thumbnail_text_mode: 'ai_generated_text',
+      avoid: ['disease cure claim', 'extreme fear', 'medicine replacement', 'fake medical chart'],
+    },
+
+    metadata_rules: {
+      title_patterns_ja: [
+        '高齢者が意識したい健康食と毎日の食べ方',
+        'シニアの体を支える食べ物と食習慣をやさしく解説',
+        '老後の健康のために取り入れたい食事のポイント',
+      ],
+      core_tags_ja: ['高齢者 食事', 'シニア 健康食', '老後の健康', '高齢者 栄養', 'シニア 食生活', '健康習慣'],
+      hashtags_ja: ['#高齢者の食事', '#健康食', '#シニアライフ', '#老後の健康'],
+    },
+
+    factual_safety_rules: COMMON_SENIOR_FOOD_SAFETY_RULES.factual_safety_rules,
+  },
+
+  senior_nutrition_basics: {
+    niche_id: 'senior_nutrition_basics',
+    niche_name_ja: '高齢者の栄養の基本',
+    niche_name_vi: 'Dinh dưỡng cơ bản cho người già',
+    audience: 'Japanese seniors and families learning basic nutrition',
+    primary_viewer: 'Seniors who want to understand protein, vegetables, hydration, and balanced meals',
+
+    content_goal: 'Explain basic senior nutrition simply, focusing on balance, easy habits, and caution against overclaim.',
+    emotional_tone: 'educational, calm, trustworthy',
+    trust_level: 'high',
+
+    default_style_id: 'soft_anime_infographic',
+    alternative_style_ids: ['gentle_lifestyle', 'clean_tv_slide', 'simple_3d_infographic'],
+
+    default_text_rendering_mode: 'ai_generated_text',
+
+    text_policy: {
+      scene_text_usage: 'frequent',
+      preferred_text_modes: ['ai_generated_text', 'minimal_label_text', 'no_text'],
+      no_text_for_visual_types: ['food_lifestyle_scene'],
+      text_heavy_visual_types: ['checklist_slide', 'simple_chart_scene', 'comparison_slide', 'summary_slide'],
+      max_text_blocks: 3,
+    },
+
+    preferred_beat_types: ['basic_explanation', 'comparison', 'checklist', 'important_condition', 'step_by_step_guide', 'summary_takeaway'],
+
+    scene_rules: {
+      density_level: 'medium',
+      average_scene_duration_sec: 28,
+      preferred_visual_types: ['simple_chart_scene', 'checklist_slide', 'food_lifestyle_scene', 'character_explanation', 'summary_slide'],
+      preferred_layout_types: ['simple_chart_slide', 'checklist_board', 'comparison_board', 'left_text_right_character', 'summary_board'],
+      preferred_elements: [
+        'balanced meal tray',
+        'protein food icons',
+        'vegetables',
+        'water glass',
+        'rice bowl',
+        'fish',
+        'tofu',
+        'simple nutrition plate diagram',
+        'elderly Japanese person eating at home',
+      ],
+      forbidden_elements: [
+        'complex nutrient table',
+        'tiny nutrition labels',
+        'medical diagnosis',
+        'supplement bottle promotion',
+        'strict diet rule',
+        'guaranteed health result',
+      ],
+    },
+
+    segmentation_rules: {
+      split_when: [
+        'a new nutrient appears',
+        'protein, vegetables, carbohydrates, fat, hydration, or fiber is introduced',
+        'a meal balance concept appears',
+        'a caution about restriction or overeating appears',
+        'a practical meal example appears',
+      ],
+      merge_when: ['several lines repeat the same balance idea', 'the lines list foods without separate explanation'],
+      ignore_or_compress: COMMON_SENIOR_FOOD_SAFETY_RULES.ignored_content_rules,
+    },
+
+    visual_keywords: [
+      'senior nutrition plate',
+      'balanced Japanese meal',
+      'protein icon',
+      'vegetables',
+      'water glass',
+      'elderly Japanese person eating',
+    ],
+
+    thumbnail_rules: {
+      emotional_angle: 'simple nutrition clarity',
+      title_style: 'nutrition basics + easy explanation',
+      recommended_copy_patterns_ja: ['栄養の基本', '食べ方で差', 'シニアの食事', 'まずはこれ'],
+      color_direction: 'green health + blue trust + warm meal tone',
+      thumbnail_text_mode: 'ai_generated_text',
+    },
+
+    metadata_rules: {
+      title_patterns_ja: [
+        '高齢者の栄養の基本｜毎日の食事で意識したいこと',
+        'シニアの食事バランスをやさしく解説',
+        '老後の体を支える栄養と食べ方の基本',
+      ],
+      core_tags_ja: ['高齢者 栄養', 'シニア 食事', '食事バランス', '老後の健康', '健康食', 'タンパク質'],
+      hashtags_ja: ['#高齢者栄養', '#シニア食事', '#健康食', '#老後の健康'],
+    },
+
+    factual_safety_rules: COMMON_SENIOR_FOOD_SAFETY_RULES.factual_safety_rules,
+  },
+
+  senior_easy_to_eat_foods: {
+    niche_id: 'senior_easy_to_eat_foods',
+    niche_name_ja: '高齢者の食べやすい食事',
+    niche_name_vi: 'Món dễ ăn / dễ nhai / dễ nuốt cho người già',
+    audience: 'Japanese seniors who have difficulty chewing or swallowing and their families',
+    primary_viewer: 'Seniors and caregivers looking for soft, easy-to-eat daily meal ideas',
+
+    content_goal: 'Introduce easy-to-eat senior meals and texture ideas while avoiding medical swallowing advice beyond the transcript.',
+    emotional_tone: 'gentle, practical, supportive',
+    trust_level: 'high',
+
+    default_style_id: 'gentle_lifestyle',
+    alternative_style_ids: ['soft_anime_infographic', 'clean_tv_slide'],
+
+    default_text_rendering_mode: 'no_text',
+
+    text_policy: {
+      scene_text_usage: 'moderate',
+      preferred_text_modes: ['no_text', 'minimal_label_text', 'ai_generated_text'],
+      no_text_for_visual_types: ['food_lifestyle_scene', 'emotional_lifestyle_scene'],
+      text_heavy_visual_types: ['checklist_slide', 'comparison_slide', 'summary_slide'],
+      max_text_blocks: 2,
+    },
+
+    preferred_beat_types: [
+      'problem_statement',
+      'basic_explanation',
+      'example_case',
+      'checklist',
+      'important_condition',
+      'step_by_step_guide',
+      'summary_takeaway',
+    ],
+
+    scene_rules: {
+      density_level: 'medium',
+      average_scene_duration_sec: 30,
+      preferred_visual_types: ['food_lifestyle_scene', 'checklist_slide', 'comparison_slide', 'character_explanation', 'summary_slide'],
+      preferred_layout_types: [
+        'emotional_lifestyle_scene',
+        'checklist_board',
+        'before_after_layout',
+        'left_text_right_character',
+        'summary_board',
+      ],
+      preferred_elements: [
+        'soft Japanese meal',
+        'rice porridge',
+        'soft tofu',
+        'stewed vegetables',
+        'steamed fish',
+        'soup',
+        'elderly Japanese person eating comfortably',
+        'caregiver preparing soft meal',
+        'small bowl and spoon',
+      ],
+      forbidden_elements: [
+        'medical swallowing diagnosis',
+        'choking scene',
+        'hospital emergency',
+        'fear-based choking warning',
+        'unappetizing puree close-up',
+        'medicine replacement claim',
+      ],
+    },
+
+    segmentation_rules: {
+      split_when: [
+        'a new easy-to-eat food appears',
+        'chewing, swallowing, softness, moisture, or texture is mentioned',
+        'a cooking method appears',
+        'a caregiver tip appears',
+        'a caution about swallowing difficulty appears',
+      ],
+      merge_when: [
+        'several lines describe the same soft food idea',
+        'the lines repeat that food should be easy to eat without adding detail',
+      ],
+      ignore_or_compress: COMMON_SENIOR_FOOD_SAFETY_RULES.ignored_content_rules,
+    },
+
+    visual_keywords: [
+      'soft Japanese meal',
+      'rice porridge',
+      'tofu',
+      'stewed vegetables',
+      'soup',
+      'elderly Japanese person eating comfortably',
+    ],
+
+    thumbnail_rules: {
+      emotional_angle: 'eating comfort + family care',
+      title_style: 'easy-to-eat meals + practical senior food',
+      recommended_copy_patterns_ja: ['食べやすい食事', 'やわらかいごはん', 'シニアの食事', '無理なく食べる'],
+      color_direction: 'warm kitchen tone + soft green + cream',
+      thumbnail_text_mode: 'ai_generated_text',
+      avoid: ['choking fear', 'hospital panic', 'unappetizing food'],
+    },
+
+    metadata_rules: {
+      title_patterns_ja: [
+        '高齢者が食べやすい食事の工夫とやわらかい献立',
+        'シニア向けやわらかいごはんと食べやすい食事のポイント',
+        '噛みにくい時に考えたい高齢者の食事の工夫',
+      ],
+      core_tags_ja: ['高齢者 食べやすい食事', 'シニア 食事', 'やわらかい食事', '介護食', '高齢者 ごはん', '食事の工夫'],
+      hashtags_ja: ['#高齢者の食事', '#やわらかい食事', '#シニアごはん', '#介護食'],
+    },
+
+    factual_safety_rules: COMMON_SENIOR_FOOD_SAFETY_RULES.factual_safety_rules,
+  },
+
+  senior_protein_muscle_foods: {
+    niche_id: 'senior_protein_muscle_foods',
+    niche_name_ja: '高齢者のたんぱく質・筋力を支える食事',
+    niche_name_vi: 'Protein / thực phẩm hỗ trợ cơ bắp cho người già',
+    audience: 'Japanese seniors concerned about muscle loss and daily strength',
+    primary_viewer: 'Seniors who want to maintain daily strength through simple protein-rich meals',
+
+    content_goal: 'Explain protein-rich senior meals and muscle-supporting eating habits without making medical or muscle-gain guarantees.',
+    emotional_tone: 'practical, encouraging, health-conscious',
+    trust_level: 'high',
+
+    default_style_id: 'soft_anime_infographic',
+    alternative_style_ids: ['gentle_lifestyle', 'simple_3d_infographic'],
+
+    default_text_rendering_mode: 'ai_generated_text',
+
+    text_policy: {
+      scene_text_usage: 'frequent',
+      preferred_text_modes: ['ai_generated_text', 'minimal_label_text', 'no_text'],
+      no_text_for_visual_types: ['food_lifestyle_scene'],
+      text_heavy_visual_types: ['checklist_slide', 'comparison_slide', 'simple_chart_scene', 'summary_slide'],
+      max_text_blocks: 3,
+    },
+
+    preferred_beat_types: [
+      'opening_hook',
+      'problem_statement',
+      'basic_explanation',
+      'comparison',
+      'checklist',
+      'example_case',
+      'important_condition',
+      'summary_takeaway',
+    ],
+
+    scene_rules: {
+      density_level: 'medium',
+      average_scene_duration_sec: 28,
+      preferred_visual_types: [
+        'food_lifestyle_scene',
+        'checklist_slide',
+        'comparison_slide',
+        'simple_chart_scene',
+        'character_explanation',
+        'summary_slide',
+      ],
+      preferred_layout_types: ['comparison_board', 'checklist_board', 'simple_chart_slide', 'left_text_right_character', 'summary_board'],
+      preferred_elements: [
+        'protein-rich Japanese meal',
+        'grilled fish',
+        'egg',
+        'tofu',
+        'natto',
+        'chicken',
+        'soy products',
+        'elderly Japanese person walking confidently',
+        'simple muscle icon',
+        'shopping basket with protein foods',
+      ],
+      forbidden_elements: [
+        'bodybuilding imagery',
+        'guaranteed muscle gain',
+        'medical cure claim',
+        'supplement promotion',
+        'extreme exercise scene',
+        'before-after body transformation',
+      ],
+    },
+
+    segmentation_rules: {
+      split_when: [
+        'a new protein food appears',
+        'muscle, walking, weakness, or daily strength is mentioned',
+        'meal timing or portion habit is introduced',
+        'a caution about balance or medical condition appears',
+        'a checklist point appears',
+      ],
+      merge_when: [
+        'several lines repeat that protein is important without new food or habit',
+        'multiple similar protein foods are listed without explanation',
+      ],
+      ignore_or_compress: COMMON_SENIOR_FOOD_SAFETY_RULES.ignored_content_rules,
+    },
+
+    visual_keywords: [
+      'protein-rich Japanese meal',
+      'fish',
+      'egg',
+      'tofu',
+      'natto',
+      'senior muscle support',
+      'elderly Japanese person walking',
+    ],
+
+    thumbnail_rules: {
+      emotional_angle: 'maintain strength + avoid frailty',
+      title_style: 'protein foods + senior strength support',
+      recommended_copy_patterns_ja: ['たんぱく質不足', '筋力を支える食事', '毎日食べたい', '老後の体を守る'],
+      color_direction: 'green health + yellow energy + warm meal tone',
+      thumbnail_text_mode: 'ai_generated_text',
+      avoid: ['guaranteed muscle gain', 'bodybuilding look', 'supplement sales'],
+    },
+
+    metadata_rules: {
+      title_patterns_ja: [
+        '高齢者が意識したいたんぱく質と筋力を支える食事',
+        'シニアの体を支えるたんぱく質食品をやさしく解説',
+        '老後の筋力低下が気になる人の食事ポイント',
+      ],
+      core_tags_ja: ['高齢者 たんぱく質', 'シニア 筋力', '老後の健康', '筋力低下', '健康食', 'タンパク質 食品'],
+      hashtags_ja: ['#たんぱく質', '#高齢者の食事', '#筋力維持', '#老後の健康'],
+    },
+
+    factual_safety_rules: COMMON_SENIOR_FOOD_SAFETY_RULES.factual_safety_rules,
+  },
+
+  senior_bone_joint_foods: {
+    niche_id: 'senior_bone_joint_foods',
+    niche_name_ja: '高齢者の骨・関節を支える食事',
+    niche_name_vi: 'Thực phẩm hỗ trợ xương khớp cho người già',
+    audience: 'Japanese seniors concerned about bones, joints, and daily mobility',
+    primary_viewer: 'Seniors who want food habits that support bones and comfortable movement',
+
+    content_goal: 'Explain food habits related to bone and joint support without claiming cure or treatment.',
+    emotional_tone: 'practical, reassuring, health-conscious',
+    trust_level: 'high',
+
+    default_style_id: 'soft_anime_infographic',
+    alternative_style_ids: ['gentle_lifestyle', 'clean_tv_slide'],
+
+    default_text_rendering_mode: 'ai_generated_text',
+
+    text_policy: {
+      scene_text_usage: 'moderate',
+      preferred_text_modes: ['ai_generated_text', 'minimal_label_text', 'no_text'],
+      no_text_for_visual_types: ['food_lifestyle_scene', 'emotional_lifestyle_scene'],
+      text_heavy_visual_types: ['checklist_slide', 'comparison_slide', 'summary_slide'],
+      max_text_blocks: 3,
+    },
+
+    preferred_beat_types: [
+      'basic_explanation',
+      'problem_statement',
+      'checklist',
+      'example_case',
+      'important_condition',
+      'summary_takeaway',
+    ],
+
+    scene_rules: {
+      density_level: 'medium',
+      average_scene_duration_sec: 30,
+      preferred_visual_types: ['food_lifestyle_scene', 'checklist_slide', 'simple_chart_scene', 'character_explanation', 'summary_slide'],
+      preferred_layout_types: ['checklist_board', 'simple_chart_slide', 'left_text_right_character', 'summary_board'],
+      preferred_elements: [
+        'small fish',
+        'tofu',
+        'milk or yogurt if transcript mentions it',
+        'mushrooms',
+        'green vegetables',
+        'sunlight walking scene',
+        'elderly Japanese person walking safely',
+        'simple bone icon',
+      ],
+      forbidden_elements: [
+        'joint pain cure claim',
+        'bone disease diagnosis',
+        'medicine replacement',
+        'dramatic pain expression',
+        'X-ray medical imagery unless transcript requires',
+        'supplement promotion',
+      ],
+    },
+
+    segmentation_rules: {
+      split_when: [
+        'a new bone-supporting food appears',
+        'calcium, vitamin D, protein, or exercise is mentioned',
+        'joint or walking concern appears',
+        'a caution about balance or medical condition appears',
+      ],
+      merge_when: ['several lines repeat the same bone support idea', 'similar foods are listed without separate explanation'],
+      ignore_or_compress: COMMON_SENIOR_FOOD_SAFETY_RULES.ignored_content_rules,
+    },
+
+    visual_keywords: ['small fish', 'tofu', 'mushrooms', 'green vegetables', 'bone icon', 'senior walking in sunlight'],
+
+    thumbnail_rules: {
+      emotional_angle: 'walk comfortably + support bones',
+      title_style: 'bone support foods + senior mobility',
+      recommended_copy_patterns_ja: ['骨を支える食事', '歩く力を守る', '毎日食べたい', '不足に注意'],
+      color_direction: 'green health + sunlight yellow + soft blue',
+      thumbnail_text_mode: 'ai_generated_text',
+    },
+
+    metadata_rules: {
+      title_patterns_ja: [
+        '高齢者の骨を支える食事と毎日意識したい食品',
+        'シニアの骨・関節が気になる人の食事ポイント',
+        '老後の歩く力を支える食べ物をやさしく解説',
+      ],
+      core_tags_ja: ['高齢者 骨', 'シニア 関節', '骨を支える食事', 'カルシウム', 'ビタミンD', '老後の健康'],
+      hashtags_ja: ['#骨の健康', '#高齢者の食事', '#老後の健康', '#シニアライフ'],
+    },
+
+    factual_safety_rules: COMMON_SENIOR_FOOD_SAFETY_RULES.factual_safety_rules,
+  },
+
+  senior_brain_health_foods: {
+    niche_id: 'senior_brain_health_foods',
+    niche_name_ja: '高齢者の脳を支える食事',
+    niche_name_vi: 'Thực phẩm hỗ trợ não bộ / trí nhớ cho người già',
+    audience: 'Japanese seniors concerned about memory, brain health, and daily habits',
+    primary_viewer: 'Seniors interested in foods and habits that may support brain health',
+
+    content_goal: 'Explain brain-health-related food habits cautiously without claiming dementia prevention or cure.',
+    emotional_tone: 'careful, educational, reassuring',
+    trust_level: 'very_high',
+
+    default_style_id: 'soft_anime_infographic',
+    alternative_style_ids: ['gentle_lifestyle', 'clean_tv_slide'],
+
+    default_text_rendering_mode: 'ai_generated_text',
+
+    text_policy: {
+      scene_text_usage: 'moderate',
+      preferred_text_modes: ['ai_generated_text', 'minimal_label_text', 'no_text'],
+      no_text_for_visual_types: ['food_lifestyle_scene', 'emotional_lifestyle_scene'],
+      text_heavy_visual_types: ['checklist_slide', 'comparison_slide', 'summary_slide', 'simple_chart_scene'],
+      max_text_blocks: 3,
+    },
+
+    preferred_beat_types: [
+      'opening_hook',
+      'problem_statement',
+      'basic_explanation',
+      'common_misunderstanding',
+      'checklist',
+      'important_condition',
+      'summary_takeaway',
+    ],
+
+    scene_rules: {
+      density_level: 'medium',
+      average_scene_duration_sec: 30,
+      preferred_visual_types: ['food_lifestyle_scene', 'checklist_slide', 'simple_chart_scene', 'character_explanation', 'summary_slide'],
+      preferred_layout_types: ['checklist_board', 'simple_chart_slide', 'left_text_right_character', 'summary_board'],
+      preferred_elements: [
+        'grilled fish',
+        'blue-backed fish if transcript mentions it',
+        'vegetables',
+        'nuts if transcript mentions them',
+        'green tea',
+        'elderly Japanese person reading or doing puzzle',
+        'simple brain icon',
+        'balanced meal',
+      ],
+      forbidden_elements: [
+        'dementia cure claim',
+        'guaranteed dementia prevention',
+        'brain disease diagnosis',
+        'medical brain scan unless transcript requires',
+        'fear-based brain decay visual',
+        'medicine replacement',
+      ],
+    },
+
+    segmentation_rules: {
+      split_when: [
+        'a new brain-related food appears',
+        'memory, dementia, cognition, blood flow, or brain habit is mentioned',
+        'a caution about overclaim or medical condition appears',
+        'a lifestyle habit is combined with food advice',
+      ],
+      merge_when: ['several lines repeat the same brain-health food idea', 'food list appears without separate explanation'],
+      ignore_or_compress: COMMON_SENIOR_FOOD_SAFETY_RULES.ignored_content_rules,
+    },
+
+    visual_keywords: [
+      'brain health food',
+      'grilled fish',
+      'vegetables',
+      'green tea',
+      'elderly Japanese person reading',
+      'simple brain icon',
+    ],
+
+    thumbnail_rules: {
+      emotional_angle: 'memory concern + daily food habit',
+      title_style: 'brain support foods + careful warning',
+      recommended_copy_patterns_ja: ['脳を支える食事', '物忘れが気になる', '毎日意識したい', '食べ方に注意'],
+      color_direction: 'blue brain/trust + green health + warm meal tone',
+      thumbnail_text_mode: 'ai_generated_text',
+      avoid: ['認知症を完全予防', 'brain horror', 'disease cure claim'],
+    },
+
+    metadata_rules: {
+      title_patterns_ja: [
+        '高齢者の脳を支える食事と毎日意識したい習慣',
+        '物忘れが気になる人が考えたい食べ物と生活習慣',
+        'シニアの脳の健康を支える食事をやさしく解説',
+      ],
+      core_tags_ja: ['高齢者 脳', '認知症予防 食事', '物忘れ', '脳に良い食べ物', '老後の健康', 'シニア 食事'],
+      hashtags_ja: ['#脳の健康', '#高齢者の食事', '#物忘れ', '#老後の健康'],
+    },
+
+    factual_safety_rules: [
+      ...COMMON_SENIOR_FOOD_SAFETY_RULES.factual_safety_rules,
+      'Do not claim that any food prevents or cures dementia.',
+      'Avoid visual metaphors like brain garbage unless the transcript directly uses it, and keep it educational.',
+    ],
+  },
+
+  senior_blood_pressure_salt_foods: {
+    niche_id: 'senior_blood_pressure_salt_foods',
+    niche_name_ja: '高齢者の血圧・減塩の食事',
+    niche_name_vi: 'Thực phẩm / ăn giảm muối cho huyết áp người già',
+    audience: 'Japanese seniors concerned about blood pressure and salt intake',
+    primary_viewer: 'Seniors who want practical low-salt eating habits without extreme restriction',
+
+    content_goal:
+      'Explain salt-conscious eating habits and blood-pressure-related food choices cautiously without medical treatment claims.',
+    emotional_tone: 'careful, practical, reassuring',
+    trust_level: 'very_high',
+
+    default_style_id: 'clean_tv_slide',
+    alternative_style_ids: ['soft_anime_infographic', 'gentle_lifestyle'],
+
+    default_text_rendering_mode: 'ai_generated_text',
+
+    text_policy: {
+      scene_text_usage: 'frequent',
+      preferred_text_modes: ['ai_generated_text', 'minimal_label_text', 'no_text'],
+      no_text_for_visual_types: ['food_lifestyle_scene'],
+      text_heavy_visual_types: ['checklist_slide', 'comparison_slide', 'warning_slide', 'summary_slide'],
+      max_text_blocks: 3,
+    },
+
+    preferred_beat_types: [
+      'problem_statement',
+      'risk_warning',
+      'basic_explanation',
+      'comparison',
+      'checklist',
+      'important_condition',
+      'summary_takeaway',
+    ],
+
+    scene_rules: {
+      density_level: 'medium',
+      average_scene_duration_sec: 28,
+      preferred_visual_types: ['checklist_slide', 'comparison_slide', 'food_lifestyle_scene', 'warning_slide', 'summary_slide'],
+      preferred_layout_types: ['checklist_board', 'comparison_board', 'warning_card', 'left_text_right_character', 'summary_board'],
+      preferred_elements: [
+        'miso soup',
+        'soy sauce bottle without brand',
+        'salt shaker',
+        'vegetables',
+        'fish',
+        'elderly Japanese person checking seasoning',
+        'simple salt icon',
+        'low-salt cooking board',
+      ],
+      forbidden_elements: [
+        'blood pressure cure claim',
+        'stop medication claim',
+        'specific blood pressure numbers unless provided',
+        'medical device close-up with fake numbers',
+        'fear-based blood vessel imagery',
+        'brand logo',
+      ],
+    },
+
+    segmentation_rules: {
+      split_when: [
+        'salt intake or seasoning is mentioned',
+        'a new low-salt cooking method appears',
+        'blood pressure or vascular health is mentioned',
+        'a caution for medical condition appears',
+        'a comparison between high-salt and low-salt foods appears',
+      ],
+      merge_when: ['several lines repeat reduce salt without new method', 'similar seasonings are listed without separate explanation'],
+      ignore_or_compress: COMMON_SENIOR_FOOD_SAFETY_RULES.ignored_content_rules,
+    },
+
+    visual_keywords: [
+      'low salt cooking',
+      'miso soup',
+      'soy sauce',
+      'salt shaker',
+      'elderly Japanese person cooking',
+      'blood pressure concern',
+    ],
+
+    thumbnail_rules: {
+      emotional_angle: 'blood pressure concern + salt check',
+      title_style: 'salt caution + daily food habit',
+      recommended_copy_patterns_ja: ['減塩のコツ', '血圧が気になる', '塩分に注意', '食べ方を見直す'],
+      color_direction: 'blue trust + yellow caution + clean kitchen',
+      thumbnail_text_mode: 'ai_generated_text',
+      avoid: ['高血圧が治る', 'fake blood pressure reading', 'medicine replacement'],
+    },
+
+    metadata_rules: {
+      title_patterns_ja: [
+        '高齢者が意識したい血圧と減塩の食事ポイント',
+        '塩分が気になるシニアのための食べ方の工夫',
+        '血圧が気になる人が見直したい毎日の食事',
+      ],
+      core_tags_ja: ['高齢者 血圧', '減塩', 'シニア 食事', '塩分 控える', '老後の健康', '高血圧 食事'],
+      hashtags_ja: ['#減塩', '#血圧', '#高齢者の食事', '#老後の健康'],
+    },
+
+    factual_safety_rules: [
+      ...COMMON_SENIOR_FOOD_SAFETY_RULES.factual_safety_rules,
+      'Do not claim that reducing salt cures hypertension.',
+      'Do not advise stopping medication.',
+    ],
+  },
+
+  senior_blood_sugar_foods: {
+    niche_id: 'senior_blood_sugar_foods',
+    niche_name_ja: '高齢者の血糖値を意識した食事',
+    niche_name_vi: 'Ăn uống chú ý đường huyết cho người già',
+    audience: 'Japanese seniors concerned about blood sugar and daily eating habits',
+    primary_viewer: 'Seniors who want practical food habits related to blood sugar awareness',
+
+    content_goal: 'Explain blood-sugar-conscious eating habits cautiously without diabetes treatment claims.',
+    emotional_tone: 'careful, practical, non-alarming',
+    trust_level: 'very_high',
+
+    default_style_id: 'clean_tv_slide',
+    alternative_style_ids: ['soft_anime_infographic', 'gentle_lifestyle'],
+
+    default_text_rendering_mode: 'ai_generated_text',
+
+    text_policy: {
+      scene_text_usage: 'frequent',
+      preferred_text_modes: ['ai_generated_text', 'minimal_label_text', 'no_text'],
+      no_text_for_visual_types: ['food_lifestyle_scene'],
+      text_heavy_visual_types: ['checklist_slide', 'comparison_slide', 'warning_slide', 'simple_chart_scene', 'summary_slide'],
+      max_text_blocks: 3,
+    },
+
+    preferred_beat_types: [
+      'problem_statement',
+      'basic_explanation',
+      'risk_warning',
+      'comparison',
+      'checklist',
+      'important_condition',
+      'summary_takeaway',
+    ],
+
+    scene_rules: {
+      density_level: 'medium',
+      average_scene_duration_sec: 28,
+      preferred_visual_types: [
+        'checklist_slide',
+        'comparison_slide',
+        'simple_chart_scene',
+        'food_lifestyle_scene',
+        'warning_slide',
+        'summary_slide',
+      ],
+      preferred_layout_types: ['checklist_board', 'comparison_board', 'simple_chart_slide', 'warning_card', 'summary_board'],
+      preferred_elements: [
+        'rice bowl',
+        'vegetables first meal',
+        'fish and tofu',
+        'sweets caution',
+        'elderly Japanese person choosing meal',
+        'simple blood sugar curve without numbers',
+        'balanced plate',
+      ],
+      forbidden_elements: [
+        'diabetes cure claim',
+        'stop medication claim',
+        'specific glucose numbers unless provided',
+        'medical device with fake reading',
+        'sugar horror imagery',
+        'extreme carbohydrate ban',
+        'brand logo',
+      ],
+    },
+
+    segmentation_rules: {
+      split_when: [
+        'blood sugar or diabetes-related caution appears',
+        'meal order is mentioned',
+        'carbohydrate, rice, sweets, or snack is discussed',
+        'a practical eating habit appears',
+        'a medical consultation caution appears',
+      ],
+      merge_when: [
+        'several lines repeat avoid sugar without new context',
+        'similar carbohydrate foods are listed without separate explanation',
+      ],
+      ignore_or_compress: COMMON_SENIOR_FOOD_SAFETY_RULES.ignored_content_rules,
+    },
+
+    visual_keywords: [
+      'blood sugar conscious meal',
+      'rice bowl',
+      'vegetables',
+      'sweets caution',
+      'balanced plate',
+      'elderly Japanese person eating',
+    ],
+
+    thumbnail_rules: {
+      emotional_angle: 'blood sugar concern + eating order',
+      title_style: 'blood sugar food habit + caution',
+      recommended_copy_patterns_ja: ['血糖値が気になる', '食べ方に注意', 'ご飯の前に', '甘い物の落とし穴'],
+      color_direction: 'blue trust + yellow caution + green healthy food',
+      thumbnail_text_mode: 'ai_generated_text',
+      avoid: ['糖尿病が治る', 'extreme no-carb message', 'fake glucose reading'],
+    },
+
+    metadata_rules: {
+      title_patterns_ja: [
+        '高齢者が意識したい血糖値と食べ方のポイント',
+        '血糖値が気になるシニアのための食事習慣',
+        'ご飯や甘い物との付き合い方をやさしく解説',
+      ],
+      core_tags_ja: ['高齢者 血糖値', '血糖値 食事', 'シニア 食事', '糖尿病 食事', '老後の健康', '食べ方'],
+      hashtags_ja: ['#血糖値', '#高齢者の食事', '#シニアライフ', '#老後の健康'],
+    },
+
+    factual_safety_rules: [
+      ...COMMON_SENIOR_FOOD_SAFETY_RULES.factual_safety_rules,
+      'Do not claim that a food cures diabetes.',
+      'Do not recommend stopping medication or medical treatment.',
+      'Avoid extreme carbohydrate elimination advice unless the transcript explicitly states a professional context.',
+    ],
+  },
+
+  senior_digestive_health_foods: {
+    niche_id: 'senior_digestive_health_foods',
+    niche_name_ja: '高齢者の胃腸にやさしい食事',
+    niche_name_vi: 'Thực phẩm tốt cho tiêu hóa / dạ dày người già',
+    audience: 'Japanese seniors who want gentle food habits for digestion',
+    primary_viewer: 'Seniors who feel heavy after meals or want easier daily digestion',
+
+    content_goal: 'Explain gentle food habits for digestion without diagnosing or treating digestive disease.',
+    emotional_tone: 'gentle, practical, reassuring',
+    trust_level: 'high',
+
+    default_style_id: 'gentle_lifestyle',
+    alternative_style_ids: ['soft_anime_infographic', 'clean_tv_slide'],
+
+    default_text_rendering_mode: 'no_text',
+
+    text_policy: {
+      scene_text_usage: 'moderate',
+      preferred_text_modes: ['no_text', 'minimal_label_text', 'ai_generated_text'],
+      no_text_for_visual_types: ['food_lifestyle_scene', 'emotional_lifestyle_scene'],
+      text_heavy_visual_types: ['checklist_slide', 'comparison_slide', 'summary_slide'],
+      max_text_blocks: 2,
+    },
+
+    preferred_beat_types: [
+      'problem_statement',
+      'basic_explanation',
+      'example_case',
+      'checklist',
+      'important_condition',
+      'summary_takeaway',
+    ],
+
+    scene_rules: {
+      density_level: 'medium',
+      average_scene_duration_sec: 30,
+      preferred_visual_types: ['food_lifestyle_scene', 'checklist_slide', 'comparison_slide', 'character_explanation', 'summary_slide'],
+      preferred_layout_types: [
+        'emotional_lifestyle_scene',
+        'checklist_board',
+        'comparison_board',
+        'left_text_right_character',
+        'summary_board',
+      ],
+      preferred_elements: [
+        'warm soup',
+        'rice porridge',
+        'stewed vegetables',
+        'tofu',
+        'elderly Japanese person eating slowly',
+        'small meal portion',
+        'warm kitchen',
+      ],
+      forbidden_elements: [
+        'stomach disease diagnosis',
+        'medical cure claim',
+        'painful stomach close-up',
+        'hospital scene',
+        'strict food ban',
+        'unappetizing food',
+      ],
+    },
+
+    segmentation_rules: {
+      split_when: [
+        'a new digestion-friendly food appears',
+        'meal size, chewing, timing, warmth, or softness is mentioned',
+        'a caution about discomfort or medical consultation appears',
+        'a practical cooking method appears',
+      ],
+      merge_when: ['same gentle eating advice repeated', 'similar soft foods listed without separate explanation'],
+      ignore_or_compress: COMMON_SENIOR_FOOD_SAFETY_RULES.ignored_content_rules,
+    },
+
+    visual_keywords: ['warm soup', 'rice porridge', 'tofu', 'stewed vegetables', 'elderly Japanese person eating slowly', 'gentle meal'],
+
+    thumbnail_rules: {
+      emotional_angle: 'stomach comfort + gentle meal',
+      title_style: 'easy digestion food + senior habit',
+      recommended_copy_patterns_ja: ['胃腸にやさしい', '食後が重い人へ', 'やさしい食事', '無理なく食べる'],
+      color_direction: 'warm soup tone + soft green + cream',
+      thumbnail_text_mode: 'ai_generated_text',
+    },
+
+    metadata_rules: {
+      title_patterns_ja: [
+        '高齢者の胃腸にやさしい食事と食べ方の工夫',
+        '食後が重いシニアが意識したい食事のポイント',
+        '老後の体にやさしい食べ方と簡単な献立',
+      ],
+      core_tags_ja: ['高齢者 胃腸', '胃にやさしい食事', 'シニア 食事', '消化に良い食べ物', '老後の健康', 'やさしい食事'],
+      hashtags_ja: ['#胃腸にやさしい', '#高齢者の食事', '#シニアごはん', '#老後の健康'],
+    },
+
+    factual_safety_rules: COMMON_SENIOR_FOOD_SAFETY_RULES.factual_safety_rules,
+  },
+
+  senior_constipation_foods: {
+    niche_id: 'senior_constipation_foods',
+    niche_name_ja: '高齢者の便秘対策の食事',
+    niche_name_vi: 'Ăn uống hỗ trợ táo bón cho người già',
+    audience: 'Japanese seniors concerned about constipation and bowel habits',
+    primary_viewer: 'Seniors who want gentle daily food and hydration habits for bowel regularity',
+
+    content_goal: 'Explain food, fiber, hydration, and routine habits for constipation support without medical treatment claims.',
+    emotional_tone: 'practical, discreet, reassuring',
+    trust_level: 'high',
+
+    default_style_id: 'soft_anime_infographic',
+    alternative_style_ids: ['gentle_lifestyle', 'clean_tv_slide'],
+
+    default_text_rendering_mode: 'ai_generated_text',
+
+    text_policy: {
+      scene_text_usage: 'moderate',
+      preferred_text_modes: ['ai_generated_text', 'minimal_label_text', 'no_text'],
+      no_text_for_visual_types: ['food_lifestyle_scene'],
+      text_heavy_visual_types: ['checklist_slide', 'summary_slide', 'simple_chart_scene'],
+      max_text_blocks: 3,
+    },
+
+    preferred_beat_types: [
+      'problem_statement',
+      'basic_explanation',
+      'checklist',
+      'step_by_step_guide',
+      'important_condition',
+      'summary_takeaway',
+    ],
+
+    scene_rules: {
+      density_level: 'medium',
+      average_scene_duration_sec: 28,
+      preferred_visual_types: ['checklist_slide', 'food_lifestyle_scene', 'simple_chart_scene', 'character_explanation', 'summary_slide'],
+      preferred_layout_types: ['checklist_board', 'simple_chart_slide', 'left_text_right_character', 'summary_board'],
+      preferred_elements: [
+        'vegetables',
+        'seaweed',
+        'beans',
+        'yogurt if transcript mentions',
+        'water glass',
+        'walking habit',
+        'elderly Japanese person eating breakfast',
+        'simple fiber icon',
+      ],
+      forbidden_elements: [
+        'toilet scene',
+        'embarrassing depiction',
+        'medical cure claim',
+        'laxative promotion',
+        'guaranteed bowel movement',
+        'disease diagnosis',
+      ],
+    },
+
+    segmentation_rules: {
+      split_when: [
+        'fiber, water, fermented foods, exercise, or routine is mentioned',
+        'a new constipation-supporting food appears',
+        'a caution about persistent symptoms or medical consultation appears',
+        'a daily habit or checklist point appears',
+      ],
+      merge_when: ['same fiber advice repeated', 'similar vegetables listed without separate explanation'],
+      ignore_or_compress: COMMON_SENIOR_FOOD_SAFETY_RULES.ignored_content_rules,
+    },
+
+    visual_keywords: ['fiber foods', 'vegetables', 'seaweed', 'beans', 'water glass', 'senior breakfast', 'gentle bowel habit'],
+
+    thumbnail_rules: {
+      emotional_angle: 'daily discomfort + gentle habit',
+      title_style: 'constipation support + food habit',
+      recommended_copy_patterns_ja: ['便秘が気になる', '食物繊維だけ？', '水分も大切', '朝の習慣'],
+      color_direction: 'green health + blue water + warm breakfast',
+      thumbnail_text_mode: 'ai_generated_text',
+      avoid: ['embarrassing toilet imagery', 'guaranteed cure', 'laxative promotion'],
+    },
+
+    metadata_rules: {
+      title_patterns_ja: [
+        '高齢者の便秘が気になる時に意識したい食事と習慣',
+        '食物繊維だけではないシニアの便秘対策の基本',
+        '老後の腸を整えるために続けたい食べ方と水分習慣',
+      ],
+      core_tags_ja: ['高齢者 便秘', '便秘 食事', '食物繊維', 'シニア 食事', '腸活', '老後の健康'],
+      hashtags_ja: ['#便秘対策', '#食物繊維', '#高齢者の食事', '#腸活'],
+    },
+
+    factual_safety_rules: [
+      ...COMMON_SENIOR_FOOD_SAFETY_RULES.factual_safety_rules,
+      'Do not guarantee relief from constipation.',
+      'Avoid embarrassing or graphic visuals.',
+    ],
+  },
+
+  senior_hydration_heat_foods: {
+    niche_id: 'senior_hydration_heat_foods',
+    niche_name_ja: '高齢者の水分補給と夏の食事',
+    niche_name_vi: 'Bổ sung nước / ăn uống mùa nóng cho người già',
+    audience: 'Japanese seniors and families during hot seasons',
+    primary_viewer: 'Seniors who need simple hydration and summer eating habits',
+
+    content_goal: 'Explain hydration and summer meal habits for seniors in a practical, non-alarming way.',
+    emotional_tone: 'protective, practical, clear',
+    trust_level: 'high',
+
+    default_style_id: 'warning_explainer',
+    alternative_style_ids: ['soft_anime_infographic', 'gentle_lifestyle'],
+
+    default_text_rendering_mode: 'ai_generated_text',
+
+    text_policy: {
+      scene_text_usage: 'frequent',
+      preferred_text_modes: ['ai_generated_text', 'minimal_label_text', 'no_text'],
+      no_text_for_visual_types: ['food_lifestyle_scene', 'emotional_lifestyle_scene'],
+      text_heavy_visual_types: ['warning_slide', 'checklist_slide', 'summary_slide'],
+      max_text_blocks: 3,
+    },
+
+    preferred_beat_types: ['risk_warning', 'safety_point', 'checklist', 'step_by_step_guide', 'important_condition', 'summary_takeaway'],
+
+    scene_rules: {
+      density_level: 'high',
+      average_scene_duration_sec: 22,
+      preferred_visual_types: ['warning_slide', 'checklist_slide', 'food_lifestyle_scene', 'character_explanation', 'summary_slide'],
+      preferred_layout_types: ['warning_card', 'checklist_board', 'left_text_right_character', 'summary_board'],
+      preferred_elements: [
+        'elderly Japanese person drinking water',
+        'water glass',
+        'tea cup',
+        'summer room',
+        'cool meal',
+        'soup',
+        'water bottle',
+        'thermometer',
+        'air conditioner',
+      ],
+      forbidden_elements: [
+        'heatstroke emergency panic',
+        'collapse scene',
+        'hospital panic',
+        'guaranteed prevention claim',
+        'extreme fear',
+        'specific medical advice unless provided',
+      ],
+    },
+
+    segmentation_rules: {
+      split_when: [
+        'hydration or water intake is mentioned',
+        'summer food or appetite loss is mentioned',
+        'salt/mineral caution appears',
+        'heatstroke or room temperature is mentioned',
+        'a family check-in habit appears',
+      ],
+      merge_when: ['same drink-water advice repeated', 'general summer caution without new action'],
+      ignore_or_compress: COMMON_SENIOR_FOOD_SAFETY_RULES.ignored_content_rules,
+    },
+
+    visual_keywords: [
+      'elderly Japanese person drinking water',
+      'summer hydration',
+      'water glass',
+      'tea cup',
+      'cool meal',
+      'thermometer',
+      'air conditioner',
+    ],
+
+    thumbnail_rules: {
+      emotional_angle: 'summer safety + hydration habit',
+      title_style: 'heat caution + easy hydration',
+      recommended_copy_patterns_ja: ['水分補給', '夏の食事', '高齢者は注意', '脱水を防ぐ'],
+      color_direction: 'blue water + yellow heat caution + white clean background',
+      thumbnail_text_mode: 'ai_generated_text',
+    },
+
+    metadata_rules: {
+      title_patterns_ja: [
+        '高齢者の水分補給と夏の食事で気をつけたいこと',
+        'シニアが夏に意識したい水分と食事の習慣',
+        '暑い日に高齢者を守る水分補給と食べ方のポイント',
+      ],
+      core_tags_ja: ['高齢者 水分補給', 'シニア 夏の食事', '脱水予防', '熱中症対策', '夏バテ 食事', '老後の健康'],
+      hashtags_ja: ['#水分補給', '#熱中症対策', '#高齢者の食事', '#夏の健康'],
+    },
+
+    factual_safety_rules: COMMON_SENIOR_FOOD_SAFETY_RULES.factual_safety_rules,
+  },
+
+  senior_breakfast_habits: {
+    niche_id: 'senior_breakfast_habits',
+    niche_name_ja: '高齢者の朝食習慣',
+    niche_name_vi: 'Thói quen ăn sáng cho người già',
+    audience: 'Japanese seniors interested in healthy morning routines',
+    primary_viewer: 'Seniors who want simple breakfast habits for daily energy and routine',
+
+    content_goal: 'Explain simple senior breakfast habits and morning meal ideas without overclaiming health benefits.',
+    emotional_tone: 'warm, practical, routine-focused',
+    trust_level: 'high',
+
+    default_style_id: 'gentle_lifestyle',
+    alternative_style_ids: ['soft_anime_infographic', 'simple_3d_infographic'],
+
+    default_text_rendering_mode: 'no_text',
+
+    text_policy: {
+      scene_text_usage: 'moderate',
+      preferred_text_modes: ['no_text', 'minimal_label_text', 'ai_generated_text'],
+      no_text_for_visual_types: ['food_lifestyle_scene', 'emotional_lifestyle_scene'],
+      text_heavy_visual_types: ['checklist_slide', 'summary_slide', 'comparison_slide'],
+      max_text_blocks: 2,
+    },
+
+    preferred_beat_types: ['opening_hook', 'problem_statement', 'basic_explanation', 'example_case', 'checklist', 'summary_takeaway'],
+
+    scene_rules: {
+      density_level: 'medium',
+      average_scene_duration_sec: 28,
+      preferred_visual_types: ['food_lifestyle_scene', 'checklist_slide', 'character_explanation', 'summary_slide'],
+      preferred_layout_types: ['emotional_lifestyle_scene', 'checklist_board', 'left_text_right_character', 'summary_board'],
+      preferred_elements: [
+        'Japanese senior breakfast',
+        'rice bowl',
+        'miso soup',
+        'grilled fish',
+        'natto',
+        'egg',
+        'vegetables',
+        'elderly Japanese person eating breakfast by window',
+        'morning sunlight',
+      ],
+      forbidden_elements: [
+        'guaranteed energy claim',
+        'strict breakfast rule',
+        'extreme fasting claim',
+        'medical cure imagery',
+        'unrealistic luxury breakfast',
+      ],
+    },
+
+    segmentation_rules: {
+      split_when: [
+        'a new breakfast food appears',
+        'morning routine or appetite issue is mentioned',
+        'a meal balance point appears',
+        'a practical preparation tip appears',
+      ],
+      merge_when: ['same breakfast idea repeated', 'similar breakfast foods listed without separate explanation'],
+      ignore_or_compress: COMMON_SENIOR_FOOD_SAFETY_RULES.ignored_content_rules,
+    },
+
+    visual_keywords: [
+      'Japanese senior breakfast',
+      'miso soup',
+      'rice bowl',
+      'natto',
+      'egg',
+      'morning sunlight',
+      'elderly Japanese person eating breakfast',
+    ],
+
+    thumbnail_rules: {
+      emotional_angle: 'morning routine + healthy habit',
+      title_style: 'breakfast habit + senior health',
+      recommended_copy_patterns_ja: ['朝食習慣', '朝に食べたい', '一日の始まり', '老後の朝ごはん'],
+      color_direction: 'morning sunlight + warm yellow + green healthy accent',
+      thumbnail_text_mode: 'ai_generated_text',
+    },
+
+    metadata_rules: {
+      title_patterns_ja: [
+        '高齢者が朝に意識したい朝食習慣と食べ方',
+        'シニアの一日を支える朝ごはんのポイント',
+        '老後の健康のために見直したい朝食習慣',
+      ],
+      core_tags_ja: ['高齢者 朝食', 'シニア 朝ごはん', '朝食習慣', '老後の健康', '健康食', '和朝食'],
+      hashtags_ja: ['#朝食習慣', '#高齢者の食事', '#シニアごはん', '#老後の健康'],
+    },
+
+    factual_safety_rules: COMMON_SENIOR_FOOD_SAFETY_RULES.factual_safety_rules,
+  },
+
+  senior_foods_to_avoid_caution: {
+    niche_id: 'senior_foods_to_avoid_caution',
+    niche_name_ja: '高齢者が注意したい食べ物',
+    niche_name_vi: 'Thực phẩm người già nên chú ý / hạn chế',
+    audience: 'Japanese seniors concerned about foods that may be risky when eaten too much',
+    primary_viewer: 'Seniors who want to avoid common dietary mistakes without extreme fear',
+
+    content_goal: 'Explain foods seniors should be careful with, focusing on moderation rather than fear or absolute bans.',
+    emotional_tone: 'careful, practical, non-alarming',
+    trust_level: 'high',
+
+    default_style_id: 'warning_explainer',
+    alternative_style_ids: ['soft_anime_infographic', 'clean_tv_slide'],
+
+    default_text_rendering_mode: 'ai_generated_text',
+
+    text_policy: {
+      scene_text_usage: 'frequent',
+      preferred_text_modes: ['ai_generated_text', 'minimal_label_text'],
+      no_text_for_visual_types: ['food_lifestyle_scene'],
+      text_heavy_visual_types: ['warning_slide', 'checklist_slide', 'comparison_slide', 'summary_slide'],
+      max_text_blocks: 3,
+    },
+
+    preferred_beat_types: [
+      'opening_hook',
+      'risk_warning',
+      'common_misunderstanding',
+      'comparison',
+      'checklist',
+      'important_condition',
+      'summary_takeaway',
+    ],
+
+    scene_rules: {
+      density_level: 'high',
+      average_scene_duration_sec: 22,
+      preferred_visual_types: ['warning_slide', 'checklist_slide', 'comparison_slide', 'food_lifestyle_scene', 'summary_slide'],
+      preferred_layout_types: ['warning_card', 'checklist_board', 'comparison_board', 'before_after_layout', 'summary_board'],
+      preferred_elements: [
+        'elderly Japanese person choosing food',
+        'processed food',
+        'salty food',
+        'sweet snack',
+        'instant food',
+        'generic warning icon',
+        'balanced alternative meal',
+        'shopping basket',
+      ],
+      forbidden_elements: [
+        'food demonization',
+        'absolute ban unless transcript says',
+        'fear-based disease claim',
+        'rotting food',
+        'gross imagery',
+        'medical cure or damage claim without support',
+      ],
+    },
+
+    segmentation_rules: {
+      split_when: [
+        'a new caution food appears',
+        'salt, sugar, fat, alcohol, processed food, or portion caution appears',
+        'an alternative food or moderation tip appears',
+        'a medical condition caution appears',
+      ],
+      merge_when: ['same caution repeated', 'similar snack foods listed without separate explanation'],
+      ignore_or_compress: COMMON_SENIOR_FOOD_SAFETY_RULES.ignored_content_rules,
+    },
+
+    visual_keywords: [
+      'food caution',
+      'processed food',
+      'salty food',
+      'sweet snack',
+      'elderly Japanese person choosing food',
+      'warning icon',
+      'balanced alternative',
+    ],
+
+    thumbnail_rules: {
+      emotional_angle: 'hidden food risk + moderation',
+      title_style: 'foods to be careful with + senior warning',
+      recommended_copy_patterns_ja: ['食べすぎ注意', '高齢者は注意', 'その食べ物大丈夫？', '毎日は危険？'],
+      color_direction: 'yellow caution + red warning accent + clean food background',
+      thumbnail_text_mode: 'ai_generated_text',
+      avoid: ['absolute ban exaggeration', 'disease fear claim', 'gross food imagery'],
+    },
+
+    metadata_rules: {
+      title_patterns_ja: [
+        '高齢者が食べすぎに注意したい食べ物と見直し方',
+        'シニアが毎日の食事で気をつけたい食品',
+        '老後の健康のために注意したい食べ物をやさしく解説',
+      ],
+      core_tags_ja: ['高齢者 食べ物 注意', 'シニア 食事', '食べすぎ注意', '健康食', '老後の健康', '避けたい食べ物'],
+      hashtags_ja: ['#食べすぎ注意', '#高齢者の食事', '#シニアライフ', '#健康食'],
+    },
+
+    factual_safety_rules: [
+      ...COMMON_SENIOR_FOOD_SAFETY_RULES.factual_safety_rules,
+      'Prefer moderation language over absolute bans unless the transcript explicitly states otherwise.',
+      'Do not demonize common foods.',
+    ],
+  },
+
+  senior_japanese_home_cooking: {
+    niche_id: 'senior_japanese_home_cooking',
+    niche_name_ja: 'シニア向け和食・家庭料理',
+    niche_name_vi: 'Món Nhật gia đình cho người già',
+    audience: 'Japanese seniors who prefer familiar home-cooked Japanese meals',
+    primary_viewer: 'Seniors who want simple, familiar, affordable Japanese home cooking',
+
+    content_goal: 'Introduce simple Japanese home-cooking ideas for seniors, focusing on comfort, balance, affordability, and ease.',
+    emotional_tone: 'warm, nostalgic, practical',
+    trust_level: 'medium_high',
+
+    default_style_id: 'gentle_lifestyle',
+    alternative_style_ids: ['soft_anime_infographic', 'simple_3d_infographic'],
+
+    default_text_rendering_mode: 'no_text',
+
+    text_policy: {
+      scene_text_usage: 'moderate',
+      preferred_text_modes: ['no_text', 'minimal_label_text', 'ai_generated_text'],
+      no_text_for_visual_types: ['food_lifestyle_scene', 'emotional_lifestyle_scene'],
+      text_heavy_visual_types: ['checklist_slide', 'summary_slide', 'comparison_slide'],
+      max_text_blocks: 2,
+    },
+
+    preferred_beat_types: ['example_case', 'checklist', 'step_by_step_guide', 'money_point', 'emotional_reflection', 'summary_takeaway'],
+
+    scene_rules: {
+      density_level: 'medium',
+      average_scene_duration_sec: 30,
+      preferred_visual_types: ['food_lifestyle_scene', 'checklist_slide', 'character_explanation', 'summary_slide'],
+      preferred_layout_types: ['emotional_lifestyle_scene', 'checklist_board', 'left_text_right_character', 'summary_board'],
+      preferred_elements: [
+        'Japanese home cooking',
+        'miso soup',
+        'rice bowl',
+        'grilled fish',
+        'simmered vegetables',
+        'tofu',
+        'natto',
+        'small kitchen',
+        'elderly Japanese person cooking',
+        'warm dining table',
+      ],
+      forbidden_elements: [
+        'luxury restaurant meal',
+        'unrealistic expensive ingredients',
+        'medical cure claim',
+        'extreme restriction',
+        'messy kitchen',
+      ],
+    },
+
+    segmentation_rules: {
+      split_when: [
+        'a new home-cooked dish appears',
+        'a cooking tip appears',
+        'a saving or preparation method appears',
+        'a balance or portion point appears',
+        'a nostalgia or daily routine point appears',
+      ],
+      merge_when: ['similar dishes listed without separate explanation', 'general praise for home cooking without new idea'],
+      ignore_or_compress: COMMON_SENIOR_FOOD_SAFETY_RULES.ignored_content_rules,
+    },
+
+    visual_keywords: [
+      'Japanese home cooking',
+      'miso soup',
+      'rice bowl',
+      'grilled fish',
+      'simmered vegetables',
+      'elderly Japanese person cooking',
+      'warm kitchen',
+    ],
+
+    thumbnail_rules: {
+      emotional_angle: 'familiar comfort + healthy simple meal',
+      title_style: 'Japanese home cooking + senior-friendly',
+      recommended_copy_patterns_ja: ['シニアの和食', '毎日の家庭料理', '簡単で安心', '老後のごはん'],
+      color_direction: 'warm kitchen light + rice white + green vegetables',
+      thumbnail_text_mode: 'ai_generated_text',
+    },
+
+    metadata_rules: {
+      title_patterns_ja: [
+        'シニア向け和食と家庭料理の簡単な工夫',
+        '高齢者が食べやすい毎日の和食ごはん',
+        '老後の食卓に取り入れたい簡単な家庭料理',
+      ],
+      core_tags_ja: ['シニア 和食', '高齢者 家庭料理', '高齢者 ごはん', '和食 健康', '簡単料理', '老後の食事'],
+      hashtags_ja: ['#和食', '#高齢者の食事', '#家庭料理', '#シニアごはん'],
+    },
+
+    factual_safety_rules: COMMON_SENIOR_FOOD_SAFETY_RULES.factual_safety_rules,
   },
 };

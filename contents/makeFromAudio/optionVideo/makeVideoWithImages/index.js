@@ -1,5 +1,6 @@
 import { PATHS } from '../constants/paths.js';
 import fs from 'fs';
+import path from 'path';
 import { resolveProjectConfigs } from './config.js';
 import { convertTranscript } from './convertTranscript.js';
 import { main as detechNiche } from './detechNiche.js';
@@ -9,6 +10,7 @@ import { main as createImagePrompts } from './createImagePrompt.js';
 import { main as generateImages } from './generateImages.js';
 import { main as mappingImages } from './mappingImages.js';
 import { main as makeVideo } from './makeVideo.js';
+import { DOWNLOADS_DIR } from '../../shared.js';
 
 const JPG_EXT = /\.jpe?g$/i;
 
@@ -33,10 +35,11 @@ export function filterImagePromptsWithoutFiles(imagePrompts, objectImages) {
   });
 }
 
-export async function main(folder = PATHS.DOWNLOADS) {
-  const transcriptObjects = await convertTranscript(folder);
+export async function makeVideoWithImages(options = {}) {
+  const { perVideoDir, originalTitle, audioSpeed: speedIn, downloadsDir = DOWNLOADS_DIR, videoLanguage } = options;
+  const transcriptObjects = await convertTranscript(downloadsDir);
 
-  // const detectedNiche = await detechNiche(transcriptObjects);
+  const detectedNiche = await detechNiche(transcriptObjects);
   // fs.writeFileSync('detectedNiche.json', JSON.stringify(detectedNiche, null, 2), 'utf8');
 
   // const { niche_config, style_config } = resolveProjectConfigs({
@@ -44,15 +47,15 @@ export async function main(folder = PATHS.DOWNLOADS) {
   //   styleId: detectedNiche.style_config,
   // });
 
-  // const visualBeats = await createBeats(transcriptObjects, detectedNiche.niche_config, detectedNiche.style_config);
+  const visualBeats = await createBeats(transcriptObjects, detectedNiche.niche_config, detectedNiche.style_config);
   // fs.writeFileSync('visualBeats.json', JSON.stringify(visualBeats, null, 2), 'utf8');
 
-  // const sceneSpecs = await createSceneSpecs(visualBeats, detectedNiche.niche_config, detectedNiche.style_config);
+  const sceneSpecs = await createSceneSpecs(visualBeats, detectedNiche.niche_config, detectedNiche.style_config);
   // fs.writeFileSync('sceneSpecs.json', JSON.stringify(sceneSpecs, null, 2), 'utf8');
 
-  // const imageScenePrompts = await createImagePrompts(sceneSpecs, detectedNiche.niche_config, detectedNiche.style_config);
+  const imageScenePrompts = await createImagePrompts(sceneSpecs, detectedNiche.niche_config, detectedNiche.style_config);
 
-  // fs.writeFileSync('imageScenePrompts.json', JSON.stringify(imageScenePrompts, null, 2), 'utf8');
+  fs.writeFileSync(path.join(downloadsDir, 'imageScenePrompts.json'), JSON.stringify(imageScenePrompts, null, 2), 'utf8');
 
   // await generateImages(imageScenePrompts, folder);
 
@@ -61,4 +64,4 @@ export async function main(folder = PATHS.DOWNLOADS) {
   await makeVideo(objectImages, folder);
 }
 
-main();
+// makeVideoWithImages();

@@ -95,6 +95,22 @@ export const SENIOR_NICHE_IDS = [
   'senior_sleep_routine',
   'senior_hobbies_brain_health',
   'senior_driving_license_return',
+
+  // foot
+  'senior_healthy_foods_general',
+  'senior_nutrition_basics',
+  'senior_easy_to_eat_foods',
+  'senior_protein_muscle_foods',
+  'senior_bone_joint_foods',
+  'senior_brain_health_foods',
+  'senior_blood_pressure_salt_foods',
+  'senior_blood_sugar_foods',
+  'senior_digestive_health_foods',
+  'senior_constipation_foods',
+  'senior_hydration_heat_foods',
+  'senior_breakfast_habits',
+  'senior_foods_to_avoid_caution',
+  'senior_japanese_home_cooking',
 ];
 
 export const NICHE_STYLE_RECOMMENDATIONS = {
@@ -181,6 +197,62 @@ export const NICHE_STYLE_RECOMMENDATIONS = {
   senior_driving_license_return: {
     default_style_id: 'gentle_lifestyle',
     default_text_rendering_mode: 'minimal_label_text',
+  },
+  senior_healthy_foods_general: {
+    default_style_id: 'gentle_lifestyle',
+    default_text_rendering_mode: 'no_text',
+  },
+  senior_nutrition_basics: {
+    default_style_id: 'soft_anime_infographic',
+    default_text_rendering_mode: 'ai_generated_text',
+  },
+  senior_easy_to_eat_foods: {
+    default_style_id: 'gentle_lifestyle',
+    default_text_rendering_mode: 'no_text',
+  },
+  senior_protein_muscle_foods: {
+    default_style_id: 'soft_anime_infographic',
+    default_text_rendering_mode: 'ai_generated_text',
+  },
+  senior_bone_joint_foods: {
+    default_style_id: 'soft_anime_infographic',
+    default_text_rendering_mode: 'ai_generated_text',
+  },
+  senior_brain_health_foods: {
+    default_style_id: 'soft_anime_infographic',
+    default_text_rendering_mode: 'ai_generated_text',
+  },
+  senior_blood_pressure_salt_foods: {
+    default_style_id: 'clean_tv_slide',
+    default_text_rendering_mode: 'ai_generated_text',
+  },
+  senior_blood_sugar_foods: {
+    default_style_id: 'clean_tv_slide',
+    default_text_rendering_mode: 'ai_generated_text',
+  },
+  senior_digestive_health_foods: {
+    default_style_id: 'gentle_lifestyle',
+    default_text_rendering_mode: 'no_text',
+  },
+  senior_constipation_foods: {
+    default_style_id: 'soft_anime_infographic',
+    default_text_rendering_mode: 'ai_generated_text',
+  },
+  senior_hydration_heat_foods: {
+    default_style_id: 'warning_explainer',
+    default_text_rendering_mode: 'ai_generated_text',
+  },
+  senior_breakfast_habits: {
+    default_style_id: 'gentle_lifestyle',
+    default_text_rendering_mode: 'no_text',
+  },
+  senior_foods_to_avoid_caution: {
+    default_style_id: 'warning_explainer',
+    default_text_rendering_mode: 'ai_generated_text',
+  },
+  senior_japanese_home_cooking: {
+    default_style_id: 'gentle_lifestyle',
+    default_text_rendering_mode: 'no_text',
   },
 };
 
