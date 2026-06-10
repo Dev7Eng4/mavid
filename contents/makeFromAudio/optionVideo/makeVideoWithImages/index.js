@@ -56,9 +56,9 @@ export async function makeVideoWithImages(options = {}) {
 
   // await generateImages(imageScenePrompts, folder);
 
-  const objectImages = await mappingImages(transcriptObjects, folder, 134);
+  // const objectImages = await mappingImages(transcriptObjects, folder, 134);
 
-  await makeVideo(objectImages, folder);
+  // await makeVideo(objectImages, folder);
 }
 
-// makeVideoWithImages();
+makeVideoWithImages();

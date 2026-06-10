@@ -106,8 +106,6 @@ async function main(options = {}) {
     console.log('Đã dọn dẹp thư mục outputs/ trước khi chạy batch.');
   }
 
-  let nextDownloadPromise = null;
-
   async function startDownload(itemIndex) {
     if (itemIndex >= items.length) return null;
     const url = items[itemIndex];
@@ -134,25 +132,11 @@ async function main(options = {}) {
       });
   }
 
-  if (items.length > 0) {
-    console.log(`\n[Pipeline] Bắt đầu tải video đầu tiên...`);
-    nextDownloadPromise = startDownload(0);
-  }
-
   for (let i = 0; i < items.length; i++) {
     const url = items[i];
     console.log(`\n[${i + 1}/${items.length}] Chờ tải/xử lý metadata: ${url}`);
 
-    const dlResult = await nextDownloadPromise;
-
-    if (i + 1 < items.length) {
-      console.log(
-        `\n>>> [Pipeline] Bắt đầu tải trước video [${i + 2}/${items.length}] trong lúc đang render video [${i + 1}/${items.length}]...`
-      );
-      nextDownloadPromise = startDownload(i + 1);
-    } else {
-      nextDownloadPromise = null;
-    }
+    const dlResult = await startDownload(i);
 
     if (dlResult && dlResult.result) {
       const { result, isolatedDownloadsDir } = dlResult;

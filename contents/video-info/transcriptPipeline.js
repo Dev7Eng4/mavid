@@ -8,7 +8,7 @@ import { loadPromptByLanguage } from '../prompts/index.js';
 import { openChromeProfile } from '../scripts/makeChromeProfile.js';
 import { openChatPage, sendPromptWithRetry, stripJsonCodeFence } from '../llm/index.js';
 import { getSrtDurationInMinutes, objectsToIdTextFormat, parseSrtToObjects } from '../utils/srt.util.js';
-import { PLAYWRIGHT_PROFILES } from '../constants/playwright-profile.js';
+import { PLAYWRIGHT_PROFILES_EXTRA } from '../constants/playwright-profile.js';
 
 /**
  * Parse phản hồi AI dạng "[id] fixed text", map về mảng objects gốc để cập nhật text.
@@ -137,8 +137,8 @@ export async function internalUpdateTranscript(rawSrtContent, options = {}) {
     typeof rawSrtContent === 'string'
       ? rawSrtContent
       : Array.isArray(rawSrtContent)
-        ? rawSrtContent.join('\n\n')
-        : String(rawSrtContent ?? '');
+      ? rawSrtContent.join('\n\n')
+      : String(rawSrtContent ?? '');
 
   const cleanedSrt = srtString.trim();
   const allObjects = parseSrtToObjects(cleanedSrt);
@@ -169,14 +169,14 @@ export async function internalUpdateTranscript(rawSrtContent, options = {}) {
   const chunkResults = new Array(totalChunks).fill(null);
 
   // Profile IDs: < 30 phút → [2,3,4] (tối đa 3), >= 30 phút → [2,3,4,5,6] (tối đa 5)
-  const maxProfiles = durationMin < 30 ? 3 : 3;
-  const profileIds = Array.from({ length: maxProfiles }, (_, i) => i + 1);
-  const activeConcurrency = Math.min(PLAYWRIGHT_PROFILES.length, totalChunks);
+  // const maxProfiles = durationMin < 30 ? 3 : 3;
+  const activeConcurrency = Math.min(PLAYWRIGHT_PROFILES_EXTRA.length, totalChunks);
+  const profileIds = Array.from({ length: activeConcurrency }, (_, i) => i + 1);
 
   console.log(
     `[update-transcript] Video ${durationMin < 30 ? '< 30' : '>= 30'} phút → mở ${activeConcurrency} Chrome profile (${profileIds
       .slice(0, activeConcurrency)
-      .join(',')}) cho ${totalChunks} chunk...`,
+      .join(',')}) cho ${totalChunks} chunk...`
   );
 
   let nextChunkIndex = 0;
@@ -186,7 +186,7 @@ export async function internalUpdateTranscript(rawSrtContent, options = {}) {
    * @param {number} workerIndex  Thứ tự worker (0-based)
    */
   async function workerProfile(workerIndex) {
-    const profileNum = PLAYWRIGHT_PROFILES[workerIndex];
+    const profileNum = PLAYWRIGHT_PROFILES_EXTRA[workerIndex];
     /** @type {import('playwright').BrowserContext | null} */
     let ctx = null;
     try {
