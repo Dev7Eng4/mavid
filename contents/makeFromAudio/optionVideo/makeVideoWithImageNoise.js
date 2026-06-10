@@ -2,7 +2,7 @@ import fs from 'fs';
 import os from 'os';
 import path from 'path';
 
-import { STOCK_VIDEO, SUBTITLE, LOGO } from '../../constants/index.js';
+import { STOCK_VIDEO, SUBTITLE } from '../../constants/index.js';
 import { GPU_INFO } from '../../utils/hardware.util.js';
 
 import {
@@ -28,7 +28,6 @@ import {
   resolveJapaneseSubtitleStyle,
 } from '../subtitle.js';
 
-import { getPrebakedLogoPng } from '../prepare/logo.js';
 import { getPrebakedNoiseMov } from '../prepare/noise.js';
 import { prepareNarratorReactionClip } from '../prepare/narrator.js';
 import { GENERAL_IMAGE_FILENAME } from '../../video-info/prepareVideoInfo.js';
@@ -64,7 +63,6 @@ export async function makeVideoWithImageNoise(options = {}) {
     perVideoDir,
     originalTitle,
     audioSpeed: speedIn,
-    logoPath: logoPathOpt,
     downloadsDir = DOWNLOADS_DIR,
     videoLanguage,
     showNarrator = false,
@@ -139,19 +137,7 @@ export async function makeVideoWithImageNoise(options = {}) {
   mergeArgs.push('-i', audioPath);
   const audioIndex = inputIdx++;
 
-  // Input 3: Logo
-  const logoPathOriginal = logoPathOpt != null && String(logoPathOpt).trim() && fs.existsSync(logoPathOpt) ? logoPathOpt : null;
-  const prebakedLogo = logoPathOriginal ? await getPrebakedLogoPng(logoPathOriginal, LOGO.SIZE) : null;
-  const logoPathForMerge = prebakedLogo || logoPathOriginal;
-  const hasLogo = Boolean(logoPathForMerge);
-  const logoIsPrebaked = Boolean(prebakedLogo);
-  let logoIndex = -1;
-  if (hasLogo) {
-    mergeArgs.push('-i', logoPathForMerge);
-    logoIndex = inputIdx++;
-  }
-
-  // Input 4: Reaction overlay
+  // Input 3: Reaction overlay
   let reactionIndex = -1;
   if (hasReaction) {
     mergeArgs.push('-stream_loop', '-1', '-i', reactionOverlayPath);
@@ -240,22 +226,7 @@ export async function makeVideoWithImageNoise(options = {}) {
     currentVLabel = 'vpadded';
   }
 
-  // Logo filter
-  if (hasLogo) {
-    if (logoIsPrebaked) {
-      filterParts.push(`[${logoIndex}:v]null[logo]`);
-    } else {
-      const r = Math.floor(LOGO.SIZE / 2);
-      const geqExpr = `if(lte(hypot(X-W/2,Y-H/2),${r}),255,0)`;
-      filterParts.push(
-        `[${logoIndex}:v]scale=${LOGO.SIZE}:${LOGO.SIZE}:flags=fast_bilinear,format=rgba,geq=r='r(X,Y)':g='g(X,Y)':b='b(X,Y)':a='${geqExpr}'[logo]`
-      );
-    }
-    filterParts.push(`[${currentVLabel}][logo]overlay=main_w-overlay_w-${LOGO.MARGIN_RIGHT}:${LOGO.MARGIN_TOP}[vout_final]`);
-    currentVLabel = 'vout_final';
-  } else {
-    filterParts.push(`[${currentVLabel}]copy[vout_final]`);
-  }
+  filterParts.push(`[${currentVLabel}]copy[vout_final]`);
 
   const fullGraph = filterParts.join(';');
   fs.writeFileSync(filterScriptPath, fullGraph, 'utf-8');

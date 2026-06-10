@@ -6,7 +6,7 @@
 import fs from 'fs';
 import path from 'path';
 
-import { STOCK_VIDEO, SUBTITLE, LOGO } from '../../constants/index.js';
+import { STOCK_VIDEO, SUBTITLE } from '../../constants/index.js';
 import { resolveStockBackgroundsDir } from '../../utils/stockBackgroundsPath.js';
 import { GPU_INFO } from '../../utils/hardware.util.js';
 
@@ -34,7 +34,6 @@ import {
   resolveJapaneseSubtitleStyle,
 } from '../subtitle.js';
 
-import { getPrebakedLogoPng } from '../prepare/logo.js';
 import { getPrebakedNoiseMov } from '../prepare/noise.js';
 import { ASSET_CHART_DIR, getPrebakedChartVideo, pickFirstChartVideo, getChartVideoFiles } from '../prepare/chart.js';
 import {
@@ -131,7 +130,6 @@ function stockNormalizeFilterChain(inputLabel, outLabel, slowmoFactor, isFlip = 
  * @param {object} [options.geminiByUrl]
  * @param {number} [options.audioSpeed]
  * @param {number} [options.stockVideoCount]
- * @param {string|null} [options.logoPath]
  * @param {string} [options.downloadsDir]
  * @param {string} [options.videoLanguage]
  * @param {string} [options.centerImageOverlayPath] - Ảnh ghép giữa khung; nếu thiếu sẽ tự tìm `background.jpg` (v.v.) trong downloadsDir như pipeline IN / Flow.
@@ -142,7 +140,6 @@ export async function makeVideoWithOverlayImageNoise(bgNameArg, options = {}) {
     originalTitle,
     audioSpeed: speedIn,
     stockVideoCount: stockCountOpt,
-    logoPath: logoPathOpt,
     downloadsDir = DOWNLOADS_DIR,
     videoLanguage,
   } = options;
@@ -225,12 +222,6 @@ export async function makeVideoWithOverlayImageNoise(bgNameArg, options = {}) {
 
   console.log(`Đang dựng video Single-Pass Pipeline (${stockSegments.length} clip stock, encode: ${GPU_INFO.encoderLabel})...`);
 
-  const logoPathOriginal = logoPathOpt != null && String(logoPathOpt).trim() && fs.existsSync(logoPathOpt) ? logoPathOpt : null;
-  const prebakedLogo = logoPathOriginal ? await getPrebakedLogoPng(logoPathOriginal, LOGO.SIZE) : null;
-  const logoPathForMerge = prebakedLogo || logoPathOriginal;
-  const hasLogo = Boolean(logoPathForMerge);
-  const logoIsPrebaked = Boolean(prebakedLogo);
-
   const stockOverlayDir = path.join(stockBgRoot, STOCK_OVERLAY_DIR);
   const stockOverlaySourcePath = pickFirstOverlayVideo(stockOverlayDir);
   const hasStockOverlay = Boolean(stockOverlaySourcePath);
@@ -294,12 +285,6 @@ export async function makeVideoWithOverlayImageNoise(bgNameArg, options = {}) {
         chartIsPrebaked ? 'cache ProRes' : 'realtime'
       })`,
     );
-  }
-
-  let logoIndex = -1;
-  if (hasLogo) {
-    logoIndex = inputIdx++;
-    mergeArgs.push('-i', logoPathForMerge);
   }
 
   const centerImageOverlayPath = resolveSiCenterBackgroundImage(options.centerImageOverlayPath, downloadsDir);
@@ -448,22 +433,7 @@ export async function makeVideoWithOverlayImageNoise(bgNameArg, options = {}) {
   //   currentVLabel = 'v_charted';
   // }
 
-  // Logo Graph
-  if (hasLogo) {
-    if (logoIsPrebaked) {
-      filterParts.push(`[${logoIndex}:v]null[logo]`);
-    } else {
-      const r = Math.floor(LOGO.SIZE / 2);
-      const geqExpr = `if(lte(hypot(X-W/2,Y-H/2),${r}),255,0)`;
-      filterParts.push(
-        `[${logoIndex}:v]scale=${LOGO.SIZE}:${LOGO.SIZE}:flags=fast_bilinear,format=rgba,geq=r='r(X,Y)':g='g(X,Y)':b='b(X,Y)':a='${geqExpr}'[logo]`,
-      );
-    }
-    filterParts.push(`[${currentVLabel}][logo]overlay=main_w-overlay_w-${LOGO.MARGIN_RIGHT}:${LOGO.MARGIN_TOP}[vout_final]`);
-    currentVLabel = 'vout_final';
-  } else {
-    filterParts.push(`[${currentVLabel}]copy[vout_final]`);
-  }
+  filterParts.push(`[${currentVLabel}]copy[vout_final]`);
 
   const fullGraph = filterParts.join(';');
   fs.writeFileSync(filterScriptPath, fullGraph, 'utf-8');

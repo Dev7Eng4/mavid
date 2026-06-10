@@ -81,14 +81,6 @@ async function main(options = {}) {
     }
   }
 
-  const wantLogo = options.showLogo;
-  const runLogoPath = wantLogo ? resolveLogoFromChannelFolder(options, destFolder) : null;
-  if (wantLogo && runLogoPath) {
-    console.log(`[logo] ${runLogoPath}`);
-  } else if (wantLogo && !runLogoPath) {
-    console.warn('[logo] showLogo bật nhưng không có ảnh (.png/.jpg/...) trong folder channel.');
-  }
-
   function resolveVideoOutputDir(videoId) {
     const base = videoId || 'unknown_id';
     const dir = path.join(destFolder, base);
@@ -167,7 +159,7 @@ async function main(options = {}) {
         } else if (currentOption === VIDEO_MAKE_OPTION.SI) {
           await makeVideoWithOverlayImageNoise(defaultStockFolder, perItemOptions);
         } else if (currentOption === VIDEO_MAKE_OPTION.AGI) {
-          await makeVideoWithImages(perItemOptions);
+          // await makeVideoWithImages(perItemOptions);
         } else {
           console.warn(`[main] Bỏ qua option không hỗ trợ: ${currentOption} (chỉ còn IN | SI).`);
         }
