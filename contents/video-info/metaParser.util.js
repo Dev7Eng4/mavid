@@ -4,10 +4,6 @@
 import { META_DATA } from '../constants/index.js';
 import { stripJsonCodeFence } from '../llm/index.js';
 
-/**
- * Parse phản hồi đúng theo # Output Format trong promptCreateVideoMeta:
- * Niche → Title → Description → Tags (mỗi nhãn nằm trên 1 dòng riêng, nội dung phía dưới).
- */
 export function parseCreateMetaInfoResponse(metaRaw) {
   let text = String(metaRaw || '').trim();
   text = stripJsonCodeFence(text);

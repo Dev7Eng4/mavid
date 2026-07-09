@@ -157,7 +157,7 @@ async function downloadVideo(url, options = {}) {
 
   await subprocess;
 
-  if (lastPercent >= 0) process.stdout.write('\n');
+  // if (lastPercent >= 0) process.stdout.write('\n');
   console.log('Tải video xong!');
 
   return outputDir;
@@ -521,136 +521,6 @@ async function downloadSingVideo(url, options = {}) {
   return result;
 }
 
-/**
- * Tải 1 video: video + transcript + audio (dùng cho xử lý batch)
- * @param {string} url - Link YouTube
- * @param {object} [options]
- * @param {(p: { url: string, title: string, description: string, tags: string }) => void | Promise<void>} [options.callback] - Truyền xuống `finalizeDownloadedTranscript` → Gemini
- * @param {string} [options.thumbnailChannelRoot] — thư mục kênh (cha của từng folder video-id); nếu có, sau Gemini gọi Flow lưu `flow-thumbnail.jpg` trong `thumbnailChannelRoot/<videoId>/` (thumbnail YouTube vẫn tải về downloads, batch copy thành `thumbnail.*`)
- * @param {boolean} [options.generateThumbnailWithFlow=true] — tắt nếu không muốn chạy Flow
- * @returns {Promise<(object & { filePath?: string }) | null>} - Thông tin video; `filePath` = file video trong downloads/ (khi tải được)
- */
-async function downloadSingleVideo(url, options = {}) {
-  const {
-    callback,
-    mode = MAKE_VIDEO_MODE.REUP_FULL,
-    thumbnailChannelRoot = null,
-    generateThumbnailWithFlow = true,
-    thumbnailPrompt = null,
-    outputDir = PATHS.DOWNLOADS,
-    downloadMaxHeight = 0,
-  } = options;
-
-  const actualOutputDir = outputDir;
-
-  if (!fs.existsSync(actualOutputDir)) {
-    fs.mkdirSync(actualOutputDir, { recursive: true });
-  } else {
-    await clearOutputDirResilient(actualOutputDir);
-  }
-
-  try {
-    const result = await getVideoInfo(url);
-
-    if (!result.metadata?.id) {
-      throw new Error('Không tìm thấy ID video');
-    }
-
-    let thumbnailFlowOutputDir = null;
-    if (generateThumbnailWithFlow && thumbnailChannelRoot && result.metadata?.id) {
-      thumbnailFlowOutputDir = path.join(thumbnailChannelRoot, result.metadata.id);
-      fs.mkdirSync(thumbnailFlowOutputDir, { recursive: true });
-    }
-
-    await downloadThumbnail(url, { outputDir: actualOutputDir });
-
-    // [OPT-2] Song song hóa download video + transcript (transcript tải subtitle riêng, không cần file video local)
-    const transcriptOptions = {
-      outputDir: actualOutputDir,
-      videoTitle: result.title,
-    };
-
-    async function downloadAndFinalizeTranscript() {
-      const dl = await downloadTranscript(url, transcriptOptions);
-      return await finalizeDownloadedTranscript(url, dl, {
-        ...transcriptOptions,
-        updateTranscript: mode === MAKE_VIDEO_MODE.FROM_AUDIO,
-        description: result.description,
-        tags: result.tags,
-        callback,
-        thumbnailFlowOutputDir,
-        generateThumbnailWithFlow,
-        thumbnailPrompt,
-      });
-    }
-
-    let transcriptFinalizeResult = null;
-
-    if (mode === MAKE_VIDEO_MODE.FROM_AUDIO) {
-      // FROM_AUDIO: tuần tự (transcript cần updateTranscript = true, phụ thuộc tiến trình)
-      await downloadAudio(url, { outputDir: actualOutputDir });
-      try {
-        transcriptFinalizeResult = await downloadAndFinalizeTranscript();
-      } catch (err) {
-        console.warn('Không tải được transcript:', err.message);
-      }
-    } else {
-      // REUP_FULL: song song hóa → tiết kiệm ~5-10 phút
-      console.log('[OPT-2] Song song: download video + transcript/Gemini/thumbnail...');
-      const [videoResult, transcriptResult] = await Promise.allSettled([
-        downloadVideo(url, { outputDir: actualOutputDir, maxHeight: downloadMaxHeight }),
-        downloadAndFinalizeTranscript(),
-      ]);
-      if (videoResult.status === 'rejected') {
-        throw videoResult.reason;
-      }
-
-      if (transcriptResult.status === 'rejected') {
-        console.warn('Không tải được transcript:', transcriptResult.reason?.message ?? String(transcriptResult.reason));
-      } else {
-        transcriptFinalizeResult = transcriptResult.value;
-      }
-    }
-
-    // Thumbnail Flow: chạy sau khi xong phần download (audio/video) + transcript/Gemini (nếu có)
-    const thumbRes = await maybeGenerateFlowThumbnailFromGeminiOut({
-      geminiOut: transcriptFinalizeResult?.lastGeminiOut,
-      thumbnailFlowOutputDir,
-      generateThumbnailWithFlow,
-      language: transcriptFinalizeResult?.transcriptLang ?? null,
-      thumbnailPrompt,
-    });
-    if (
-      !thumbRes.ok &&
-      thumbRes.reason &&
-      thumbRes.reason !== 'disabled-or-missing-input' &&
-      thumbRes.reason !== 'missing-title-or-summary'
-    ) {
-      console.warn('[thumbnail-flow]', thumbRes.reason);
-    }
-
-    const videoExt = /\.(mp4|mkv|mov|webm|avi)$/i;
-    const mediaFiles = fs.readdirSync(actualOutputDir).filter(f => videoExt.test(f));
-    const videoId = result.metadata?.id;
-    if (mediaFiles.length > 0) {
-      let pick = mediaFiles[0];
-      if (videoId) {
-        const byId = mediaFiles.find(f => f.includes(videoId));
-        if (byId) pick = byId;
-      }
-      result.filePath = path.join(actualOutputDir, pick);
-    }
-
-    // Đính kèm các cấu hình mở rộng (như overlay - stock/image option) vào result
-    if (options.overlay) result.overlay = options.overlay;
-
-    return result;
-  } catch (err) {
-    console.error(`Lỗi tải ${url}:`, err.message);
-    return null;
-  }
-}
-
 async function main() {
   if (!fs.existsSync(INPUT_FILE)) {
     console.error('Không tìm thấy file input.txt');
@@ -726,14 +596,4 @@ async function main() {
 
 export default downloadVideo;
 
-export {
-  clearOutputDirResilient,
-  downloadAudio,
-  downloadSingleVideo,
-  downloadThumbnail,
-  downloadTranscript,
-  downloadVideoVisual,
-  finalizeDownloadedTranscript,
-  getVideoInfo,
-  main,
-};
+export { clearOutputDirResilient, downloadAudio, downloadThumbnail, downloadTranscript, downloadVideoVisual, getVideoInfo, main };

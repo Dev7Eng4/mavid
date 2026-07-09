@@ -615,7 +615,7 @@ const prepareVideoInfo = async ({ url, options = {} }) => {
       const srts = fs.readdirSync(actualOutputDir).filter(f => /\.srt$/i.test(f));
       if (srts.length === 0) {
         console.warn(
-          `[prepareVideoInfo] onlyUpdateInfo: thiếu seoTitle/seoDescription cần LLM nhưng không có file .srt trong ${actualOutputDir}`,
+          `[prepareVideoInfo] onlyUpdateInfo: thiếu seoTitle/seoDescription cần LLM nhưng không có file .srt trong ${actualOutputDir}`
         );
         return { ok: false };
       }
@@ -674,7 +674,7 @@ const prepareVideoInfo = async ({ url, options = {} }) => {
         }
       } else {
         console.warn(
-          '[prepareVideoInfo] onlyUpdateInfo: chưa có flow-thumbnail.jpg nhưng thiếu seoTitle hoặc summary để gọi generateFlowThumbnailFromGemini',
+          '[prepareVideoInfo] onlyUpdateInfo: chưa có flow-thumbnail.jpg nhưng thiếu seoTitle hoặc summary để gọi generateFlowThumbnailFromGemini'
         );
       }
     }
@@ -694,7 +694,6 @@ const prepareVideoInfo = async ({ url, options = {} }) => {
   }
 
   const videoMeta = await getVideoInfo(url);
-  console.log('🚀 ~ prepareVideoInfo ~ videoMeta:', videoMeta);
   const videoTitle = String(videoMeta?.title ?? '');
 
   const downloadResults = await Promise.allSettled([
@@ -733,6 +732,7 @@ const prepareVideoInfo = async ({ url, options = {} }) => {
   }
 
   const transcriptLang = downloadResults[0]?.value?.transcriptLang ?? 'ja';
+  console.log('🚀 ~ prepareVideoInfo ~ transcriptLang:', transcriptLang);
 
   const llmResult = await createVideoInfoWithLLM({
     outputDir: actualOutputDir,

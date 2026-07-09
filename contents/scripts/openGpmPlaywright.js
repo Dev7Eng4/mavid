@@ -29,7 +29,7 @@
 
 import fs from 'fs';
 import net from 'net';
-import { chromium } from 'playwright';
+import { chromium } from './playwrightStealth.js';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { GPM_API_DEFAULT_ORIGIN, GPM_API_VERSION } from '../constants/gpmApi.js';

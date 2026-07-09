@@ -11,7 +11,7 @@
  *   await context.close();
  */
 
-import { chromium } from 'playwright';
+import { chromium } from './playwrightStealth.js';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import fs from 'fs';

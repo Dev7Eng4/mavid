@@ -61,4 +61,4 @@ export async function makeVideoWithImages(options = {}) {
   // await makeVideo(objectImages, folder);
 }
 
-makeVideoWithImages();
+// makeVideoWithImages();
