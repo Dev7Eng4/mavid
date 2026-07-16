@@ -17,8 +17,7 @@ const __dirname = path.dirname(__filename);
 const DEFAULT_SRT = path.join(__dirname, 'transcript.srt');
 const DEFAULT_MAX_MINUTES = 25;
 
-const isMain =
-  process.argv[1] != null && pathToFileURL(path.resolve(process.argv[1])).href === pathToFileURL(__filename).href;
+const isMain = process.argv[1] != null && pathToFileURL(path.resolve(process.argv[1])).href === pathToFileURL(__filename).href;
 
 /** @param {string} srtPath */
 export function plainTextOutputPath(srtPath) {
